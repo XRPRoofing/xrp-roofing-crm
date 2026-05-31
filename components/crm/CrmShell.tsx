@@ -66,23 +66,24 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 overflow-hidden border-r border-slate-200 bg-white text-slate-900 shadow-xl shadow-slate-200/70 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe,transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] text-slate-900">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
           <Link href="/crm" className="group flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-lg font-black text-white shadow-lg shadow-blue-200">XR</span>
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#07183f] shadow-lg shadow-slate-950/25">XR</span>
             <span>
-              <span className="block text-xl font-black tracking-tight text-slate-950">XRP CRM</span>
-              <span className="mt-0.5 block text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Roofing OS</span>
+              <span className="block text-xl font-black tracking-tight">XRP CRM</span>
+              <span className="mt-0.5 block text-xs font-bold uppercase tracking-[0.2em] text-orange-200">Roofing OS</span>
             </span>
           </Link>
-          <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 lg:hidden"><X className="h-6 w-6" /></button>
+          <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-blue-100 hover:bg-white/10 lg:hidden"><X className="h-6 w-6" /></button>
         </div>
-        <div className="relative mx-4 mb-4 grid grid-cols-3 gap-2 rounded-3xl border border-slate-200 bg-slate-50 p-2">
+        <div className="relative mx-4 mb-4 grid grid-cols-3 gap-2 rounded-3xl bg-white/10 p-2 ring-1 ring-white/10">
           {quickStats.map((stat) => (
-            <div key={stat.label} className="rounded-2xl bg-white px-2 py-3 text-center shadow-sm">
-              <p className="text-sm font-black text-slate-950">{stat.value}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{stat.label}</p>
+            <div key={stat.label} className="rounded-2xl bg-white/10 px-2 py-3 text-center">
+              <p className="text-sm font-black text-white">{stat.value}</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-blue-100">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -91,20 +92,20 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>
+              <Link key={item.href} href={item.href} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-white text-[#07183f] shadow-lg shadow-slate-950/20" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
                 <span className="flex items-center gap-3">
-                  <span className={`rounded-xl p-2 ${active ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600"}`}><Icon className="h-4 w-4" /></span>
+                  <span className={`rounded-xl p-2 ${active ? "bg-orange-100 text-orange-600" : "bg-white/10 text-blue-100 group-hover:text-white"}`}><Icon className="h-4 w-4" /></span>
                   {item.label}
                 </span>
-                {active && <span className="h-2 w-2 rounded-full bg-blue-600" />}
+                {active && <span className="h-2 w-2 rounded-full bg-orange-500" />}
               </Link>
             );
           })}
         </nav>
-        <div className="absolute bottom-6 left-4 right-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+        <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-4 text-sm text-blue-100 ring-1 ring-white/10 backdrop-blur">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-blue-600" />
-            <p className="font-bold text-slate-950">Secure team workspace</p>
+            <ShieldCheck className="h-5 w-5 text-orange-300" />
+            <p className="font-bold text-white">Secure team workspace</p>
           </div>
           <p className="mt-2 leading-6">Admin, sales, production, and office workflows in one professional CRM.</p>
         </div>

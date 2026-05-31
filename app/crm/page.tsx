@@ -21,23 +21,23 @@ export default function CrmDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100/70 blur-3xl" />
-        <div className="absolute bottom-0 right-24 h-32 w-32 rounded-full bg-indigo-100/70 blur-2xl" />
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
+        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
+        <div className="absolute bottom-0 right-10 h-40 w-40 rounded-full bg-blue-300/20 blur-2xl" />
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div className="relative">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">Operations Command Center</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">Good morning, XRP Roofing team.</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">Track leads, roof inspections, estimates, tasks, uploads, and job progress from a single premium CRM workspace.</p>
+            <p className="text-sm font-bold uppercase tracking-[0.25em] text-orange-300">Operations Command Center</p>
+            <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Good morning, XRP Roofing team.</h1>
+            <p className="mt-4 max-w-2xl text-blue-100">Track leads, roof inspections, estimates, tasks, uploads, and job progress from a single premium CRM workspace.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               {pipelineStages.map((stage) => (
-                <span key={stage.label} className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600">{stage.label} {stage.value}</span>
+                <span key={stage.label} className="rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-blue-50 ring-1 ring-white/15">{stage.label} {stage.value}</span>
               ))}
             </div>
           </div>
           <div className="relative flex flex-wrap gap-3">
-            <button className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"><Plus className="mr-2 inline h-4 w-4" />New lead</button>
-            <button className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50">Schedule inspection</button>
+            <button className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white shadow-lg shadow-orange-950/30 transition hover:bg-orange-600"><Plus className="mr-2 inline h-4 w-4" />New lead</button>
+            <button className="rounded-2xl bg-white/10 px-5 py-3 font-bold text-white ring-1 ring-white/15 transition hover:bg-white/15">Schedule inspection</button>
           </div>
         </div>
       </section>
@@ -55,7 +55,7 @@ export default function CrmDashboardPage() {
               <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{card.value}</p>
               <p className="mt-1 text-sm text-slate-500">{card.detail}</p>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-2/3 rounded-full bg-blue-600 transition-all group-hover:w-5/6" />
+                <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-orange-400 to-blue-600 transition-all group-hover:w-5/6" />
               </div>
             </div>
           );
@@ -74,7 +74,7 @@ export default function CrmDashboardPage() {
           <div className="mt-8 flex h-64 items-end gap-3 rounded-3xl border border-slate-100 bg-slate-50 p-5">
             {monthlyBars.map((height, index) => (
               <div key={index} className="flex flex-1 items-end">
-                <div className="w-full rounded-t-2xl bg-gradient-to-t from-blue-700 via-blue-600 to-blue-300 shadow-sm" style={{ height: `${height}%` }} />
+                <div className="w-full rounded-t-2xl bg-gradient-to-t from-[#0f2156] via-blue-600 to-orange-400 shadow-lg shadow-blue-900/10" style={{ height: `${height}%` }} />
               </div>
             ))}
           </div>

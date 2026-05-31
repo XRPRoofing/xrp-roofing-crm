@@ -740,7 +740,10 @@ export default function ProposalsPage() {
       setSendNotice(`Proposal sent to ${sendForm.toEmail}. Link: ${proposalLink}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Email could not be sent.";
-      setSendNotice(`${message} Proposal link: ${proposalLink}`);
+      const supportMessage = message === "Email service is not configured"
+        ? "Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually."
+        : message;
+      setSendNotice(`${supportMessage} Proposal link: ${proposalLink}`);
     }
   }
 
