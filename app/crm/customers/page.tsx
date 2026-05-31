@@ -80,7 +80,7 @@ function getCustomerCommunications(customer: Customer, jobs: Lead[]) {
   const relatedJobs = getCustomerJobs(customer, jobs);
   const relatedJobIds = new Set(relatedJobs.map((job) => job.id));
   const relatedCustomerIds = new Set(relatedJobs.map((job) => `C-${job.id}`));
-  const conversations = jobs.map(createConversationFromLead);
+  const conversations = jobs.map((job) => createConversationFromLead(job, customer));
 
   return conversations
     .filter((conversation) =>

@@ -1,5 +1,5 @@
 import type { ConversationFilter, ConversationRecord } from "@/types/conversations";
-import type { Lead } from "@/types/crm";
+import type { Customer, Lead } from "@/types/crm";
 
 export const conversationFilters: ConversationFilter[] = ["Unread", "Missed Calls", "New Leads", "Assigned Rep", "SMS", "Calls"];
 
@@ -14,11 +14,17 @@ export const pipelineStages = ["New Lead", "Inspection Scheduled", "Inspection C
 
 export const appointmentTypes = ["Roof inspection", "Insurance adjuster meeting", "Estimate review", "Production walkthrough", "Warranty follow-up"];
 
-export function createConversationFromLead(lead: Lead): ConversationRecord {
+export function createConversationFromLead(lead: Lead, customer?: Customer): ConversationRecord {
   const stageLabel = lead.stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   const isCallLead = lead.lastActivity.toLowerCase().includes("call") || lead.stage === "inspection_scheduled";
   const isNewLead = lead.stage === "new_lead";
-  const customerId = `C-${lead.id}`;
+  const customerId = customer?.id || `C-${lead.id}`;
+  const contactName = customer?.name || lead.name;
+  const contactPhone = customer?.phone || lead.phone;
+  const contactEmail = customer?.email || lead.email;
+  const contactAddress = customer?.propertyAddress || `${lead.address}, ${lead.city}, AZ`;
+  const contactRoofType = customer?.roofDetails || lead.roofType;
+  const contactJobStatus = customer?.status || stageLabel;
 
   return {
     id: `conv-${lead.id}`,
@@ -26,16 +32,16 @@ export function createConversationFromLead(lead: Lead): ConversationRecord {
     jobId: lead.id,
     contact: {
       id: lead.id,
-      name: lead.name,
-      phone: lead.phone,
-      email: lead.email,
-      address: `${lead.address}, ${lead.city}, AZ`,
-      roofType: lead.roofType,
+      name: contactName,
+      phone: contactPhone,
+      email: contactEmail,
+      address: contactAddress,
+      roofType: contactRoofType,
       assignedRep: lead.assignedTo,
-      insuranceStatus: lead.stage === "waiting_approval" ? "Waiting approval" : lead.stage === "approved" ? "Approved" : "Not confirmed",
-      jobStatus: stageLabel,
+      insuranceStatus: customer?.insuranceCarrier || (lead.stage === "waiting_approval" ? "Waiting approval" : lead.stage === "approved" ? "Approved" : "Not confirmed"),
+      jobStatus: contactJobStatus,
       leadSource: lead.source,
-      tags: [lead.roofType, lead.source, stageLabel],
+      tags: [lead.roofType, lead.source, contactJobStatus],
       notes: lead.lastActivity,
     },
     lastMessage: lead.lastActivity,
@@ -46,7 +52,7 @@ export function createConversationFromLead(lead: Lead): ConversationRecord {
     channels: isCallLead ? ["call", "sms"] : ["sms"],
     messages: [
       { id: `${lead.id}-m1`, channel: "note", direction: "internal", author: "CRM", body: `${stageLabel}: ${lead.lastActivity}`, timestamp: "CRM sync", customerId, jobId: lead.id },
-      { id: `${lead.id}-m2`, channel: "sms", direction: "outbound", author: lead.assignedTo, body: `Hi ${lead.name.split(" ")[0]}, this is XRP Roofing following up about ${lead.roofType.toLowerCase()} at ${lead.address}.`, timestamp: "Ready", status: "sent", customerId, jobId: lead.id },
+      { id: `${lead.id}-m2`, channel: "sms", direction: "outbound", author: lead.assignedTo, body: `Hi ${contactName.split(" ")[0]}, this is XRP Roofing following up about ${lead.roofType.toLowerCase()} at ${lead.address}.`, timestamp: "Ready", status: "sent", customerId, jobId: lead.id },
     ],
   };
 }

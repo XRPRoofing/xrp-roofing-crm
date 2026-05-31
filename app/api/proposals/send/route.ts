@@ -13,7 +13,7 @@ const schema = z.object({
   coverText: z.string().optional(),
 });
 
-const xrpLogoPath = "/images/logo.jpeg";
+const xrpLogoPath = "/images/logo.png";
 
 function escapeHtml(value: string) {
   return value

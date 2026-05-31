@@ -291,7 +291,7 @@ const initialProposals: Proposal[] = leads.slice(0, 3).map((job, index) => ({
   template: index === 0 ? "executive" : index === 1 ? "insurance" : "premium",
   title: index === 1 ? "INSURANCE ROOFING PROPOSAL" : index === 2 ? "PREMIUM ROOFING PROPOSAL" : "BEST ROOFING PROPOSAL",
   summary: "A professional roofing proposal prepared for review and approval.",
-  coverPhoto: "/images/logo.jpeg",
+  coverPhoto: "/images/logo.png",
   coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
   notes: "Includes materials, labor, cleanup, workmanship standards, and customer-ready project documentation.",
   terms: defaultTerms,
@@ -390,7 +390,7 @@ export default function ProposalsPage() {
     address: "",
     title: "",
     summary: "",
-    coverPhoto: "/images/logo.jpeg",
+    coverPhoto: "/images/logo.png",
     coverText: "",
     scope: "",
     total: "",
@@ -577,7 +577,7 @@ export default function ProposalsPage() {
       template: "executive",
       title: "BEST ROOFING PROPOSAL",
       summary: "A professional roofing proposal prepared for review and approval.",
-      coverPhoto: "/images/logo.jpeg",
+      coverPhoto: "/images/logo.png",
       coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
       notes: "Includes professional roof assessment, materials, labor, cleanup, and customer-ready project documentation.",
       terms: defaultTerms,
@@ -631,7 +631,7 @@ export default function ProposalsPage() {
       address: proposal.address,
       title: proposal.title,
       summary: proposal.summary,
-      coverPhoto: proposal.coverPhoto || "/images/logo.jpeg",
+      coverPhoto: proposal.coverPhoto || "/images/logo.png",
       coverText: proposal.coverText || "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
       scope: proposal.scope,
       total: String(proposal.total),
@@ -875,7 +875,7 @@ export default function ProposalsPage() {
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Cover photo URL
-                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" placeholder="/images/logo.jpeg" />
+                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" placeholder="/images/logo.png" />
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Cover text
@@ -950,7 +950,7 @@ export default function ProposalsPage() {
                 {(isPreviewing || activeSection === "Cover") && (
                   <div className="mt-8 rounded-3xl bg-slate-50 p-8 text-center">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Cover page</p>
-                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
+                    <Image src={editorForm.coverPhoto || "/images/logo.png"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
                     <p className="mt-5 text-3xl font-black text-[#07183f]">{editorForm.title}</p>
                     <p className="mt-4 text-lg font-bold text-slate-700">{editorForm.customerName}</p>
                     <p className="mt-2 text-sm text-slate-500">{editorForm.address}</p>
@@ -1197,12 +1197,12 @@ export default function ProposalsPage() {
                   </label>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="rounded-t-xl bg-slate-200 py-5 text-center">
-                      <Image src="/images/logo.jpeg" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
+                      <Image src="/images/logo.png" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
                     </div>
                     <div className="rounded-b-xl bg-white p-5 text-sm leading-7 text-slate-700">
                       <p className="whitespace-pre-line">{sendForm.message}</p>
                       <div className="mt-5 rounded-xl border border-slate-200 p-4 text-center">
-                        <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
+                        <Image src={editorForm.coverPhoto || "/images/logo.png"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
                         <p className="mt-3 font-black text-[#07183f]">{editorForm.title}</p>
                         <p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{editorForm.coverText}</p>
                       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { leads } from "@/lib/crm-data";
+import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, createConversationFromLead, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
@@ -59,6 +59,8 @@ function ConversationInbox({ conversations, active, onSelect }: { conversations:
                 <p className="truncate text-base font-bold text-slate-950">{conversation.contact.name}</p>
                 <span className="shrink-0 text-xs text-slate-500">{conversation.lastActivityAt}</span>
               </div>
+              <p className="mt-1 truncate text-sm font-medium text-slate-700">{conversation.contact.phone}</p>
+              <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{conversation.contact.address}</p>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{conversation.lastMessage}</p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-500">{status}</span>
@@ -117,31 +119,22 @@ function FloatingDialer({ contact, dialNumber, isOpen, isMinimized, isActiveCall
           </div>
         </div>
         {!isMinimized && (
-          <div className="p-4">
-            <p className="mb-3 text-sm text-slate-500">Calling as XRP Roofing · {contact.name}</p>
-            <div className="grid grid-cols-3 gap-2 text-center text-base font-semibold">{keys.map((key) => <button key={key} onClick={() => onDialNumberChange(`${dialNumber}${key}`)} className="rounded-xl border border-slate-200 bg-slate-50 py-3 text-slate-800 transition hover:bg-blue-50 hover:text-blue-700">{key}</button>)}</div>
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              <button className="rounded-xl border border-slate-200 p-3 text-slate-600 hover:bg-slate-50"><Mic className="mx-auto h-4 w-4" /></button>
-              <button className="rounded-xl border border-slate-200 p-3 text-slate-600 hover:bg-slate-50"><Pause className="mx-auto h-4 w-4" /></button>
-              <button onClick={onStartCall} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Phone className="mx-auto h-4 w-4" /></button>
-              <button onClick={onEndCall} className="rounded-xl bg-slate-900 p-3 text-white transition hover:bg-slate-800"><PhoneOff className="mx-auto h-4 w-4" /></button>
+          <div className="p-3">
+            <p className="mb-2 text-xs text-slate-500">Calling as XRP Roofing · {contact.name}</p>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button onClick={onStartCall} className="rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-blue-700"><Phone className="mr-2 inline h-4 w-4" />Dial number</button>
+              <button onClick={onEndCall} className="rounded-xl bg-slate-900 px-3 py-3 text-sm font-bold text-white transition hover:bg-slate-800"><PhoneOff className="mr-2 inline h-4 w-4" />End</button>
             </div>
-            <textarea onChange={(event) => onNotesChange(event.target.value)} className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder={callSid ? "Type live call notes..." : "Start a call to save notes"} />
+            <div className="grid grid-cols-3 gap-2 text-center text-base font-semibold">{keys.map((key) => <button key={key} onClick={() => onDialNumberChange(`${dialNumber}${key}`)} className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-slate-800 transition hover:bg-blue-50 hover:text-blue-700">{key}</button>)}</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button className="rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50"><Mic className="mx-auto h-4 w-4" /></button>
+              <button className="rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50"><Pause className="mx-auto h-4 w-4" /></button>
+            </div>
+            {callSid && <textarea onChange={(event) => onNotesChange(event.target.value)} className="mt-3 min-h-16 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." />}
           </div>
         )}
       </Card>
     </div>
-  );
-}
-
-function LeadIntakePanel() {
-  return (
-    <Card className="p-4">
-      <p className="text-sm font-semibold text-slate-950">Fast lead intake</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {["Customer name", "Phone", "Address", "Email", "Roof type", "Insurance status"].map((field) => <input key={field} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder={field} />)}
-      </div>
-    </Card>
   );
 }
 
@@ -211,7 +204,7 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 }
 
 export default function ConversationBoard() {
-  const conversations = useMemo(() => leads.map(createConversationFromLead), []);
+  const conversations = useMemo(() => leads.map((lead) => createConversationFromLead(lead, customers.find((customer) => customer.name === lead.name))), []);
   const [activeConversationId, setActiveConversationId] = useState(conversations[0]?.id || "");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
   const [isDialerOpen, setIsDialerOpen] = useState(false);
@@ -301,7 +294,7 @@ export default function ConversationBoard() {
             <div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div>
             <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
           </div>
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div><LeadIntakePanel /></div>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div></div>
           <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-4">
             <div className="mb-3 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
