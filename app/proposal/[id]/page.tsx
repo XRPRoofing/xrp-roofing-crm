@@ -4,6 +4,8 @@ import ProposalClientView from "./ProposalClientView";
 type PublicProposal = {
   id: string;
   customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   address?: string;
   title?: string;
   summary?: string;

@@ -40,6 +40,8 @@ type Proposal = {
   id: string;
   job?: Lead;
   customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
   address: string;
   scope: string;
   total: number;
@@ -378,6 +380,8 @@ export default function ProposalsPage() {
   });
   const [editorForm, setEditorForm] = useState({
     customerName: "",
+    customerEmail: "",
+    customerPhone: "",
     address: "",
     title: "",
     summary: "",
@@ -557,6 +561,8 @@ export default function ProposalsPage() {
       id: `P-${1001 + proposals.length}`,
       job: proposalMode === "job" ? selectedJob : undefined,
       customerName: proposalMode === "job" && selectedJob ? selectedJob.name : customerName,
+      customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : "",
+      customerPhone: proposalMode === "job" && selectedJob ? selectedJob.phone : "",
       address: proposalMode === "job" && selectedJob ? `${selectedJob.address}, ${selectedJob.city}` : address,
       scope: scope || (proposalMode === "job" && selectedJob ? `${selectedJob.roofType} roofing proposal` : "Roofing proposal"),
       total: proposalMode === "job" && selectedJob ? selectedJob.value : Number(total) || 0,
@@ -611,6 +617,8 @@ export default function ProposalsPage() {
   function openProposal(proposal: Proposal) {
     setEditorForm({
       customerName: proposal.customerName,
+      customerEmail: proposal.customerEmail || proposal.job?.email || "",
+      customerPhone: proposal.customerPhone || proposal.job?.phone || "",
       address: proposal.address,
       title: proposal.title,
       summary: proposal.summary,
@@ -642,6 +650,8 @@ export default function ProposalsPage() {
     const updatedProposal: Proposal = {
       ...activeProposal,
       customerName: editorForm.customerName,
+      customerEmail: editorForm.customerEmail,
+      customerPhone: editorForm.customerPhone,
       address: editorForm.address,
       title: editorForm.title,
       summary: editorForm.summary,
@@ -825,6 +835,8 @@ export default function ProposalsPage() {
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer</p>
                   <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-[#07183f] outline-none" />
                   <input value={editorForm.address} onChange={(event) => setEditorForm({ ...editorForm, address: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 outline-none" />
+                  <input value={editorForm.customerPhone} onChange={(event) => setEditorForm({ ...editorForm, customerPhone: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 outline-none" placeholder="Customer phone" />
+                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
                 </div>
                 <button className="text-slate-400">•••</button>
               </div>
@@ -898,8 +910,8 @@ export default function ProposalsPage() {
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Client Info</p>
                     <p className="mt-3 text-xl font-black text-[#07183f]">{editorForm.customerName}</p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{editorForm.address}</p>
-                    {activeProposal.job?.phone && <p className="mt-2 text-sm font-bold text-slate-700">{activeProposal.job.phone}</p>}
-                    {activeProposal.job?.email && <p className="mt-1 text-sm font-bold text-blue-700">{activeProposal.job.email}</p>}
+                    {editorForm.customerPhone && <p className="mt-2 text-sm font-bold text-slate-700">{editorForm.customerPhone}</p>}
+                    {editorForm.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{editorForm.customerEmail}</p>}
                   </div>
                   <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Prepared By</p>
