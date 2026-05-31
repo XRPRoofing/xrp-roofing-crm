@@ -46,7 +46,7 @@ export default function CrmDashboardPage() {
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+            <div key={card.label} className="group rounded-3xl border border-white/80 bg-white p-5 shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
               <div className="flex items-center justify-between">
                 <div className={`rounded-2xl p-3 ${card.tone}`}><Icon className="h-6 w-6" /></div>
                 <div className="rounded-full bg-emerald-50 p-2 text-emerald-500"><TrendingUp className="h-4 w-4" /></div>
@@ -112,7 +112,7 @@ export default function CrmDashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-lg shadow-blue-950/5">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-950">Recent customer activity</h2>

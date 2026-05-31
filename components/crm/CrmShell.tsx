@@ -66,7 +66,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe,transparent_28%),linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] text-slate-900">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)] text-slate-900">
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
@@ -111,31 +111,31 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 shadow-sm shadow-slate-200/60 backdrop-blur-xl">
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07183f]/95 text-white shadow-xl shadow-slate-950/20 backdrop-blur-xl">
           <div className="flex h-20 items-center gap-4 px-4 sm:px-6 lg:px-8">
-            <button onClick={() => setOpen(true)} className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
+            <button onClick={() => setOpen(true)} className="rounded-xl border border-white/15 bg-white/10 p-2 text-white shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
             <div className="hidden min-w-0 lg:block">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Command Center</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">Roofing operations dashboard</p>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">Command Center</p>
+              <p className="mt-1 text-sm font-semibold text-blue-100">Roofing operations dashboard</p>
             </div>
             <div className="relative max-w-2xl flex-1 lg:ml-6">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm shadow-sm outline-none transition focus:border-blue-300 focus:bg-white focus:shadow-md focus:ring-4 focus:ring-blue-50" placeholder="Search jobs, customers, proposals, invoices..." />
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-100" />
+              <input className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder="Search jobs, customers, proposals, invoices..." />
             </div>
-            <button className="relative rounded-2xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm hover:bg-slate-50">
+            <button className="relative rounded-2xl border border-white/15 bg-white/10 p-3 text-white shadow-sm hover:bg-white/15">
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
             </button>
-            <button className="hidden items-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-black text-blue-700 xl:flex">
+            <button className="hidden items-center gap-2 rounded-2xl border border-orange-300/40 bg-orange-400/15 px-4 py-3 text-sm font-black text-orange-100 xl:flex">
               <Sparkles className="h-4 w-4" /> Pro
             </button>
-            <button onClick={logout} className="hidden items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 sm:flex">
+            <button onClick={logout} className="hidden items-center gap-2 rounded-2xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-600 sm:flex">
               <LogOut className="h-4 w-4" /> Logout
             </button>
           </div>
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-[1600px]">{children}</div>
+          <div className="mx-auto max-w-[1600px] rounded-[2rem] bg-slate-50/95 p-4 shadow-2xl shadow-slate-950/20 backdrop-blur sm:p-6">{children}</div>
         </main>
       </div>
     </div>

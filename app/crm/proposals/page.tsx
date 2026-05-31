@@ -1134,13 +1134,20 @@ export default function ProposalsPage() {
   }
 
   return (
-    <div className="space-y-5 font-serif">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-black text-[#07183f]">Proposals</h1>
-        <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="rounded-full bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-200">⊕ Proposal</button>
+    <div className="space-y-5 font-sans">
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20">
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Proposal Center</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight">Proposals</h1>
+            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
+          </div>
+          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-600">⊕ Proposal</button>
+        </div>
       </div>
 
-      <div className="border-b border-slate-200">
+      <div className="rounded-3xl border border-white/70 bg-white/95 px-5 pt-4 shadow-lg shadow-blue-950/5">
         <div className="flex gap-8 text-sm font-black">
           <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Proposals</button>
           <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Drafts</button>
@@ -1149,12 +1156,12 @@ export default function ProposalsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="rounded-3xl border border-white/70 bg-white/95 p-4 shadow-lg shadow-blue-950/5">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
             <div className="relative max-w-md flex-1">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
-              <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500" placeholder="Search for a customer or address..." />
+              <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white" placeholder="Search for a customer or address..." />
             </div>
             <button className="w-fit rounded-full bg-slate-50 px-5 py-3 text-sm font-black text-blue-600">▽ Filter</button>
           </div>
@@ -1276,7 +1283,7 @@ export default function ProposalsPage() {
       {activeTab !== "templates" && activeTab !== "settings" && (
       <div className="max-h-[calc(100vh-18rem)] space-y-3 overflow-y-auto pr-2">
         {filteredProposals.map((proposal) => (
-          <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded bg-slate-50 p-4 text-left transition hover:bg-blue-50 md:grid-cols-[1fr_auto]">
+          <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-3xl border border-white/70 bg-white/95 p-4 text-left shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
             <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-black leading-4 text-[#07183f] shadow-sm">XRP<br />ROOF</div>
