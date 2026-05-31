@@ -7,7 +7,7 @@ const proposalSchema = z.record(z.string(), z.unknown()).and(z.object({ id: z.st
 
 function getAdminClient() {
   const url = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!key) return null;
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const supabase = getAdminClient();
 
     if (!supabase) {
-      return NextResponse.json({ error: "Proposal sharing storage is not configured" }, { status: 503 });
+      return NextResponse.json({ error: "Proposal sharing requires SUPABASE_SERVICE_ROLE_KEY so server writes can bypass row-level security." }, { status: 503 });
     }
 
     const { error } = await supabase
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       .upsert({ id: proposal.id, payload: proposal, updated_at: new Date().toISOString() }, { onConflict: "id" });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 503 });
+      return NextResponse.json({ error: error.message.includes("row-level security") ? "Supabase rejected the proposal share because SUPABASE_SERVICE_ROLE_KEY is missing or invalid. Add the service role key in Vercel environment variables and redeploy." : error.message }, { status: 503 });
     }
 
     return NextResponse.json({ ok: true, id: proposal.id });
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient();
 
   if (!supabase) {
-    return NextResponse.json({ error: "Proposal sharing storage is not configured" }, { status: 503 });
+    return NextResponse.json({ error: "Proposal sharing requires SUPABASE_SERVICE_ROLE_KEY so server reads can bypass row-level security." }, { status: 503 });
   }
 
   const { data, error } = await supabase
