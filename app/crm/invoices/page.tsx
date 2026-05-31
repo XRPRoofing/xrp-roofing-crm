@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { leads } from "@/lib/crm-data";
+import type { Lead } from "@/types/crm";
 
 type InvoiceStatus = "Draft" | "Sent" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
@@ -46,6 +48,7 @@ type Invoice = {
 };
 
 const today = new Date().toISOString().slice(0, 10);
+const invoicesStorageKey = "xrp-crm-invoices";
 
 const initialInvoices: Invoice[] = [
   {
@@ -171,6 +174,48 @@ function createInvoiceNumber(count: number) {
   return `XRP-INV-${String(1001 + count).padStart(4, "0")}`;
 }
 
+function createBlankInvoice(count: number): Invoice {
+  return {
+    id: "",
+    invoiceNumber: createInvoiceNumber(count),
+    clientName: "",
+    email: "",
+    phone: "",
+    jobName: "",
+    propertyAddress: "",
+    issueDate: today,
+    dueDate: today,
+    jobReference: "",
+    roofType: "",
+    proposalReference: "",
+    projectCompletionDate: today,
+    warrantyDuration: "",
+    paymentTerms: "Payment due upon receipt unless otherwise agreed in writing.",
+    warrantyNotes: "Warranty begins after final payment is received.",
+    discount: 0,
+    status: "Draft",
+    lineItems: [emptyLineItem],
+    payments: [],
+    activity: ["Invoice created"],
+  };
+}
+
+function createInvoiceFromJob(job: Lead, count: number): Invoice {
+  return {
+    ...createBlankInvoice(count),
+    clientName: job.name,
+    email: job.email,
+    phone: job.phone,
+    jobName: `${job.roofType} Roofing Job`,
+    propertyAddress: `${job.address}, ${job.city}, AZ`,
+    jobReference: job.id,
+    roofType: job.roofType,
+    dueDate: job.dueDate || today,
+    projectCompletionDate: job.dueDate || today,
+    lineItems: [{ description: `${job.roofType} roofing services`, quantity: 1, unitPrice: job.value, tax: 7.8 }],
+  };
+}
+
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
   if (status === "Partially Paid") return "bg-blue-50 text-blue-700 ring-blue-100";
@@ -188,7 +233,17 @@ function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    if (typeof window === "undefined") return initialInvoices;
+    const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
+    if (!savedInvoices) return initialInvoices;
+
+    try {
+      return JSON.parse(savedInvoices) as Invoice[];
+    } catch {
+      return initialInvoices;
+    }
+  });
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -222,6 +277,10 @@ export default function InvoicesPage() {
     payments: [],
     activity: ["Invoice created"],
   });
+
+  useEffect(() => {
+    window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
+  }, [invoices]);
 
   const selectedInvoice = invoices.find((invoice) => invoice.id === selectedInvoiceId) || null;
   const boardTotals = useMemo(() => {
@@ -293,7 +352,19 @@ export default function InvoicesPage() {
     };
     setInvoices((currentInvoices) => [invoice, ...currentInvoices]);
     setSelectedInvoiceId(invoice.id);
+    setCreateForm(createBlankInvoice(invoices.length + 1));
     setShowCreateModal(false);
+  }
+
+  function handleStartInvoice() {
+    setCreateForm(createBlankInvoice(invoices.length));
+    setShowCreateModal(true);
+  }
+
+  function handlePrefillFromJob(jobId: string) {
+    const job = leads.find((item) => item.id === jobId);
+    if (!job) return;
+    setCreateForm(createInvoiceFromJob(job, invoices.length));
   }
 
   function handleRecordPayment(offline = false) {
@@ -458,7 +529,7 @@ export default function InvoicesPage() {
           <h1 className="mt-2 text-3xl font-black text-[#07183f]">Invoice Board</h1>
           <p className="mt-2 text-slate-600">Track invoice status, balances, payments, PDF invoices, and roofing job billing.</p>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200">+ New invoice</button>
+        <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200">+ New invoice</button>
         </div>
         <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-2xl bg-slate-50 p-4">
@@ -641,6 +712,13 @@ export default function InvoicesPage() {
                 <h2 className="mt-2 text-3xl font-black text-[#07183f]">{createForm.invoiceNumber}</h2>
               </div>
               <button onClick={() => setShowCreateModal(false)} className="text-2xl text-slate-500">×</button>
+            </div>
+            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <label className="text-xs font-black uppercase tracking-wider text-blue-700">Quick fill from roofing job</label>
+              <select onChange={(event) => handlePrefillFromJob(event.target.value)} className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none">
+                <option value="">Start blank or select a job...</option>
+                {leads.map((job) => <option key={job.id} value={job.id}>{job.name} • {job.roofType} • {currency(job.value)}</option>)}
+              </select>
             </div>
             <div className="mt-6">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
             <div className="mt-6 flex justify-end gap-3">
