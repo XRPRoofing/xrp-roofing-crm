@@ -1120,12 +1120,16 @@ export default function ProposalsPage() {
         {showSendModal && (
           <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50">
             <div className="flex h-full w-full max-w-[530px] flex-col bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 px-7 py-5">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-7 py-5 shadow-sm">
                 <div className="flex items-center gap-3 text-xl font-black text-slate-900">
                   <span className="text-blue-600">✉</span>
                   <span>Send proposal</span>
                 </div>
-                <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-slate-500">×</button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setIsPreviewing(true)} className="hidden rounded-full border border-blue-600 px-4 py-2 text-xs font-black text-blue-600 sm:inline-flex">↗ Preview</button>
+                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-100">✈ Send</button>
+                  <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-slate-500">×</button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="bg-slate-50 px-7 py-6">
@@ -1187,7 +1191,7 @@ export default function ProposalsPage() {
                   {sendNotice && <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
                 </div>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-200 px-7 py-5">
+              <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-slate-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
                 <button type="button" onClick={() => setShowSendModal(false)} className="text-sm font-black text-blue-600">Cancel</button>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setIsPreviewing(true)} className="rounded-full border border-blue-600 px-6 py-3 text-sm font-black text-blue-600">↗ Preview</button>
