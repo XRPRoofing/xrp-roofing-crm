@@ -18,9 +18,12 @@ export function createConversationFromLead(lead: Lead): ConversationRecord {
   const stageLabel = lead.stage.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   const isCallLead = lead.lastActivity.toLowerCase().includes("call") || lead.stage === "inspection_scheduled";
   const isNewLead = lead.stage === "new_lead";
+  const customerId = `C-${lead.id}`;
 
   return {
     id: `conv-${lead.id}`,
+    customerId,
+    jobId: lead.id,
     contact: {
       id: lead.id,
       name: lead.name,
@@ -42,8 +45,8 @@ export function createConversationFromLead(lead: Lead): ConversationRecord {
     isNewLead,
     channels: isCallLead ? ["call", "sms"] : ["sms"],
     messages: [
-      { id: `${lead.id}-m1`, channel: "note", direction: "internal", author: "CRM", body: `${stageLabel}: ${lead.lastActivity}`, timestamp: "CRM sync" },
-      { id: `${lead.id}-m2`, channel: "sms", direction: "outbound", author: lead.assignedTo, body: `Hi ${lead.name.split(" ")[0]}, this is XRP Roofing following up about ${lead.roofType.toLowerCase()} at ${lead.address}.`, timestamp: "Ready", status: "sent" },
+      { id: `${lead.id}-m1`, channel: "note", direction: "internal", author: "CRM", body: `${stageLabel}: ${lead.lastActivity}`, timestamp: "CRM sync", customerId, jobId: lead.id },
+      { id: `${lead.id}-m2`, channel: "sms", direction: "outbound", author: lead.assignedTo, body: `Hi ${lead.name.split(" ")[0]}, this is XRP Roofing following up about ${lead.roofType.toLowerCase()} at ${lead.address}.`, timestamp: "Ready", status: "sent", customerId, jobId: lead.id },
     ],
   };
 }

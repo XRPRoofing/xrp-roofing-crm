@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, CalendarCheck2, CalendarPlus, Edit3, FileText, Image as ImageIcon, Mail, MapPin, Phone, Plus, Search, ShieldCheck, UploadCloud, X } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck2, CalendarPlus, Edit3, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Search, ShieldCheck, UploadCloud, Voicemail, X } from "lucide-react";
 import { customers, leadStages, leads } from "@/lib/crm-data";
+import { createConversationFromLead } from "@/lib/crm-conversations";
+import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { Customer, Lead } from "@/types/crm";
 
 const customersStorageKey = "xrp-crm-customers";
@@ -74,6 +76,41 @@ function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   );
 }
 
+function getCustomerCommunications(customer: Customer, jobs: Lead[]) {
+  const relatedJobs = getCustomerJobs(customer, jobs);
+  const relatedJobIds = new Set(relatedJobs.map((job) => job.id));
+  const relatedCustomerIds = new Set(relatedJobs.map((job) => `C-${job.id}`));
+  const conversations = jobs.map(createConversationFromLead);
+
+  return conversations
+    .filter((conversation) =>
+      (conversation.customerId && relatedCustomerIds.has(conversation.customerId)) ||
+      (conversation.jobId && relatedJobIds.has(conversation.jobId)) ||
+      conversation.contact.email === customer.email ||
+      conversation.contact.phone === customer.phone ||
+      conversation.contact.name.toLowerCase() === customer.name.toLowerCase()
+    )
+    .flatMap((conversation) =>
+      conversation.messages.map((message) => ({
+        conversation,
+        message,
+      }))
+    );
+}
+
+function getCommunicationLabel(message: ConversationMessage) {
+  if (message.recordingUrl) return "Recording";
+  if (message.channel === "call") return "Call";
+  if (message.channel === "sms") return "Message";
+  return "CRM Note";
+}
+
+function getCommunicationIcon(message: ConversationMessage) {
+  if (message.recordingUrl || message.channel === "call") return Voicemail;
+  if (message.channel === "sms") return MessageSquare;
+  return FileText;
+}
+
 function formatDate(value?: string) {
   if (!value) return "Not available";
   const date = new Date(`${value}T12:00:00`);
@@ -131,6 +168,7 @@ export default function CustomersPage() {
 
   const selectedCustomer = customerList.find((customer) => customer.id === selectedCustomerId) || null;
   const selectedCustomerJobs = selectedCustomer ? getCustomerJobs(selectedCustomer, jobList) : [];
+  const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, jobList) : [];
 
   const filteredCustomers = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -342,6 +380,31 @@ export default function CustomersPage() {
               <section className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Roof details</p><p className="mt-2 font-bold text-slate-900">{selectedCustomer.roofDetails}</p></div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="h-5 w-5 text-orange-600" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Insurance status</p><p className="font-bold text-slate-900">{selectedCustomer.insuranceCarrier}</p></div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Calls, Messages & Recordings</h3></div>
+                <div className="mt-4 space-y-3">
+                  {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: { conversation: ConversationRecord; message: ConversationMessage }) => {
+                    const Icon = getCommunicationIcon(message);
+                    return (
+                      <div key={`${conversation.id}-${message.id}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-xl bg-blue-50 p-2 text-blue-700"><Icon className="h-4 w-4" /></div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-black text-slate-900">{getCommunicationLabel(message)} • Job #{conversation.jobId || "Unassigned"}</p>
+                              <p className="text-xs font-bold text-slate-500">{message.timestamp}</p>
+                            </div>
+                            <p className="mt-1 text-sm font-medium leading-5 text-slate-700">{message.body}</p>
+                            <p className="mt-2 text-xs font-bold text-slate-500">Customer #{conversation.customerId || selectedCustomer.id} • Conversation #{conversation.id}</p>
+                            {message.recordingUrl && <a href={message.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700 hover:text-blue-800">Open recording</a>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No linked calls, messages, or recordings yet.</p>}
+                </div>
               </section>
 
               <section className="grid gap-3 sm:grid-cols-3">

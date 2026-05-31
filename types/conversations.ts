@@ -11,6 +11,9 @@ export interface ConversationMessage {
   timestamp: string;
   status?: "sent" | "delivered" | "read" | "missed";
   attachments?: string[];
+  customerId?: string;
+  jobId?: string;
+  recordingUrl?: string;
 }
 
 export interface ConversationContact {
@@ -30,6 +33,8 @@ export interface ConversationContact {
 
 export interface ConversationRecord {
   id: string;
+  customerId?: string;
+  jobId?: string;
   contact: ConversationContact;
   lastMessage: string;
   lastActivityAt: string;

@@ -4,17 +4,23 @@ export interface TwilioSmsPayload {
   to: string;
   body: string;
   conversationId?: string;
+  customerId?: string;
+  jobId?: string;
   mediaUrl?: string[];
 }
 
 export interface TwilioCallPayload {
   to: string;
   conversationId?: string;
+  customerId?: string;
+  jobId?: string;
 }
 
 export interface TwilioCallNotePayload {
   callSid: string;
   conversationId?: string;
+  customerId?: string;
+  jobId?: string;
   notes: string;
 }
 
@@ -29,6 +35,9 @@ export interface TwilioConversationEvent {
   callSid?: string;
   messageSid?: string;
   conversationId?: string;
+  customerId?: string;
+  jobId?: string;
+  recordingUrl?: string;
   payload: Record<string, unknown>;
   createdAt: string;
 }
