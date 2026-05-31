@@ -1,0 +1,4 @@
+export default function SettingsPage() {
+  const settings = ["Company settings", "User management", "Notification settings", "Branding settings", "Role permissions", "Supabase connection"];
+  return <div className="space-y-6"><div><p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Admin</p><h1 className="mt-2 text-3xl font-black text-[#07183f]">Settings</h1><p className="mt-2 text-slate-600">Manage XRP Roofing CRM configuration and team access.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{settings.map((item) => <div key={item} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="font-black text-[#07183f]">{item}</h2><p className="mt-2 text-sm text-slate-500">Production-ready configuration surface placeholder.</p></div>)}</div></div>;
+}
