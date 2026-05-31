@@ -66,3 +66,48 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ proposal: data.payload });
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get("id");
+    const updates = z.record(z.string(), z.unknown()).parse(await req.json());
+
+    if (!id) {
+      return NextResponse.json({ error: "Proposal id is required" }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+
+    if (!supabase) {
+      return NextResponse.json({ error: "Proposal sharing requires SUPABASE_SERVICE_ROLE_KEY so server updates can bypass row-level security." }, { status: 503 });
+    }
+
+    const { data, error } = await supabase
+      .from("proposal_shares")
+      .select("payload")
+      .eq("id", id)
+      .single();
+
+    if (error || !data?.payload) {
+      return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+    }
+
+    const proposal = proposalSchema.parse(data.payload);
+    const nextProposal = { ...proposal, ...updates, id, updatedAt: new Date().toISOString() };
+    const { error: updateError } = await supabase
+      .from("proposal_shares")
+      .upsert({ id, payload: nextProposal, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 503 });
+    }
+
+    return NextResponse.json({ proposal: nextProposal });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid proposal update data", details: error.issues }, { status: 400 });
+    }
+
+    return NextResponse.json({ error: "Unable to update proposal" }, { status: 500 });
+  }
+}
