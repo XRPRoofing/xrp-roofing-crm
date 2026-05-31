@@ -87,6 +87,7 @@ type ProposalTemplate = {
   title: string;
   summary: string;
   terms: string;
+  packages?: Proposal["packages"];
 };
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
@@ -321,6 +322,7 @@ const initialProposalTemplates: ProposalTemplate[] = [
     title: "BEST ROOFING PROPOSAL",
     summary: "A professional roofing proposal prepared for review and approval.",
     terms: defaultTerms,
+    packages: defaultPackages,
   },
   {
     id: "insurance",
@@ -329,6 +331,7 @@ const initialProposalTemplates: ProposalTemplate[] = [
     title: "INSURANCE ROOFING PROPOSAL",
     summary: "Prepared for insurance documentation, carrier review, and roofing claim support.",
     terms: defaultTerms,
+    packages: defaultPackages,
   },
   {
     id: "premium",
@@ -337,6 +340,7 @@ const initialProposalTemplates: ProposalTemplate[] = [
     title: "PREMIUM ROOFING PROPOSAL",
     summary: "A premium customer-ready roofing package with clear scope, value, and next steps.",
     terms: defaultTerms,
+    packages: defaultPackages,
   },
 ];
 
@@ -377,6 +381,7 @@ export default function ProposalsPage() {
     title: "",
     summary: "",
     terms: "",
+    packages: defaultPackages,
   });
   const [editorForm, setEditorForm] = useState({
     customerName: "",
@@ -594,6 +599,7 @@ export default function ProposalsPage() {
       title: template.title,
       summary: template.summary,
       terms: template.terms,
+      packages: normalizePackages(template.packages),
     });
   }
 
@@ -608,10 +614,11 @@ export default function ProposalsPage() {
       title: templateForm.title,
       summary: templateForm.summary || "A professional roofing proposal prepared for customer review.",
       terms: templateForm.terms || defaultTerms,
+      packages: normalizePackages(templateForm.packages),
     };
 
     setTemplates((currentTemplates) => [newTemplate, ...currentTemplates]);
-    setTemplateForm({ label: "", description: "", title: "", summary: "", terms: "" });
+    setTemplateForm({ label: "", description: "", title: "", summary: "", terms: "", packages: defaultPackages });
   }
 
   function openProposal(proposal: Proposal) {
@@ -1272,6 +1279,18 @@ export default function ProposalsPage() {
               <input value={templateForm.description} onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Short description" />
               <input required value={templateForm.title} onChange={(event) => setTemplateForm({ ...templateForm, title: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Proposal title" />
               <textarea value={templateForm.summary} onChange={(event) => setTemplateForm({ ...templateForm, summary: event.target.value })} className="min-h-28 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Proposal summary" />
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-500">Template package options</p>
+                {(["good", "better", "best"] as const).map((option) => (
+                  <div key={option} className="rounded-xl bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black uppercase text-[#07183f]">{option}</p>
+                      <input type="number" value={normalizePackages(templateForm.packages)[option].price} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], price: Number(event.target.value) || 0 } } })} className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-right text-xs font-black text-blue-700 outline-none" placeholder="Price" />
+                    </div>
+                    <textarea value={normalizePackages(templateForm.packages)[option].scope} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], scope: event.target.value } } })} className="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs leading-5 text-slate-600 outline-none" placeholder={`${option.toUpperCase()} included services`} />
+                  </div>
+                ))}
+              </div>
               <textarea value={templateForm.terms} onChange={(event) => setTemplateForm({ ...templateForm, terms: event.target.value })} className="min-h-36 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Default terms and conditions" />
               <button className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Save template</button>
             </div>
@@ -1298,6 +1317,21 @@ export default function ProposalsPage() {
                   Terms and Conditions
                   <textarea value={template.terms} onChange={(event) => handleUpdateTemplate({ ...template, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-slate-600 outline-none" />
                 </label>
+                <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-500">GOOD / BETTER / BEST packages</p>
+                  {(["good", "better", "best"] as const).map((option) => {
+                    const templatePackages = normalizePackages(template.packages);
+                    return (
+                      <div key={option} className="rounded-xl bg-white p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-black uppercase text-[#07183f]">{option}</p>
+                          <input type="number" value={templatePackages[option].price} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], price: Number(event.target.value) || 0 } } })} className="w-32 rounded-xl border border-slate-200 px-3 py-2 text-right text-sm font-black text-blue-700 outline-none" />
+                        </div>
+                        <textarea value={templatePackages[option].scope} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], scope: event.target.value } } })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-600 outline-none" />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
