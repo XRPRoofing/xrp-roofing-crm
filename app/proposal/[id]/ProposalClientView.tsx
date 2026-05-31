@@ -56,6 +56,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [typedSignature, setTypedSignature] = useState(initialProposal.signedBy || "");
   const [notice, setNotice] = useState("");
+  const isAccepted = proposal.status === "Won";
 
   const packages = useMemo(() => ({
     good: normalizePackage(proposal.packages?.good),
@@ -89,7 +90,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     };
 
     setProposal((currentProposal) => ({ ...currentProposal, ...updates }));
-    setNotice("Proposal accepted and signed. XRP Roofing has been notified in the CRM.");
+    setNotice("Thank you! Your proposal has been accepted and signed.");
     await updateSharedProposal(proposal.id, updates);
   }
 
@@ -179,24 +180,40 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 p-6">
-            <label className="flex items-start gap-3 text-sm font-bold text-slate-700">
-              <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
-              <span>I agree to the Terms and Conditions</span>
-            </label>
-            <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                Client Signature
-                <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none" placeholder="Type full legal name" />
-              </label>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
-                <p className="mt-3 font-bold">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+          {isAccepted ? (
+            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-8 text-center shadow-sm">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-3xl text-white">✓</div>
+              <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted</p>
+              <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">Thank you, {proposal.customerName || "valued customer"}!</h2>
+              <p className="mx-auto mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">Your proposal has been signed successfully. XRP Roofing has been notified, and our team will contact you shortly to proceed with scheduling the work.</p>
+              <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-emerald-200 bg-white p-5 text-left">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-500">Signed By</p>
+                <p className="mt-2 text-2xl font-bold italic text-slate-900">{proposal.signedBy || typedSignature}</p>
+                <p className="mt-4 text-xs font-black uppercase tracking-wider text-slate-500">Date Signed</p>
+                <p className="mt-2 font-bold text-slate-700">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
               </div>
-            </div>
-            <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
-            {notice && <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
-          </section>
+              {notice && <p className="mt-5 rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
+            </section>
+          ) : (
+            <section className="rounded-3xl border border-slate-200 p-6">
+              <label className="flex items-start gap-3 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
+                <span>I agree to the Terms and Conditions</span>
+              </label>
+              <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Client Signature
+                  <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none" placeholder="Type full legal name" />
+                </label>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
+                  <p className="mt-3 font-bold">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                </div>
+              </div>
+              <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
+              {notice && <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
+            </section>
+          )}
         </div>
       </section>
     </main>
