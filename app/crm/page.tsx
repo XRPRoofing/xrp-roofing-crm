@@ -2,7 +2,7 @@ import { Activity, CalendarClock, CircleDollarSign, ClipboardCheck, Plus, Trendi
 import { customers, leads, tasks } from "@/lib/crm-data";
 
 const revenue = leads.reduce((total, lead) => total + lead.value, 0);
-const openEstimates = leads.filter((lead) => lead.stage === "estimate_sent" || lead.stage === "insurance_review").length;
+const openEstimates = leads.filter((lead) => lead.stage === "estimate_sent" || lead.stage === "waiting_approval").length;
 const monthlyBars = [35, 62, 48, 76, 58, 88, 71, 94, 67, 82, 91, 100];
 const pipelineStages = [
   { label: "New Jobs", value: "32%", color: "bg-blue-500" },

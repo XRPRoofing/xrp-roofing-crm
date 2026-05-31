@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "sales_rep" | "office_staff";
 
-export type LeadStage = "new_lead" | "inspection_scheduled" | "estimate_sent" | "insurance_review" | "approved" | "in_progress" | "completed";
+export type LeadStage = "new_lead" | "inspection_scheduled" | "inspection_complete" | "estimate_sent" | "waiting_approval" | "approved" | "scheduled" | "in_progress" | "final_inspection" | "completed" | "paid";
 
 export type Priority = "low" | "medium" | "high" | "urgent";
 
@@ -17,6 +17,8 @@ export interface Lead {
   roofType: string;
   source: string;
   lastActivity: string;
+  dueDate?: string;
+  nextAction?: string;
 }
 
 export interface Customer {

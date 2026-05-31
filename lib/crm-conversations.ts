@@ -10,7 +10,7 @@ export const quickTemplates = [
   "We will follow up with your insurance carrier and update you shortly.",
 ];
 
-export const pipelineStages = ["New Lead", "Inspection Scheduled", "Estimate Sent", "Insurance Review", "Approved", "In Production"];
+export const pipelineStages = ["New Lead", "Inspection Scheduled", "Inspection Complete", "Estimate Sent", "Waiting Approval", "Approved", "Scheduled", "In Production"];
 
 export const appointmentTypes = ["Roof inspection", "Insurance adjuster meeting", "Estimate review", "Production walkthrough", "Warranty follow-up"];
 
@@ -29,7 +29,7 @@ export function createConversationFromLead(lead: Lead): ConversationRecord {
       address: `${lead.address}, ${lead.city}, AZ`,
       roofType: lead.roofType,
       assignedRep: lead.assignedTo,
-      insuranceStatus: lead.stage === "insurance_review" ? "Insurance review" : lead.stage === "approved" ? "Approved" : "Not confirmed",
+      insuranceStatus: lead.stage === "waiting_approval" ? "Waiting approval" : lead.stage === "approved" ? "Approved" : "Not confirmed",
       jobStatus: stageLabel,
       leadSource: lead.source,
       tags: [lead.roofType, lead.source, stageLabel],
