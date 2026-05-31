@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 type PublicProposal = {
   id: string;
   customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   address?: string;
   title?: string;
   summary?: string;
@@ -63,7 +65,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const selectedPackage = packages[selectedOption];
 
   useEffect(() => {
-    if (proposal.status === "Signed" || proposal.status === "Won") return;
+    if (proposal.status === "Won") return;
     void updateSharedProposal(proposal.id, { status: "Viewed", viewedAt: new Date().toISOString() });
   }, [proposal.id, proposal.status]);
 
@@ -81,7 +83,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     const updates = {
       selectedOption,
       total: selectedPackage.price,
-      status: "Signed",
+      status: "Won",
       signedAt,
       signedBy: typedSignature.trim(),
     };
@@ -99,6 +101,8 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Client Info</p>
             <p className="mt-3 text-2xl font-bold tracking-tight">{proposal.customerName || "Customer"}</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.address || proposal.id}</p>
+            {proposal.customerPhone && <p className="mt-2 text-sm font-bold text-slate-700">{proposal.customerPhone}</p>}
+            {proposal.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{proposal.customerEmail}</p>}
           </div>
           <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Prepared By</p>

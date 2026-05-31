@@ -417,7 +417,9 @@ export default function ProposalsPage() {
   const filteredProposals = useMemo(() => {
     const query = proposalSearch.toLowerCase().trim();
 
-    const visibleProposals = proposalFilter === "drafts" ? proposals.filter((proposal) => proposal.status === "Draft") : proposals;
+    const visibleProposals = proposalFilter === "drafts"
+      ? proposals.filter((proposal) => proposal.status === "Draft")
+      : proposals.filter((proposal) => proposal.status !== "Draft");
 
     if (!query) return visibleProposals;
 
@@ -695,7 +697,7 @@ export default function ProposalsPage() {
     setSendNotice("");
     setSendForm({
       toName: savedProposal.customerName,
-      toEmail: savedProposal.job?.email || "info@xrproofing.com",
+      toEmail: savedProposal.customerEmail || savedProposal.job?.email || "info@xrproofing.com",
       ccRecipients: savedProposal.ccRecipients || "",
       templateName: "Personalized Proposal Email",
       subject: savedProposal.sendSubject || `Proposal for ${savedProposal.customerName}`,
@@ -724,18 +726,13 @@ export default function ProposalsPage() {
     setSendNotice("Sending proposal email...");
 
     try {
-      const shareResponse = await fetch("/api/proposals/share", {
+      const sharePromise = fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
       });
 
-      if (!shareResponse.ok) {
-        const data = await shareResponse.json().catch(() => null) as { error?: string } | null;
-        throw new Error(data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.");
-      }
-
-      const response = await fetch("/api/proposals/send", {
+      const emailPromise = fetch("/api/proposals/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -750,13 +747,20 @@ export default function ProposalsPage() {
           coverText: sentProposal?.coverText || editorForm.coverText,
         }),
       });
+      const [shareResponse, response] = await Promise.all([sharePromise, emailPromise]);
+      let shareWarning = "";
+
+      if (!shareResponse.ok) {
+        const data = await shareResponse.json().catch(() => null) as { error?: string } | null;
+        shareWarning = data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.";
+      }
 
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Unable to send proposal email");
       }
 
-      setSendNotice(`Proposal sent to ${sendForm.toEmail}. Link: ${proposalLink}`);
+      setSendNotice(`${shareWarning ? `${shareWarning} Email was sent, but the customer link may not open until sharing is configured.` : `Proposal sent to ${sendForm.toEmail}.`} Link: ${proposalLink}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Email could not be sent.";
       const supportMessage = message === "Email service is not configured"
@@ -785,7 +789,7 @@ export default function ProposalsPage() {
     if (!activeProposal || !agreementAccepted || !typedSignature.trim()) return;
 
     const signedProposal = saveActiveProposal({
-      status: "Signed",
+      status: "Won",
       signedAt: new Date().toISOString(),
       signedBy: typedSignature.trim(),
     });
