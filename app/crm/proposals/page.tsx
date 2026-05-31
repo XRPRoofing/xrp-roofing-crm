@@ -358,6 +358,8 @@ export default function ProposalsPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
   const [showSendModal, setShowSendModal] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [typedSignature, setTypedSignature] = useState("");
   const [sendForm, setSendForm] = useState({
     toName: "",
     toEmail: "info@xrproofing.com",
@@ -762,6 +764,20 @@ export default function ProposalsPage() {
     setDeletedProposal(null);
   }
 
+  function handleAcceptProposal() {
+    if (!activeProposal || !agreementAccepted || !typedSignature.trim()) return;
+
+    const signedProposal = saveActiveProposal({
+      status: "Signed",
+      signedAt: new Date().toISOString(),
+      signedBy: typedSignature.trim(),
+    });
+
+    if (signedProposal) {
+      setActiveProposal(signedProposal);
+    }
+  }
+
   function handleInspectionPhotoUpload(index: number, file: File | undefined) {
     if (!file) return;
 
@@ -876,19 +892,35 @@ export default function ProposalsPage() {
           <main className="p-6">
             <div className="mx-auto max-w-[760px]">
               <p className="mb-5 text-center text-sm font-black text-slate-700">{selectedTemplate?.label || "Custom Proposal"}</p>
-              <div className={`min-h-[900px] border bg-white p-10 shadow-sm ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-slate-300"}`}>
-                <div className={`flex items-start justify-between border-b-4 pb-4 ${editorForm.template === "premium" ? "border-orange-500" : "border-[#07183f]"}`}>
+              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-slate-200 ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-slate-200"}`}>
+                <div className="grid gap-6 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:grid-cols-2">
                   <div>
-                    {isPreviewing ? (
-                      <p className={`text-2xl font-black ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`}>{editorForm.title}</p>
-                    ) : (
-                      <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-2xl font-black outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`} />
-                    )}
-                    <p className="mt-2 text-sm font-semibold text-slate-500">{activeProposal.id}</p>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Client Info</p>
+                    <p className="mt-3 text-xl font-black text-[#07183f]">{editorForm.customerName}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{editorForm.address}</p>
+                    {activeProposal.job?.phone && <p className="mt-2 text-sm font-bold text-slate-700">{activeProposal.job.phone}</p>}
+                    {activeProposal.job?.email && <p className="mt-1 text-sm font-bold text-blue-700">{activeProposal.job.email}</p>}
                   </div>
-                  <div className="text-right text-sm">
-                    <p className="font-black text-[#07183f]">XRP Roofing</p>
-                    <p className="text-slate-500">ROC #350898</p>
+                  <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Prepared By</p>
+                    <p className="mt-3 text-xl font-black text-[#07183f]">XRP Roofing</p>
+                    <p className="mt-2 text-sm font-bold text-slate-700">Jonathan Gonzalez</p>
+                    <p className="mt-2 text-sm text-slate-600">(623) 300-8097</p>
+                    <p className="mt-1 text-sm text-blue-700">info@xrproofing.com</p>
+                    <p className="mt-1 text-sm text-slate-600">xrproofing.com</p>
+                  </div>
+                </div>
+
+                <div className="my-8 text-center">
+                  {isPreviewing ? (
+                    <h1 className={`text-3xl font-black tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`}>ROOFING PROPOSAL</h1>
+                  ) : (
+                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-black tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`} />
+                  )}
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-black uppercase tracking-wider">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">ID {activeProposal.id}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">Issued {new Date().toLocaleDateString()}</span>
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{activeProposal.status}</span>
                   </div>
                 </div>
 
@@ -980,17 +1012,22 @@ export default function ProposalsPage() {
 
                 {isPreviewing && (
                   <div className="mt-8">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Proposal options</p>
-                    <div className="mt-4 grid gap-4">
-                      {(["good", "better", "best"] as const).map((option) => (
-                        <div key={option} className="rounded-2xl border border-slate-200 p-5">
-                          <div className="flex items-center justify-between">
-                            <p className="text-2xl font-black uppercase text-[#07183f]">{option} Roofing Package</p>
-                            <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">${normalizePackages(editorForm.packages)[option].price.toLocaleString()}</span>
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
+                    <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                      {(["good", "better", "best"] as const).map((option) => {
+                        const packageOption = normalizePackages(editorForm.packages)[option];
+                        const selected = (activeProposal.selectedOption || "best") === option;
+                        return (
+                          <div key={option} className={`rounded-3xl border p-5 ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
+                            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
+                            <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
+                            <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{packageOption.scope}</p>
+                            <p className="mt-5 text-2xl font-black text-blue-700">${packageOption.price.toLocaleString()}</p>
+                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
                           </div>
-                          <p className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-700">{normalizePackages(editorForm.packages)[option].scope}</p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1017,23 +1054,54 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-32 rounded-2xl border border-slate-200 p-5">
-                    <p className="font-black text-[#07183f]">Customer approval</p>
-                    <div className="mt-8 grid gap-6 md:grid-cols-2">
-                      <div className="border-t border-slate-300 pt-2 text-xs text-slate-500">Customer signature</div>
-                      <div className="border-t border-slate-300 pt-2 text-xs text-slate-500">Date</div>
+                  <div className="mt-8 rounded-3xl border border-blue-100 bg-blue-50 p-6">
+                    <p className="text-xs font-black uppercase tracking-wider text-blue-700">Total Summary</p>
+                    <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                      <div>
+                        <p className="text-sm font-bold text-slate-600">Selected Package</p>
+                        <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{activeProposal.selectedOption || "best"}</p>
+                        {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{editorForm.notes}</p>}
+                      </div>
+                      <div className="text-left md:text-right">
+                        <p className="text-sm font-bold text-slate-600">Total Price</p>
+                        <p className="mt-1 text-4xl font-black text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Terms and Conditions") && (
-                  <div className="mt-8 rounded-2xl border border-slate-200 p-5">
-                    <p className="font-black text-[#07183f]">Terms and Conditions</p>
+                  <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    <p className="text-2xl font-black text-[#07183f]">Terms and Conditions</p>
                     {isPreviewing ? (
-                      <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">{editorForm.terms}</p>
+                      <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700">
+                        {editorForm.terms.split("\n\n").map((section, index) => (
+                          <p key={index} className="mb-4 whitespace-pre-line">{section}</p>
+                        ))}
+                      </div>
                     ) : (
                       <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-3 min-h-32 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-slate-600 outline-none" />
                     )}
+                  </div>
+                )}
+
+                {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
+                  <div className="mt-8 rounded-3xl border border-slate-200 p-6">
+                    <label className="flex items-start gap-3 text-sm font-bold text-slate-700">
+                      <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
+                      <span>I agree to the Terms and Conditions</span>
+                    </label>
+                    <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
+                      <label className="block text-xs font-black uppercase tracking-wider text-slate-500">
+                        Client Signature
+                        <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none" placeholder="Type full legal name" />
+                      </label>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">Date Signed</p>
+                        <p className="mt-3 font-black text-[#07183f]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
                   </div>
                 )}
 
