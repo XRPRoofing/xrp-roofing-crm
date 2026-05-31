@@ -218,18 +218,18 @@ function createInvoiceFromJob(job: Lead, count: number): Invoice {
 
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
-  if (status === "Partially Paid") return "bg-blue-50 text-blue-700 ring-blue-100";
-  if (status === "Due Soon") return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (status === "Due Soon") return "bg-orange-50 text-orange-700 ring-orange-100";
   if (status === "Overdue") return "bg-red-50 text-red-700 ring-red-100";
   if (status === "Voided") return "bg-slate-100 text-slate-600 ring-slate-200";
   if (status === "Draft") return "bg-slate-50 text-slate-700 ring-slate-200";
-  return "bg-orange-50 text-orange-700 ring-orange-100";
+  return "bg-red-50 text-red-700 ring-red-100";
 }
 
 function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
-  if (stage === "Paid") return "from-emerald-50 to-white text-emerald-700";
-  if (stage === "Partially Paid") return "from-blue-50 to-white text-blue-700";
-  return "from-orange-50 to-white text-orange-700";
+  if (stage === "Paid") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (stage === "Partially Paid") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-red-200 bg-red-50 text-red-700";
 }
 
 export default function InvoicesPage() {
@@ -522,46 +522,37 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-sm shadow-slate-200">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
-          <h1 className="mt-2 text-3xl font-black text-[#07183f]">Invoice Board</h1>
-          <p className="mt-2 text-slate-600">Track invoice status, balances, payments, PDF invoices, and roofing job billing.</p>
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
+          </div>
+          <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
         </div>
-        <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200">+ New invoice</button>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          {[
+            ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
+            ["Paid This Month", currency(boardTotals.paid), "text-emerald-700"],
+            ["Pending", String(boardTotals.pending), "text-slate-950"],
+            ["Overdue", String(boardTotals.overdue), "text-red-700"],
+            ["Partial Payments", String(boardTotals.partial), "text-amber-700"],
+            ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
+          ].map(([label, value, valueClass]) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className={`mt-2 text-xl font-bold tracking-tight ${valueClass}`}>{value}</p>
+            </div>
+          ))}
         </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-slate-500">Outstanding balance</p>
-            <p className="mt-2 text-2xl font-black text-[#07183f]">{currency(boardTotals.balance)}</p>
+        <div className="mt-5 flex flex-col items-stretch justify-between gap-3 xl:flex-row xl:items-center">
+          <div className="mx-auto w-full max-w-2xl">
+            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search invoices by client, invoice number, or property..." />
           </div>
-          <div className="rounded-2xl bg-emerald-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Paid this month</p>
-            <p className="mt-2 text-2xl font-black text-emerald-800">{currency(boardTotals.paid)}</p>
-          </div>
-          <div className="rounded-2xl bg-orange-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-orange-700">Pending payments</p>
-            <p className="mt-2 text-2xl font-black text-orange-800">{boardTotals.pending}</p>
-          </div>
-          <div className="rounded-2xl bg-red-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-red-700">Overdue invoices</p>
-            <p className="mt-2 text-2xl font-black text-red-800">{boardTotals.overdue}</p>
-          </div>
-          <div className="rounded-2xl bg-blue-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-blue-700">Partial payments</p>
-            <p className="mt-2 text-2xl font-black text-blue-800">{boardTotals.partial}</p>
-          </div>
-          <div className="rounded-2xl bg-violet-50 p-4">
-            <p className="text-xs font-black uppercase tracking-wider text-violet-700">Collection rate</p>
-            <p className="mt-2 text-2xl font-black text-violet-800">{boardTotals.collectionRate}%</p>
-          </div>
-        </div>
-        <div className="mt-5 flex flex-col gap-3 lg:flex-row">
-          <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-300" placeholder="Search by client name, invoice number, property address..." />
-          <div className="flex flex-wrap gap-2">
+          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
             {filterOptions.map((option) => (
-              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`rounded-2xl px-4 py-3 text-sm font-black ${invoiceFilter === option ? "bg-[#07183f] text-white" : "bg-slate-50 text-slate-600"}`}>{option}</button>
+              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
             ))}
           </div>
         </div>
@@ -572,47 +563,53 @@ export default function InvoicesPage() {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
           return (
-            <section key={stage} className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-sm shadow-slate-200">
-              <div className={`bg-gradient-to-br ${stageHeaderClass(stage)} flex items-center justify-between border-b border-slate-100 p-5`}>
+            <section key={stage} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className={`flex items-center justify-between border-b p-4 ${stageHeaderClass(stage)}`}>
                 <div>
-                  <h2 className="text-lg font-black text-[#07183f]">{stage}</h2>
-                  <p className="text-sm font-semibold text-slate-500">{invoicesInStage.length} invoices</p>
+                  <h2 className="text-base font-bold text-slate-950">{stage}</h2>
+                  <p className="text-sm text-slate-500">{invoicesInStage.length} invoices</p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black shadow-sm">{currency(stageTotal)}</span>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">{currency(stageTotal)}</span>
               </div>
-              <div className="space-y-3 p-5">
+              <div className="space-y-3 p-4">
                 {invoicesInStage.map((invoice) => {
                   const totals = calculateTotals(invoice);
-                  const paid = getPaidAmount(invoice);
                   const balance = Math.max(totals.finalTotal - getPaidAmount(invoice), 0);
                   const status = getComputedStatus(invoice);
                   return (
-                    <button key={invoice.id} onClick={() => openInvoice(invoice)} className="group w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:-translate-y-0.5 hover:border-orange-100 hover:bg-white hover:shadow-lg">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-black text-slate-900">{invoice.clientName}</p>
-                          <p className="mt-1 text-sm text-slate-500">{invoice.invoiceNumber} · {invoice.jobName}</p>
+                    <article key={invoice.id} className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+                      <button type="button" onClick={() => openInvoice(invoice)} className="w-full text-left">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-bold text-slate-950">{invoice.clientName}</p>
+                            <p className="mt-1 truncate text-sm text-slate-500">{invoice.invoiceNumber} · {invoice.jobName || invoice.roofType}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusBadgeClass(status)}`}>{status}</span>
                         </div>
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${statusBadgeClass(status)}`}>{status}</span>
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                        <div className="rounded-xl bg-white p-3">
-                          <p className="text-xs font-bold uppercase text-slate-400">Total</p>
-                          <p className="font-black text-[#07183f]">{currency(totals.finalTotal)}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Amount</p>
+                            <p className="mt-1 font-bold text-slate-950">{currency(totals.finalTotal)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Balance Due</p>
+                            <p className={`mt-1 font-bold ${balance > 0 ? "text-red-700" : "text-emerald-700"}`}>{currency(balance)}</p>
+                          </div>
                         </div>
-                        <div className="rounded-xl bg-white p-3">
-                          <p className="text-xs font-bold uppercase text-slate-400">Balance</p>
-                          <p className="font-black text-orange-700">{currency(balance)}</p>
+                        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                          <p className="text-xs font-semibold text-slate-500">Due {invoice.dueDate}</p>
+                          <p className="text-xs font-semibold text-slate-400">View details</p>
                         </div>
+                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => openInvoice(invoice)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">View</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">Edit</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">Send Reminder</button>
                       </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                        <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-emerald-500" style={{ width: `${Math.min((paid / Math.max(totals.finalTotal, 1)) * 100, 100)}%` }} />
-                      </div>
-                      <p className="mt-3 text-xs font-bold text-slate-500">Due {invoice.dueDate} · Click to open details</p>
-                    </button>
+                    </article>
                   );
                 })}
-                {invoicesInStage.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-bold text-slate-500">No invoices in this column.</div>}
+                {invoicesInStage.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">No invoices in this column.</div>}
               </div>
             </section>
           );
