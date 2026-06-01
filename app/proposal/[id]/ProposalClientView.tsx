@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 type PublicProposal = {
@@ -99,6 +100,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
       <section className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
         <div className="grid gap-6 border-b border-slate-200 bg-white p-6 sm:p-8 md:grid-cols-2">
           <div>
+            <div className="mb-6 flex h-20 w-40 items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={140} height={64} className="max-h-14 w-auto object-contain" priority />
+            </div>
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Client Info</p>
             <p className="mt-3 text-2xl font-bold tracking-tight">{proposal.customerName || "Customer"}</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.address || proposal.id}</p>
@@ -116,6 +120,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
         </div>
 
         <div className="border-b border-slate-200 p-6 text-center sm:p-8">
+          <div className="mx-auto mb-5 flex h-24 w-52 items-center justify-center rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+            <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={180} height={80} className="max-h-16 w-auto object-contain" priority />
+          </div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">XRP Roofing Proposal</p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight">ROOFING PROPOSAL</h1>
           <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wide">

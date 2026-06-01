@@ -60,6 +60,7 @@ type Proposal = {
   signedAt?: string;
   signedBy?: string;
   signatureData?: string;
+  deletedAt?: string;
   selectedOption?: "good" | "better" | "best";
   inspectionPhotos?: InspectionPhoto[];
   packages?: {
@@ -91,6 +92,8 @@ type ProposalTemplate = {
 };
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
+const trashRetentionDays = 30;
+const trashRetentionMs = trashRetentionDays * 24 * 60 * 60 * 1000;
 const defaultInspectionPhotos: InspectionPhoto[] = [
   { label: "Front elevation", image: "", note: "" },
   { label: "Roof condition", image: "", note: "" },
@@ -291,7 +294,7 @@ const initialProposals: Proposal[] = leads.slice(0, 3).map((job, index) => ({
   template: index === 0 ? "executive" : index === 1 ? "insurance" : "premium",
   title: index === 1 ? "INSURANCE ROOFING PROPOSAL" : index === 2 ? "PREMIUM ROOFING PROPOSAL" : "BEST ROOFING PROPOSAL",
   summary: "A professional roofing proposal prepared for review and approval.",
-  coverPhoto: "/images/logo.png",
+  coverPhoto: "/images/logo.jpeg",
   coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
   notes: "Includes materials, labor, cleanup, workmanship standards, and customer-ready project documentation.",
   terms: defaultTerms,
@@ -390,7 +393,7 @@ export default function ProposalsPage() {
     address: "",
     title: "",
     summary: "",
-    coverPhoto: "/images/logo.png",
+    coverPhoto: "/images/logo.jpeg",
     coverText: "",
     scope: "",
     total: "",
@@ -416,10 +419,11 @@ export default function ProposalsPage() {
   }, [jobSearch]);
   const filteredProposals = useMemo(() => {
     const query = proposalSearch.toLowerCase().trim();
+    const activeProposals = proposals.filter((proposal) => !proposal.deletedAt);
 
     const visibleProposals = proposalFilter === "drafts"
-      ? proposals.filter((proposal) => proposal.status === "Draft")
-      : proposals.filter((proposal) => proposal.status !== "Draft");
+      ? activeProposals.filter((proposal) => proposal.status === "Draft")
+      : activeProposals.filter((proposal) => proposal.status !== "Draft");
 
     if (!query) return visibleProposals;
 
@@ -428,6 +432,7 @@ export default function ProposalsPage() {
         .some((value) => value.toLowerCase().includes(query))
     );
   }, [proposalFilter, proposalSearch, proposals]);
+  const trashedProposals = useMemo(() => proposals.filter((proposal) => Boolean(proposal.deletedAt)), [proposals]);
 
   useEffect(() => {
     const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
@@ -435,7 +440,9 @@ export default function ProposalsPage() {
 
     queueMicrotask(() => {
       if (savedProposals) {
-        setProposals(JSON.parse(savedProposals) as Proposal[]);
+        const restoredProposals = (JSON.parse(savedProposals) as Proposal[])
+          .filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+        setProposals(restoredProposals);
       }
 
       if (savedTemplates) {
@@ -460,12 +467,13 @@ export default function ProposalsPage() {
           const response = await fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`).catch(() => null);
           if (!response?.ok) return proposal;
           const data = await response.json().catch(() => null) as { proposal?: Proposal } | null;
-          return data?.proposal || proposal;
+          return data?.proposal ? { ...proposal, ...data.proposal, deletedAt: proposal.deletedAt } : proposal;
         }));
+        const retainedProposals = serverProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
 
-        window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(serverProposals));
-        setProposals(serverProposals);
-        setActiveProposal((currentProposal) => currentProposal ? serverProposals.find((proposal) => proposal.id === currentProposal.id) || currentProposal : currentProposal);
+        window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(retainedProposals));
+        setProposals(retainedProposals);
+        setActiveProposal((currentProposal) => currentProposal ? retainedProposals.find((proposal) => proposal.id === currentProposal.id && !proposal.deletedAt) || null : currentProposal);
       }
     }
 
@@ -577,7 +585,7 @@ export default function ProposalsPage() {
       template: "executive",
       title: "BEST ROOFING PROPOSAL",
       summary: "A professional roofing proposal prepared for review and approval.",
-      coverPhoto: "/images/logo.png",
+      coverPhoto: "/images/logo.jpeg",
       coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
       notes: "Includes professional roof assessment, materials, labor, cleanup, and customer-ready project documentation.",
       terms: defaultTerms,
@@ -631,7 +639,7 @@ export default function ProposalsPage() {
       address: proposal.address,
       title: proposal.title,
       summary: proposal.summary,
-      coverPhoto: proposal.coverPhoto || "/images/logo.png",
+      coverPhoto: proposal.coverPhoto || "/images/logo.jpeg",
       coverText: proposal.coverText || "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
       scope: proposal.scope,
       total: String(proposal.total),
@@ -771,8 +779,9 @@ export default function ProposalsPage() {
   }
 
   function handleDeleteProposal(proposal: Proposal) {
-    setDeletedProposal(proposal);
-    setProposals((currentProposals) => currentProposals.filter((currentProposal) => currentProposal.id !== proposal.id));
+    const trashedProposal = { ...proposal, deletedAt: new Date().toISOString() };
+    setDeletedProposal(trashedProposal);
+    setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
     if (activeProposal?.id === proposal.id) {
       setActiveProposal(null);
     }
@@ -781,8 +790,23 @@ export default function ProposalsPage() {
   function handleUndoDelete() {
     if (!deletedProposal) return;
 
-    setProposals((currentProposals) => [deletedProposal, ...currentProposals]);
+    setProposals((currentProposals) => currentProposals.map((proposal) => proposal.id === deletedProposal.id ? { ...proposal, deletedAt: undefined } : proposal));
     setDeletedProposal(null);
+  }
+
+  function handleRestoreProposal(proposal: Proposal) {
+    setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? { ...currentProposal, deletedAt: undefined } : currentProposal));
+  }
+
+  function handlePermanentDeleteProposal(proposal: Proposal) {
+    setProposals((currentProposals) => currentProposals.filter((currentProposal) => currentProposal.id !== proposal.id));
+    if (deletedProposal?.id === proposal.id) {
+      setDeletedProposal(null);
+    }
+  }
+
+  function handleEmptyExpiredTrash() {
+    setProposals((currentProposals) => currentProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs));
   }
 
   function handleAcceptProposal() {
@@ -875,7 +899,7 @@ export default function ProposalsPage() {
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Cover photo URL
-                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" placeholder="/images/logo.png" />
+                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" placeholder="/images/logo.jpeg" />
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Cover text
@@ -950,7 +974,7 @@ export default function ProposalsPage() {
                 {(isPreviewing || activeSection === "Cover") && (
                   <div className="mt-8 rounded-3xl bg-slate-50 p-8 text-center">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Cover page</p>
-                    <Image src={editorForm.coverPhoto || "/images/logo.png"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
+                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
                     <p className="mt-5 text-3xl font-black text-[#07183f]">{editorForm.title}</p>
                     <p className="mt-4 text-lg font-bold text-slate-700">{editorForm.customerName}</p>
                     <p className="mt-2 text-sm text-slate-500">{editorForm.address}</p>
@@ -1197,12 +1221,12 @@ export default function ProposalsPage() {
                   </label>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="rounded-t-xl bg-slate-200 py-5 text-center">
-                      <Image src="/images/logo.png" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
+                      <Image src="/images/logo.jpeg" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
                     </div>
                     <div className="rounded-b-xl bg-white p-5 text-sm leading-7 text-slate-700">
                       <p className="whitespace-pre-line">{sendForm.message}</p>
                       <div className="mt-5 rounded-xl border border-slate-200 p-4 text-center">
-                        <Image src={editorForm.coverPhoto || "/images/logo.png"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
+                        <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
                         <p className="mt-3 font-black text-[#07183f]">{editorForm.title}</p>
                         <p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{editorForm.coverText}</p>
                       </div>
@@ -1343,7 +1367,49 @@ export default function ProposalsPage() {
       )}
 
       {activeTab === "settings" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-slate-600 shadow-sm">Proposal settings will appear here.</div>
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Settings</p>
+                <h2 className="mt-2 text-2xl font-black text-[#07183f]">Proposal trash bin</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Deleted proposals are hidden from the proposal board and drafts. They stay here for {trashRetentionDays} days before they are removed completely.</p>
+              </div>
+              <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-700 hover:bg-white">Clear expired trash</button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {trashedProposals.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 p-8 text-center">
+                <p className="text-lg font-black text-[#07183f]">Trash bin is empty</p>
+                <p className="mt-2 text-sm text-slate-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trashedProposals.map((proposal) => {
+                  const deletedAt = proposal.deletedAt ? new Date(proposal.deletedAt) : new Date();
+                  const daysUsed = Math.max(0, Math.floor((Date.now() - deletedAt.getTime()) / (24 * 60 * 60 * 1000)));
+                  const daysLeft = Math.max(0, trashRetentionDays - daysUsed);
+
+                  return (
+                    <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center">
+                      <div>
+                        <p className="text-base font-black text-[#07183f]">{proposal.customerName}</p>
+                        <p className="mt-1 text-sm text-slate-600">{proposal.address}</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Deleted {deletedAt.toLocaleDateString()} · Permanently deletes in {daysLeft} days</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white">Restore</button>
+                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-black text-red-700">Delete forever</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab !== "templates" && activeTab !== "settings" && showCreateForm && (
