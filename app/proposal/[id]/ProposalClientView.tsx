@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type PublicProposal = {
   id: string;
@@ -21,6 +21,7 @@ type PublicProposal = {
   selectedOption?: "good" | "better" | "best";
   signedAt?: string;
   signedBy?: string;
+  signatureDataUrl?: string;
   packages?: {
     good?: string | { scope?: string; price?: number };
     better?: string | { scope?: string; price?: number };
@@ -55,7 +56,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [proposal, setProposal] = useState(initialProposal);
   const [selectedOption, setSelectedOption] = useState<"good" | "better" | "best">(initialProposal.selectedOption || "best");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
-  const [typedSignature, setTypedSignature] = useState(initialProposal.signedBy || "");
+  const [signatureDataUrl, setSignatureDataUrl] = useState(initialProposal.signatureDataUrl || "");
+  const [isSigning, setIsSigning] = useState(false);
+  const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notice, setNotice] = useState("");
   const isAccepted = proposal.status === "Won";
 
@@ -79,7 +82,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }
 
   async function handleSignProposal() {
-    if (!agreementAccepted || !typedSignature.trim()) return;
+    if (!agreementAccepted || !signatureDataUrl) return;
 
     const signedAt = new Date().toISOString();
     const updates = {
@@ -87,7 +90,8 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
       total: selectedPackage.price,
       status: "Won",
       signedAt,
-      signedBy: typedSignature.trim(),
+      signedBy: proposal.customerName || "Customer",
+      signatureDataUrl,
     };
 
     setProposal((currentProposal) => ({ ...currentProposal, ...updates }));
@@ -195,7 +199,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               <p className="mx-auto mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">Your proposal has been signed successfully. XRP Roofing has been notified, and our team will contact you shortly to proceed with scheduling the work.</p>
               <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-emerald-200 bg-white p-5 text-left">
                 <p className="text-xs font-black uppercase tracking-wider text-slate-500">Signed By</p>
-                <p className="mt-2 text-2xl font-bold italic text-slate-900">{proposal.signedBy || typedSignature}</p>
+                <p className="mt-2 text-2xl font-bold italic text-slate-900">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-2 max-h-24 w-full object-contain" /> : proposal.signedBy}</p>
                 <p className="mt-4 text-xs font-black uppercase tracking-wider text-slate-500">Date Signed</p>
                 <p className="mt-2 font-bold text-slate-700">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
               </div>
@@ -210,14 +214,15 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                   Client Signature
-                  <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none" placeholder="Type full legal name" />
+                  <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(event.clientX - rect.left, event.clientY - rect.top); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(event.clientX - rect.left, event.clientY - rect.top); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-44 w-full touch-none rounded-2xl border border-slate-200 bg-white" />
+                  <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="mt-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600">Clear Signature</button>
                 </label>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
                   <p className="mt-3 font-bold">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                 </div>
               </div>
-              <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
+              <button type="button" disabled={!agreementAccepted || !signatureDataUrl} onClick={handleSignProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
               {notice && <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
             </section>
           )}
@@ -226,3 +231,4 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     </main>
   );
 }
+

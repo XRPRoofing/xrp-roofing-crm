@@ -19,6 +19,7 @@ type PublicProposal = {
   selectedOption?: "good" | "better" | "best";
   signedAt?: string;
   signedBy?: string;
+  signatureDataUrl?: string;
   packages?: {
     good?: string | { scope?: string; price?: number };
     better?: string | { scope?: string; price?: number };
@@ -59,3 +60,4 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
 
   return <ProposalClientView proposal={proposal} />;
 }
+
