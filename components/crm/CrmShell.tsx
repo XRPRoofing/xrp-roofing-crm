@@ -66,7 +66,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)] text-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)] text-slate-900">
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
@@ -87,7 +87,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </div>
           ))}
         </div>
-        <nav className="relative min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-36">
+        <nav className="scrollbar-hide relative min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-36 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
