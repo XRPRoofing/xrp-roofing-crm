@@ -55,6 +55,21 @@ export async function startOutboundCall(payload: TwilioCallPayload) {
   return response.json() as Promise<{ sid: string; status: string }>;
 }
 
+export async function controlCall(payload: { callSid: string; action: "end" | "hold" | "resume"; conversationId?: string }) {
+  const response = await fetch("/api/twilio/voice/call-control", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || "Unable to control call");
+  }
+
+  return response.json() as Promise<{ sid: string; status: string; action: string }>;
+}
+
 export async function saveCallNotes(payload: TwilioCallNotePayload) {
   const response = await fetch("/api/twilio/notes", {
     method: "POST",

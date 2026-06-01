@@ -59,7 +59,13 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
 
 export function buildIncomingCallTwiml() {
   const response = new twilio.twiml.VoiceResponse();
-  const dial = response.dial({ answerOnBridge: true });
+  const dial = response.dial({
+    answerOnBridge: true,
+    record: "record-from-answer-dual",
+    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallbackEvent: ["completed"],
+    recordingStatusCallbackMethod: "POST",
+  });
 
   dial.client("crm-agent");
 
@@ -75,7 +81,13 @@ export function buildOutboundBrowserCallTwiml(to?: string | null) {
     return response.toString();
   }
 
-  response.dial({ callerId: config.phoneNumber }).number(to);
+  response.dial({
+    callerId: config.phoneNumber,
+    record: "record-from-answer-dual",
+    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallbackEvent: ["completed"],
+    recordingStatusCallbackMethod: "POST",
+  }).number(to);
 
   return response.toString();
 }
@@ -92,14 +104,14 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
     direction: String(payload.Direction || "").includes("outbound") ? "outbound" : "inbound",
     from: String(payload.From || ""),
     to: String(payload.To || ""),
-    body: String(payload.Body || ""),
-    status: String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || ""),
+    body: String(payload.Body || payload.TranscriptionText || ""),
+    status: String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || ""),
     callSid: callSid || undefined,
     messageSid: messageSid || undefined,
     conversationId: payload.conversationId ? String(payload.conversationId) : undefined,
     customerId: payload.customerId ? String(payload.customerId) : undefined,
     jobId: payload.jobId ? String(payload.jobId) : undefined,
-    recordingUrl: payload.RecordingUrl ? String(payload.RecordingUrl) : undefined,
+    recordingUrl: payload.RecordingUrl ? `${payload.RecordingUrl}.mp3` : undefined,
     payload,
     createdAt: now,
   };
