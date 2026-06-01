@@ -10,3 +10,7 @@ export async function POST(req: NextRequest) {
 
   return new NextResponse(buildIncomingCallTwiml(), { headers: { "Content-Type": "text/xml" } });
 }
+
+export async function GET() {
+  return new NextResponse(buildIncomingCallTwiml(), { headers: { "Content-Type": "text/xml" } });
+}

@@ -8,3 +8,10 @@ export async function POST(req: NextRequest) {
 
   return new NextResponse(twiml, { headers: { "Content-Type": "text/xml" } });
 }
+
+export async function GET(req: NextRequest) {
+  const to = req.nextUrl.searchParams.get("To");
+  const twiml = buildOutboundBrowserCallTwiml(to);
+
+  return new NextResponse(twiml, { headers: { "Content-Type": "text/xml" } });
+}
