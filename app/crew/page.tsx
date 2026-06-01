@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud } from "lucide-react";
 import { leads } from "@/lib/crm-data";
@@ -18,7 +18,7 @@ function fileToDataUrl(file: File) {
 }
 
 export default function CrewPortalPage() {
-  const [jobs] = useState(() => readSavedJobs(leads));
+  const [jobs, setJobs] = useState(() => readSavedJobs(leads));
   const [selectedCrew, setSelectedCrew] = useState(crewMembers[0]);
   const [assignments, setAssignments] = useState<CrewAssignment[]>(() => {
     const savedAssignments = readCrewAssignments();
@@ -27,6 +27,22 @@ export default function CrewPortalPage() {
   const crewJobs = useMemo(() => mergeJobsWithCrewAssignments(jobs, assignments).filter((job) => job.assignedCrew.includes(selectedCrew)), [assignments, jobs, selectedCrew]);
   const [selectedJobId, setSelectedJobId] = useState(crewJobs[0]?.id || "");
   const selectedJob = crewJobs.find((job) => job.id === selectedJobId) || crewJobs[0];
+
+  useEffect(() => {
+    function refreshCrewWorkflow() {
+      const nextJobs = readSavedJobs(leads);
+      const nextAssignments = readCrewAssignments();
+      setJobs(nextJobs);
+      setAssignments(nextJobs.map((job, index) => nextAssignments.find((assignment) => assignment.jobId === job.id) || createDefaultCrewAssignment(job, index)));
+    }
+
+    window.addEventListener("crm-crew-workflow-updated", refreshCrewWorkflow);
+    window.addEventListener("storage", refreshCrewWorkflow);
+    return () => {
+      window.removeEventListener("crm-crew-workflow-updated", refreshCrewWorkflow);
+      window.removeEventListener("storage", refreshCrewWorkflow);
+    };
+  }, []);
 
   function updateAssignment(jobId: string, updates: Partial<CrewAssignment>) {
     setAssignments((currentAssignments) => {

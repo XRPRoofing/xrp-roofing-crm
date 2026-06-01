@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FolderOpen, ImageIcon, Search, UploadCloud } from "lucide-react";
 import { readCrmFileFolders, type CrmFileFolder } from "@/lib/crm-files";
@@ -10,7 +10,7 @@ function formatDate(value: string) {
 }
 
 export default function FilesPage() {
-  const [folders] = useState<CrmFileFolder[]>(() => readCrmFileFolders());
+  const [folders, setFolders] = useState<CrmFileFolder[]>(() => readCrmFileFolders());
   const [search, setSearch] = useState("");
   const filteredFolders = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -19,6 +19,19 @@ export default function FilesPage() {
     return folders.filter((folder) => [folder.name, folder.address, folder.workType, folder.customerName].some((value) => value.toLowerCase().includes(query)));
   }, [folders, search]);
   const totalPhotos = folders.reduce((total, folder) => total + folder.files.length, 0);
+
+  useEffect(() => {
+    function refreshFolders() {
+      setFolders(readCrmFileFolders());
+    }
+
+    window.addEventListener("crm-files-updated", refreshFolders);
+    window.addEventListener("storage", refreshFolders);
+    return () => {
+      window.removeEventListener("crm-files-updated", refreshFolders);
+      window.removeEventListener("storage", refreshFolders);
+    };
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -54,7 +67,7 @@ export default function FilesPage() {
               <div className="border-b border-slate-100 bg-slate-50 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><FolderOpen className="h-5 w-5 text-blue-600" />{folder.address}</div>
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><FolderOpen className="h-5 w-5 text-blue-600" />{folder.name}</div>
                     <h2 className="mt-2 text-xl font-black text-[#07183f]">{folder.workType}</h2>
                     <p className="mt-1 text-sm font-semibold text-slate-500">{folder.customerName}</p>
                   </div>

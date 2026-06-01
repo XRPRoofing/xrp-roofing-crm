@@ -22,8 +22,8 @@ export type CrmFileFolder = {
 
 export const crmFilesStorageKey = "xrp-crm-files-dashboard";
 
-function createFolderId(jobId: string, address: string, workType: string) {
-  return `${jobId}-${address}-${workType}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+function createFolderId(address: string) {
+  return address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 export function readCrmFileFolders() {
@@ -41,6 +41,7 @@ export function readCrmFileFolders() {
 
 export function saveCrmFileFolders(folders: CrmFileFolder[]) {
   window.localStorage.setItem(crmFilesStorageKey, JSON.stringify(folders));
+  window.dispatchEvent(new Event("crm-files-updated"));
 }
 
 export function syncCrewPhotosToFiles(input: {
@@ -55,7 +56,7 @@ export function syncCrewPhotosToFiles(input: {
   if (typeof window === "undefined" || input.photos.length === 0) return;
 
   const now = new Date().toISOString();
-  const folderId = createFolderId(input.jobId, input.address, input.workType);
+  const folderId = createFolderId(input.address);
   const folders = readCrmFileFolders();
   const nextFiles: CrmFileRecord[] = input.photos.map((photo, index) => ({
     id: `${folderId}-${Date.now()}-${index}`,
@@ -70,7 +71,7 @@ export function syncCrewPhotosToFiles(input: {
   const existingFolder = folders.find((folder) => folder.id === folderId);
   const nextFolder: CrmFileFolder = {
     id: folderId,
-    name: `${input.address} - ${input.workType}`,
+    name: input.address,
     address: input.address,
     workType: input.workType,
     jobId: input.jobId,

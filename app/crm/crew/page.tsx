@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, Plus, RotateCcw, Search, UploadCloud, UsersRound, X } from "lucide-react";
 import { leads } from "@/lib/crm-data";
 import { syncCrewPhotosToFiles } from "@/lib/crm-files";
 import { addCrmNotification } from "@/lib/crm-notifications";
-import { createDefaultCrewAssignment, crewMembers, crewStatuses, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, type CrewAssignment, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
+import { createDefaultCrewAssignment, crewMembers, crewStatuses, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, saveCrewJobs, type CrewAssignment, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
   { label: "All Jobs", value: "all" },
@@ -62,6 +62,22 @@ export default function CrewWorkflowPage() {
     });
   }, [activeFilter, crewJobs, search]);
   const selectedJob = crewJobs.find((job) => job.id === selectedJobId) || null;
+
+  useEffect(() => {
+    function refreshCrewWorkflow() {
+      const nextJobs = readSavedJobs(leads);
+      const nextAssignments = readCrewAssignments();
+      setJobs(nextJobs);
+      setAssignments(nextJobs.map((job, index) => nextAssignments.find((assignment) => assignment.jobId === job.id) || createDefaultCrewAssignment(job, index)));
+    }
+
+    window.addEventListener("crm-crew-workflow-updated", refreshCrewWorkflow);
+    window.addEventListener("storage", refreshCrewWorkflow);
+    return () => {
+      window.removeEventListener("crm-crew-workflow-updated", refreshCrewWorkflow);
+      window.removeEventListener("storage", refreshCrewWorkflow);
+    };
+  }, []);
 
   function updateAssignment(jobId: string, updates: Partial<CrewAssignment>) {
     const job = crewJobs.find((item) => item.id === jobId);
@@ -141,7 +157,7 @@ export default function CrewWorkflowPage() {
     };
     const nextJobs = [job, ...jobs];
     const nextAssignments = [assignment, ...assignments];
-    window.localStorage.setItem("xrp-crm-jobs-board", JSON.stringify(nextJobs));
+    saveCrewJobs(nextJobs);
     saveCrewAssignments(nextAssignments);
     setJobs(nextJobs);
     setAssignments(nextAssignments);

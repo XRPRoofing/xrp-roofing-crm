@@ -59,6 +59,12 @@ export function mergeJobsWithCrewAssignments(jobs: Lead[], assignments: CrewAssi
 
 export function saveCrewAssignments(assignments: CrewAssignment[]) {
   window.localStorage.setItem(crewWorkflowStorageKey, JSON.stringify(assignments));
+  window.dispatchEvent(new Event("crm-crew-workflow-updated"));
+}
+
+export function saveCrewJobs(jobs: Lead[]) {
+  window.localStorage.setItem(jobsStorageKey, JSON.stringify(jobs));
+  window.dispatchEvent(new Event("crm-crew-workflow-updated"));
 }
 
 export function readCrewAssignments() {
