@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import { CheckCircle2, RotateCcw, Search, UsersRound, X } from "lucide-react";
+import { Camera, CheckCircle2, Plus, RotateCcw, Search, UploadCloud, UsersRound, X } from "lucide-react";
 import { leads } from "@/lib/crm-data";
+import { syncCrewPhotosToFiles } from "@/lib/crm-files";
 import { createDefaultCrewAssignment, crewMembers, crewStatuses, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, type CrewAssignment, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
@@ -27,15 +28,25 @@ const statusStyles: Record<CrewJobStatus, string> = {
   "Done Payment": "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 function formatAddress(job: CrewJob) {
   return `${job.address}, ${job.city}, AZ`;
 }
 
 export default function CrewWorkflowPage() {
-  const [jobs] = useState(() => readSavedJobs(leads));
+  const [jobs, setJobs] = useState(() => readSavedJobs(leads));
   const [activeFilter, setActiveFilter] = useState<"all" | CrewJobStatus>("all");
   const [search, setSearch] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [showCreateJob, setShowCreateJob] = useState(false);
+  const [newJob, setNewJob] = useState({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
   const [assignments, setAssignments] = useState<CrewAssignment[]>(() => {
     const savedAssignments = readCrewAssignments();
     return jobs.map((job, index) => savedAssignments.find((assignment) => assignment.jobId === job.id) || createDefaultCrewAssignment(job, index));
@@ -64,6 +75,65 @@ export default function CrewWorkflowPage() {
     updateAssignment(job.id, { assignedCrew });
   }
 
+  async function handlePhotoUpload(job: CrewJob, type: "beforePhotos" | "afterPhotos", files: FileList | null) {
+    if (!files?.length) return;
+
+    const selectedFiles = Array.from(files);
+    const uploadedPhotos = await Promise.all(selectedFiles.map(fileToDataUrl));
+    updateAssignment(job.id, {
+      completion: {
+        ...job.completion,
+        [type]: [...job.completion[type], ...uploadedPhotos],
+      },
+    });
+    syncCrewPhotosToFiles({
+      jobId: job.id,
+      customerName: job.name,
+      address: formatAddress(job),
+      workType: job.jobScope,
+      uploadedBy: job.assignedCrew[0] || "Crew",
+      photoType: type === "beforePhotos" ? "Before" : "After",
+      photos: selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })),
+    });
+  }
+
+  function handleCreateJob() {
+    if (!newJob.name.trim() || !newJob.address.trim()) return;
+
+    const job = {
+      id: `L-${Date.now()}`,
+      name: newJob.name,
+      email: newJob.email || "customer@example.com",
+      phone: newJob.phone || "",
+      address: newJob.address,
+      city: newJob.city || "Phoenix",
+      stage: "scheduled" as const,
+      value: Number(newJob.value) || 0,
+      assignedTo: "Crew",
+      roofType: newJob.roofType || "Roofing",
+      source: "Crew",
+      lastActivity: newJob.jobNotes || "Created by crew",
+      nextAction: "Complete job",
+      dueDate: newJob.dueDate || new Date().toISOString().slice(0, 10),
+    };
+    const assignment = {
+      ...createDefaultCrewAssignment(job, jobs.length),
+      assignedCrew: [newJob.assignedCrew],
+      scheduleDate: job.dueDate,
+      jobScope: newJob.jobScope || job.roofType,
+      jobNotes: newJob.jobNotes || "Crew-created job.",
+    };
+    const nextJobs = [job, ...jobs];
+    const nextAssignments = [assignment, ...assignments];
+    window.localStorage.setItem("xrp-crm-jobs-board", JSON.stringify(nextJobs));
+    saveCrewAssignments(nextAssignments);
+    setJobs(nextJobs);
+    setAssignments(nextAssignments);
+    setSelectedJobId(job.id);
+    setNewJob({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
+    setShowCreateJob(false);
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -73,9 +143,12 @@ export default function CrewWorkflowPage() {
             <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Roofing Crew Workflow</h1>
             <p className="mt-1 text-sm font-semibold text-slate-600">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
           </div>
-          <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search jobs, team, scope..." />
+          <div className="flex w-full flex-col gap-3 lg:max-w-lg lg:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search jobs, team, scope..." />
+            </div>
+            <button type="button" onClick={() => setShowCreateJob(true)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"><Plus className="mr-2 inline h-4 w-4" />New Job</button>
           </div>
         </div>
 
@@ -121,6 +194,37 @@ export default function CrewWorkflowPage() {
         {filteredJobs.length === 0 && <div className="p-8 text-center text-sm font-bold text-slate-500">No crew jobs match this filter.</div>}
       </section>
 
+      {showCreateJob && (
+        <section className="rounded-3xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-700">Crew Created Job</p>
+              <h2 className="mt-1 text-2xl font-black text-[#07183f]">Create New Job</h2>
+            </div>
+            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-xl p-2 text-slate-500 hover:bg-white"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <input value={newJob.name} onChange={(event) => setNewJob({ ...newJob, name: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-1" placeholder="Customer name" />
+            <input value={newJob.phone} onChange={(event) => setNewJob({ ...newJob, phone: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Phone" />
+            <input value={newJob.email} onChange={(event) => setNewJob({ ...newJob, email: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Email" />
+            <input value={newJob.address} onChange={(event) => setNewJob({ ...newJob, address: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-2" placeholder="Property address" />
+            <input value={newJob.city} onChange={(event) => setNewJob({ ...newJob, city: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="City" />
+            <input value={newJob.roofType} onChange={(event) => setNewJob({ ...newJob, roofType: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Roof type" />
+            <input value={newJob.value} onChange={(event) => setNewJob({ ...newJob, value: event.target.value })} type="number" className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Job value" />
+            <input value={newJob.dueDate} onChange={(event) => setNewJob({ ...newJob, dueDate: event.target.value })} type="date" className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" />
+            <select value={newJob.assignedCrew} onChange={(event) => setNewJob({ ...newJob, assignedCrew: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none">
+              {crewMembers.map((member) => <option key={member}>{member}</option>)}
+            </select>
+            <input value={newJob.jobScope} onChange={(event) => setNewJob({ ...newJob, jobScope: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job scope" />
+            <textarea value={newJob.jobNotes} onChange={(event) => setNewJob({ ...newJob, jobNotes: event.target.value })} className="min-h-24 rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job notes" />
+          </div>
+          <div className="mt-4 flex justify-end gap-3">
+            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700">Cancel</button>
+            <button type="button" onClick={handleCreateJob} className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white">Create Job</button>
+          </div>
+        </section>
+      )}
+
       {selectedJob && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={() => setSelectedJobId(null)}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -151,6 +255,16 @@ export default function CrewWorkflowPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-black text-[#07183f]">Uploaded Photos</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 text-center text-sm font-black text-blue-700">
+                    <Camera className="mb-2 h-5 w-5" />Upload before photos
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "beforePhotos", event.target.files)} />
+                  </label>
+                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 text-center text-sm font-black text-blue-700">
+                    <UploadCloud className="mb-2 h-5 w-5" />Upload after photos
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "afterPhotos", event.target.files)} />
+                  </label>
+                </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...selectedJob.completion.beforePhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Crew uploaded completion" width={400} height={240} unoptimized className="h-32 w-full rounded-xl object-cover" />)}</div>
                 {selectedJob.completion.beforePhotos.length + selectedJob.completion.afterPhotos.length === 0 && <p className="mt-2 text-sm font-semibold text-slate-500">No photos uploaded yet.</p>}
               </div>
@@ -186,3 +300,4 @@ export default function CrewWorkflowPage() {
     </div>
   );
 }
+

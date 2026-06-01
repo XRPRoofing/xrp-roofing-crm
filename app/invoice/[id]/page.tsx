@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import Link from "next/link";
+import InvoicePaymentButtons from "./InvoicePaymentButtons";
 
 type Invoice = {
   id: string;
@@ -65,10 +65,6 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
   }
 
   const totals = calculateTotals(invoice);
-  const paymentMethods = [
-    { label: "Pay by Card", method: "card" },
-    { label: "Pay by ACH Bank Transfer", method: "ach" },
-  ];
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-950">
@@ -130,13 +126,7 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
 
             <section className="rounded-3xl border border-blue-100 bg-blue-50 p-5">
               <h2 className="text-lg font-black text-[#07183f]">Choose Payment Method</h2>
-              <div className="mt-4 space-y-3">
-                {paymentMethods.map((payment) => (
-                  <Link key={payment.method} href={`/api/stripe/checkout?invoiceId=${encodeURIComponent(invoice.id)}&method=${payment.method}`} className="block rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white shadow-sm">
-                    {payment.label}
-                  </Link>
-                ))}
-              </div>
+              <InvoicePaymentButtons invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber || invoice.id} amount={totals.balance} customerEmail={invoice.email || ""} />
               <p className="mt-3 text-xs font-semibold leading-5 text-blue-800">Online payment supports card and ACH when Stripe is configured. You may also contact XRP Roofing for offline payment options.</p>
             </section>
           </aside>
@@ -145,3 +135,5 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
     </main>
   );
 }
+
+
