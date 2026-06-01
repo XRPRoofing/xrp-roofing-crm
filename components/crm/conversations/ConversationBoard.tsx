@@ -6,7 +6,7 @@ import { appointmentTypes, conversationFilters, createConversationFromLead, pipe
 import { saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { CheckCheck, Clock, FileImage, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCheck, Clock, FileImage, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -214,6 +214,7 @@ export default function ConversationBoard() {
   const [messageText, setMessageText] = useState("");
   const [twilioNotice, setTwilioNotice] = useState("Twilio realtime ready");
   const [dialNumber, setDialNumber] = useState(active?.contact.phone || "");
+  const [showMobileThread, setShowMobileThread] = useState(false);
 
   useEffect(() => {
     try {
@@ -266,6 +267,7 @@ export default function ConversationBoard() {
     setDialNumber(conversation.contact.phone);
     setIsDialerOpen(true);
     setIsDialerMinimized(false);
+    setShowMobileThread(true);
   }
 
   return (
@@ -285,13 +287,16 @@ export default function ConversationBoard() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[320px_minmax(520px,1fr)_340px]">
-        <ConversationInbox conversations={conversations} active={active} onSelect={(conversation) => {
-          setActiveConversationId(conversation.id);
-          setDialNumber(conversation.contact.phone);
-        }} />
-        <main className="flex min-h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
+          <ConversationInbox conversations={conversations} active={active} onSelect={(conversation) => {
+            setActiveConversationId(conversation.id);
+            setDialNumber(conversation.contact.phone);
+            setShowMobileThread(true);
+          }} />
+        </div>
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} min-h-[calc(100vh-12rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:min-h-[calc(100vh-8rem)]`}> 
           <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
-            <div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div>
+            <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
             <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
           </div>
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div></div>
@@ -300,7 +305,7 @@ export default function ConversationBoard() {
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
-        <ContactPanel conversation={active} onDial={openDialerForConversation} />
+        <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} /></div>
       </div>
 
       {!isDialerOpen && (
@@ -312,3 +317,4 @@ export default function ConversationBoard() {
     </div>
   );
 }
+
