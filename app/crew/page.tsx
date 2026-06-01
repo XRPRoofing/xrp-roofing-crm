@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud } from "lucide-react";
 import { leads } from "@/lib/crm-data";
+import { syncCrewPhotosToFiles } from "@/lib/crm-files";
 import { crewMembers, createDefaultCrewAssignment, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, type CrewAssignment, type CrewJob } from "@/lib/crew-workflow";
 
 function fileToDataUrl(file: File) {
@@ -37,12 +38,22 @@ export default function CrewPortalPage() {
   async function handlePhotoUpload(job: CrewJob, type: "beforePhotos" | "afterPhotos", files: FileList | null) {
     if (!files?.length) return;
 
-    const uploadedPhotos = await Promise.all(Array.from(files).map(fileToDataUrl));
+    const selectedFiles = Array.from(files);
+    const uploadedPhotos = await Promise.all(selectedFiles.map(fileToDataUrl));
     updateAssignment(job.id, {
       completion: {
         ...job.completion,
         [type]: [...job.completion[type], ...uploadedPhotos],
       },
+    });
+    syncCrewPhotosToFiles({
+      jobId: job.id,
+      customerName: job.name,
+      address: `${job.address}, ${job.city}, AZ`,
+      workType: job.jobScope,
+      uploadedBy: selectedCrew,
+      photoType: type === "beforePhotos" ? "Before" : "After",
+      photos: selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })),
     });
   }
 
@@ -153,5 +164,7 @@ export default function CrewPortalPage() {
     </main>
   );
 }
+
+
 
 
