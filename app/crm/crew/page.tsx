@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Camera, CheckCircle2, Plus, RotateCcw, Search, UploadCloud, UsersRound, X } from "lucide-react";
 import { leads } from "@/lib/crm-data";
 import { syncCrewPhotosToFiles } from "@/lib/crm-files";
+import { addCrmNotification } from "@/lib/crm-notifications";
 import { createDefaultCrewAssignment, crewMembers, crewStatuses, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, type CrewAssignment, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
@@ -63,6 +64,15 @@ export default function CrewWorkflowPage() {
   const selectedJob = crewJobs.find((job) => job.id === selectedJobId) || null;
 
   function updateAssignment(jobId: string, updates: Partial<CrewAssignment>) {
+    const job = crewJobs.find((item) => item.id === jobId);
+    if (job && updates.status && updates.status !== job.status) {
+      addCrmNotification({
+        title: "Crew job moved",
+        message: `${job.name} moved from ${job.status} to ${updates.status}.`,
+        actor: "CRM user",
+        module: "Crew Workflow",
+      });
+    }
     setAssignments((currentAssignments) => {
       const nextAssignments = currentAssignments.map((assignment) => assignment.jobId === jobId ? { ...assignment, ...updates } : assignment);
       saveCrewAssignments(nextAssignments);
@@ -94,6 +104,12 @@ export default function CrewWorkflowPage() {
       uploadedBy: job.assignedCrew[0] || "Crew",
       photoType: type === "beforePhotos" ? "Before" : "After",
       photos: selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })),
+    });
+    addCrmNotification({
+      title: "Crew photos uploaded",
+      message: `${selectedFiles.length} ${type === "beforePhotos" ? "before" : "after"} photo(s) uploaded for ${job.name}.`,
+      actor: job.assignedCrew[0] || "Crew",
+      module: "Crew Workflow",
     });
   }
 
@@ -130,6 +146,12 @@ export default function CrewWorkflowPage() {
     setJobs(nextJobs);
     setAssignments(nextAssignments);
     setSelectedJobId(job.id);
+    addCrmNotification({
+      title: "New crew job created",
+      message: `${job.name} was created and assigned to ${newJob.assignedCrew}.`,
+      actor: "CRM user",
+      module: "Crew Workflow",
+    });
     setNewJob({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
     setShowCreateJob(false);
   }

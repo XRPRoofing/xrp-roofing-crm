@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -40,6 +41,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userRole, setUserRole] = useState("admin");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<CrmNotification[]>([]);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => item.href === "/crm/crew") : navigation;
   const mobileNavigation = isCrewUser ? visibleNavigation : navigation.filter((item) => mobilePrimaryNavigation.includes(item.href));
@@ -72,10 +75,34 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router]);
 
+  useEffect(() => {
+    if (isCrewUser) return;
+
+    function refreshNotifications() {
+      setNotifications(readCrmNotifications());
+    }
+
+    refreshNotifications();
+    window.addEventListener("crm-notifications-updated", refreshNotifications);
+    window.addEventListener("storage", refreshNotifications);
+    return () => {
+      window.removeEventListener("crm-notifications-updated", refreshNotifications);
+      window.removeEventListener("storage", refreshNotifications);
+    };
+  }, [isCrewUser]);
+
   async function logout() {
     await createClient().auth.signOut();
     router.push("/login");
   }
+
+  function handleToggleNotifications() {
+    setNotificationsOpen((current) => !current);
+    markCrmNotificationsRead();
+    setNotifications(readCrmNotifications());
+  }
+
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
 
   if (checkingAuth) {
     return (
@@ -147,10 +174,35 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-100" />
               <input className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder={isCrewUser ? "Search assigned crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
             </div>
-            <button className="relative rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm hover:bg-white lg:border-white/15 lg:bg-white/10 lg:p-3 lg:text-white lg:hover:bg-white/15">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
-            </button>
+            {!isCrewUser && (
+              <div className="relative">
+                <button onClick={handleToggleNotifications} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm hover:bg-white lg:border-white/15 lg:bg-white/10 lg:p-3 lg:text-white lg:hover:bg-white/15">
+                  <Bell className="h-5 w-5" />
+                  {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-black text-white ring-2 ring-white">{unreadNotifications}</span>}
+                </button>
+                {notificationsOpen && (
+                  <div className="absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-900 shadow-2xl shadow-slate-950/20">
+                    <div className="border-b border-slate-200 p-4">
+                      <p className="text-sm font-black text-[#07183f]">Notifications</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">Recent CRM changes and movements</p>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto p-2">
+                      {notifications.map((notification) => (
+                        <div key={notification.id} className="rounded-2xl p-3 hover:bg-slate-50">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-black text-slate-900">{notification.title}</p>
+                            {!notification.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-orange-500" />}
+                          </div>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{notification.message}</p>
+                          <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                        </div>
+                      ))}
+                      {notifications.length === 0 && <p className="p-5 text-center text-sm font-semibold text-slate-500">No notifications yet.</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button className="hidden items-center gap-2 rounded-2xl border border-orange-300/40 bg-orange-400/15 px-4 py-3 text-sm font-black text-orange-100 xl:flex">
               <Sparkles className="h-4 w-4" /> Pro
             </button>

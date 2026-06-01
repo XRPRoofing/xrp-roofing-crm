@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud } from "lucide-react";
 import { leads } from "@/lib/crm-data";
 import { syncCrewPhotosToFiles } from "@/lib/crm-files";
+import { addCrmNotification } from "@/lib/crm-notifications";
 import { crewMembers, createDefaultCrewAssignment, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, type CrewAssignment, type CrewJob } from "@/lib/crew-workflow";
 
 function fileToDataUrl(file: File) {
@@ -55,6 +56,12 @@ export default function CrewPortalPage() {
       photoType: type === "beforePhotos" ? "Before" : "After",
       photos: selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })),
     });
+    addCrmNotification({
+      title: "Crew photos uploaded",
+      message: `${selectedCrew} uploaded ${selectedFiles.length} ${type === "beforePhotos" ? "before" : "after"} photo(s) for ${job.name}.`,
+      actor: selectedCrew,
+      module: "Crew Portal",
+    });
   }
 
   function submitForApproval(job: CrewJob) {
@@ -65,6 +72,12 @@ export default function CrewPortalPage() {
       status: "Mark Done",
       completion: { ...job.completion, submittedAt: new Date().toISOString() },
       adminNotification: `${selectedCrew} marked ${job.name} done.`,
+    });
+    addCrmNotification({
+      title: "Crew job marked done",
+      message: `${selectedCrew} marked ${job.name} done and ready for review.`,
+      actor: selectedCrew,
+      module: "Crew Portal",
     });
   }
 
