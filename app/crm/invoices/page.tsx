@@ -23,6 +23,31 @@ type Payment = {
   offline: boolean;
 };
 
+
+type ProposalPackageOption = {
+  scope?: string;
+  price?: number;
+};
+
+type StoredProposal = {
+  id: string;
+  customerName: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  address: string;
+  scope: string;
+  title?: string;
+  total: number;
+  status: string;
+  selectedOption?: "good" | "better" | "best";
+  signedAt?: string;
+  packages?: {
+    good?: string | ProposalPackageOption;
+    better?: string | ProposalPackageOption;
+    best?: string | ProposalPackageOption;
+  };
+  job?: Lead;
+};
 type Invoice = {
   id: string;
   invoiceNumber: string;
@@ -139,6 +164,35 @@ const integrations = [
   { group: "Storage", items: ["Google Drive", "Dropbox"] },
 ];
 
+
+function normalizeProposalPackage(value?: string | ProposalPackageOption): Required<ProposalPackageOption> {
+  if (!value) return { scope: "Approved roofing scope of work", price: 0 };
+  if (typeof value === "string") return { scope: value, price: 0 };
+  return { scope: value.scope || "Approved roofing scope of work", price: Number(value.price || 0) };
+}
+
+function readWonProposals() {
+  if (typeof window === "undefined") return [] as StoredProposal[];
+
+  const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
+  if (!savedProposals) return [] as StoredProposal[];
+
+  try {
+    return (JSON.parse(savedProposals) as StoredProposal[]).filter((proposal) => proposal.status === "Won");
+  } catch {
+    return [] as StoredProposal[];
+  }
+}
+
+function getProposalSelectedPackage(proposal: StoredProposal) {
+  const selectedOption = proposal.selectedOption || "best";
+  const packageOption = normalizeProposalPackage(proposal.packages?.[selectedOption]);
+  return {
+    selectedOption,
+    scope: packageOption.scope || proposal.scope,
+    price: packageOption.price || proposal.total,
+  };
+}
 function currency(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
@@ -216,6 +270,29 @@ function createInvoiceFromJob(job: Lead, count: number): Invoice {
   };
 }
 
+
+function createInvoiceFromProposal(proposal: StoredProposal, count: number): Invoice {
+  const selectedPackage = getProposalSelectedPackage(proposal);
+  const job = proposal.job;
+
+  return {
+    ...createBlankInvoice(count),
+    clientName: proposal.customerName,
+    email: proposal.customerEmail || job?.email || "",
+    phone: proposal.customerPhone || job?.phone || "",
+    jobName: `${selectedPackage.selectedOption.toUpperCase()} Package - ${proposal.title || job?.roofType || "Roofing Project"}`,
+    propertyAddress: proposal.address,
+    jobReference: job?.id || proposal.id,
+    roofType: job?.roofType || "Roofing",
+    proposalReference: proposal.id,
+    dueDate: today,
+    projectCompletionDate: today,
+    paymentTerms: "Customer may pay online by credit card or ACH bank transfer. Payment is due according to the approved proposal terms.",
+    warrantyNotes: "Warranty details follow the approved proposal scope and XRP Roofing workmanship terms.",
+    lineItems: [{ description: selectedPackage.scope, quantity: 1, unitPrice: selectedPackage.price, tax: 0 }],
+    activity: [`Invoice created from won proposal ${proposal.id}`, `${selectedPackage.selectedOption.toUpperCase()} package selected by customer`],
+  };
+}
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
   if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
@@ -252,6 +329,7 @@ export default function InvoicesPage() {
   const [invoiceFilter, setInvoiceFilter] = useState<(typeof filterOptions)[number]>("All");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [integrationNotice, setIntegrationNotice] = useState("");
+  const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
   const [createForm, setCreateForm] = useState<Invoice>({
@@ -357,12 +435,20 @@ export default function InvoicesPage() {
   }
 
   function handleStartInvoice() {
+    setWonProposals(readWonProposals());
     setCreateForm(createBlankInvoice(invoices.length));
     setShowCreateModal(true);
   }
 
-  function handlePrefillFromJob(jobId: string) {
-    const job = leads.find((item) => item.id === jobId);
+  function handlePrefillFromJob(sourceId: string) {
+    if (sourceId.startsWith("proposal:")) {
+      const proposalId = sourceId.replace("proposal:", "");
+      const proposal = wonProposals.find((item) => item.id === proposalId);
+      if (proposal) setCreateForm(createInvoiceFromProposal(proposal, invoices.length));
+      return;
+    }
+
+    const job = leads.find((item) => item.id === sourceId);
     if (!job) return;
     setCreateForm(createInvoiceFromJob(job, invoices.length));
   }
@@ -774,3 +860,8 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
+
+
+
+
