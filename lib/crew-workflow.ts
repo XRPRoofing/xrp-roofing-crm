@@ -28,6 +28,11 @@ export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "On Wor
 export const crewWorkflowStorageKey = "xrp-crm-crew-workflow";
 export const jobsStorageKey = "xrp-crm-jobs-board";
 
+function cleanAssignedCrew(assignedCrew: string[], index = 0) {
+  const validCrew = assignedCrew.filter((member) => crewMembers.includes(member));
+  return validCrew.length > 0 ? validCrew : [crewMembers[index % crewMembers.length]];
+}
+
 export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignment {
   return {
     jobId: job.id,
@@ -48,7 +53,7 @@ export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignmen
 export function mergeJobsWithCrewAssignments(jobs: Lead[], assignments: CrewAssignment[]): CrewJob[] {
   return jobs.map((job, index) => {
     const assignment = assignments.find((item) => item.jobId === job.id) || createDefaultCrewAssignment(job, index);
-    return { ...job, ...assignment };
+    return { ...job, ...assignment, assignedCrew: cleanAssignedCrew(assignment.assignedCrew, index) };
   });
 }
 
@@ -63,7 +68,10 @@ export function readCrewAssignments() {
   if (!savedAssignments) return [] as CrewAssignment[];
 
   try {
-    return JSON.parse(savedAssignments) as CrewAssignment[];
+    const assignments = JSON.parse(savedAssignments) as CrewAssignment[];
+    const cleanedAssignments = assignments.map((assignment, index) => ({ ...assignment, assignedCrew: cleanAssignedCrew(assignment.assignedCrew, index) }));
+    window.localStorage.setItem(crewWorkflowStorageKey, JSON.stringify(cleanedAssignments));
+    return cleanedAssignments;
   } catch {
     return [] as CrewAssignment[];
   }
