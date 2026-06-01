@@ -4,6 +4,13 @@ import { createClient } from "@/lib/supabase/client";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 type VoiceDevice = import("@twilio/voice-sdk").Device;
+export type BrowserVoiceCall = {
+  accept: () => void;
+  disconnect: () => void;
+  reject: () => void;
+  on: (event: "accept" | "disconnect" | "error" | "cancel", handler: (error?: Error) => void) => void;
+  parameters?: Record<string, string>;
+};
 
 export async function getVoiceToken(identity = "crm-agent") {
   const response = await fetch("/api/twilio/voice/token", {

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, createConversationFromLead, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound } from "lucide-react";
@@ -210,7 +211,8 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 }
 
 export default function ConversationBoard() {
-  const browserCallRef = useRef<{ disconnect: () => void; parameters?: Record<string, string> } | null>(null);
+  const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
+  const browserCallRef = useRef<BrowserVoiceCall | null>(null);
   const conversations = useMemo(() => leads.map((lead) => createConversationFromLead(lead, customers.find((customer) => customer.name === lead.name))), []);
   const [activeConversationId, setActiveConversationId] = useState(conversations[0]?.id || "");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
@@ -223,6 +225,8 @@ export default function ConversationBoard() {
   const [twilioNotice, setTwilioNotice] = useState("Twilio realtime ready");
   const [dialNumber, setDialNumber] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
+  const [incomingFrom, setIncomingFrom] = useState("");
   const matchedDialContact = conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   useEffect(() => {
@@ -235,6 +239,53 @@ export default function ConversationBoard() {
     }
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function registerVoiceDevice() {
+      try {
+        const device = await createBrowserVoiceDevice("crm-agent");
+        if (!mounted) return;
+
+        voiceDeviceRef.current = device;
+        device.on("incoming", (call) => {
+          const incoming = call as BrowserVoiceCall;
+          setIncomingCall(incoming);
+          setIncomingFrom(incoming.parameters?.From || "Unknown caller");
+          setTwilioNotice("Incoming call ringing in CRM");
+          incoming.on("cancel", () => {
+            setIncomingCall(null);
+            setIncomingFrom("");
+            setTwilioNotice("Incoming call canceled");
+          });
+          incoming.on("disconnect", () => {
+            setIncomingCall(null);
+            setIncomingFrom("");
+            setIsActiveCall(false);
+            setCallSid(undefined);
+            browserCallRef.current = null;
+            setTwilioNotice("Call ended");
+          });
+          incoming.on("error", (error) => {
+            setTwilioNotice(error?.message || "Incoming call error");
+          });
+        });
+        await device.register();
+        setTwilioNotice("Ready for inbound calls");
+      } catch (error) {
+        setTwilioNotice(error instanceof Error ? error.message : "Inbound calling is not configured");
+      }
+    }
+
+    registerVoiceDevice();
+
+    return () => {
+      mounted = false;
+      voiceDeviceRef.current?.destroy();
+      voiceDeviceRef.current = null;
+    };
+  }, []);
+
   async function handleStartCall() {
     const destination = dialNumber.trim();
     if (!destination) {
@@ -244,9 +295,10 @@ export default function ConversationBoard() {
 
     setTwilioNotice("Starting Twilio call...");
     try {
-      const device = await createBrowserVoiceDevice("crm-agent");
+      const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
+      voiceDeviceRef.current = device;
       const call = await device.connect({ params: { To: destination } });
-      browserCallRef.current = call as unknown as { disconnect: () => void; parameters?: Record<string, string> };
+      browserCallRef.current = call as unknown as BrowserVoiceCall;
       setCallSid(browserCallRef.current.parameters?.CallSid);
       setIsActiveCall(true);
       setIsHeld(false);
@@ -275,6 +327,27 @@ export default function ConversationBoard() {
         setTwilioNotice(error instanceof Error ? error.message : "Twilio call unavailable");
       }
     }
+  }
+
+  function handleAnswerIncomingCall() {
+    if (!incomingCall) return;
+
+    incomingCall.accept();
+    browserCallRef.current = incomingCall;
+    setCallSid(incomingCall.parameters?.CallSid);
+    setDialNumber(incomingCall.parameters?.From || "");
+    setIncomingCall(null);
+    setIncomingFrom("");
+    setIsActiveCall(true);
+    setIsHeld(false);
+    setTwilioNotice("Incoming call connected");
+  }
+
+  function handleDeclineIncomingCall() {
+    incomingCall?.reject();
+    setIncomingCall(null);
+    setIncomingFrom("");
+    setTwilioNotice("Incoming call declined");
   }
 
   async function handleEndCall() {
@@ -347,6 +420,12 @@ export default function ConversationBoard() {
 
   return (
     <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      {incomingCall && (
+        <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
+          <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
+          <div className="flex gap-2"><button onClick={handleAnswerIncomingCall} className="inline-flex items-center rounded-xl bg-white px-3.5 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"><Phone className="mr-1.5 h-4 w-4" />Answer</button><button onClick={handleDeclineIncomingCall} className="inline-flex items-center rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"><PhoneOff className="mr-1.5 h-4 w-4" />Decline</button></div>
+        </div>
+      )}
       {isActiveCall && (
         <div className="sticky top-20 z-40 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-600 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /><span className="text-sm font-semibold">Active call with {matchedDialContact?.name || dialNumber}</span><Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge></div>
