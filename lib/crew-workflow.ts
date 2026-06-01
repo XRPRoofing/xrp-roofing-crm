@@ -32,8 +32,8 @@ export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignmen
   return {
     jobId: job.id,
     assignedCrew: [crewMembers[index % crewMembers.length]],
-    status: job.stage === "completed" || job.stage === "paid" ? "Completed" : job.stage === "in_progress" ? "In Progress" : "Assigned",
-    scheduleDate: job.dueDate || "2026-06-05",
+    status: job.stage === "completed" ? "Completed" : job.stage === "in_progress" ? "In Progress" : "Assigned",
+    scheduleDate: "2026-06-05",
     jobScope: job.roofType || "Roofing work",
     jobNotes: job.lastActivity || "Review job details before starting work.",
     completion: {
@@ -81,3 +81,6 @@ export function readSavedJobs(fallbackJobs: Lead[]) {
     return fallbackJobs;
   }
 }
+
+
+
