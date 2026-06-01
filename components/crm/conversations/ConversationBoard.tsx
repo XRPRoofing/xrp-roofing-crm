@@ -213,6 +213,9 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 export default function ConversationBoard() {
   const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneContextRef = useRef<AudioContext | null>(null);
+  const ringtoneOscillatorRef = useRef<OscillatorNode | null>(null);
   const conversations = useMemo(() => leads.map((lead) => createConversationFromLead(lead, customers.find((customer) => customer.name === lead.name))), []);
   const [activeConversationId, setActiveConversationId] = useState(conversations[0]?.id || "");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
@@ -228,6 +231,40 @@ export default function ConversationBoard() {
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
   const matchedDialContact = conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
+
+  function stopIncomingAlert() {
+    ringtoneRef.current?.pause();
+    ringtoneRef.current = null;
+    ringtoneOscillatorRef.current?.stop();
+    ringtoneOscillatorRef.current = null;
+    ringtoneContextRef.current?.close();
+    ringtoneContextRef.current = null;
+    navigator.vibrate?.(0);
+  }
+
+  function startIncomingAlert(from: string) {
+    navigator.vibrate?.([500, 200, 500, 200, 500, 200, 500]);
+    if ("Notification" in window && Notification.permission === "granted") {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.active?.postMessage({ type: "INCOMING_CALL_NOTIFICATION", from });
+      });
+    }
+
+    const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const context = new AudioContextClass();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.08;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    ringtoneContextRef.current = context;
+    ringtoneOscillatorRef.current = oscillator;
+  }
 
   useEffect(() => {
     try {
@@ -250,15 +287,19 @@ export default function ConversationBoard() {
         voiceDeviceRef.current = device;
         device.on("incoming", (call) => {
           const incoming = call as BrowserVoiceCall;
+          const from = incoming.parameters?.From || "Unknown caller";
           setIncomingCall(incoming);
-          setIncomingFrom(incoming.parameters?.From || "Unknown caller");
+          setIncomingFrom(from);
           setTwilioNotice("Incoming call ringing in CRM");
+          startIncomingAlert(from);
           incoming.on("cancel", () => {
+            stopIncomingAlert();
             setIncomingCall(null);
             setIncomingFrom("");
             setTwilioNotice("Incoming call canceled");
           });
           incoming.on("disconnect", () => {
+            stopIncomingAlert();
             setIncomingCall(null);
             setIncomingFrom("");
             setIsActiveCall(false);
@@ -332,6 +373,7 @@ export default function ConversationBoard() {
   function handleAnswerIncomingCall() {
     if (!incomingCall) return;
 
+    stopIncomingAlert();
     incomingCall.accept();
     browserCallRef.current = incomingCall;
     setCallSid(incomingCall.parameters?.CallSid);
@@ -344,6 +386,7 @@ export default function ConversationBoard() {
   }
 
   function handleDeclineIncomingCall() {
+    stopIncomingAlert();
     incomingCall?.reject();
     setIncomingCall(null);
     setIncomingFrom("");
@@ -477,4 +520,5 @@ export default function ConversationBoard() {
     </div>
   );
 }
+
 

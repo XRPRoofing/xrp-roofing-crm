@@ -27,3 +27,40 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/crm")))
   );
 });
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "INCOMING_CALL_NOTIFICATION") return;
+
+  const from = event.data.from || "Unknown caller";
+
+  event.waitUntil(
+    self.registration.showNotification("Incoming call", {
+      body: `Call from ${from}`,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: "incoming-call",
+      requireInteraction: true,
+      vibrate: [300, 120, 300, 120, 300],
+      data: { url: "/crm/conversations" },
+      actions: [
+        { action: "open", title: "Open CRM" },
+      ],
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/crm/conversations";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) return client.focus();
+      }
+
+      if (clients.openWindow) return clients.openWindow(url);
+      return undefined;
+    })
+  );
+});

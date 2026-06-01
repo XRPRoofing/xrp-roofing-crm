@@ -8,6 +8,9 @@ export default function PwaRegistrar() {
 
     window.addEventListener("load", () => {
       void navigator.serviceWorker.register("/sw.js");
+      if ("Notification" in window && Notification.permission === "default") {
+        void Notification.requestPermission();
+      }
     });
   }, []);
 
