@@ -6,6 +6,7 @@ import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileS
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
+import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -42,8 +43,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userRole, setUserRole] = useState("admin");
+  const [currentUserId, setCurrentUserId] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CrmNotification[]>([]);
+  const [unreadTeamChatCount, setUnreadTeamChatCount] = useState(0);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
   const mobileNavigation = isCrewUser ? visibleNavigation : navigation.filter((item) => mobilePrimaryNavigation.includes(item.href));
@@ -61,6 +64,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       }
 
       const role = getUserRole(data.session.user.user_metadata);
+      setCurrentUserId(data.session.user.id);
       setUserRole(role);
 
       if (role === "crew" && !["/crm/crew", "/crm/team-chat"].includes(pathname)) {
@@ -92,6 +96,47 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     };
   }, [isCrewUser]);
 
+  useEffect(() => {
+    function refreshUnreadTeamChatCount() {
+      setUnreadTeamChatCount(readTeamChatUnreadCount());
+    }
+
+    refreshUnreadTeamChatCount();
+    window.addEventListener("team-chat-unread-updated", refreshUnreadTeamChatCount);
+    window.addEventListener("storage", refreshUnreadTeamChatCount);
+    return () => {
+      window.removeEventListener("team-chat-unread-updated", refreshUnreadTeamChatCount);
+      window.removeEventListener("storage", refreshUnreadTeamChatCount);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId || pathname === "/crm/team-chat") return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("team-chat-global-unread")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: teamChatTableName, filter: `room_id=eq.${teamChatRoomId}` },
+        (payload) => {
+          const nextMessage = payload.new as TeamChatMessage;
+          if (nextMessage.user_id !== currentUserId) incrementTeamChatUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, pathname]);
+
+  useEffect(() => {
+    if (pathname === "/crm/team-chat") {
+      markTeamChatRead();
+    }
+  }, [pathname]);
+
   async function logout() {
     await createClient().auth.signOut();
     router.push("/login");
@@ -104,6 +149,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+  const showTeamChatFloatingButton = pathname !== "/crm/team-chat";
 
   if (checkingAuth) {
     return (
@@ -139,13 +185,17 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
+            const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
             return (
               <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-white text-[#07183f] shadow-lg shadow-slate-950/20" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
                 <span className="flex items-center gap-3">
-                  <span className={`rounded-xl p-2 ${active ? "bg-orange-100 text-orange-600" : "bg-white/10 text-blue-100 group-hover:text-white"}`}><Icon className="h-4 w-4" /></span>
+                  <span className={`relative rounded-xl p-2 ${active ? "bg-orange-100 text-orange-600" : "bg-white/10 text-blue-100 group-hover:text-white"}`}>
+                    <Icon className="h-4 w-4" />
+                    {showChatBadge && <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-[#07183f]">{unreadTeamChatCount}</span>}
+                  </span>
                   {item.label}
                 </span>
-                {active && <span className="h-2 w-2 rounded-full bg-orange-500" />}
+                {showChatBadge ? <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-black text-white">{unreadTeamChatCount}</span> : active && <span className="h-2 w-2 rounded-full bg-orange-500" />}
               </Link>
             );
           })}
@@ -220,15 +270,28 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             {mobileNavigation.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
+              const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
               return (
-                <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${active ? "bg-[#07183f] text-white" : "text-slate-500 hover:bg-slate-100 hover:text-[#07183f]"}`}>
-                  <Icon className="h-5 w-5" />
+                <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${active ? "bg-[#07183f] text-white" : "text-slate-500 hover:bg-slate-100 hover:text-[#07183f]"}`}>
+                  <span className="relative">
+                    <Icon className="h-5 w-5" />
+                    {showChatBadge && <span className="absolute -right-3 -top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
+                  </span>
                   <span>{item.shortLabel}</span>
                 </Link>
               );
             })}
           </div>
         </nav>
+        {showTeamChatFloatingButton && (
+          <Link href="/crm/team-chat" className="fixed bottom-24 right-5 z-40 flex items-center gap-3 rounded-full bg-[#07183f] px-4 py-3 text-sm font-black text-white shadow-2xl shadow-blue-950/30 ring-4 ring-white/80 transition hover:-translate-y-0.5 hover:bg-blue-800 lg:bottom-8">
+            <span className="relative rounded-full bg-orange-500 p-2">
+              <MessageCircle className="h-5 w-5" />
+              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
+            </span>
+            <span className="hidden sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
+          </Link>
+        )}
       </div>
     </div>
   );

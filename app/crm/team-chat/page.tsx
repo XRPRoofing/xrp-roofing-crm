@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MessageCircle, SendHorizonal, UsersRound } from "lucide-react";
+import Image from "next/image";
+import { AtSign, ImagePlus, Loader2, MessageCircle, SendHorizonal, SmilePlus, UsersRound, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatChatTimestamp, getInitials, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
+import { extractMentions, formatChatTimestamp, getInitials, markTeamChatRead, quickChatEmojis, teamChatRoomId, teamChatTableName, type TeamChatAttachment, type TeamChatMessage } from "@/lib/team-chat";
 
 function getUserName(metadata: Record<string, unknown> | undefined, email?: string) {
   if (typeof metadata?.full_name === "string" && metadata.full_name.trim()) return metadata.full_name.trim();
@@ -17,11 +18,32 @@ function getAvatarUrl(metadata: Record<string, unknown> | undefined) {
   return null;
 }
 
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderMessageText(message: string) {
+  return message.split(/(@[\w.-]+)/g).map((part, index) => {
+    if (part.startsWith("@")) {
+      return <span key={`${part}-${index}`} className="rounded-full bg-orange-100 px-1.5 py-0.5 font-black text-orange-700">{part}</span>;
+    }
+
+    return part;
+  });
+}
+
 export default function TeamChatPage() {
   const supabase = useMemo(() => createClient(), []);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<TeamChatMessage[]>([]);
   const [message, setMessage] = useState("");
+  const [attachments, setAttachments] = useState<TeamChatAttachment[]>([]);
+  const [showEmojis, setShowEmojis] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +73,7 @@ export default function TeamChatPage() {
 
       const { data, error: messagesError } = await supabase
         .from(teamChatTableName)
-        .select("id, room_id, user_id, user_name, user_avatar_url, message, created_at")
+        .select("id, room_id, user_id, user_name, user_avatar_url, message, mentions, attachments, created_at")
         .eq("room_id", teamChatRoomId)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -65,6 +87,7 @@ export default function TeamChatPage() {
       }
 
       setMessages((data || []) as TeamChatMessage[]);
+      markTeamChatRead();
       setLoading(false);
     }
 
@@ -78,6 +101,7 @@ export default function TeamChatPage() {
         (payload) => {
           const nextMessage = payload.new as TeamChatMessage;
           setMessages((currentMessages) => currentMessages.some((item) => item.id === nextMessage.id) ? currentMessages : [...currentMessages, nextMessage]);
+          markTeamChatRead();
         }
       )
       .subscribe();
@@ -95,7 +119,7 @@ export default function TeamChatPage() {
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedMessage = message.trim();
-    if (!trimmedMessage || !currentUser) return;
+    if ((!trimmedMessage && attachments.length === 0) || !currentUser) return;
 
     setSending(true);
     setError("");
@@ -108,8 +132,10 @@ export default function TeamChatPage() {
         user_name: currentUser.name,
         user_avatar_url: currentUser.avatarUrl,
         message: trimmedMessage,
+        mentions: extractMentions(trimmedMessage),
+        attachments,
       })
-      .select("id, room_id, user_id, user_name, user_avatar_url, message, created_at")
+      .select("id, room_id, user_id, user_name, user_avatar_url, message, mentions, attachments, created_at")
       .single();
 
     if (sendError) {
@@ -124,7 +150,26 @@ export default function TeamChatPage() {
     }
 
     setMessage("");
+    setAttachments([]);
+    setShowEmojis(false);
     setSending(false);
+  }
+
+  async function handlePhotoUpload(files: FileList | null) {
+    if (!files?.length) return;
+
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, 4 - attachments.length);
+    const nextAttachments = await Promise.all(imageFiles.map(async (file) => ({
+      id: `${Date.now()}-${file.name}`,
+      name: file.name,
+      type: file.type,
+      dataUrl: await fileToDataUrl(file),
+    })));
+    setAttachments((currentAttachments) => [...currentAttachments, ...nextAttachments].slice(0, 4));
+  }
+
+  function insertMention() {
+    setMessage((currentMessage) => `${currentMessage}${currentMessage.endsWith(" ") || currentMessage.length === 0 ? "" : " "}@`);
   }
 
   return (
@@ -168,7 +213,7 @@ export default function TeamChatPage() {
               return (
                 <article key={chatMessage.id} className={`flex gap-3 ${isMine ? "flex-row-reverse" : ""}`}>
                   {chatMessage.user_avatar_url ? (
-                    <img src={chatMessage.user_avatar_url} alt={chatMessage.user_name} className="h-11 w-11 rounded-2xl object-cover" />
+                    <Image src={chatMessage.user_avatar_url} alt={chatMessage.user_name} width={44} height={44} unoptimized className="h-11 w-11 rounded-2xl object-cover" />
                   ) : (
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#07183f] text-sm font-black text-white">{getInitials(chatMessage.user_name)}</div>
                   )}
@@ -177,7 +222,16 @@ export default function TeamChatPage() {
                       <span>{chatMessage.user_name}</span>
                       <span>{formatChatTimestamp(chatMessage.created_at)}</span>
                     </div>
-                    <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6">{chatMessage.message}</p>
+                    {chatMessage.message && <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6">{renderMessageText(chatMessage.message)}</p>}
+                    {chatMessage.attachments?.length > 0 && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {chatMessage.attachments.map((attachment) => (
+                          <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/30 bg-white/10">
+                            <Image src={attachment.dataUrl} alt={attachment.name} width={420} height={280} unoptimized className="h-40 w-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </article>
               );
@@ -190,12 +244,37 @@ export default function TeamChatPage() {
           <div className="border-t border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700">{error}</div>
         )}
 
-        <form onSubmit={sendMessage} className="flex gap-3 border-t border-slate-100 bg-white p-4">
-          <input value={message} onChange={(event) => setMessage(event.target.value)} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Message General Chat..." maxLength={1000} />
-          <button disabled={sending || !message.trim() || !currentUser} className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50">
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
-            Send
-          </button>
+        <form onSubmit={sendMessage} className="space-y-3 border-t border-slate-100 bg-white p-4">
+          {attachments.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-4">
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="relative overflow-hidden rounded-2xl border border-slate-200">
+                  <Image src={attachment.dataUrl} alt={attachment.name} width={240} height={160} unoptimized className="h-28 w-full object-cover" />
+                  <button type="button" onClick={() => setAttachments((currentAttachments) => currentAttachments.filter((item) => item.id !== attachment.id))} className="absolute right-2 top-2 rounded-full bg-slate-950/70 p-1 text-white"><X className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          {showEmojis && (
+            <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              {quickChatEmojis.map((emoji) => (
+                <button key={emoji} type="button" onClick={() => setMessage((currentMessage) => `${currentMessage}${emoji}`)} className="rounded-xl bg-white px-3 py-2 text-xl shadow-sm hover:bg-orange-50">{emoji}</button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={insertMention} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#07183f] hover:bg-white"><AtSign className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setShowEmojis((current) => !current)} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#07183f] hover:bg-white"><SmilePlus className="h-5 w-5" /></button>
+            <label className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[#07183f] hover:bg-white">
+              <ImagePlus className="h-5 w-5" />
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => handlePhotoUpload(event.target.files)} />
+            </label>
+            <input value={message} onChange={(event) => setMessage(event.target.value)} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Message General Chat, mention @name, add photos or emojis..." maxLength={1000} />
+            <button disabled={sending || (!message.trim() && attachments.length === 0) || !currentUser} className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
+              Send
+            </button>
+          </div>
         </form>
       </section>
     </div>
