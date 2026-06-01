@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, createConversationFromLead, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound } from "lucide-react";
@@ -206,6 +206,7 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 }
 
 export default function ConversationBoard() {
+  const browserCallRef = useRef<{ disconnect: () => void; parameters?: Record<string, string> } | null>(null);
   const conversations = useMemo(() => leads.map((lead) => createConversationFromLead(lead, customers.find((customer) => customer.name === lead.name))), []);
   const [activeConversationId, setActiveConversationId] = useState(conversations[0]?.id || "");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
@@ -232,21 +233,43 @@ export default function ConversationBoard() {
   async function handleStartCall() {
     setTwilioNotice("Starting Twilio call...");
     try {
-      const call = await startOutboundCall({ to: dialNumber || active.contact.phone, conversationId: active.id });
-      setCallSid(call.sid);
+      const device = await createBrowserVoiceDevice("crm-agent");
+      const call = await device.connect({ params: { To: dialNumber || active.contact.phone } });
+      browserCallRef.current = call as unknown as { disconnect: () => void; parameters?: Record<string, string> };
+      setCallSid(browserCallRef.current.parameters?.CallSid);
       setIsActiveCall(true);
       setIsHeld(false);
-      setTwilioNotice(`Call ${call.status}`);
+      setTwilioNotice("Browser call connected. Your microphone is linked to Twilio.");
+      call.on("disconnect", () => {
+        setIsActiveCall(false);
+        setIsHeld(false);
+        setCallSid(undefined);
+        browserCallRef.current = null;
+        setTwilioNotice("Call ended");
+      });
+      call.on("error", (error) => {
+        setTwilioNotice(error instanceof Error ? error.message : "Browser call error");
+      });
     } catch (error) {
-      setIsActiveCall(true);
-      setIsHeld(false);
-      setCallSid(undefined);
-      setTwilioNotice(error instanceof Error ? error.message : "Twilio call unavailable");
+      try {
+        const fallbackCall = await startOutboundCall({ to: dialNumber || active.contact.phone, conversationId: active.id });
+        setCallSid(fallbackCall.sid);
+        setIsActiveCall(true);
+        setIsHeld(false);
+        setTwilioNotice(`Server call ${fallbackCall.status}. Browser audio was not connected.`);
+      } catch {
+        setIsActiveCall(false);
+        setIsHeld(false);
+        setCallSid(undefined);
+        setTwilioNotice(error instanceof Error ? error.message : "Twilio call unavailable");
+      }
     }
   }
 
   async function handleEndCall() {
     if (!callSid) {
+      browserCallRef.current?.disconnect();
+      browserCallRef.current = null;
       setIsActiveCall(false);
       setIsHeld(false);
       return;
@@ -255,6 +278,8 @@ export default function ConversationBoard() {
     setTwilioNotice("Ending Twilio call...");
     try {
       const result = await controlCall({ callSid, action: "end", conversationId: active.id });
+      browserCallRef.current?.disconnect();
+      browserCallRef.current = null;
       setIsActiveCall(false);
       setIsHeld(false);
       setCallSid(undefined);
