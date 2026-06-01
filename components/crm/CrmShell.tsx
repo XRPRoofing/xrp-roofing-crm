@@ -28,11 +28,18 @@ const quickStats = [
   { label: "Tasks", value: "18" },
 ];
 
+function getUserRole(metadata: Record<string, unknown> | undefined) {
+  return typeof metadata?.role === "string" ? metadata.role : "admin";
+}
+
 export default function CrmShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [userRole, setUserRole] = useState("admin");
+  const isCrewUser = userRole === "crew";
+  const visibleNavigation = isCrewUser ? navigation.filter((item) => item.href === "/crm/crew") : navigation;
 
   useEffect(() => {
     let mounted = true;
@@ -42,6 +49,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
       if (!data.session) {
         router.replace(`/login?redirectedFrom=${encodeURIComponent(pathname)}`);
+        return;
+      }
+
+      const role = getUserRole(data.session.user.user_metadata);
+      setUserRole(role);
+
+      if (role === "crew" && pathname !== "/crm/crew") {
+        router.replace("/crm/crew");
         return;
       }
 
@@ -71,7 +86,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
-          <Link href="/crm" className="group flex items-center gap-3">
+          <Link href={isCrewUser ? "/crm/crew" : "/crm"} className="group flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#07183f] shadow-lg shadow-slate-950/25">XR</span>
             <span>
               <span className="block text-xl font-black tracking-tight">XRP CRM</span>
@@ -81,7 +96,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-blue-100 hover:bg-white/10 lg:hidden"><X className="h-6 w-6" /></button>
         </div>
         <div className="relative mx-4 mb-4 grid grid-cols-3 gap-2 rounded-3xl bg-white/10 p-2 ring-1 ring-white/10">
-          {quickStats.map((stat) => (
+          {(isCrewUser ? [{ label: "Crew", value: "Portal" }, { label: "Access", value: "Field" }, { label: "Jobs", value: "Only" }] : quickStats).map((stat) => (
             <div key={stat.label} className="rounded-2xl bg-white/10 px-2 py-3 text-center">
               <p className="text-sm font-black text-white">{stat.value}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-blue-100">{stat.label}</p>
@@ -89,7 +104,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           ))}
         </div>
         <nav className="scrollbar-hide relative min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-36 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
             return (
@@ -108,7 +123,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             <ShieldCheck className="h-5 w-5 text-orange-300" />
             <p className="font-bold text-white">Secure team workspace</p>
           </div>
-          <p className="mt-2 leading-6">Admin, sales, production, and office workflows in one professional CRM.</p>
+          <p className="mt-2 leading-6">{isCrewUser ? "Crew access is limited to assigned roofing workflow only." : "Admin, sales, production, and office workflows in one professional CRM."}</p>
         </div>
       </aside>
       <div className="lg:pl-72">
@@ -116,12 +131,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-20 items-center gap-4 px-4 sm:px-6 lg:px-8">
             <button onClick={() => setOpen(true)} className="rounded-xl border border-white/15 bg-white/10 p-2 text-white shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
             <div className="hidden min-w-0 lg:block">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">Command Center</p>
-              <p className="mt-1 text-sm font-semibold text-blue-100">Roofing operations dashboard</p>
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">{isCrewUser ? "Crew Workspace" : "Command Center"}</p>
+              <p className="mt-1 text-sm font-semibold text-blue-100">{isCrewUser ? "Assigned jobs and completion workflow" : "Roofing operations dashboard"}</p>
             </div>
             <div className="relative max-w-2xl flex-1 lg:ml-6">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-100" />
-              <input className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder="Search jobs, customers, proposals, invoices..." />
+              <input className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder={isCrewUser ? "Search assigned crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
             </div>
             <button className="relative rounded-2xl border border-white/15 bg-white/10 p-3 text-white shadow-sm hover:bg-white/15">
               <Bell className="h-5 w-5" />
