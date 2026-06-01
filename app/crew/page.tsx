@@ -51,9 +51,9 @@ export default function CrewPortalPage() {
     if (!hasPhoto || !job.completion.notes.trim()) return;
 
     updateAssignment(job.id, {
-      status: "Done - Pending Approval",
+      status: "Mark Done",
       completion: { ...job.completion, submittedAt: new Date().toISOString() },
-      adminNotification: `${selectedCrew} submitted ${job.name} for approval.`,
+      adminNotification: `${selectedCrew} marked ${job.name} done.`,
     });
   }
 
@@ -63,9 +63,9 @@ export default function CrewPortalPage() {
         <div className="rounded-[2rem] bg-gradient-to-br from-[#07183f] to-[#1d4ed8] p-5 text-white shadow-xl shadow-blue-950/20">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Crew Portal</p>
           <h1 className="mt-2 text-3xl font-black">My Assigned Jobs</h1>
-          <p className="mt-2 text-sm font-semibold leading-6 text-blue-100">Field-only job view for roofing crews. No proposals, invoices, payments, reports, settings, or other customer records.</p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-blue-100">Field-only job view for roofing teams. No proposals, invoices, payments, reports, settings, or other customer records.</p>
           <label className="mt-5 grid gap-2 text-xs font-black uppercase tracking-wide text-blue-100">
-            Crew Member
+            Team Member
             <select value={selectedCrew} onChange={(event) => { setSelectedCrew(event.target.value); setSelectedJobId(""); }} className="rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black normal-case tracking-normal text-[#07183f] outline-none">
               {crewMembers.map((member) => <option key={member}>{member}</option>)}
             </select>
@@ -78,7 +78,7 @@ export default function CrewPortalPage() {
               <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
                 <Hammer className="mx-auto h-8 w-8 text-slate-400" />
                 <p className="mt-3 font-black text-[#07183f]">No assigned jobs</p>
-                <p className="mt-1 text-sm text-slate-500">Ask an admin to assign jobs to this crew member.</p>
+                <p className="mt-1 text-sm text-slate-500">Ask an admin to assign jobs to this Team Member.</p>
               </div>
             ) : crewJobs.map((job) => (
               <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`w-full rounded-3xl border p-4 text-left shadow-sm transition ${selectedJob?.id === job.id ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white"}`}>
@@ -142,9 +142,9 @@ export default function CrewPortalPage() {
                 </label>
 
                 <button type="button" disabled={(selectedJob.completion.beforePhotos.length + selectedJob.completion.afterPhotos.length === 0) || !selectedJob.completion.notes.trim()} onClick={() => submitForApproval(selectedJob)} className="mt-5 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
-                  <CheckCircle2 className="mr-2 inline h-5 w-5" />Mark Complete - Submit For Approval
+                  <CheckCircle2 className="mr-2 inline h-5 w-5" />Mark Done
                 </button>
-                <p className="mt-3 text-center text-xs font-bold text-slate-500">Requires at least one photo and completion notes before submitting.</p>
+                <p className="mt-3 text-center text-xs font-bold text-slate-500">Requires at least one photo and completion notes before marking done.</p>
               </div>
             </section>
           )}
@@ -153,3 +153,5 @@ export default function CrewPortalPage() {
     </main>
   );
 }
+
+

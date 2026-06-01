@@ -1,6 +1,6 @@
 import type { Lead } from "@/types/crm";
 
-export type CrewJobStatus = "Assigned" | "In Progress" | "Done - Pending Approval" | "Completed";
+export type CrewJobStatus = "Assigned" | "In Progress" | "On Work" | "Mark Done" | "Completed" | "Proceed to Invoice" | "Done Payment";
 
 export type CrewJobCompletion = {
   beforePhotos: string[];
@@ -23,8 +23,8 @@ export type CrewAssignment = {
 
 export type CrewJob = Lead & CrewAssignment;
 
-export const crewMembers = ["Juan Dela Cruz", "Pedro Santos", "Mike Johnson"];
-export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "Done - Pending Approval", "Completed"];
+export const crewMembers = ["Jonathan", "Adrian"];
+export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "On Work", "Mark Done", "Completed", "Proceed to Invoice", "Done Payment"];
 export const crewWorkflowStorageKey = "xrp-crm-crew-workflow";
 export const jobsStorageKey = "xrp-crm-jobs-board";
 
@@ -81,6 +81,3 @@ export function readSavedJobs(fallbackJobs: Lead[]) {
     return fallbackJobs;
   }
 }
-
-
-
