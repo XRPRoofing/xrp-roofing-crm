@@ -100,7 +100,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   );
 }
 
-function FloatingDialer({ contact, dialNumber, isOpen, isMinimized, isActiveCall, isHeld, callSid, onClose, onMinimize, onStartCall, onEndCall, onHoldCall, onNotesChange, onDialNumberChange }: { contact: ConversationRecord["contact"]; dialNumber: string; isOpen: boolean; isMinimized: boolean; isActiveCall: boolean; isHeld: boolean; callSid?: string; onClose: () => void; onMinimize: () => void; onStartCall: () => void; onEndCall: () => void; onHoldCall: () => void; onNotesChange: (notes: string) => void; onDialNumberChange: (value: string) => void }) {
+function FloatingDialer({ contactName, dialNumber, isOpen, isMinimized, isActiveCall, isHeld, callSid, onClose, onMinimize, onStartCall, onEndCall, onHoldCall, onNotesChange, onDialNumberChange }: { contactName?: string; dialNumber: string; isOpen: boolean; isMinimized: boolean; isActiveCall: boolean; isHeld: boolean; callSid?: string; onClose: () => void; onMinimize: () => void; onStartCall: () => void; onEndCall: () => void; onHoldCall: () => void; onNotesChange: (notes: string) => void; onDialNumberChange: (value: string) => void }) {
   if (!isOpen) return null;
 
   const keys = "123456789*0#".split("");
@@ -111,7 +111,7 @@ function FloatingDialer({ contact, dialNumber, isOpen, isMinimized, isActiveCall
         <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Dialer</p>
-            <input value={dialNumber} onChange={(event) => onDialNumberChange(event.target.value)} className="mt-1 w-full bg-transparent text-lg font-bold text-slate-950 outline-none" aria-label="Dial number" />
+            <input value={dialNumber} onChange={(event) => onDialNumberChange(event.target.value)} className="mt-1 w-full bg-transparent text-lg font-bold text-slate-950 outline-none" aria-label="Dial number" placeholder="Enter phone number" />
           </div>
           <div className="flex items-center gap-1">
             {isActiveCall && <Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge>}
@@ -121,7 +121,7 @@ function FloatingDialer({ contact, dialNumber, isOpen, isMinimized, isActiveCall
         </div>
         {!isMinimized && (
           <div className="p-3">
-            <p className="mb-2 text-xs text-slate-500">Calling as XRP Roofing · {contact.name}</p>
+            <p className="mb-2 text-xs text-slate-500">Calling as XRP Roofing · {contactName || dialNumber || "Manual number"}</p>
             <div className="mb-3 grid grid-cols-2 gap-2">
               <button onClick={onStartCall} className="rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-blue-700"><Phone className="mr-2 inline h-4 w-4" />Dial number</button>
               <button onClick={onEndCall} disabled={!isActiveCall} className="rounded-xl bg-slate-900 px-3 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><PhoneOff className="mr-2 inline h-4 w-4" />End</button>
@@ -157,6 +157,10 @@ function SchedulerPanel() {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return <div className="grid gap-1"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm leading-5 text-slate-800">{value}</p></div>;
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
 }
 
 function ContactPanel({ conversation, onDial }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void }) {
@@ -217,8 +221,9 @@ export default function ConversationBoard() {
   const [callSid, setCallSid] = useState<string>();
   const [messageText, setMessageText] = useState("");
   const [twilioNotice, setTwilioNotice] = useState("Twilio realtime ready");
-  const [dialNumber, setDialNumber] = useState(active?.contact.phone || "");
+  const [dialNumber, setDialNumber] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
+  const matchedDialContact = conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   useEffect(() => {
     try {
@@ -231,10 +236,16 @@ export default function ConversationBoard() {
   }, []);
 
   async function handleStartCall() {
+    const destination = dialNumber.trim();
+    if (!destination) {
+      setTwilioNotice("Enter a phone number before dialing.");
+      return;
+    }
+
     setTwilioNotice("Starting Twilio call...");
     try {
       const device = await createBrowserVoiceDevice("crm-agent");
-      const call = await device.connect({ params: { To: dialNumber || active.contact.phone } });
+      const call = await device.connect({ params: { To: destination } });
       browserCallRef.current = call as unknown as { disconnect: () => void; parameters?: Record<string, string> };
       setCallSid(browserCallRef.current.parameters?.CallSid);
       setIsActiveCall(true);
@@ -252,7 +263,7 @@ export default function ConversationBoard() {
       });
     } catch (error) {
       try {
-        const fallbackCall = await startOutboundCall({ to: dialNumber || active.contact.phone, conversationId: active.id });
+        const fallbackCall = await startOutboundCall({ to: destination, conversationId: matchedDialContact ? active.id : undefined });
         setCallSid(fallbackCall.sid);
         setIsActiveCall(true);
         setIsHeld(false);
@@ -304,10 +315,11 @@ export default function ConversationBoard() {
   }
 
   async function handleSendSms() {
-    if (!messageText.trim()) return;
+    const destination = dialNumber.trim() || active.contact.phone;
+    if (!messageText.trim() || !destination) return;
     setTwilioNotice("Sending SMS...");
     try {
-      const message = await sendSms({ to: active.contact.phone, body: messageText.trim(), conversationId: active.id });
+      const message = await sendSms({ to: destination, body: messageText.trim(), conversationId: matchedDialContact ? active.id : undefined });
       setMessageText("");
       setTwilioNotice(`SMS ${message.status}`);
     } catch (error) {
@@ -337,7 +349,7 @@ export default function ConversationBoard() {
     <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       {isActiveCall && (
         <div className="sticky top-20 z-40 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-600 px-4 py-3 text-white shadow-sm">
-          <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /><span className="text-sm font-semibold">Active call with {active.contact.name}</span><Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge></div>
+          <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /><span className="text-sm font-semibold">Active call with {matchedDialContact?.name || dialNumber}</span><Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge></div>
           <div className="flex gap-2"><Button variant="ghost" className="text-white hover:bg-blue-500"><Mic className="mr-1 h-3 w-3" />Mute</Button><Button variant="ghost" className="text-white hover:bg-blue-500" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}>Open dialer</Button><button onClick={handleEndCall} className="inline-flex items-center rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"><PhoneOff className="mr-1.5 h-4 w-4" />End</button></div>
         </div>
       )}
@@ -365,6 +377,7 @@ export default function ConversationBoard() {
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div></div>
           <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-4">
             <div className="mb-3 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
+            <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
@@ -381,7 +394,7 @@ export default function ConversationBoard() {
           </button>
         </div>
       )}
-      <FloatingDialer contact={active.contact} dialNumber={dialNumber} isOpen={isDialerOpen} isMinimized={isDialerMinimized} isActiveCall={isActiveCall} isHeld={isHeld} callSid={callSid} onClose={() => setIsDialerOpen(false)} onMinimize={() => setIsDialerMinimized((value) => !value)} onStartCall={handleStartCall} onEndCall={handleEndCall} onHoldCall={handleHoldCall} onNotesChange={handleNotesChange} onDialNumberChange={setDialNumber} />
+      <FloatingDialer contactName={matchedDialContact?.name} dialNumber={dialNumber} isOpen={isDialerOpen} isMinimized={isDialerMinimized} isActiveCall={isActiveCall} isHeld={isHeld} callSid={callSid} onClose={() => setIsDialerOpen(false)} onMinimize={() => setIsDialerMinimized((value) => !value)} onStartCall={handleStartCall} onEndCall={handleEndCall} onHoldCall={handleHoldCall} onNotesChange={handleNotesChange} onDialNumberChange={setDialNumber} />
     </div>
   );
 }

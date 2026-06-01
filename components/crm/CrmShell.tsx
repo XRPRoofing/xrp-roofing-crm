@@ -149,7 +149,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   const unreadNotifications = notifications.filter((notification) => !notification.read).length;
-  const showTeamChatFloatingButton = pathname !== "/crm/team-chat";
+  const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";
 
   if (checkingAuth) {
     return (
