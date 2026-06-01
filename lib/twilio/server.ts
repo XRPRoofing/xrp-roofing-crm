@@ -16,7 +16,7 @@ export function createVoiceAccessToken(identity: string) {
   const config = getTwilioConfig();
   const AccessToken = twilio.jwt.AccessToken;
   const VoiceGrant = AccessToken.VoiceGrant;
-  const token = new AccessToken(config.accountSid, config.apiKeySid, config.apiKeySecret, { identity });
+  const token = new AccessToken(config.accountSid, config.apiKeySid, config.apiKeySecret, { identity, ttl: 86400 });
 
   token.addGrant(new VoiceGrant({ outgoingApplicationSid: config.twimlAppSid, incomingAllow: true }));
 

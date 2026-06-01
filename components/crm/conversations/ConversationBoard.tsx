@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
@@ -371,6 +371,7 @@ export default function ConversationBoard() {
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
+  const [inboundReady, setInboundReady] = useState(false);
   const matchedDialContact = findCrmContactByPhone(dialNumber) || conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   function stopIncomingAlert() {
@@ -441,6 +442,26 @@ export default function ConversationBoard() {
         if (!mounted) return;
 
         voiceDeviceRef.current = device;
+        device.on("registered", () => {
+          setInboundReady(true);
+          setTwilioNotice("Ready for inbound calls");
+        });
+        device.on("unregistered", () => {
+          setInboundReady(false);
+          setTwilioNotice("Inbound calling disconnected. Reconnecting...");
+          void device.register().catch(() => setTwilioNotice("Inbound calling needs page refresh"));
+        });
+        device.on("tokenWillExpire", () => {
+          setTwilioNotice("Refreshing inbound call token...");
+          getVoiceToken("crm-agent").then(({ token }) => {
+            device.updateToken?.(token);
+            return device.register();
+          }).catch(() => setTwilioNotice("Inbound token refresh failed. Reload the CRM."));
+        });
+        device.on("error", (error) => {
+          setInboundReady(false);
+          setTwilioNotice(error?.message || "Twilio inbound device error");
+        });
         device.on("incoming", (call) => {
           const incoming = call as BrowserVoiceCall;
           const from = incoming.parameters?.From || "Unknown caller";
@@ -468,8 +489,8 @@ export default function ConversationBoard() {
           });
         });
         await device.register();
-        setTwilioNotice("Ready for inbound calls");
       } catch (error) {
+        setInboundReady(false);
         setTwilioNotice(error instanceof Error ? error.message : "Inbound calling is not configured");
       }
     }
@@ -478,6 +499,7 @@ export default function ConversationBoard() {
 
     return () => {
       mounted = false;
+      setInboundReady(false);
       voiceDeviceRef.current?.destroy();
       voiceDeviceRef.current = null;
     };
@@ -637,7 +659,7 @@ export default function ConversationBoard() {
 
       <div className="sticky top-20 z-30 mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Communication center</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Conversations</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><p className="mt-2 text-xs font-medium text-blue-700">{twilioNotice}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Communication center</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Conversations</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge><p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
           <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button>{pipelineStages.slice(0, 3).map((stage) => <Button key={stage}>{stage}</Button>)}</div>
         </div>
       </div>

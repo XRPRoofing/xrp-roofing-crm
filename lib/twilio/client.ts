@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 type VoiceDevice = import("@twilio/voice-sdk").Device;
+export type BrowserVoiceDevice = VoiceDevice & {
+  updateToken?: (token: string) => void;
+};
 export type BrowserVoiceCall = {
   accept: () => void;
   disconnect: () => void;
@@ -29,7 +32,7 @@ export async function getVoiceToken(identity = "crm-agent") {
 
 export async function createBrowserVoiceDevice(identity = "crm-agent") {
   const [{ Device }, { token }] = await Promise.all([import("@twilio/voice-sdk"), getVoiceToken(identity)]);
-  return new Device(token) as VoiceDevice;
+  return new Device(token) as BrowserVoiceDevice;
 }
 
 export async function sendSms(payload: TwilioSmsPayload) {
