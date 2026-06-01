@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, getVoiceToken, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -384,13 +384,24 @@ export default function ConversationBoard() {
     navigator.vibrate?.(0);
   }
 
-  function startIncomingAlert(from: string) {
-    navigator.vibrate?.([500, 200, 500, 200, 500, 200, 500]);
-    if ("Notification" in window && Notification.permission === "granted") {
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.active?.postMessage({ type: "INCOMING_CALL_NOTIFICATION", from });
+  const notifyIncomingCall = useCallback((from: string) => {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    navigator.serviceWorker.ready.then((registration) => {
+      registration.showNotification("Incoming call", {
+        body: `Call from ${from || "Unknown caller"}`,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: "incoming-call",
+        requireInteraction: true,
+        data: { url: "/crm/conversations" },
       });
-    }
+    }).catch(() => undefined);
+  }, []);
+
+  const startIncomingAlert = useCallback((from: string) => {
+    navigator.vibrate?.([500, 200, 500, 200, 500, 200, 500]);
+    notifyIncomingCall(from);
 
     const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -406,7 +417,7 @@ export default function ConversationBoard() {
     oscillator.start();
     ringtoneContextRef.current = context;
     ringtoneOscillatorRef.current = oscillator;
-  }
+  }, [notifyIncomingCall]);
 
   function applyLocalEvent(event: TwilioConversationEvent) {
     const phone = getEventPhone(event);
@@ -427,11 +438,15 @@ export default function ConversationBoard() {
         if (event.type === "call_recording") {
           setCallInsights((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, 5));
         }
+        if (event.type === "incoming_call") {
+          notifyIncomingCall(getEventPhone(event));
+          navigator.vibrate?.([500, 200, 500, 200, 500]);
+        }
       });
     } catch {
       queueMicrotask(() => setTwilioNotice("Realtime subscription waiting for Supabase configuration"));
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, notifyIncomingCall]);
 
   useEffect(() => {
     let mounted = true;
@@ -503,7 +518,7 @@ export default function ConversationBoard() {
       voiceDeviceRef.current?.destroy();
       voiceDeviceRef.current = null;
     };
-  }, []);
+  }, [startIncomingAlert]);
 
   async function handleStartCall() {
     const destination = dialNumber.trim();
