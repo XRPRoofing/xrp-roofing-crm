@@ -1,4 +1,4 @@
-export type TwilioConversationEventType = "incoming_call" | "incoming_sms" | "call_status" | "message_status" | "call_note";
+export type TwilioConversationEventType = "incoming_call" | "incoming_sms" | "call_status" | "message_status" | "call_note" | "call_recording";
 
 export interface TwilioSmsPayload {
   to: string;

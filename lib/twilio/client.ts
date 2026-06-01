@@ -112,6 +112,7 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
           callSid: row.call_sid ? String(row.call_sid) : undefined,
           messageSid: row.message_sid ? String(row.message_sid) : undefined,
           conversationId: row.conversation_id ? String(row.conversation_id) : undefined,
+          recordingUrl: row.payload && typeof row.payload === "object" && "recordingUrl" in row.payload ? String((row.payload as Record<string, unknown>).recordingUrl) : undefined,
           payload: (row.payload as Record<string, unknown>) || {},
           createdAt: String(row.created_at),
         });

@@ -101,6 +101,23 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   );
 }
 
+function CallInsightsCard({ event }: { event: TwilioConversationEvent }) {
+  const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
+  const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
+
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-950">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-bold">Call recording, transcript, and summary</p>
+        <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
+      </div>
+      {event.recordingUrl && <audio controls src={event.recordingUrl} className="mt-3 w-full" />}
+      {summary && <div className="mt-3 rounded-xl bg-white/80 p-3"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary</p><p className="mt-1 whitespace-pre-wrap leading-6">{summary}</p></div>}
+      {transcript && <details className="mt-3 rounded-xl bg-white/80 p-3"><summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-emerald-700">Transcript</summary><p className="mt-2 whitespace-pre-wrap leading-6">{transcript}</p></details>}
+    </div>
+  );
+}
+
 function FloatingDialer({ contactName, dialNumber, isOpen, isMinimized, isActiveCall, isHeld, callSid, onClose, onMinimize, onStartCall, onEndCall, onHoldCall, onNotesChange, onDialNumberChange }: { contactName?: string; dialNumber: string; isOpen: boolean; isMinimized: boolean; isActiveCall: boolean; isHeld: boolean; callSid?: string; onClose: () => void; onMinimize: () => void; onStartCall: () => void; onEndCall: () => void; onHoldCall: () => void; onNotesChange: (notes: string) => void; onDialNumberChange: (value: string) => void }) {
   if (!isOpen) return null;
 
@@ -230,6 +247,7 @@ export default function ConversationBoard() {
   const [showMobileThread, setShowMobileThread] = useState(false);
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
+  const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const matchedDialContact = conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   function stopIncomingAlert() {
@@ -270,6 +288,9 @@ export default function ConversationBoard() {
     try {
       return subscribeToConversationEvents((event: TwilioConversationEvent) => {
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
+        if (event.type === "call_recording") {
+          setCallInsights((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, 5));
+        }
       });
     } catch {
       queueMicrotask(() => setTwilioNotice("Realtime subscription waiting for Supabase configuration"));
@@ -496,7 +517,7 @@ export default function ConversationBoard() {
             <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
             <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
           </div>
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div></div>
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.map((event) => <CallInsightsCard key={event.id} event={event} />)}<div className="flex justify-start"><div className="rounded-full bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">Office is typing...</div></div></div>
           <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-4">
             <div className="mb-3 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
             <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />
