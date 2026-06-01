@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -10,6 +10,7 @@ import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
   { href: "/crm/conversations", label: "Conversation board", shortLabel: "Messages", icon: MessageSquareText },
+  { href: "/crm/team-chat", label: "Team Chat", shortLabel: "Chat", icon: MessageCircle },
   { href: "/crm/leads", label: "Jobs", shortLabel: "Jobs", icon: BriefcaseBusiness },
   { href: "/crm/customers", label: "Customers", shortLabel: "Clients", icon: UsersRound },
   { href: "/crm/crew", label: "Crew Workflow", shortLabel: "Crew", icon: Hammer },
@@ -23,7 +24,7 @@ const navigation = [
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 
-const mobilePrimaryNavigation = ["/crm", "/crm/leads", "/crm/crew", "/crm/files", "/crm/settings"];
+const mobilePrimaryNavigation = ["/crm", "/crm/leads", "/crm/crew", "/crm/team-chat", "/crm/files"];
 
 const quickStats = [
   { label: "Live jobs", value: "24" },
@@ -44,7 +45,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CrmNotification[]>([]);
   const isCrewUser = userRole === "crew";
-  const visibleNavigation = isCrewUser ? navigation.filter((item) => item.href === "/crm/crew") : navigation;
+  const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
   const mobileNavigation = isCrewUser ? visibleNavigation : navigation.filter((item) => mobilePrimaryNavigation.includes(item.href));
   const activeModule = visibleNavigation.find((item) => pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href)));
 
@@ -62,7 +63,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       const role = getUserRole(data.session.user.user_metadata);
       setUserRole(role);
 
-      if (role === "crew" && pathname !== "/crm/crew") {
+      if (role === "crew" && !["/crm/crew", "/crm/team-chat"].includes(pathname)) {
         router.replace("/crm/crew");
         return;
       }
