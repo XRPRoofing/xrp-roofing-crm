@@ -15,6 +15,14 @@ const copy = {
   reset: { title: "Choose a new password", subtitle: "Set a secure password for your CRM account.", cta: "Update password" },
 };
 
+function getAuthRedirectOrigin() {
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
+
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+
+  return "";
+}
 function withTimeout<T>(promise: Promise<T>, milliseconds = 15000) {
   return Promise.race([
     promise,
@@ -73,7 +81,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
         const { error: signUpError } = await withTimeout(supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name, role: "sales_rep" }, emailRedirectTo: `${window.location.origin}/crm` },
+          options: { data: { full_name: name, role: "sales_rep" }, emailRedirectTo: `${getAuthRedirectOrigin()}/crm` },
         }));
         if (signUpError) setError(signUpError.message);
         else setMessage("Check your email to confirm the account before logging in.");
@@ -81,7 +89,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
 
       if (mode === "forgot") {
         const { error: resetError } = await withTimeout(supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${getAuthRedirectOrigin()}/reset-password`,
         }));
         if (resetError) setError(resetError.message);
         else setMessage("Password reset email sent.");
@@ -168,3 +176,5 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
     </div>
   );
 }
+
+
