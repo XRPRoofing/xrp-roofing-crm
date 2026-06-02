@@ -365,9 +365,6 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 export default function ConversationBoard() {
   const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
-  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
-  const ringtoneContextRef = useRef<AudioContext | null>(null);
-  const ringtoneOscillatorRef = useRef<OscillatorNode | null>(null);
   const initialConversations = useMemo<ConversationRecord[]>(() => [], []);
   const [conversations, setConversations] = useState<ConversationRecord[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState("");
@@ -388,12 +385,6 @@ export default function ConversationBoard() {
   const matchedDialContact = findCrmContactByPhone(dialNumber) || conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   function stopIncomingAlert() {
-    ringtoneRef.current?.pause();
-    ringtoneRef.current = null;
-    ringtoneOscillatorRef.current?.stop();
-    ringtoneOscillatorRef.current = null;
-    ringtoneContextRef.current?.close();
-    ringtoneContextRef.current = null;
     navigator.vibrate?.(0);
   }
 
@@ -415,21 +406,6 @@ export default function ConversationBoard() {
   const startIncomingAlert = useCallback((from: string) => {
     navigator.vibrate?.([500, 200, 500, 200, 500, 200, 500]);
     notifyIncomingCall(from);
-
-    const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const context = new AudioContextClass();
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 880;
-    gain.gain.value = 0.08;
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    ringtoneContextRef.current = context;
-    ringtoneOscillatorRef.current = oscillator;
   }, [notifyIncomingCall]);
 
   function applyLocalEvent(event: TwilioConversationEvent) {

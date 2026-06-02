@@ -62,6 +62,8 @@ export function buildIncomingCallTwiml() {
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
+    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    method: "POST",
     recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
@@ -84,6 +86,8 @@ export function buildOutboundBrowserCallTwiml(to?: string | null) {
   response.dial({
     callerId: config.phoneNumber,
     record: "record-from-answer-dual",
+    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    method: "POST",
     recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",

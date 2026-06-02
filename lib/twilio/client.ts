@@ -114,16 +114,12 @@ function mapConversationEventRow(row: Record<string, unknown>): TwilioConversati
 }
 
 export async function listConversationEvents(limit = 250) {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("conversation_events")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  const response = await fetch(`/api/twilio/events?limit=${limit}`);
+  const data = await response.json().catch(() => null) as { events?: TwilioConversationEvent[]; error?: string } | null;
 
-  if (error) throw new Error(error.message);
+  if (!response.ok || data?.error) throw new Error(data?.error || "Unable to load saved call history");
 
-  return ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow);
+  return data?.events || [];
 }
 
 export function subscribeToConversationEvents(onEvent: (event: TwilioConversationEvent) => void) {
