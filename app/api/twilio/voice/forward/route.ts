@@ -11,7 +11,8 @@ function buildForwardTwiml(to?: string | null) {
     return response.toString();
   }
 
-  response.dial({ callerId: config.phoneNumber }).number(to);
+  const dial = config.phoneNumber ? response.dial({ callerId: config.phoneNumber }) : response.dial();
+  dial.number(to);
   return response.toString();
 }
 

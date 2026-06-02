@@ -155,7 +155,7 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, isOpen, isMini
               <button onClick={onMuteCall} disabled={!isActiveCall} className={`rounded-xl border border-slate-200 p-2.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${isMuted ? "bg-red-50 text-red-700" : "text-slate-600"}`}><Mic className="mx-auto h-4 w-4" /></button>
               <button onClick={onHoldCall} disabled={!isActiveCall || !callSid} className={`rounded-xl border border-slate-200 p-2.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${isHeld ? "bg-orange-50 text-orange-700" : "text-slate-600"}`}><Pause className="mx-auto h-4 w-4" /></button>
             </div>
-            {callSid && <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">Recording starts automatically when Twilio connects the call. Transcript and summary sync from Twilio webhook data when available.</div>}
+            {callSid && <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">Call connected. Add notes below or forward this live call to another number.</div>}
             {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Forward call</p><div className="flex gap-2"><input value={forwardNumber} onChange={(event) => onForwardNumberChange(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Forward to phone number" /><button onClick={onForwardCall} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Forward</button></div></div>}
             {callSid && <div className="mt-3"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Call notes</p><textarea onChange={(event) => onNotesChange(event.target.value)} className="min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." /></div>}
           </div>
@@ -661,8 +661,6 @@ export default function ConversationBoard() {
 
   async function handleEndCall() {
     if (!callSid) {
-      browserCallRef.current?.disconnect();
-      browserCallRef.current = null;
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
