@@ -22,6 +22,7 @@ export interface TwilioCallNotePayload {
   customerId?: string;
   jobId?: string;
   notes: string;
+  disposition?: string;
 }
 
 export interface TwilioConversationEvent {

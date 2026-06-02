@@ -130,8 +130,8 @@ export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConvers
     conversationId: payload.conversationId,
     customerId: payload.customerId,
     jobId: payload.jobId,
-    body: payload.notes,
-    payload: { notes: payload.notes },
+    body: payload.disposition ? `${payload.disposition}: ${payload.notes}` : payload.notes,
+    payload: { notes: payload.notes, disposition: payload.disposition },
     createdAt: new Date().toISOString(),
   };
 }

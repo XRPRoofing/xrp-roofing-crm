@@ -124,10 +124,11 @@ function CallInsightsCard({ event }: { event: TwilioConversationEvent }) {
   );
 }
 
-function FloatingDialer({ contactName, dialNumber, forwardNumber, isOpen, isMinimized, isActiveCall, isHeld, isMuted, callSid, onClose, onMinimize, onStartCall, onEndCall, onHoldCall, onMuteCall, onForwardCall, onNotesChange, onDialNumberChange, onForwardNumberChange }: { contactName?: string; dialNumber: string; forwardNumber: string; isOpen: boolean; isMinimized: boolean; isActiveCall: boolean; isHeld: boolean; isMuted: boolean; callSid?: string; onClose: () => void; onMinimize: () => void; onStartCall: () => void; onEndCall: () => void; onHoldCall: () => void; onMuteCall: () => void; onForwardCall: () => void; onNotesChange: (notes: string) => void; onDialNumberChange: (value: string) => void; onForwardNumberChange: (value: string) => void }) {
+function FloatingDialer({ contactName, dialNumber, forwardNumber, callNotes, callDisposition, isOpen, isMinimized, isActiveCall, isHeld, isMuted, callSid, onClose, onMinimize, onStartCall, onEndCall, onHoldCall, onMuteCall, onForwardCall, onSaveCallNotes, onNotesChange, onDispositionChange, onDialNumberChange, onForwardNumberChange }: { contactName?: string; dialNumber: string; forwardNumber: string; callNotes: string; callDisposition: string; isOpen: boolean; isMinimized: boolean; isActiveCall: boolean; isHeld: boolean; isMuted: boolean; callSid?: string; onClose: () => void; onMinimize: () => void; onStartCall: () => void; onEndCall: () => void; onHoldCall: () => void; onMuteCall: () => void; onForwardCall: () => void; onSaveCallNotes: () => void; onNotesChange: (notes: string) => void; onDispositionChange: (disposition: string) => void; onDialNumberChange: (value: string) => void; onForwardNumberChange: (value: string) => void }) {
   if (!isOpen) return null;
 
   const keys = "123456789*0#".split("");
+  const dispositions = ["Not interested", "Marketing", "Booked Appointment", "Free Inspection", "Not answer", "Voicemail"];
 
   return (
     <div className="fixed inset-x-3 bottom-3 z-50 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[340px]">
@@ -157,7 +158,8 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, isOpen, isMini
             </div>
             {callSid && <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-semibold text-emerald-700">Call connected. Add notes below or forward this live call to another number.</div>}
             {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Forward call</p><div className="flex gap-2"><input value={forwardNumber} onChange={(event) => onForwardNumberChange(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Forward to phone number" /><button onClick={onForwardCall} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Forward</button></div></div>}
-            {callSid && <div className="mt-3"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Call notes</p><textarea onChange={(event) => onNotesChange(event.target.value)} className="min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." /></div>}
+            {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Call disposition</p><select value={callDisposition} onChange={(event) => onDispositionChange(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"><option value="">Select disposition</option>{dispositions.map((disposition) => <option key={disposition} value={disposition}>{disposition}</option>)}</select></div>}
+            {callSid && <div className="mt-3"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Call notes</p><textarea value={callNotes} onChange={(event) => onNotesChange(event.target.value)} className="min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." /><button onClick={onSaveCallNotes} className="mt-2 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700">Save call notes</button></div>}
           </div>
         )}
       </Card>
@@ -400,6 +402,8 @@ export default function ConversationBoard() {
   const [twilioNotice, setTwilioNotice] = useState("Twilio realtime ready");
   const [dialNumber, setDialNumber] = useState("");
   const [forwardNumber, setForwardNumber] = useState("");
+  const [callNotes, setCallNotes] = useState("");
+  const [callDisposition, setCallDisposition] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
@@ -619,6 +623,8 @@ export default function ConversationBoard() {
         setIsHeld(false);
         setIsMuted(false);
         setCallSid(undefined);
+        setCallNotes("");
+        setCallDisposition("");
         browserCallRef.current = null;
         setTwilioNotice("Call ended");
       });
@@ -638,6 +644,8 @@ export default function ConversationBoard() {
         setIsHeld(false);
         setIsMuted(false);
         setCallSid(undefined);
+        setCallNotes("");
+        setCallDisposition("");
         setTwilioNotice(error instanceof Error ? error.message : "Twilio call unavailable");
       }
     }
@@ -683,6 +691,8 @@ export default function ConversationBoard() {
       setIsHeld(false);
       setIsMuted(false);
       setCallSid(undefined);
+      setCallNotes("");
+      setCallDisposition("");
       setTwilioNotice(`Call ${result.status}`);
     } catch (error) {
       setTwilioNotice(error instanceof Error ? error.message : "Call could not be ended");
@@ -745,13 +755,18 @@ export default function ConversationBoard() {
     }
   }
 
-  async function handleNotesChange(notes: string) {
+  async function handleSaveCallNotes() {
     if (!callSid) return;
+    if (!callNotes.trim() && !callDisposition) {
+      setTwilioNotice("Add notes or choose a disposition first");
+      return;
+    }
+
     try {
-      await saveCallNotes({ callSid, conversationId: active.id, notes });
-      setTwilioNotice("Call notes auto-saved");
+      await saveCallNotes({ callSid, conversationId: active.id, notes: callNotes.trim(), disposition: callDisposition });
+      setTwilioNotice("Call notes and disposition saved");
     } catch {
-      setTwilioNotice("Call notes waiting for realtime storage");
+      setTwilioNotice("Call notes could not be saved");
     }
   }
 
@@ -830,7 +845,7 @@ export default function ConversationBoard() {
           </button>
         </div>
       )}
-      <FloatingDialer contactName={matchedDialContact?.name} dialNumber={dialNumber} forwardNumber={forwardNumber} isOpen={isDialerOpen} isMinimized={isDialerMinimized} isActiveCall={isActiveCall} isHeld={isHeld} isMuted={isMuted} callSid={callSid} onClose={() => setIsDialerOpen(false)} onMinimize={() => setIsDialerMinimized((value) => !value)} onStartCall={handleStartCall} onEndCall={handleEndCall} onHoldCall={handleHoldCall} onMuteCall={handleMuteCall} onForwardCall={handleForwardCall} onNotesChange={handleNotesChange} onDialNumberChange={setDialNumber} onForwardNumberChange={setForwardNumber} />
+      <FloatingDialer contactName={matchedDialContact?.name} dialNumber={dialNumber} forwardNumber={forwardNumber} callNotes={callNotes} callDisposition={callDisposition} isOpen={isDialerOpen} isMinimized={isDialerMinimized} isActiveCall={isActiveCall} isHeld={isHeld} isMuted={isMuted} callSid={callSid} onClose={() => setIsDialerOpen(false)} onMinimize={() => setIsDialerMinimized((value) => !value)} onStartCall={handleStartCall} onEndCall={handleEndCall} onHoldCall={handleHoldCall} onMuteCall={handleMuteCall} onForwardCall={handleForwardCall} onSaveCallNotes={handleSaveCallNotes} onNotesChange={setCallNotes} onDispositionChange={setCallDisposition} onDialNumberChange={setDialNumber} onForwardNumberChange={setForwardNumber} />
     </div>
   );
 }
