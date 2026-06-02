@@ -97,15 +97,16 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   const now = new Date().toISOString();
   const messageSid = String(payload.MessageSid || payload.SmsSid || "");
   const callSid = String(payload.CallSid || "");
+  const status = String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || "");
 
   return {
-    id: messageSid || callSid || crypto.randomUUID(),
+    id: messageSid || (callSid ? `${callSid}-${status || type}-${Date.now()}` : crypto.randomUUID()),
     type,
     direction: String(payload.Direction || "").includes("outbound") ? "outbound" : "inbound",
     from: String(payload.From || ""),
     to: String(payload.To || ""),
     body: String(payload.Body || payload.TranscriptionText || ""),
-    status: String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || ""),
+    status,
     callSid: callSid || undefined,
     messageSid: messageSid || undefined,
     conversationId: payload.conversationId ? String(payload.conversationId) : undefined,

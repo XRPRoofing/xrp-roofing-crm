@@ -95,6 +95,37 @@ export async function saveCallNotes(payload: TwilioCallNotePayload) {
   return response.json() as Promise<{ ok: boolean; eventId: string }>;
 }
 
+function mapConversationEventRow(row: Record<string, unknown>): TwilioConversationEvent {
+  return {
+    id: String(row.id),
+    type: row.type as TwilioConversationEvent["type"],
+    direction: row.direction as TwilioConversationEvent["direction"],
+    from: row.from_phone ? String(row.from_phone) : undefined,
+    to: row.to_phone ? String(row.to_phone) : undefined,
+    body: row.body ? String(row.body) : undefined,
+    status: row.status ? String(row.status) : undefined,
+    callSid: row.call_sid ? String(row.call_sid) : undefined,
+    messageSid: row.message_sid ? String(row.message_sid) : undefined,
+    conversationId: row.conversation_id ? String(row.conversation_id) : undefined,
+    recordingUrl: row.recording_url ? String(row.recording_url) : row.payload && typeof row.payload === "object" && "recordingUrl" in row.payload ? String((row.payload as Record<string, unknown>).recordingUrl) : undefined,
+    payload: (row.payload as Record<string, unknown>) || {},
+    createdAt: String(row.created_at),
+  };
+}
+
+export async function listConversationEvents(limit = 250) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("conversation_events")
+    .select("*")
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+
+  return ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow);
+}
+
 export function subscribeToConversationEvents(onEvent: (event: TwilioConversationEvent) => void) {
   const supabase = createClient();
   const channel = supabase
@@ -104,21 +135,7 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
       { event: "INSERT", schema: "public", table: "conversation_events" },
       (payload) => {
         const row = payload.new as Record<string, unknown>;
-        onEvent({
-          id: String(row.id),
-          type: row.type as TwilioConversationEvent["type"],
-          direction: row.direction as TwilioConversationEvent["direction"],
-          from: row.from_phone ? String(row.from_phone) : undefined,
-          to: row.to_phone ? String(row.to_phone) : undefined,
-          body: row.body ? String(row.body) : undefined,
-          status: row.status ? String(row.status) : undefined,
-          callSid: row.call_sid ? String(row.call_sid) : undefined,
-          messageSid: row.message_sid ? String(row.message_sid) : undefined,
-          conversationId: row.conversation_id ? String(row.conversation_id) : undefined,
-          recordingUrl: row.payload && typeof row.payload === "object" && "recordingUrl" in row.payload ? String((row.payload as Record<string, unknown>).recordingUrl) : undefined,
-          payload: (row.payload as Record<string, unknown>) || {},
-          createdAt: String(row.created_at),
-        });
+        onEvent(mapConversationEventRow(row));
       }
     )
     .subscribe();

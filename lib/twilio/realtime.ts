@@ -26,6 +26,7 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     status: event.status,
     call_sid: event.callSid,
     message_sid: event.messageSid,
+    recording_url: event.recordingUrl,
     conversation_id: event.conversationId,
     payload: event.payload,
     created_at: event.createdAt,

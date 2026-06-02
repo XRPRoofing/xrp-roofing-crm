@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
@@ -105,14 +106,18 @@ function MessageRow({ message }: { message: ConversationMessage }) {
 function CallInsightsCard({ event }: { event: TwilioConversationEvent }) {
   const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
+  const isProcessing = event.status === "processing";
 
   return (
     <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-bold">Call recording, transcript, and summary</p>
-        <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
+        <p className="font-bold">{isProcessing ? "Call recording saved" : "Call recording, transcript, and summary"}</p>
+        <div className="flex items-center gap-2">
+          {isProcessing && <Badge tone="slate">Processing summary</Badge>}
+          <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
+        </div>
       </div>
-      {event.recordingUrl && <audio controls src={event.recordingUrl} className="mt-3 w-full" />}
+      {event.recordingUrl && <><audio controls src={event.recordingUrl} className="mt-3 w-full" /><a href={event.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-emerald-700 underline">Open recording</a></>}
       {summary && <div className="mt-3 rounded-xl bg-white/80 p-3"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary</p><p className="mt-1 whitespace-pre-wrap leading-6">{summary}</p></div>}
       {transcript && <details className="mt-3 rounded-xl bg-white/80 p-3"><summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-emerald-700">Transcript</summary><p className="mt-2 whitespace-pre-wrap leading-6">{transcript}</p></details>}
     </div>
@@ -244,11 +249,19 @@ function getEventPhone(event: TwilioConversationEvent) {
   return event.direction === "outbound" ? event.to || event.from || "" : event.from || event.to || "";
 }
 
+function isMissedCallEvent(event: TwilioConversationEvent) {
+  return getTwilioCallOutcomeLabel(event) === "Missed call";
+}
+
+function isAnsweredCallEvent(event: TwilioConversationEvent) {
+  return ["Answered call", "Completed call", "Call recorded with summary"].includes(getTwilioCallOutcomeLabel(event));
+}
+
 function createMessageFromEvent(event: TwilioConversationEvent): ConversationMessage {
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
   const direction = event.direction || "internal";
-  const fallbackBody = event.type === "call_recording" ? "Call recording summary completed" : isCall ? `Call ${event.status || "activity"}` : "Message activity";
+  const fallbackBody = event.type === "call_recording" ? "Call recording summary completed" : isCall ? getTwilioCallOutcomeLabel(event) : "Message activity";
 
   return {
     id: event.id,
@@ -257,7 +270,7 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
     author: direction === "outbound" ? "XRP Roofing" : formatPhoneIdentity(event.from || "Customer"),
     body: event.body || fallbackBody,
     timestamp: new Date(event.createdAt).toLocaleString(),
-    status: event.status === "missed" ? "missed" : direction === "outbound" ? "sent" : "read",
+    status: isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read",
     recordingUrl: event.recordingUrl,
   };
 }
@@ -281,7 +294,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     lastMessage: message.body,
     lastActivityAt: "Now",
     unreadCount: event.direction === "inbound" ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
-    isMissedCall: event.status === "missed" || nextConversation.isMissedCall,
+    isMissedCall: isMissedCallEvent(event) ? true : isAnsweredCallEvent(event) ? false : nextConversation.isMissedCall,
     channels,
     messages: nextMessages,
   };
@@ -422,14 +435,36 @@ export default function ConversationBoard() {
   function applyLocalEvent(event: TwilioConversationEvent) {
     const phone = getEventPhone(event);
     const conversationId = `phone-${normalizePhone(phone) || phone}`;
+    addTwilioCrmNotification(event);
     setConversations((current) => upsertConversationFromEvent(current, event));
     setActiveConversationId(conversationId);
   }
 
   useEffect(() => {
+    let mounted = true;
+
+    listConversationEvents().then((events) => {
+      if (!mounted) return;
+
+      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event), []);
+      setConversations(savedConversations);
+      setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());
+      setActiveConversationId((current) => current || savedConversations[0]?.id || "");
+      setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
+    }).catch(() => {
+      if (mounted) setTwilioNotice("Saved call history is waiting for Supabase configuration");
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       return subscribeToConversationEvents((event: TwilioConversationEvent) => {
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
+        addTwilioCrmNotification(event);
         setConversations((current) => {
           const next = upsertConversationFromEvent(current, event);
           if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));

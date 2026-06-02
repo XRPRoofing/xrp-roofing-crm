@@ -41,6 +41,24 @@ export function addCrmNotification(input: Omit<CrmNotification, "id" | "createdA
   saveCrmNotifications([notification, ...readCrmNotifications()].slice(0, 80));
 }
 
+export function addUniqueCrmNotification(uniqueId: string, input: Omit<CrmNotification, "id" | "createdAt" | "read">) {
+  if (typeof window === "undefined") return;
+
+  const notifications = readCrmNotifications();
+  const id = `notification-${uniqueId}`;
+  if (notifications.some((notification) => notification.id === id)) return;
+
+  saveCrmNotifications([
+    {
+      ...input,
+      id,
+      createdAt: new Date().toISOString(),
+      read: false,
+    },
+    ...notifications,
+  ].slice(0, 80));
+}
+
 export function markCrmNotificationsRead() {
   saveCrmNotifications(readCrmNotifications().map((notification) => ({ ...notification, read: true })));
 }

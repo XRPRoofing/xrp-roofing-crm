@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
+import { subscribeToConversationEvents } from "@/lib/twilio/client";
+import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -94,6 +96,19 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("crm-notifications-updated", refreshNotifications);
       window.removeEventListener("storage", refreshNotifications);
     };
+  }, [isCrewUser]);
+
+  useEffect(() => {
+    if (isCrewUser) return;
+
+    try {
+      return subscribeToConversationEvents((event) => {
+        addTwilioCrmNotification(event);
+        setNotifications(readCrmNotifications());
+      });
+    } catch {
+      return undefined;
+    }
   }, [isCrewUser]);
 
   useEffect(() => {
