@@ -188,6 +188,17 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) outputArray[index] = rawData.charCodeAt(index);
+
+  return outputArray;
+}
+
 function formatPhoneIdentity(value: string) {
   return value.trim() || "Unknown number";
 }
@@ -418,7 +429,32 @@ export default function ConversationBoard() {
 
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
-    setTwilioNotice(permission === "granted" ? "Mobile notifications enabled" : "Mobile notifications are blocked in browser settings");
+    if (permission !== "granted") {
+      setTwilioNotice("Mobile notifications are blocked in browser settings");
+      return;
+    }
+
+    try {
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicKey) throw new Error("VAPID public key is not configured");
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription),
+      });
+
+      if (!response.ok) throw new Error("Unable to save mobile push subscription");
+      setTwilioNotice("Mobile call notifications enabled");
+    } catch (error) {
+      setTwilioNotice(error instanceof Error ? error.message : "Mobile push setup failed");
+    }
   }
 
   const startIncomingAlert = useCallback((from: string) => {

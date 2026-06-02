@@ -21,18 +21,17 @@ async function downloadRecording(recordingUrl: string) {
   const auth = getBasicAuthHeader();
   const response = await fetch(recordingUrl, { headers: auth ? { Authorization: auth } : undefined });
 
-  if (!response.ok) throw new Error("Unable to download Twilio recording");
+  if (!response.ok) throw new Error(`Unable to download Twilio recording (${response.status})`);
 
-  const blob = await response.blob();
-  return new File([blob], "call-recording.mp3", { type: blob.type || "audio/mpeg" });
+  return response.blob();
 }
 
-async function transcribeRecording(file: File) {
+async function transcribeRecording(blob: Blob) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", blob, "call-recording.mp3");
   form.append("model", "gpt-4o-mini-transcribe");
   form.append("response_format", "json");
 
@@ -42,7 +41,7 @@ async function transcribeRecording(file: File) {
     body: form,
   });
 
-  if (!response.ok) throw new Error("OpenAI transcription failed");
+  if (!response.ok) throw new Error(`OpenAI transcription failed (${response.status}): ${await response.text()}`);
 
   const data = await response.json() as { text?: string };
   return data.text || "";
@@ -74,7 +73,7 @@ async function summarizeTranscript(transcript: string) {
     }),
   });
 
-  if (!response.ok) throw new Error("OpenAI summary failed");
+  if (!response.ok) throw new Error(`OpenAI summary failed (${response.status}): ${await response.text()}`);
 
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   return data.choices?.[0]?.message?.content?.trim() || "Summary unavailable.";
@@ -83,8 +82,8 @@ async function summarizeTranscript(transcript: string) {
 export async function createCallRecordingInsights(input: RecordingInsightsInput): Promise<TwilioConversationEvent | null> {
   if (!input.recordingUrl) return null;
 
-  const recordingFile = await downloadRecording(input.recordingUrl);
-  const transcript = await transcribeRecording(recordingFile);
+  const recordingBlob = await downloadRecording(input.recordingUrl);
+  const transcript = await transcribeRecording(recordingBlob);
   const summary = transcript ? await summarizeTranscript(transcript) : "Transcript unavailable.";
 
   return {

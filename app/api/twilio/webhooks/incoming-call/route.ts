@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendIncomingCallPushNotification } from "@/lib/push-notifications";
 import { buildIncomingCallTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 
@@ -7,6 +8,7 @@ export async function POST(req: NextRequest) {
   const event = normalizeTwilioWebhookEvent("incoming_call", formData);
 
   await publishConversationEvent(event);
+  await sendIncomingCallPushNotification(event.from);
 
   return new NextResponse(buildIncomingCallTwiml(), { headers: { "Content-Type": "text/xml" } });
 }
@@ -16,6 +18,7 @@ export async function GET(req: NextRequest) {
   req.nextUrl.searchParams.forEach((value, key) => formData.set(key, value));
   const event = normalizeTwilioWebhookEvent("incoming_call", formData);
   await publishConversationEvent(event);
+  await sendIncomingCallPushNotification(event.from);
 
   return new NextResponse(buildIncomingCallTwiml(), { headers: { "Content-Type": "text/xml" } });
 }

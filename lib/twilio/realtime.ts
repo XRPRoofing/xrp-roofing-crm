@@ -31,12 +31,12 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     payload: event.payload,
     created_at: event.createdAt,
   };
-  const { error } = await supabase.from("conversation_events").insert(row);
+  const { error } = await supabase.from("conversation_events").upsert(row, { onConflict: "id" });
 
   if (error && error.message.includes("recording_url")) {
     const fallbackRow: Record<string, unknown> = { ...row };
     delete fallbackRow.recording_url;
-    const fallback = await supabase.from("conversation_events").insert(fallbackRow);
+    const fallback = await supabase.from("conversation_events").upsert(fallbackRow, { onConflict: "id" });
     if (fallback.error) return { stored: false, reason: getConversationEventsErrorMessage(fallback.error.message) };
     return { stored: true };
   }

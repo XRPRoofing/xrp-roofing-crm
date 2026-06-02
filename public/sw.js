@@ -1,4 +1,4 @@
-const CACHE_NAME = "xrp-crm-pwa-v2";
+const CACHE_NAME = "xrp-crm-pwa-v3";
 const APP_SHELL = ["/", "/crm", "/crew", "/login", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -42,6 +42,25 @@ self.addEventListener("message", (event) => {
       requireInteraction: true,
       vibrate: [300, 120, 300, 120, 300],
       data: { url: "/crm/conversations" },
+      actions: [
+        { action: "open", title: "Open CRM" },
+      ],
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  const data = event.data?.json?.() || {};
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "XRP CRM", {
+      body: data.body || "New CRM notification",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: data.tag || "xrp-crm",
+      requireInteraction: true,
+      vibrate: [300, 120, 300, 120, 300],
+      data: { url: data.url || "/crm/conversations" },
       actions: [
         { action: "open", title: "Open CRM" },
       ],
