@@ -24,11 +24,12 @@ function Button({ children, variant = "secondary", className = "", onClick }: { 
   return <button type="button" onClick={onClick} className={`inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-semibold transition ${styles[variant]} ${className}`}>{children}</button>;
 }
 
-function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "slate" | "green" }) {
+function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "slate" | "green" | "orange" }) {
   const styles = {
     blue: "bg-blue-50 text-blue-700 ring-blue-100",
     slate: "bg-slate-100 text-slate-600 ring-slate-200",
     green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    orange: "bg-orange-50 text-orange-700 ring-orange-100",
   };
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[tone]}`}>{children}</span>;
 }
@@ -56,7 +57,9 @@ function ConversationInbox({ conversations, active, onSelect }: { conversations:
         {conversations.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">No conversations yet. Dial, receive a call, or send a text to create an accurate client conversation.</div>}
         {conversations.map((conversation) => {
           const selected = conversation.id === active?.id;
-          const status = conversation.isMissedCall ? "Missed call" : conversation.unreadCount > 0 ? "Unread" : conversation.channels.includes("sms") ? "SMS" : "Call";
+          const unreadCount = conversation.isMissedCall ? 0 : conversation.unreadCount;
+          const status = conversation.isMissedCall ? "Missed call" : unreadCount > 0 ? "Unread" : "Read";
+          const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-emerald-700" : "text-orange-600";
           return (
             <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-xl border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"}`}>
               <div className="flex items-start justify-between gap-3">
@@ -67,8 +70,8 @@ function ConversationInbox({ conversations, active, onSelect }: { conversations:
               <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{conversation.contact.address}</p>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{conversation.lastMessage}</p>
               <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500">{status}</span>
-                {conversation.unreadCount > 0 && <Badge>{conversation.unreadCount} new</Badge>}
+                <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
+                {unreadCount > 0 && <Badge tone="orange">{unreadCount} new</Badge>}
               </div>
             </button>
           );
@@ -214,6 +217,15 @@ function SchedulerPanel() {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return <div className="grid gap-1"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm leading-5 text-slate-800">{value}</p></div>;
+}
+
+function EditableDetailRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-transparent bg-slate-50 px-2 py-1.5 text-sm leading-5 text-slate-800 outline-none transition hover:border-slate-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
+    </label>
+  );
 }
 
 function normalizePhone(value: string) {
@@ -369,7 +381,7 @@ function createLocalCommunicationEvent(type: TwilioConversationEvent["type"], ph
   };
 }
 
-function ContactPanel({ conversation, onDial }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void }) {
+function ContactPanel({ conversation, onDial, onContactChange }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void }) {
   const contact = conversation.contact;
   return (
     <aside className="space-y-4 xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-1">
@@ -377,7 +389,7 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-bold text-slate-950">{contact.name}</p>
+            <input value={contact.name} onChange={(event) => onContactChange("name", event.target.value)} className="w-full rounded-lg border border-transparent bg-transparent px-1 text-lg font-bold text-slate-950 outline-none transition hover:border-slate-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
             <button onClick={() => onDial(conversation)} className="mt-1 inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-800"><Phone className="mr-1.5 h-3.5 w-3.5" />{contact.phone}</button>
           </div>
         </div>
@@ -386,19 +398,19 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
       <Card className="p-5">
         <h3 className="text-sm font-bold text-slate-950">Contact Info</h3>
         <div className="mt-4 space-y-4">
-          <DetailRow label="Email" value={contact.email} />
-          <DetailRow label="Address" value={contact.address} />
-          <DetailRow label="Lead source" value={contact.leadSource} />
+          <EditableDetailRow label="Email" value={contact.email} onChange={(value) => onContactChange("email", value)} />
+          <EditableDetailRow label="Address" value={contact.address} onChange={(value) => onContactChange("address", value)} />
+          <EditableDetailRow label="Lead source" value={contact.leadSource} onChange={(value) => onContactChange("leadSource", value)} />
         </div>
       </Card>
 
       <Card className="p-5">
         <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
         <div className="mt-4 space-y-4">
-          <DetailRow label="Roof type" value={contact.roofType} />
-          <DetailRow label="Assigned rep" value={contact.assignedRep} />
-          <DetailRow label="Insurance" value={contact.insuranceStatus} />
-          <DetailRow label="Job status" value={contact.jobStatus} />
+          <EditableDetailRow label="Roof type" value={contact.roofType} onChange={(value) => onContactChange("roofType", value)} />
+          <EditableDetailRow label="Assigned rep" value={contact.assignedRep} onChange={(value) => onContactChange("assignedRep", value)} />
+          <EditableDetailRow label="Insurance" value={contact.insuranceStatus} onChange={(value) => onContactChange("insuranceStatus", value)} />
+          <EditableDetailRow label="Job status" value={contact.jobStatus} onChange={(value) => onContactChange("jobStatus", value)} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">{contact.tags.slice(0, 3).map((tag) => <Badge key={tag} tone="slate">{tag}</Badge>)}</div>
       </Card>
@@ -513,6 +525,23 @@ export default function ConversationBoard() {
     notifyIncomingCall(from);
   }, [notifyIncomingCall]);
 
+  function markConversationRead(conversationId: string) {
+    setConversations((current) => current.map((conversation) => conversation.id === conversationId && !conversation.isMissedCall ? { ...conversation, unreadCount: 0 } : conversation));
+  }
+
+  function handleSelectConversation(conversation: ConversationRecord) {
+    setActiveConversationId(conversation.id);
+    setDialNumber(conversation.contact.phone);
+    setShowMobileThread(true);
+    markConversationRead(conversation.id);
+  }
+
+  function handleContactChange(field: keyof ConversationRecord["contact"], value: string) {
+    if (!active) return;
+
+    setConversations((current) => current.map((conversation) => conversation.id === active.id ? { ...conversation, contact: { ...conversation.contact, [field]: value } } : conversation));
+  }
+
   function applyLocalEvent(event: TwilioConversationEvent) {
     const phone = getEventPhone(event);
     const conversationId = `phone-${normalizePhone(phone) || phone}`;
@@ -528,7 +557,8 @@ export default function ConversationBoard() {
       if (!mounted) return;
 
       const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event), []);
-      setConversations(savedConversations);
+      const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
+      setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
       setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());
       setActiveConversationId((current) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
@@ -840,11 +870,7 @@ export default function ConversationBoard() {
 
       <div className="grid gap-5 xl:grid-cols-[320px_minmax(520px,1fr)_340px]">
         <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
-          <ConversationInbox conversations={conversations} active={active} onSelect={(conversation) => {
-            setActiveConversationId(conversation.id);
-            setDialNumber(conversation.contact.phone);
-            setShowMobileThread(true);
-          }} />
+          <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} />
         </div>
         <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100vh-9rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
           {active ? (
@@ -870,7 +896,7 @@ export default function ConversationBoard() {
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
-        {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} /></div>}
+        {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} /></div>}
       </div>
 
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
