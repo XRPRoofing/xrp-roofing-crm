@@ -627,6 +627,30 @@ export default function ConversationBoard() {
     }
   }, [activeConversationId, notifyIncomingCall]);
 
+
+  useEffect(() => {
+    const transferredCall = (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall;
+    if (!transferredCall || browserCallRef.current) return;
+
+    browserCallRef.current = transferredCall;
+    setCallSid(transferredCall.parameters?.CallSid);
+    setDialNumber(transferredCall.parameters?.From || "");
+    setIsActiveCall(true);
+    setIsHeld(false);
+    setIsMuted(false);
+    setIsDialerOpen(true);
+    setIsDialerMinimized(false);
+    setTwilioNotice("Incoming call connected from global popup");
+    transferredCall.on("disconnect", () => {
+      setIsActiveCall(false);
+      setIsMuted(false);
+      setCallSid(undefined);
+      browserCallRef.current = null;
+      (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = undefined;
+      setTwilioNotice("Call ended");
+    });
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 

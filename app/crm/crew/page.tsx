@@ -6,6 +6,7 @@ import { Camera, CheckCircle2, Plus, RotateCcw, Search, UploadCloud, UsersRound,
 import { leads } from "@/lib/crm-data";
 import { syncCrewPhotosToFiles } from "@/lib/crm-files";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { ensureInvoiceTaskForCompletedJob } from "@/lib/office-tasks";
 import { createDefaultCrewAssignment, crewMembers, crewStatuses, mergeJobsWithCrewAssignments, readCrewAssignments, readSavedJobs, saveCrewAssignments, saveCrewJobs, type CrewAssignment, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
@@ -81,6 +82,10 @@ export default function CrewWorkflowPage() {
 
   function updateAssignment(jobId: string, updates: Partial<CrewAssignment>) {
     const job = crewJobs.find((item) => item.id === jobId);
+    if (job && updates.status === "Completed" && updates.status !== job.status) {
+      ensureInvoiceTaskForCompletedJob({ ...job, ...updates, status: "Completed" });
+    }
+
     if (job && updates.status && updates.status !== job.status) {
       addCrmNotification({
         title: "Crew job moved",

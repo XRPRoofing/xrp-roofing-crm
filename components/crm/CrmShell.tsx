@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { subscribeToConversationEvents } from "@/lib/twilio/client";
+import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 
 const navigation = [
@@ -49,6 +49,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CrmNotification[]>([]);
   const [unreadTeamChatCount, setUnreadTeamChatCount] = useState(0);
+  const voiceDeviceRef = useRef<BrowserVoiceDevice | null>(null);
+  const incomingCallRef = useRef<BrowserVoiceCall | null>(null);
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
@@ -118,6 +120,53 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     }
   }, [isCrewUser]);
 
+
+  useEffect(() => {
+    if (isCrewUser) return;
+    let mounted = true;
+
+    async function registerGlobalVoiceDevice() {
+      try {
+        const device = await createBrowserVoiceDevice("crm-agent");
+        if (!mounted) {
+          device.destroy();
+          return;
+        }
+
+        voiceDeviceRef.current = device;
+        device.on("incoming", (call) => {
+          const incoming = call as BrowserVoiceCall;
+          const phone = incoming.parameters?.From || "Unknown number";
+          incomingCallRef.current = incoming;
+          setGlobalIncomingCall({ name: phone, phone });
+          incoming.on("cancel", () => {
+            incomingCallRef.current = null;
+            setGlobalIncomingCall(null);
+          });
+          incoming.on("disconnect", () => {
+            incomingCallRef.current = null;
+            setGlobalIncomingCall(null);
+          });
+        });
+        device.on("unregistered", () => {
+          void device.register().catch(() => undefined);
+        });
+        await device.register();
+      } catch {
+        voiceDeviceRef.current = null;
+      }
+    }
+
+    registerGlobalVoiceDevice();
+
+    return () => {
+      mounted = false;
+      voiceDeviceRef.current?.destroy();
+      voiceDeviceRef.current = null;
+      incomingCallRef.current = null;
+    };
+  }, [isCrewUser]);
+
   useEffect(() => {
     function refreshUnreadTeamChatCount() {
       setUnreadTeamChatCount(readTeamChatUnreadCount());
@@ -175,6 +224,25 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setNotifications(readCrmNotifications());
   }
 
+  function handleAnswerGlobalIncomingCall() {
+    const incoming = incomingCallRef.current;
+    if (!incoming) {
+      router.push("/crm/conversations");
+      return;
+    }
+
+    incoming.accept();
+    (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = incoming;
+    setGlobalIncomingCall(null);
+    router.push("/crm/conversations?activeCall=1");
+  }
+
+  function handleDeclineGlobalIncomingCall() {
+    incomingCallRef.current?.reject();
+    incomingCallRef.current = null;
+    setGlobalIncomingCall(null);
+  }
+
   const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
   const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";
 
@@ -194,8 +262,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <p className="mt-2 text-xl font-black">{globalIncomingCall.name}</p>
           <p className="mt-1 text-sm font-bold text-slate-600">{globalIncomingCall.phone}</p>
           <div className="mt-4 flex gap-2">
-            <Link href="/crm/conversations" onClick={() => setGlobalIncomingCall(null)} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700">Accept</Link>
-            <button onClick={() => setGlobalIncomingCall(null)} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
+            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700">Answer</button>
+            <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
           </div>
         </div>
       )}
