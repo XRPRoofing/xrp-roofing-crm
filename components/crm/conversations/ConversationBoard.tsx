@@ -427,8 +427,8 @@ export default function ConversationBoard() {
       setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());
       setActiveConversationId((current) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
-    }).catch(() => {
-      if (mounted) setTwilioNotice("Saved call history is waiting for Supabase configuration");
+    }).catch((error) => {
+      if (mounted) setTwilioNotice(error instanceof Error ? `Call history sync issue: ${error.message}` : "Call history sync issue");
     });
 
     return () => {
@@ -455,7 +455,7 @@ export default function ConversationBoard() {
         }
       });
     } catch {
-      queueMicrotask(() => setTwilioNotice("Realtime subscription waiting for Supabase configuration"));
+      queueMicrotask(() => setTwilioNotice("Call history syncs automatically after each call"));
     }
   }, [activeConversationId, notifyIncomingCall]);
 
