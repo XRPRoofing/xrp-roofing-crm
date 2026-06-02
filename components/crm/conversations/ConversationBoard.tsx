@@ -9,7 +9,7 @@ import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twili
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -104,23 +104,52 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   );
 }
 
-function CallInsightsCard({ event }: { event: TwilioConversationEvent }) {
-  const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
-  const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
+function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; onOpen: (event: TwilioConversationEvent) => void }) {
   const isProcessing = event.status === "processing";
 
   return (
     <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-950">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-bold">{isProcessing ? "Call recording saved" : "Call recording, transcript, and summary"}</p>
+        <p className="font-bold">{isProcessing ? "Call recording saved" : "Call recording available"}</p>
         <div className="flex items-center gap-2">
           {isProcessing && <Badge tone="slate">Processing summary</Badge>}
           <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
         </div>
       </div>
-      {event.recordingUrl && <><audio controls src={event.recordingUrl} className="mt-3 w-full" /><a href={event.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-emerald-700 underline">Open recording</a></>}
-      {summary && <div className="mt-3 rounded-xl bg-white/80 p-3"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary</p><p className="mt-1 whitespace-pre-wrap leading-6">{summary}</p></div>}
-      {transcript && <details className="mt-3 rounded-xl bg-white/80 p-3"><summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-emerald-700">Click here for the transcript</summary><div className="mt-2 max-h-64 overflow-y-auto rounded-lg bg-white p-3 text-xs leading-6 text-slate-700"><p className="whitespace-pre-wrap break-words">{transcript}</p></div></details>}
+      {event.recordingUrl && <audio controls src={event.recordingUrl} className="mt-3 w-full" />}
+      <button onClick={() => onOpen(event)} className="mt-3 inline-flex rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">Click here for call transcript</button>
+    </div>
+  );
+}
+
+function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEvent | null; onClose: () => void }) {
+  if (!event) return null;
+
+  const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
+  const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="max-h-[86vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+          <div>
+            <p className="text-sm font-bold text-slate-950">Call summary and transcript</p>
+            <p className="text-xs font-semibold text-slate-500">{new Date(event.createdAt).toLocaleString()}</p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="max-h-[calc(86vh-5rem)] space-y-4 overflow-y-auto p-4">
+          {event.recordingUrl && <a href={event.recordingUrl} target="_blank" rel="noreferrer" className="inline-flex text-xs font-bold text-blue-700 underline">Open call recording</a>}
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary Call</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{summary || "Summary is still processing or unavailable."}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Call Transcript</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{transcript || "Transcript is still processing or unavailable."}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -417,6 +446,7 @@ export default function ConversationBoard() {
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const [inboundReady, setInboundReady] = useState(false);
+  const [selectedCallInsight, setSelectedCallInsight] = useState<TwilioConversationEvent | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return "default";
     return Notification.permission;
@@ -816,14 +846,14 @@ export default function ConversationBoard() {
             setShowMobileThread(true);
           }} />
         </div>
-        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} min-h-[calc(100vh-12rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:min-h-[calc(100vh-8rem)]`}> 
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100vh-9rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
           {active ? (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
                 <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
               </div>
-              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
+              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-8 text-center">
@@ -842,6 +872,8 @@ export default function ConversationBoard() {
         </main>
         {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} /></div>}
       </div>
+
+      <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
 
       {!isDialerOpen && (
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
