@@ -1,4 +1,4 @@
-const CACHE_NAME = "xrp-crm-pwa-v1";
+const CACHE_NAME = "xrp-crm-pwa-v2";
 const APP_SHELL = ["/", "/crm", "/crew", "/login", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

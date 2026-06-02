@@ -5,7 +5,8 @@ import { publishConversationEvent } from "@/lib/twilio/realtime";
 
 const controlSchema = z.object({
   callSid: z.string().min(1),
-  action: z.enum(["end", "hold", "resume"]),
+  action: z.enum(["end", "hold", "resume", "forward"]),
+  forwardTo: z.string().optional(),
   conversationId: z.string().optional(),
 });
 
@@ -37,6 +38,28 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ sid: call.sid, status: call.status, action: parsed.data.action });
+    }
+
+    if (parsed.data.action === "forward") {
+      if (!parsed.data.forwardTo) return NextResponse.json({ error: "Forward number is required" }, { status: 400 });
+
+      const url = new URL("/api/twilio/voice/forward", req.nextUrl.origin);
+      url.searchParams.set("To", parsed.data.forwardTo);
+      const call = await client.calls(parsed.data.callSid).update({ url: url.toString(), method: "POST" });
+
+      await publishConversationEvent({
+        id: crypto.randomUUID(),
+        type: "call_status",
+        direction: "outbound",
+        status: "forwarded",
+        callSid: parsed.data.callSid,
+        conversationId: parsed.data.conversationId,
+        body: `Call forwarded to ${parsed.data.forwardTo}`,
+        payload: { sid: call.sid, action: parsed.data.action, status: call.status, forwardTo: parsed.data.forwardTo },
+        createdAt: new Date().toISOString(),
+      });
+
+      return NextResponse.json({ sid: call.sid, status: "forwarded", action: parsed.data.action });
     }
 
     await publishConversationEvent({

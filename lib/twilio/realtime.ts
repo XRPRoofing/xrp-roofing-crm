@@ -37,11 +37,11 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     const fallbackRow: Record<string, unknown> = { ...row };
     delete fallbackRow.recording_url;
     const fallback = await supabase.from("conversation_events").insert(fallbackRow);
-    if (fallback.error) return { stored: false, reason: fallback.error.message };
+    if (fallback.error) return { stored: false, reason: getConversationEventsErrorMessage(fallback.error.message) };
     return { stored: true };
   }
 
-  if (error) return { stored: false, reason: error.message };
+  if (error) return { stored: false, reason: getConversationEventsErrorMessage(error.message) };
 
   return { stored: true };
 }
@@ -75,7 +75,15 @@ export async function listConversationEvents(limit = 250) {
     .order("created_at", { ascending: true })
     .limit(limit);
 
-  if (error) return { ok: false as const, reason: error.message, events: [] };
+  if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), events: [] };
 
   return { ok: true as const, events: ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow) };
+}
+
+function getConversationEventsErrorMessage(message: string) {
+  if (message.includes("conversation_events") && message.includes("schema cache")) {
+    return "Call history table is missing. Run supabase/conversation-events.sql in the Supabase SQL editor.";
+  }
+
+  return message;
 }

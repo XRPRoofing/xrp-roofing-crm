@@ -11,6 +11,7 @@ export type BrowserVoiceCall = {
   accept: () => void;
   disconnect: () => void;
   reject: () => void;
+  mute?: (shouldMute: boolean) => void;
   on: (event: "accept" | "disconnect" | "error" | "cancel", handler: (error?: Error) => void) => void;
   parameters?: Record<string, string>;
 };
@@ -65,7 +66,7 @@ export async function startOutboundCall(payload: TwilioCallPayload) {
   return response.json() as Promise<{ sid: string; status: string }>;
 }
 
-export async function controlCall(payload: { callSid: string; action: "end" | "hold" | "resume"; conversationId?: string }) {
+export async function controlCall(payload: { callSid: string; action: "end" | "hold" | "resume" | "forward"; conversationId?: string; forwardTo?: string }) {
   const response = await fetch("/api/twilio/voice/call-control", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
