@@ -85,8 +85,9 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   if (internal) {
     return (
       <div className="flex justify-center">
-        <div className="max-w-[86%] rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-500">
-          <span className="font-medium">{message.timestamp}</span> · {message.body}
+        <div className="max-w-[86%] rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+          <span className="font-semibold">{message.timestamp}</span>
+          <p className="mt-1 whitespace-pre-wrap break-words leading-5">{message.body}</p>
         </div>
       </div>
     );
@@ -96,7 +97,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-800 shadow-sm"}`}>
         <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-slate-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}</div>
-        <p className="text-sm leading-6">{message.body}</p>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
         {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
     </div>
@@ -119,7 +120,7 @@ function CallInsightsCard({ event }: { event: TwilioConversationEvent }) {
       </div>
       {event.recordingUrl && <><audio controls src={event.recordingUrl} className="mt-3 w-full" /><a href={event.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-emerald-700 underline">Open recording</a></>}
       {summary && <div className="mt-3 rounded-xl bg-white/80 p-3"><p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary</p><p className="mt-1 whitespace-pre-wrap leading-6">{summary}</p></div>}
-      {transcript && <details className="mt-3 rounded-xl bg-white/80 p-3"><summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-emerald-700">Transcript</summary><p className="mt-2 whitespace-pre-wrap leading-6">{transcript}</p></details>}
+      {transcript && <details className="mt-3 rounded-xl bg-white/80 p-3"><summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-emerald-700">Click here for the transcript</summary><div className="mt-2 max-h-64 overflow-y-auto rounded-lg bg-white p-3 text-xs leading-6 text-slate-700"><p className="whitespace-pre-wrap break-words">{transcript}</p></div></details>}
     </div>
   );
 }
@@ -388,10 +389,17 @@ function ContactPanel({ conversation, onDial }: { conversation: ConversationReco
 export default function ConversationBoard() {
   const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
+  const messageBoardRef = useRef<HTMLDivElement | null>(null);
   const initialConversations = useMemo<ConversationRecord[]>(() => [], []);
   const [conversations, setConversations] = useState<ConversationRecord[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState("");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
+
+  function scrollMessageBoardToBottom() {
+    requestAnimationFrame(() => {
+      messageBoardRef.current?.scrollTo({ top: messageBoardRef.current.scrollHeight, behavior: "smooth" });
+    });
+  }
   const [isDialerOpen, setIsDialerOpen] = useState(false);
   const [isDialerMinimized, setIsDialerMinimized] = useState(false);
   const [isActiveCall, setIsActiveCall] = useState(false);
@@ -815,7 +823,7 @@ export default function ConversationBoard() {
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
                 <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
               </div>
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} />)}</div>
+              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-8 text-center">

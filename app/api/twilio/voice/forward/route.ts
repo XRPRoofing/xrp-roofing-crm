@@ -1,26 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import twilio from "twilio";
-import { getTwilioConfig } from "@/lib/twilio/config";
+
+function escapeXml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+function normalizeForwardNumber(value?: string | null) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed) return "";
+
+  const normalized = trimmed.startsWith("+") ? "+" + trimmed.slice(1).replace(/\D/g, "") : trimmed.replace(/\D/g, "");
+  return normalized.length >= 7 ? normalized : "";
+}
 
 function buildForwardTwiml(to?: string | null) {
-  const response = new twilio.twiml.VoiceResponse();
-  const config = getTwilioConfig();
+  const forwardTo = normalizeForwardNumber(to);
 
-  if (!to) {
-    response.say("No forwarding number was provided.");
-    return response.toString();
+  if (!forwardTo) {
+    return '<?xml version="1.0" encoding="UTF-8"?><Response><Say>No valid forwarding number was provided.</Say></Response>';
   }
 
-  const dial = config.phoneNumber ? response.dial({ callerId: config.phoneNumber }) : response.dial();
-  dial.number(to);
-  return response.toString();
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Number>${escapeXml(forwardTo)}</Number></Dial></Response>`;
 }
 
 export async function POST(req: NextRequest) {
-  const formData = await req.formData().catch(() => new FormData());
-  const to = formData.get("To")?.toString() || req.nextUrl.searchParams.get("To");
+  try {
+    const formData = await req.formData().catch(() => new FormData());
+    const to = formData.get("To")?.toString() || req.nextUrl.searchParams.get("To");
 
-  return new NextResponse(buildForwardTwiml(to), { headers: { "Content-Type": "text/xml" } });
+    return new NextResponse(buildForwardTwiml(to), { headers: { "Content-Type": "text/xml" } });
+  } catch {
+    return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response><Say>Forwarding could not be completed.</Say></Response>', { headers: { "Content-Type": "text/xml" } });
+  }
 }
 
 export async function GET(req: NextRequest) {

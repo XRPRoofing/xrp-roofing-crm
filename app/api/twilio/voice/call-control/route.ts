@@ -41,10 +41,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (parsed.data.action === "forward") {
-      if (!parsed.data.forwardTo) return NextResponse.json({ error: "Forward number is required" }, { status: 400 });
+      const forwardTo = parsed.data.forwardTo?.trim();
+      const normalizedForwardTo = forwardTo?.startsWith("+") ? `+${forwardTo.slice(1).replace(/\D/g, "")}` : forwardTo?.replace(/\D/g, "");
+      if (!normalizedForwardTo || normalizedForwardTo.length < 7) return NextResponse.json({ error: "Enter a valid forwarding number" }, { status: 400 });
 
       const url = new URL("/api/twilio/voice/forward", req.nextUrl.origin);
-      url.searchParams.set("To", parsed.data.forwardTo);
+      url.searchParams.set("To", normalizedForwardTo);
       const call = await client.calls(parsed.data.callSid).update({ url: url.toString(), method: "POST" });
 
       await publishConversationEvent({
@@ -54,8 +56,8 @@ export async function POST(req: NextRequest) {
         status: "forwarded",
         callSid: parsed.data.callSid,
         conversationId: parsed.data.conversationId,
-        body: `Call forwarded to ${parsed.data.forwardTo}`,
-        payload: { sid: call.sid, action: parsed.data.action, status: call.status, forwardTo: parsed.data.forwardTo },
+        body: `Call forwarded to ${normalizedForwardTo}`,
+        payload: { sid: call.sid, action: parsed.data.action, status: call.status, forwardTo: normalizedForwardTo },
         createdAt: new Date().toISOString(),
       });
 
