@@ -31,3 +31,20 @@ create policy "Allow realtime read conversation events"
   using (true);
 
 alter publication supabase_realtime add table public.conversation_events;
+
+
+create table if not exists public.conversation_read_states (
+  conversation_id text primary key,
+  read_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.conversation_read_states enable row level security;
+
+drop policy if exists "Allow read conversation read states" on public.conversation_read_states;
+create policy "Allow read conversation read states"
+  on public.conversation_read_states
+  for select
+  using (true);
+
+create index if not exists conversation_read_states_updated_at_idx on public.conversation_read_states (updated_at desc);

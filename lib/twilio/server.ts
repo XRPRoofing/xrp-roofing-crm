@@ -64,13 +64,13 @@ function normalizePhoneForTwiml(value?: string) {
   return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
 }
 
-export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL) {
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
-    action: statusCallbackUrl,
+    action: actionCallbackUrl,
     method: "POST",
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
@@ -87,7 +87,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
   return response.toString();
 }
 
-export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL) {
+export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
@@ -99,7 +99,7 @@ export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallback
   response.dial({
     callerId: config.phoneNumber,
     record: "record-from-answer-dual",
-    action: statusCallbackUrl,
+    action: actionCallbackUrl,
     method: "POST",
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],

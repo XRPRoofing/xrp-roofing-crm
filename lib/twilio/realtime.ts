@@ -87,3 +87,34 @@ function getConversationEventsErrorMessage(message: string) {
 
   return message;
 }
+
+
+export async function listConversationReadStates() {
+  const supabase = getAdminClient();
+
+  if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured", readStates: {} as Record<string, string> };
+
+  const { data, error } = await supabase.from("conversation_read_states").select("conversation_id, read_at");
+
+  if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), readStates: {} as Record<string, string> };
+
+  const readStates = ((data || []) as Array<{ conversation_id: string; read_at: string }>).reduce<Record<string, string>>((current, row) => {
+    current[row.conversation_id] = row.read_at;
+    return current;
+  }, {});
+
+  return { ok: true as const, readStates };
+}
+
+export async function markConversationReadState(conversationId: string) {
+  const supabase = getAdminClient();
+
+  if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured" };
+
+  const readAt = new Date().toISOString();
+  const { error } = await supabase.from("conversation_read_states").upsert({ conversation_id: conversationId, read_at: readAt, updated_at: readAt }, { onConflict: "conversation_id" });
+
+  if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message) };
+
+  return { ok: true as const, readAt };
+}

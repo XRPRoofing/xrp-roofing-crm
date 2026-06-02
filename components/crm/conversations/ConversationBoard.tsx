@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
@@ -313,6 +313,36 @@ function isAnsweredCallEvent(event: TwilioConversationEvent) {
   return ["Answered call", "Completed call", "Call recorded with summary"].includes(getTwilioCallOutcomeLabel(event));
 }
 
+function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
+  if (!event.type.includes("call")) return true;
+  if (event.type === "call_note" || event.type === "call_recording") return true;
+
+  const status = (event.status || String(event.payload.CallStatus || "")).toLowerCase();
+  const label = getTwilioCallOutcomeLabel(event);
+
+  if (["ringing", "initiated", "queued", "in-progress"].includes(status)) return false;
+  return ["Incoming Call", "Outgoing Call", "Missed call", "Completed call", "Answered call", "Call recorded with summary"].includes(label) || status === "completed";
+}
+
+function getConversationIdForPhone(phone: string) {
+  return "phone-" + (normalizePhone(phone) || phone);
+}
+
+function getCallMessageId(event: TwilioConversationEvent) {
+  if (!event.callSid || !event.type.includes("call")) return event.id;
+  if (event.type === "call_recording") return "recording-" + event.callSid;
+  if (event.type === "call_note") return event.id;
+  return "call-" + event.callSid;
+}
+
+function getCallDurationLabel(event: TwilioConversationEvent) {
+  const seconds = Number(event.payload.CallDuration || event.payload.DialCallDuration || 0);
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes > 0 ? minutes + "m " + remainingSeconds + "s" : remainingSeconds + "s";
+}
+
 function eventMatchesConversation(event: TwilioConversationEvent, conversation: ConversationRecord) {
   if (event.conversationId && event.conversationId === conversation.id) return true;
   const eventPhone = normalizePhone(getEventPhone(event));
@@ -326,10 +356,12 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
   const direction = event.direction || "internal";
-  const fallbackBody = event.type === "call_recording" ? "Call recording summary completed" : isCall ? getTwilioCallOutcomeLabel(event) : "Message activity";
+  const callLabel = direction === "outbound" ? "Outgoing Call" : isMissedCallEvent(event) ? "Missed Call" : "Incoming Call";
+  const duration = getCallDurationLabel(event);
+  const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
 
   return {
-    id: event.id,
+    id: getCallMessageId(event),
     channel,
     direction,
     author: direction === "outbound" ? "XRP Roofing" : formatPhoneIdentity(event.from || "Customer"),
@@ -339,26 +371,26 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
     recordingUrl: event.recordingUrl,
   };
 }
-
 function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent) {
   const phone = getEventPhone(event);
   const existing = event.conversationId ? current.find((conversation) => conversation.id === event.conversationId) : current.find((conversation) => eventMatchesConversation(event, conversation));
   if (!phone && !existing) return current;
 
   const normalized = normalizePhone(phone || existing?.contact.phone || "");
-  const id = existing?.id || `phone-${normalized || phone}`;
-  const message = createMessageFromEvent(event);
-  const channel = message.channel;
+  const id = existing?.id || getConversationIdForPhone(phone);
+  const channel: ConversationChannel = event.type.includes("call") ? "call" : event.type.includes("sms") || event.type.includes("message") ? "sms" : "note";
   const nextConversation = existing || createManualConversation(phone);
-  const nextMessages = [message, ...nextConversation.messages.filter((item) => item.id !== message.id)].slice(0, 50);
+  const shouldDisplayMessage = isVisibleCallTimelineEvent(event);
+  const message = shouldDisplayMessage ? createMessageFromEvent(event) : null;
+  const nextMessages = message ? [message, ...nextConversation.messages.filter((item) => item.id !== message.id)].slice(0, 50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
   const updated: ConversationRecord = {
     ...nextConversation,
     id,
-    lastMessage: message.body,
-    lastActivityAt: "Now",
-    unreadCount: event.direction === "inbound" ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
+    lastMessage: message?.body || nextConversation.lastMessage,
+    lastActivityAt: message ? "Now" : nextConversation.lastActivityAt,
+    unreadCount: message && event.direction === "inbound" && !isMissedCallEvent(event) ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
     isMissedCall: isMissedCallEvent(event) ? true : isAnsweredCallEvent(event) ? false : nextConversation.isMissedCall,
     channels,
     messages: nextMessages,
@@ -527,6 +559,7 @@ export default function ConversationBoard() {
 
   function markConversationRead(conversationId: string) {
     setConversations((current) => current.map((conversation) => conversation.id === conversationId && !conversation.isMissedCall ? { ...conversation, unreadCount: 0 } : conversation));
+    void persistConversationRead(conversationId);
   }
 
   function handleSelectConversation(conversation: ConversationRecord) {
@@ -544,7 +577,7 @@ export default function ConversationBoard() {
 
   function applyLocalEvent(event: TwilioConversationEvent) {
     const phone = getEventPhone(event);
-    const conversationId = `phone-${normalizePhone(phone) || phone}`;
+    const conversationId = getConversationIdForPhone(phone);
     addTwilioCrmNotification(event);
     setConversations((current) => upsertConversationFromEvent(current, event));
     setActiveConversationId(conversationId);
@@ -553,10 +586,10 @@ export default function ConversationBoard() {
   useEffect(() => {
     let mounted = true;
 
-    listConversationEvents().then((events) => {
+    Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
       if (!mounted) return;
 
-      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event), []);
+      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event), []).map((conversation) => readStates[conversation.id] && !conversation.isMissedCall ? { ...conversation, unreadCount: 0 } : conversation);
       const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
       setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
       setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());

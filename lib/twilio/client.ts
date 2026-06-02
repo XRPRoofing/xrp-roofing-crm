@@ -141,3 +141,19 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
     supabase.removeChannel(channel);
   };
 }
+
+
+export async function listConversationReadStates() {
+  const response = await fetch("/api/twilio/conversations/read-state");
+  const data = await response.json().catch(() => null) as { readStates?: Record<string, string> } | null;
+
+  return data?.readStates || {};
+}
+
+export async function markConversationRead(conversationId: string) {
+  await fetch("/api/twilio/conversations/read-state", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId }),
+  });
+}

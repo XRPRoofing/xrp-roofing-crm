@@ -63,7 +63,7 @@ async function summarizeTranscript(transcript: string) {
       messages: [
         {
           role: "system",
-          content: "You summarize roofing CRM phone calls. Return concise, useful CRM notes with customer issue, roof/job details, insurance/payment details, urgency, next steps, and follow-up tasks when mentioned.",
+          content: "You summarize roofing CRM phone calls for a production CRM. Return exactly these sections with concise bullets when possible: Summary, Key Discussion Points, Customer Concerns, Next Steps, Follow-Up Tasks. If a section is not mentioned, write Not discussed.",
         },
         {
           role: "user",

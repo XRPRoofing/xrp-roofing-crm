@@ -12,7 +12,9 @@ export async function POST(req: NextRequest) {
 
   const callbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL || new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
 
-  return new NextResponse(buildIncomingCallTwiml(callbackUrl), { headers: { "Content-Type": "text/xml" } });
+  const actionUrl = new URL("/api/twilio/webhooks/call-ended", req.nextUrl.origin).toString();
+
+  return new NextResponse(buildIncomingCallTwiml(callbackUrl, actionUrl), { headers: { "Content-Type": "text/xml" } });
 }
 
 export async function GET(req: NextRequest) {
@@ -24,5 +26,7 @@ export async function GET(req: NextRequest) {
 
   const callbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL || new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
 
-  return new NextResponse(buildIncomingCallTwiml(callbackUrl), { headers: { "Content-Type": "text/xml" } });
+  const actionUrl = new URL("/api/twilio/webhooks/call-ended", req.nextUrl.origin).toString();
+
+  return new NextResponse(buildIncomingCallTwiml(callbackUrl, actionUrl), { headers: { "Content-Type": "text/xml" } });
 }
