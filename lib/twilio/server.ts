@@ -57,14 +57,14 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
   });
 }
 
-export function buildIncomingCallTwiml() {
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL) {
   const response = new twilio.twiml.VoiceResponse();
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
-    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    action: statusCallbackUrl,
     method: "POST",
-    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
   });
@@ -74,7 +74,7 @@ export function buildIncomingCallTwiml() {
   return response.toString();
 }
 
-export function buildOutboundBrowserCallTwiml(to?: string | null) {
+export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
@@ -86,9 +86,9 @@ export function buildOutboundBrowserCallTwiml(to?: string | null) {
   response.dial({
     callerId: config.phoneNumber,
     record: "record-from-answer-dual",
-    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    action: statusCallbackUrl,
     method: "POST",
-    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
   }).number(to);

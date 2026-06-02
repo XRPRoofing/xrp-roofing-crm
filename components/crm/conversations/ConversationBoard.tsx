@@ -269,6 +269,15 @@ function isAnsweredCallEvent(event: TwilioConversationEvent) {
   return ["Answered call", "Completed call", "Call recorded with summary"].includes(getTwilioCallOutcomeLabel(event));
 }
 
+function eventMatchesConversation(event: TwilioConversationEvent, conversation: ConversationRecord) {
+  if (event.conversationId && event.conversationId === conversation.id) return true;
+  const eventPhone = normalizePhone(getEventPhone(event));
+  if (eventPhone && eventPhone === normalizePhone(conversation.contact.phone)) return true;
+  if (!event.callSid) return false;
+
+  return conversation.messages.some((message) => message.id.includes(event.callSid || ""));
+}
+
 function createMessageFromEvent(event: TwilioConversationEvent): ConversationMessage {
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
@@ -289,11 +298,11 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
 
 function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent) {
   const phone = getEventPhone(event);
-  if (!phone) return current;
+  const existing = event.conversationId ? current.find((conversation) => conversation.id === event.conversationId) : current.find((conversation) => eventMatchesConversation(event, conversation));
+  if (!phone && !existing) return current;
 
-  const normalized = normalizePhone(phone);
-  const id = `phone-${normalized || phone}`;
-  const existing = current.find((conversation) => conversation.id === id);
+  const normalized = normalizePhone(phone || existing?.contact.phone || "");
+  const id = existing?.id || `phone-${normalized || phone}`;
   const message = createMessageFromEvent(event);
   const channel = message.channel;
   const nextConversation = existing || createManualConversation(phone);
@@ -670,8 +679,6 @@ export default function ConversationBoard() {
     setTwilioNotice("Ending Twilio call...");
     try {
       const result = await controlCall({ callSid, action: "end", conversationId: active.id });
-      browserCallRef.current?.disconnect();
-      browserCallRef.current = null;
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
@@ -714,8 +721,6 @@ export default function ConversationBoard() {
     setTwilioNotice("Forwarding call...");
     try {
       const result = await controlCall({ callSid, action: "forward", forwardTo: forwardNumber.trim(), conversationId: active.id });
-      browserCallRef.current?.disconnect();
-      browserCallRef.current = null;
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
@@ -795,7 +800,7 @@ export default function ConversationBoard() {
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
                 <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
               </div>
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => normalizePhone(getEventPhone(event)) === normalizePhone(active.contact.phone)).map((event) => <CallInsightsCard key={event.id} event={event} />)}</div>
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50 p-5">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} />)}</div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-8 text-center">
