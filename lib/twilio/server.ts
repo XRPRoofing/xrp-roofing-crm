@@ -57,8 +57,16 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
   });
 }
 
+function normalizePhoneForTwiml(value?: string) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed) return "";
+
+  return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
+}
+
 export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL) {
   const response = new twilio.twiml.VoiceResponse();
+  const config = getTwilioConfig();
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
@@ -70,6 +78,11 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
   });
 
   dial.client("crm-agent");
+
+  const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
+  if (inboundForwardNumber) {
+    dial.number(inboundForwardNumber);
+  }
 
   return response.toString();
 }

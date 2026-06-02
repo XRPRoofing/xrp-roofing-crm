@@ -6,6 +6,7 @@ export function getTwilioConfig() {
     apiKeySecret: process.env.TWILIO_API_KEY_SECRET || "",
     twimlAppSid: process.env.TWILIO_TWIML_APP_SID || "",
     phoneNumber: process.env.TWILIO_PHONE_NUMBER || "",
+    inboundForwardNumber: process.env.TWILIO_INBOUND_FORWARD_NUMBER || "",
   };
 }
 
