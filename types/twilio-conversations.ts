@@ -38,6 +38,7 @@ export interface TwilioConversationEvent {
   conversationId?: string;
   customerId?: string;
   jobId?: string;
+  recordingSid?: string;
   recordingUrl?: string;
   payload: Record<string, unknown>;
   createdAt: string;

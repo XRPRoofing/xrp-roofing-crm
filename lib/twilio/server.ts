@@ -54,6 +54,9 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
     url: process.env.TWILIO_OUTBOUND_VOICE_WEBHOOK_URL,
     statusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
     statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    record: true,
+    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallbackEvent: ["completed"],
   });
 }
 
@@ -115,9 +118,10 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   const messageSid = String(payload.MessageSid || payload.SmsSid || "");
   const callSid = String(payload.CallSid || "");
   const status = String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || "");
+  const recordingSid = String(payload.RecordingSid || "");
 
   return {
-    id: messageSid || (callSid ? `${callSid}-${status || type}-${Date.now()}` : crypto.randomUUID()),
+    id: messageSid || recordingSid || (callSid ? `${callSid}-${status || type}` : crypto.randomUUID()),
     type,
     direction: String(payload.Direction || "").includes("outbound") ? "outbound" : "inbound",
     from: String(payload.From || ""),
@@ -129,6 +133,7 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
     conversationId: payload.conversationId ? String(payload.conversationId) : undefined,
     customerId: payload.customerId ? String(payload.customerId) : undefined,
     jobId: payload.jobId ? String(payload.jobId) : undefined,
+    recordingSid: recordingSid || undefined,
     recordingUrl: payload.RecordingUrl ? `${payload.RecordingUrl}.mp3` : undefined,
     payload,
     createdAt: now,

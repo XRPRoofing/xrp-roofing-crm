@@ -11,8 +11,20 @@ export async function POST(req: NextRequest) {
     const event = normalizeTwilioWebhookEvent("call_status", formData);
     isDialActionCallback = formData.has("DialCallStatus");
 
-    await publishConversationEvent(event);
+    console.log("[Twilio Call Status] Webhook received", {
+      callSid: event.callSid,
+      recordingSid: event.recordingSid,
+      status: event.status,
+      hasRecordingUrl: Boolean(event.recordingUrl),
+      isDialActionCallback,
+      payloadKeys: Array.from(formData.keys()),
+    });
+
+    const storeResult = await publishConversationEvent(event);
+    console.log("[Twilio Call Status] Event stored", { callSid: event.callSid, recordingSid: event.recordingSid, status: event.status, storeResult });
+
     if (event.recordingUrl) {
+      console.log("[Twilio Recording] Recording completed callback received", { callSid: event.callSid, recordingSid: event.recordingSid, recordingUrl: event.recordingUrl });
       await publishConversationEvent({
         ...event,
         id: `${event.id}-recording-available`,
@@ -29,13 +41,17 @@ export async function POST(req: NextRequest) {
 
       createCallRecordingInsights({
         callSid: event.callSid,
+        recordingSid: event.recordingSid,
         recordingUrl: event.recordingUrl,
         from: event.from,
         to: event.to,
         direction: event.direction,
         payload: event.payload,
       }).then((insights) => {
-        if (insights) void publishConversationEvent(insights);
+        if (insights) {
+          console.log("[Twilio Recording] Publishing transcript and summary", { callSid: insights.callSid, recordingSid: insights.recordingSid });
+          void publishConversationEvent(insights);
+        }
       }).catch((error) => {
         void publishConversationEvent({
           ...event,
@@ -43,9 +59,11 @@ export async function POST(req: NextRequest) {
           type: "call_recording",
           status: "failed",
           body: error instanceof Error ? `Recording saved, but summary failed: ${error.message}` : "Recording saved, but summary failed.",
+          recordingSid: event.recordingSid,
           recordingUrl: event.recordingUrl,
           payload: {
             ...event.payload,
+            recordingSid: event.recordingSid,
             recordingUrl: event.recordingUrl,
             summary: "Recording saved, but transcript and summary could not be created.",
             processingError: error instanceof Error ? error.message : "Unknown processing error",

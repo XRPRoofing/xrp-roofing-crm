@@ -8,6 +8,7 @@ create table if not exists public.conversation_events (
   status text,
   call_sid text,
   message_sid text,
+  recording_sid text,
   recording_url text,
   conversation_id text,
   customer_id text,
@@ -19,6 +20,7 @@ create table if not exists public.conversation_events (
 create index if not exists conversation_events_created_at_idx on public.conversation_events (created_at desc);
 create index if not exists conversation_events_call_sid_idx on public.conversation_events (call_sid);
 create index if not exists conversation_events_message_sid_idx on public.conversation_events (message_sid);
+create index if not exists conversation_events_recording_sid_idx on public.conversation_events (recording_sid);
 create index if not exists conversation_events_from_phone_idx on public.conversation_events (from_phone);
 create index if not exists conversation_events_to_phone_idx on public.conversation_events (to_phone);
 
@@ -48,3 +50,7 @@ create policy "Allow read conversation read states"
   using (true);
 
 create index if not exists conversation_read_states_updated_at_idx on public.conversation_read_states (updated_at desc);
+
+
+alter table public.conversation_events add column if not exists recording_sid text;
+create index if not exists conversation_events_recording_sid_idx on public.conversation_events (recording_sid);

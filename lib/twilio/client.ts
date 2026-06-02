@@ -108,6 +108,7 @@ function mapConversationEventRow(row: Record<string, unknown>): TwilioConversati
     callSid: row.call_sid ? String(row.call_sid) : undefined,
     messageSid: row.message_sid ? String(row.message_sid) : undefined,
     conversationId: row.conversation_id ? String(row.conversation_id) : undefined,
+    recordingSid: row.recording_sid ? String(row.recording_sid) : row.payload && typeof row.payload === "object" && "RecordingSid" in row.payload ? String((row.payload as Record<string, unknown>).RecordingSid) : undefined,
     recordingUrl: row.recording_url ? String(row.recording_url) : row.payload && typeof row.payload === "object" && "recordingUrl" in row.payload ? String((row.payload as Record<string, unknown>).recordingUrl) : undefined,
     payload: (row.payload as Record<string, unknown>) || {},
     createdAt: String(row.created_at),
