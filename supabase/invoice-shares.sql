@@ -24,9 +24,13 @@ create table if not exists public.invoice_shares (
 -- ---------------------------------------------------------------------------
 -- Keep updated_at fresh on every write.
 -- ---------------------------------------------------------------------------
+-- security invoker + a pinned empty search_path satisfy Supabase's Security
+-- Advisor (avoids the "function has a role mutable search_path" warning).
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+security invoker
+set search_path = ''
 as $$
 begin
   new.updated_at = now();
@@ -34,8 +38,8 @@ begin
 end;
 $$;
 
-drop trigger if exists invoice_shares_set_updated_at on public.invoice_shares;
-create trigger invoice_shares_set_updated_at
+-- create or replace (no drop) keeps this idempotent without a destructive step.
+create or replace trigger invoice_shares_set_updated_at
   before update on public.invoice_shares
   for each row
   execute function public.set_updated_at();
@@ -49,21 +53,38 @@ create trigger invoice_shares_set_updated_at
 -- ---------------------------------------------------------------------------
 alter table public.invoice_shares enable row level security;
 
-drop policy if exists "Authenticated read invoice_shares" on public.invoice_shares;
-drop policy if exists "Authenticated write invoice_shares" on public.invoice_shares;
+-- Create policies only if missing (no destructive drop) so the script can be
+-- re-run safely.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'invoice_shares'
+      and policyname = 'Authenticated read invoice_shares'
+  ) then
+    create policy "Authenticated read invoice_shares"
+      on public.invoice_shares
+      for select
+      to authenticated
+      using (true);
+  end if;
 
-create policy "Authenticated read invoice_shares"
-  on public.invoice_shares
-  for select
-  to authenticated
-  using (true);
-
-create policy "Authenticated write invoice_shares"
-  on public.invoice_shares
-  for all
-  to authenticated
-  using (true)
-  with check (true);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'invoice_shares'
+      and policyname = 'Authenticated write invoice_shares'
+  ) then
+    create policy "Authenticated write invoice_shares"
+      on public.invoice_shares
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+  end if;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Realtime: broadcast INSERT/UPDATE/DELETE so the admin board stays in sync.
