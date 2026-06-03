@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
         "metadata[invoiceId]": data.invoiceId,
         "metadata[invoiceNumber]": data.invoiceNumber,
         "metadata[paymentMethod]": data.paymentMethod,
+        // Copy metadata onto the PaymentIntent so payment_intent.* webhook
+        // events can resolve back to this invoice.
+        "payment_intent_data[metadata][invoiceId]": data.invoiceId,
+        "payment_intent_data[metadata][invoiceNumber]": data.invoiceNumber,
+        "payment_intent_data[metadata][paymentMethod]": data.paymentMethod,
       }),
     });
 

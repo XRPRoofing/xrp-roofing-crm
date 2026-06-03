@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
+import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
+import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
+import { addCrmNotification } from "@/lib/crm-notifications";
+import type { Customer } from "@/types/crm";
 
 type InvoiceStatus = "Draft" | "Sent" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
@@ -70,7 +74,12 @@ type Invoice = {
   lineItems: InvoiceLineItem[];
   payments: Payment[];
   activity: string[];
+  viewedAt?: string;
+  paidAt?: string;
+  failedAt?: string;
 };
+
+const customersStorageKey = "xrp-crm-customers";
 
 const today = new Date().toISOString().slice(0, 10);
 const invoicesStorageKey = "xrp-crm-invoices";
@@ -309,6 +318,81 @@ function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
   return "border-red-200 bg-red-50 text-red-700";
 }
 
+/**
+ * Overlay Stripe-driven payment + tracking state from `invoice_shares` onto a
+ * local invoice. Stripe is the source of truth for payment fields; everything
+ * else (line items, customer info edited locally) is preserved. Returns the
+ * same reference when nothing changed so React can skip re-renders.
+ */
+function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): Invoice {
+  const nextPayments = share.payments ? (share.payments as Payment[]) : invoice.payments;
+  const nextStatus = (share.status as InvoiceStatus) || invoice.status;
+  const nextActivity = share.activity && share.activity.length ? share.activity : invoice.activity;
+  const changed =
+    nextStatus !== invoice.status ||
+    nextPayments.length !== invoice.payments.length ||
+    share.viewedAt !== invoice.viewedAt ||
+    share.paidAt !== invoice.paidAt ||
+    share.failedAt !== invoice.failedAt ||
+    nextActivity !== invoice.activity;
+
+  if (!changed) return invoice;
+
+  return {
+    ...invoice,
+    payments: nextPayments,
+    status: nextStatus,
+    activity: nextActivity,
+    viewedAt: share.viewedAt ?? invoice.viewedAt,
+    paidAt: share.paidAt ?? invoice.paidAt,
+    failedAt: share.failedAt ?? invoice.failedAt,
+  };
+}
+
+/**
+ * When an invoice is paid in Stripe, cascade the status to the customer record
+ * (Customer Status = Paid) and the linked job (Job Payment Status = Paid), and
+ * raise a CRM notification. Best-effort and guarded for SSR.
+ */
+function propagatePaidStatus(invoice: Invoice) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const raw = window.localStorage.getItem(customersStorageKey);
+    if (raw) {
+      const list = JSON.parse(raw) as Customer[];
+      let changed = false;
+      const next = list.map((customer) => {
+        const matches =
+          (customer.email && invoice.email && customer.email === invoice.email) ||
+          customer.name.toLowerCase() === invoice.clientName.toLowerCase();
+        if (matches && customer.status !== "Paid") {
+          changed = true;
+          return { ...customer, status: "Paid" };
+        }
+        return customer;
+      });
+      if (changed) {
+        window.localStorage.setItem(customersStorageKey, JSON.stringify(next));
+        window.dispatchEvent(new Event(crewSyncUpdatedEvent));
+      }
+    }
+  } catch {
+    // ignore malformed customer cache
+  }
+
+  if (invoice.jobReference) {
+    void updateJobRecord(invoice.jobReference, { stage: "paid" }).catch(() => {});
+  }
+
+  addCrmNotification({
+    title: "Payment received",
+    message: `${invoice.clientName} paid ${invoice.invoiceNumber}`,
+    actor: "Stripe",
+    module: "Invoices",
+  });
+}
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     if (typeof window === "undefined") return initialInvoices;
@@ -356,8 +440,62 @@ export default function InvoicesPage() {
     activity: ["Invoice created"],
   });
 
+  const paidPropagatedRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
+  }, [invoices]);
+
+  // Real-time Stripe payment sync: load the shared invoice state from Supabase
+  // and subscribe to live changes written by the Stripe webhook. Stripe is the
+  // source of truth, so payment/tracking fields are merged onto local invoices
+  // without requiring a refresh.
+  useEffect(() => {
+    let active = true;
+
+    // Seed with already-paid invoices so we only cascade NEW payments.
+    paidPropagatedRef.current = new Set(
+      invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").map((invoice) => invoice.id),
+    );
+
+    function applyShare(share: InvoiceSharePayload) {
+      setInvoices((current) => {
+        const index = current.findIndex((invoice) => invoice.id === share.id);
+        if (index === -1) return current;
+        const merged = mergeShareIntoInvoice(current[index], share);
+        if (merged === current[index]) return current;
+        const next = [...current];
+        next[index] = merged;
+        return next;
+      });
+    }
+
+    void loadInvoiceShares()
+      .then((shares) => {
+        if (active) shares.forEach(applyShare);
+      })
+      .catch(() => {});
+
+    const unsubscribe = subscribeToInvoiceShares((share) => {
+      if (active) applyShare(share);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cascade Customer/Job status to Paid whenever an invoice newly becomes Paid
+  // (Stripe sync or a full manual payment). Guarded so each invoice fires once.
+  useEffect(() => {
+    invoices.forEach((invoice) => {
+      if (getComputedStatus(invoice) === "Paid" && !paidPropagatedRef.current.has(invoice.id)) {
+        paidPropagatedRef.current.add(invoice.id);
+        propagatePaidStatus(invoice);
+      }
+    });
   }, [invoices]);
 
   const selectedInvoice = invoices.find((invoice) => invoice.id === selectedInvoiceId) || null;
@@ -365,11 +503,14 @@ export default function InvoicesPage() {
     const total = invoices.reduce((sum, invoice) => sum + calculateTotals(invoice).finalTotal, 0);
     const paid = invoices.reduce((sum, invoice) => sum + getPaidAmount(invoice), 0);
     const balance = Math.max(total - paid, 0);
+    const paidCount = invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").length;
+    const unpaid = invoices.filter((invoice) => !["Paid", "Voided"].includes(getComputedStatus(invoice))).length;
     const overdue = invoices.filter((invoice) => getComputedStatus(invoice) === "Overdue").length;
     const pending = invoices.filter((invoice) => ["Pending", "Due Soon", "Overdue"].includes(getComputedStatus(invoice))).length;
     const partial = invoices.filter((invoice) => getComputedStatus(invoice) === "Partially Paid").length;
+    const viewed = invoices.filter((invoice) => invoice.viewedAt || invoice.activity.includes("Viewed")).length;
     const collectionRate = total > 0 ? Math.round((paid / total) * 100) : 0;
-    return { total, paid, balance, overdue, pending, partial, collectionRate };
+    return { total, paid, balance, paidCount, unpaid, overdue, pending, partial, viewed, collectionRate };
   }, [invoices]);
   const filteredInvoices = useMemo(() => {
     const query = invoiceSearch.toLowerCase().trim();
@@ -619,11 +760,11 @@ export default function InvoicesPage() {
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {[
+            ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
+            ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
+            ["Overdue Invoices", String(boardTotals.overdue), "text-red-700"],
+            ["Viewed Invoices", String(boardTotals.viewed), "text-blue-700"],
             ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
-            ["Paid This Month", currency(boardTotals.paid), "text-emerald-700"],
-            ["Pending", String(boardTotals.pending), "text-slate-950"],
-            ["Overdue", String(boardTotals.overdue), "text-red-700"],
-            ["Partial Payments", String(boardTotals.partial), "text-amber-700"],
             ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
           ].map(([label, value, valueClass]) => (
             <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
