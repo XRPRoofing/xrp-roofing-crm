@@ -6,9 +6,10 @@ import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { createClient } from "@/lib/supabase/client";
 import type { Customer } from "@/types/crm";
 
-type InvoiceStatus = "Draft" | "Sent" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
+type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
 
 type InvoiceLineItem = {
@@ -77,6 +78,10 @@ type Invoice = {
   viewedAt?: string;
   paidAt?: string;
   failedAt?: string;
+  sentAt?: string;
+  sentBy?: string;
+  emailDeliveredAt?: string;
+  emailOpenedAt?: string;
 };
 
 const customersStorageKey = "xrp-crm-customers";
@@ -228,6 +233,7 @@ function getComputedStatus(invoice: Invoice): InvoiceStatus {
   const currentDate = new Date(`${today}T00:00:00`);
   const daysUntilDue = Math.ceil((dueDate.getTime() - currentDate.getTime()) / 86400000);
   if (daysUntilDue < 0) return "Overdue";
+  if (invoice.viewedAt || invoice.activity.includes("Viewed")) return "Viewed";
   if (daysUntilDue <= 3) return "Due Soon";
   if (invoice.status === "Sent") return "Pending";
   return invoice.status === "Pending" || invoice.status === "Due Soon" || invoice.status === "Overdue" ? invoice.status : "Pending";
@@ -305,11 +311,32 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
   if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (status === "Viewed") return "bg-indigo-50 text-indigo-700 ring-indigo-100";
+  if (status === "Sent" || status === "Pending") return "bg-blue-50 text-blue-700 ring-blue-100";
   if (status === "Due Soon") return "bg-orange-50 text-orange-700 ring-orange-100";
   if (status === "Overdue") return "bg-red-50 text-red-700 ring-red-100";
   if (status === "Voided") return "bg-slate-100 text-slate-600 ring-slate-200";
   if (status === "Draft") return "bg-slate-50 text-slate-700 ring-slate-200";
   return "bg-red-50 text-red-700 ring-red-100";
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
+type TimelineStep = { label: string; at?: string; done: boolean };
+
+function buildInvoiceTimeline(invoice: Invoice): TimelineStep[] {
+  const lastPayment = invoice.payments.length ? invoice.payments[invoice.payments.length - 1] : undefined;
+  return [
+    { label: "Invoice Created", at: invoice.issueDate, done: true },
+    { label: "Invoice Sent", at: invoice.sentAt, done: Boolean(invoice.sentAt) || invoice.status === "Sent" },
+    { label: "Invoice Viewed", at: invoice.viewedAt, done: Boolean(invoice.viewedAt) },
+    { label: "Payment Received", at: invoice.paidAt || lastPayment?.date, done: getComputedStatus(invoice) === "Paid" || invoice.payments.length > 0 },
+  ];
 }
 
 function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
@@ -334,6 +361,8 @@ function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): In
     share.viewedAt !== invoice.viewedAt ||
     share.paidAt !== invoice.paidAt ||
     share.failedAt !== invoice.failedAt ||
+    share.emailDeliveredAt !== invoice.emailDeliveredAt ||
+    share.emailOpenedAt !== invoice.emailOpenedAt ||
     nextActivity !== invoice.activity;
 
   if (!changed) return invoice;
@@ -346,6 +375,10 @@ function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): In
     viewedAt: share.viewedAt ?? invoice.viewedAt,
     paidAt: share.paidAt ?? invoice.paidAt,
     failedAt: share.failedAt ?? invoice.failedAt,
+    sentAt: share.sentAt ?? invoice.sentAt,
+    sentBy: share.sentBy ?? invoice.sentBy,
+    emailDeliveredAt: share.emailDeliveredAt ?? invoice.emailDeliveredAt,
+    emailOpenedAt: share.emailOpenedAt ?? invoice.emailOpenedAt,
   };
 }
 
@@ -413,6 +446,7 @@ export default function InvoicesPage() {
   const [invoiceFilter, setInvoiceFilter] = useState<(typeof filterOptions)[number]>("All");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [integrationNotice, setIntegrationNotice] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
@@ -445,6 +479,17 @@ export default function InvoicesPage() {
   useEffect(() => {
     window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
   }, [invoices]);
+
+  // Identify the signed-in CRM user so "Sent By" can be recorded on send.
+  useEffect(() => {
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        const email = data.session?.user.email;
+        if (email) setCurrentUserEmail(email);
+      })
+      .catch(() => {});
+  }, []);
 
   // Real-time Stripe payment sync: load the shared invoice state from Supabase
   // and subscribe to live changes written by the Stripe webhook. Stripe is the
@@ -612,11 +657,15 @@ export default function InvoicesPage() {
 
     setSendForm((currentForm) => ({ ...currentForm, message: "Sending invoice email..." }));
 
+    const sentAt = new Date().toISOString();
+    const sentBy = currentUserEmail || "CRM user";
+    const sentInvoice: Invoice = { ...selectedInvoice, status: "Sent", sentAt, sentBy };
+
     try {
       const shareResponse = await fetch("/api/invoices/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(selectedInvoice),
+        body: JSON.stringify(sentInvoice),
       });
 
       if (!shareResponse.ok) {
@@ -632,6 +681,7 @@ export default function InvoicesPage() {
           subject: sendForm.subject,
           message: sendForm.message,
           invoiceNumber: selectedInvoice.invoiceNumber,
+          invoiceId: selectedInvoice.id,
           invoiceLink,
           balance: currency(balance),
         }),
@@ -642,7 +692,7 @@ export default function InvoicesPage() {
         throw new Error(data.error || "Unable to send invoice email");
       }
 
-      updateInvoice({ ...selectedInvoice, status: "Sent" }, `Invoice sent with online payment link using ${sendForm.template} template`);
+      updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
       setShowSendModal(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
@@ -870,6 +920,34 @@ export default function InvoicesPage() {
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-2xl bg-red-50 px-4 py-3 font-bold text-red-700">Void Invoice</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
+
+            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-black text-[#07183f]">Sent To</h3>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { label: "Email Delivered", at: selectedInvoice.emailDeliveredAt, fallbackDone: Boolean(selectedInvoice.sentAt) },
+                    { label: "Email Opened", at: selectedInvoice.emailOpenedAt, fallbackDone: false },
+                    { label: "Invoice Viewed", at: selectedInvoice.viewedAt, fallbackDone: false },
+                  ] as const).map((indicator) => {
+                    const done = Boolean(indicator.at) || indicator.fallbackDone;
+                    return (
+                      <span key={indicator.label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ring-1 ${done ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>
+                        <span className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`} />
+                        {indicator.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#07183f]">{selectedInvoice.clientName || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.email || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#07183f]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.sentBy || "—"}</p></div>
+              </div>
+            </section>
+
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <section className="rounded-3xl bg-slate-50 p-5">
                 <h3 className="font-black text-[#07183f]">Payments</h3>
@@ -879,10 +957,27 @@ export default function InvoicesPage() {
                 </div>
               </section>
               <section className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="font-black text-[#07183f]">Activity Log</h3>
-                <div className="mt-3 space-y-2">
-                  {selectedInvoice.activity.map((item, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{item}</p>)}
-                </div>
+                <h3 className="font-black text-[#07183f]">Activity Timeline</h3>
+                <ol className="mt-4 space-y-4">
+                  {buildInvoiceTimeline(selectedInvoice).map((step, index, steps) => (
+                    <li key={step.label} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ${step.done ? "bg-emerald-500" : "bg-slate-300"}`}>{step.done ? "✓" : index + 1}</span>
+                        {index < steps.length - 1 && <span className={`mt-1 w-0.5 flex-1 ${step.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
+                      </div>
+                      <div className="pb-1">
+                        <p className={`text-sm font-black ${step.done ? "text-[#07183f]" : "text-slate-400"}`}>{step.label}</p>
+                        <p className="text-xs font-semibold text-slate-500">{step.done ? (formatDateTime(step.at) || "Completed") : "Pending"}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-xs font-black uppercase tracking-wide text-slate-500">Full activity log</summary>
+                  <div className="mt-2 space-y-2">
+                    {selectedInvoice.activity.map((item, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{item}</p>)}
+                  </div>
+                </details>
               </section>
             </div>
             {clientHistory && (
