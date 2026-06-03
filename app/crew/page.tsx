@@ -103,7 +103,7 @@ export default function CrewPortalPage() {
     });
   }
 
-  async function handlePhotoUpload(job: CrewJob, type: "Before" | "After", files: FileList | null) {
+  async function handlePhotoUpload(job: CrewJob, type: "Before" | "Progress" | "After", files: FileList | null) {
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
@@ -123,7 +123,7 @@ export default function CrewPortalPage() {
   }
 
   function submitForApproval(job: CrewJob) {
-    const hasPhoto = job.completion.beforePhotos.length + job.completion.afterPhotos.length > 0;
+    const hasPhoto = job.completion.beforePhotos.length + job.completion.progressPhotos.length + job.completion.afterPhotos.length > 0;
     if (!hasPhoto || !job.completion.notes.trim()) return;
 
     updateJobFields(job.id, { status: "Mark Done", submittedAt: new Date().toISOString() });
@@ -212,19 +212,33 @@ export default function CrewPortalPage() {
 
               <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <h3 className="text-lg font-black text-[#07183f]">Job Completion Form</h3>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-white p-4 text-center text-sm font-black text-blue-700">
-                    <Camera className="mb-2 h-6 w-6" />Upload before photos
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "Before", event.target.files)} />
-                  </label>
-                  <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-white p-4 text-center text-sm font-black text-blue-700">
-                    <UploadCloud className="mb-2 h-6 w-6" />Upload after photos
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "After", event.target.files)} />
-                  </label>
+                <p className="mt-3 text-xs font-bold text-slate-500">Take photos directly from your phone camera or upload from your gallery. Each photo saves automatically to this job&apos;s folder.</p>
+                <div className="mt-3 space-y-3">
+                  {(["Before", "Progress", "After"] as const).map((type) => {
+                    const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
+                    return (
+                      <div key={type} className="rounded-2xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">{type} Photos</p>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{count} photo(s)</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#07183f] px-3 py-3 text-sm font-black text-white transition hover:bg-blue-800">
+                            <Camera className="h-5 w-5" /> Take Photo
+                            <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
+                          </label>
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100">
+                            <UploadCloud className="h-5 w-5" /> Upload Photo
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {[...selectedJob.completion.beforePhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Uploaded job completion" width={400} height={260} unoptimized className="h-36 w-full rounded-2xl object-cover" />)}
+                  {[...selectedJob.completion.beforePhotos, ...selectedJob.completion.progressPhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Uploaded job completion" width={400} height={260} unoptimized className="h-36 w-full rounded-2xl object-cover" />)}
                 </div>
 
                 <label className="mt-4 grid gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
@@ -236,7 +250,7 @@ export default function CrewPortalPage() {
                   <input value={selectedJob.completion.materialsUsed || ""} onChange={(event) => updateJobFields(selectedJob.id, { materialsUsed: event.target.value })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="Owens Corning shingles, underlayment, flashing..." />
                 </label>
 
-                <button type="button" disabled={(selectedJob.completion.beforePhotos.length + selectedJob.completion.afterPhotos.length === 0) || !selectedJob.completion.notes.trim()} onClick={() => submitForApproval(selectedJob)} className="mt-5 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+                <button type="button" disabled={(selectedJob.completion.beforePhotos.length + selectedJob.completion.progressPhotos.length + selectedJob.completion.afterPhotos.length === 0) || !selectedJob.completion.notes.trim()} onClick={() => submitForApproval(selectedJob)} className="mt-5 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
                   <CheckCircle2 className="mr-2 inline h-5 w-5" />Mark Done
                 </button>
                 <p className="mt-3 text-center text-xs font-bold text-slate-500">Requires at least one photo and completion notes before marking done.</p>

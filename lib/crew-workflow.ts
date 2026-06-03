@@ -4,6 +4,7 @@ export type CrewJobStatus = "Assigned" | "In Progress" | "On Work" | "Mark Done"
 
 export type CrewJobCompletion = {
   beforePhotos: string[];
+  progressPhotos: string[];
   afterPhotos: string[];
   notes: string;
   materialsUsed?: string;
@@ -47,6 +48,7 @@ export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignmen
     jobNotes: job.lastActivity || "Review job details before starting work.",
     completion: {
       beforePhotos: [],
+      progressPhotos: [],
       afterPhotos: [],
       notes: "",
       materialsUsed: "",

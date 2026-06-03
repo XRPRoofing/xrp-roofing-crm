@@ -35,7 +35,7 @@ export type JobRecord = Lead & {
   submittedAt?: string;
 };
 
-export type JobPhotoType = "Before" | "After" | "Job Photo";
+export type JobPhotoType = "Before" | "Progress" | "After" | "Job Photo";
 
 export type JobPhoto = {
   id: string;
@@ -114,6 +114,7 @@ export function assembleCrewJob(record: JobRecord, photos: JobPhoto[]): CrewJob 
     assignedCrew: cleanAssignedCrewMembers(record.assignedCrew),
     completion: {
       beforePhotos: jobPhotos.filter((photo) => photo.photoType === "Before").map((photo) => photo.dataUrl),
+      progressPhotos: jobPhotos.filter((photo) => photo.photoType === "Progress").map((photo) => photo.dataUrl),
       afterPhotos: jobPhotos.filter((photo) => photo.photoType === "After").map((photo) => photo.dataUrl),
       notes: record.completionNotes,
       materialsUsed: record.materialsUsed,
@@ -294,6 +295,7 @@ function writeLocalJobs(records: JobRecord[]) {
     jobNotes: record.jobNotes,
     completion: {
       beforePhotos: [],
+      progressPhotos: [],
       afterPhotos: [],
       notes: record.completionNotes,
       materialsUsed: record.materialsUsed,
