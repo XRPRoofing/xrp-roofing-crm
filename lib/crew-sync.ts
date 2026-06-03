@@ -390,6 +390,21 @@ export async function updateJobRecord(jobId: string, patch: Partial<JobRecord>):
   if (error) throw new Error(error.message);
 }
 
+export async function deleteJobRecord(jobId: string): Promise<void> {
+  if (!hasSupabaseConfig()) {
+    writeLocalJobs(readLocalJobs().filter((item) => item.id !== jobId));
+    writeLocal(crewSyncPhotosKey, readLocal<JobPhoto[]>(crewSyncPhotosKey, []).filter((photo) => photo.jobId !== jobId));
+    writeLocal(crewSyncNotesKey, readLocal<JobNote[]>(crewSyncNotesKey, []).filter((note) => note.jobId !== jobId));
+    writeLocal(crewSyncChecklistKey, readLocal<JobChecklistItem[]>(crewSyncChecklistKey, []).filter((item) => item.jobId !== jobId));
+    return;
+  }
+  // Child rows (photos, notes, checklist) are removed automatically via the
+  // ON DELETE CASCADE foreign keys defined in supabase/crew-workflow.sql.
+  const supabase = createClient();
+  const { error } = await supabase.from(jobsTable).delete().eq("id", jobId);
+  if (error) throw new Error(error.message);
+}
+
 export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoType; name: string; dataUrl: string; uploadedBy: string }[]): Promise<void> {
   if (photos.length === 0) return;
   if (!hasSupabaseConfig()) {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, UploadCloud, UsersRound, X } from "lucide-react";
+import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { ensureInvoiceTaskForCompletedJob } from "@/lib/office-tasks";
 import { crewMembers, crewStatuses, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
@@ -11,6 +11,7 @@ import {
   addJobNote,
   addJobPhotos,
   assembleCrewJobs,
+  deleteJobRecord,
   ensureSeedJobs,
   joinCrewPresence,
   loadCrewDataset,
@@ -274,6 +275,26 @@ export default function CrewWorkflowPage() {
     }
   }
 
+  async function handleDeleteJob(job: CrewJob) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${job.name}"? This permanently removes the job and its photos, notes, and checklist for everyone. This cannot be undone.`)) return;
+
+    const previousJobs = jobs;
+    setSelectedJobId(null);
+    setJobs((current) => current.filter((item) => item.id !== job.id));
+    try {
+      await deleteJobRecord(job.id);
+      addCrmNotification({
+        title: "Crew job deleted",
+        message: `${job.name} was deleted.`,
+        actor: "CRM user",
+        module: "Crew Workflow",
+      });
+    } catch (deleteError) {
+      setJobs(previousJobs);
+      reportError(deleteError instanceof Error ? deleteError.message : "Failed to delete job.");
+    }
+  }
+
   const viewersForSelectedJob = presence.filter((entry) => entry.jobId === selectedJobId);
 
   return (
@@ -400,7 +421,10 @@ export default function CrewWorkflowPage() {
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
                   <p className="mt-1 text-sm font-bold text-slate-500">{formatAddress(selectedJob)}</p>
                 </div>
-                <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                </div>
               </div>
               {viewersForSelectedJob.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
