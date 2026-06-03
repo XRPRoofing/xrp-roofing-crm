@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Upload, X } from "lucide-react";
-import { customers, leadStages, leads } from "@/lib/crm-data";
+import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
+import { ensureSeedJobs, leadToJobRecord, loadCrewDataset, subscribeToCrewData, updateJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 
 declare global {
   interface Window {
@@ -35,7 +36,6 @@ const arizonaBounds = {
   east: -109.0452,
   west: -114.8184,
 };
-const jobsStorageKey = "xrp-crm-jobs-board";
 const customersStorageKey = "xrp-crm-customers";
 const legacyStageMap: Partial<Record<string, LeadStage>> = {
   insurance_review: "waiting_approval",
@@ -78,10 +78,6 @@ function getCityFromAddress(address: string) {
   return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
 }
 
-function saveJobs(nextJobs: Lead[]) {
-  window.localStorage.setItem(jobsStorageKey, JSON.stringify(nextJobs));
-}
-
 function getSavedCustomers() {
   const savedCustomers = window.localStorage.getItem(customersStorageKey);
   if (!savedCustomers) return customers;
@@ -120,18 +116,7 @@ function syncCustomerFromJob(job: Lead) {
 }
 
 export default function LeadsPage() {
-  const [jobs, setJobs] = useState<Lead[]>(() => {
-    if (typeof window === "undefined") return leads.map(normalizeJob);
-
-    const savedJobs = window.localStorage.getItem(jobsStorageKey);
-    if (!savedJobs) return leads.map(normalizeJob);
-
-    try {
-      return (JSON.parse(savedJobs) as Lead[]).map(normalizeJob);
-    } catch {
-      return leads.map(normalizeJob);
-    }
-  });
+  const [jobs, setJobs] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
@@ -190,8 +175,28 @@ export default function LeadsPage() {
   }, [jobs]);
 
   useEffect(() => {
-    window.localStorage.setItem(jobsStorageKey, JSON.stringify(jobs));
-  }, [jobs]);
+    let mounted = true;
+    async function loadJobs() {
+      try {
+        const data = await loadCrewDataset();
+        const seededJobs = await ensureSeedJobs(data.jobs);
+        if (mounted) setJobs(seededJobs.map(normalizeJob));
+      } catch {
+        /* leave jobs empty when the shared store is unavailable */
+      }
+    }
+    loadJobs();
+
+    const unsubscribe = subscribeToCrewData(() => {
+      void loadCrewDataset().then((data) => {
+        if (mounted) setJobs(data.jobs.map(normalizeJob));
+      }).catch(() => {});
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!showForm || !addressInputRef.current) return;
@@ -241,11 +246,8 @@ export default function LeadsPage() {
   }, [showForm]);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
-    setJobs((currentJobs) => {
-      const nextJobs = currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job);
-      saveJobs(nextJobs);
-      return nextJobs;
-    });
+    setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
+    void updateJobRecord(jobId, updates).catch(() => {});
   }
 
   function updateJobStage(jobId: string, stage: LeadStage) {
@@ -272,11 +274,8 @@ export default function LeadsPage() {
       dueDate: form.dueDate,
     };
 
-    setJobs((currentJobs) => {
-      const nextJobs = [newJob, ...currentJobs];
-      saveJobs(nextJobs);
-      return nextJobs;
-    });
+    setJobs((currentJobs) => [newJob, ...currentJobs]);
+    void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
     syncCustomerFromJob(newJob);
     setForm({
       name: "",

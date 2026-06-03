@@ -28,9 +28,13 @@ export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "On Wor
 export const crewWorkflowStorageKey = "xrp-crm-crew-workflow";
 export const jobsStorageKey = "xrp-crm-jobs-board";
 
-function cleanAssignedCrew(assignedCrew: string[], index = 0) {
+export function cleanAssignedCrewMembers(assignedCrew: string[], index = 0) {
   const validCrew = assignedCrew.filter((member) => crewMembers.includes(member));
   return validCrew.length > 0 ? validCrew : [crewMembers[index % crewMembers.length]];
+}
+
+function cleanAssignedCrew(assignedCrew: string[], index = 0) {
+  return cleanAssignedCrewMembers(assignedCrew, index);
 }
 
 export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignment {
