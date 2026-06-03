@@ -6,7 +6,7 @@ export type CrmFileRecord = {
   dataUrl: string;
   uploadedAt: string;
   uploadedBy: string;
-  photoType: "Before" | "After" | "Job Photo";
+  photoType: "Before" | "Progress" | "After" | "Job Photo";
   jobId: string;
   jobName: string;
 };
@@ -91,7 +91,7 @@ export function syncCrewPhotosToFiles(input: {
   address: string;
   workType: string;
   uploadedBy: string;
-  photoType: "Before" | "After" | "Job Photo";
+  photoType: "Before" | "Progress" | "After" | "Job Photo";
   photos: { name: string; dataUrl: string }[];
 }) {
   if (typeof window === "undefined" || input.photos.length === 0) return;
