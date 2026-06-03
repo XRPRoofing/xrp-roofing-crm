@@ -31,26 +31,73 @@ export async function POST(req: NextRequest) {
     }
 
     const safeMessage = escapeHtml(data.message).replaceAll("\n", "<br />");
-    const html = `
-      <div style="margin:0;background:#f1f5f9;padding:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-        <div style="background:#e9eef3;padding:28px 0;text-align:center;">
-          <img src="${new URL("/images/logo.jpeg", data.invoiceLink).toString()}" alt="XRP Roofing" style="width:150px;height:auto;display:inline-block;background:#fff;" />
-        </div>
-        <div style="max-width:560px;margin:0 auto;background:#fff;padding:38px 32px 46px;line-height:1.7;font-size:16px;">
-          <div>${safeMessage}</div>
-          <div style="border:1px solid #e2e8f0;border-radius:16px;padding:18px;margin-top:28px;">
-            <div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.12em;">Invoice</div>
-            <div style="font-weight:900;color:#07183f;font-size:22px;margin-top:4px;">${escapeHtml(data.invoiceNumber)}</div>
-            <div style="font-weight:900;color:#ea580c;font-size:28px;margin-top:12px;">${escapeHtml(data.balance)}</div>
-            <div style="font-size:13px;color:#475569;margin-top:4px;">Remaining balance due</div>
-          </div>
-          <div style="text-align:center;margin-top:30px;">
-            <a href="${data.invoiceLink}" style="display:inline-block;border-radius:999px;background:#1768c9;color:#fff;text-decoration:none;padding:12px 25px;font-weight:700;">View & Pay Invoice</a>
-          </div>
-          <p style="font-size:12px;color:#64748b;margin-top:26px;text-align:center;">Payment options include ACH bank transfer and credit card.</p>
-        </div>
-      </div>
-    `;
+    const logoUrl = new URL("/images/logo.jpeg", data.invoiceLink).toString();
+    const payLink = `${data.invoiceLink}${data.invoiceLink.includes("?") ? "&" : "?"}action=pay#pay`;
+
+    // Bulletproof, mobile-first email: table-based layout + table/VML buttons so
+    // the View/Pay actions render and stay tappable in Gmail, Apple Mail and
+    // Outlook (mobile + desktop).
+    const button = (href: string, label: string, fill: string) => `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+        <tr>
+          <td align="center" bgcolor="${fill}" style="border-radius:999px;">
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${href}" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="50%" stroke="f" fillcolor="${fill}">
+            <w:anchorlock/>
+            <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;">${label}</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-- -->
+            <a href="${href}" target="_blank" style="display:block;min-width:200px;padding:14px 28px;border-radius:999px;background:${fill};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;text-decoration:none;text-align:center;">${label}</a>
+            <!--<![endif]-->
+          </td>
+        </tr>
+      </table>`;
+
+    const html = `<!DOCTYPE html>
+      <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="x-apple-disable-message-reformatting" />
+        <meta name="color-scheme" content="light only" />
+        <meta name="supported-color-schemes" content="light only" />
+        <title>XRP Roofing Invoice</title>
+      </head>
+      <body style="margin:0;padding:0;background:#f1f5f9;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;">
+          <tr>
+            <td align="center" style="padding:0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+                <tr>
+                  <td align="center" style="background:#e9eef3;padding:28px 16px;">
+                    <img src="${logoUrl}" alt="XRP Roofing" width="150" style="width:150px;max-width:60%;height:auto;display:block;background:#fff;" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background:#ffffff;padding:32px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:16px;line-height:1.7;">
+                    <div>${safeMessage}</div>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:16px;margin-top:28px;">
+                      <tr>
+                        <td style="padding:18px;">
+                          <div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.12em;">Invoice</div>
+                          <div style="font-weight:900;color:#07183f;font-size:22px;margin-top:4px;">${escapeHtml(data.invoiceNumber)}</div>
+                          <div style="font-weight:900;color:#ea580c;font-size:28px;margin-top:12px;">${escapeHtml(data.balance)}</div>
+                          <div style="font-size:13px;color:#475569;margin-top:4px;">Remaining balance due</div>
+                        </td>
+                      </tr>
+                    </table>
+                    <div style="margin-top:30px;">${button(data.invoiceLink, "View Invoice", "#07183f")}</div>
+                    <div style="margin-top:14px;">${button(payLink, "Pay Invoice", "#1768c9")}</div>
+                    <p style="font-size:12px;color:#64748b;margin-top:26px;text-align:center;">Payment options include ACH bank transfer and credit card.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>`;
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
