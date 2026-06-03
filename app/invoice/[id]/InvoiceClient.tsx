@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import InvoicePaymentButtons from "./InvoicePaymentButtons";
+import ScopeText from "@/components/invoice/ScopeText";
 
 type Invoice = {
   id: string;
@@ -164,10 +165,10 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
               <h2 className="text-lg font-black text-[#07183f] sm:text-xl">Scope of Work</h2>
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                 {(invoice.lineItems || []).map((item, index) => (
-                  <div key={index} className="grid gap-1 border-b border-slate-100 p-4 last:border-b-0 sm:grid-cols-[1fr_120px] sm:gap-3">
+                  <div key={index} className="grid gap-2 border-b border-slate-100 p-4 last:border-b-0 sm:grid-cols-[1fr_120px] sm:gap-3">
                     <div className="min-w-0">
-                      <p className="break-words font-black text-slate-900">{item.description}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">Qty {item.quantity} · Tax {item.tax}%</p>
+                      <ScopeText text={item.description} />
+                      <p className="mt-2 text-xs font-semibold text-slate-400">Qty {item.quantity} · Tax {item.tax}%</p>
                     </div>
                     <p className="font-black text-blue-700 sm:text-right">{currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</p>
                   </div>
