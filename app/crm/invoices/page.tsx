@@ -827,7 +827,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="sticky top-16 z-20 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:top-20">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
@@ -868,15 +868,15 @@ export default function InvoicesPage() {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
           return (
-            <section key={stage} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className={`flex items-center justify-between border-b p-4 ${stageHeaderClass(stage)}`}>
+            <section key={stage} className="flex max-h-[68vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-20rem)]">
+              <div className={`flex shrink-0 items-center justify-between border-b p-4 ${stageHeaderClass(stage)}`}>
                 <div>
                   <h2 className="text-base font-bold text-slate-950">{stage}</h2>
                   <p className="text-sm text-slate-500">{invoicesInStage.length} invoices</p>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">{currency(stageTotal)}</span>
               </div>
-              <div className="space-y-3 p-4">
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {invoicesInStage.map((invoice) => {
                   const totals = calculateTotals(invoice);
                   const balance = Math.max(totals.finalTotal - getPaidAmount(invoice), 0);
