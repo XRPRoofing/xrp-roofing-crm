@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient } from "@/lib/supabase/client";
@@ -88,6 +89,18 @@ const customersStorageKey = "xrp-crm-customers";
 
 const today = new Date().toISOString().slice(0, 10);
 const invoicesStorageKey = "xrp-crm-invoices";
+
+/** Read the invoices persisted in this browser (written by any tab on this device). */
+function readStoredInvoices(): Invoice[] | null {
+  if (typeof window === "undefined") return null;
+  const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
+  if (!savedInvoices) return null;
+  try {
+    return JSON.parse(savedInvoices) as Invoice[];
+  } catch {
+    return null;
+  }
+}
 
 const initialInvoices: Invoice[] = [
   {
@@ -427,17 +440,7 @@ function propagatePaidStatus(invoice: Invoice) {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    if (typeof window === "undefined") return initialInvoices;
-    const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
-    if (!savedInvoices) return initialInvoices;
-
-    try {
-      return JSON.parse(savedInvoices) as Invoice[];
-    } catch {
-      return initialInvoices;
-    }
-  });
+  const [invoices, setInvoices] = useState<Invoice[]>(() => readStoredInvoices() ?? initialInvoices);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -531,6 +534,31 @@ export default function InvoicesPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // No manual refresh: when the user returns to this tab/device (focus,
+  // visibility, or a cross-tab write), re-read invoices saved on this device and
+  // re-pull the Stripe-synced share state so the board is always current.
+  useAutoRefresh(() => {
+    const saved = readStoredInvoices();
+    if (saved) {
+      setInvoices((current) => (JSON.stringify(current) === JSON.stringify(saved) ? current : saved));
+    }
+    void loadInvoiceShares()
+      .then((shares) => {
+        setInvoices((current) => {
+          let changed = false;
+          const next = current.map((invoice) => {
+            const share = shares.find((item) => item.id === invoice.id);
+            if (!share) return invoice;
+            const merged = mergeShareIntoInvoice(invoice, share);
+            if (merged !== invoice) changed = true;
+            return merged;
+          });
+          return changed ? next : current;
+        });
+      })
+      .catch(() => {});
+  });
 
   // Cascade Customer/Job status to Paid whenever an invoice newly becomes Paid
   // (Stripe sync or a full manual payment). Guarded so each invoice fires once.
