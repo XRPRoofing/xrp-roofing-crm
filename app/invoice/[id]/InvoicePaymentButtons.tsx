@@ -29,7 +29,7 @@ export default function InvoicePaymentButtons({ invoiceId, invoiceNumber, amount
           amount,
           paymentMethod,
           customerEmail,
-          successUrl: `${window.location.origin}/invoice/${encodeURIComponent(invoiceId)}?payment=success`,
+          successUrl: `${window.location.origin}/invoice/${encodeURIComponent(invoiceId)}/thank-you`,
           cancelUrl: `${window.location.origin}/invoice/${encodeURIComponent(invoiceId)}?payment=cancelled`,
         }),
       });

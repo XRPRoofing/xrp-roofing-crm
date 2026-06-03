@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import InvoicePaymentButtons from "./InvoicePaymentButtons";
+import InvoiceViewTracker from "./InvoiceViewTracker";
 
 type Invoice = {
   id: string;
@@ -68,6 +69,7 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 text-slate-950">
+      <InvoiceViewTracker invoiceId={id} />
       <section className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
         <div className="bg-[#07183f] p-8 text-white">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">XRP Roofing Invoice</p>
