@@ -1,16 +1,56 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FolderOpen, ImageIcon, Search, UploadCloud } from "lucide-react";
-import { readCrmFileFolders, type CrmFileFolder } from "@/lib/crm-files";
+import type { CrmFileFolder } from "@/lib/crm-files";
+import { loadCrewDataset, subscribeToCrewData, type JobPhoto, type JobRecord } from "@/lib/crew-sync";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
 }
 
+function createFolderId(address: string) {
+  return address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function buildFolders(jobs: JobRecord[], photos: JobPhoto[]): CrmFileFolder[] {
+  const jobsById = new Map(jobs.map((job) => [job.id, job]));
+  const folders = new Map<string, CrmFileFolder>();
+
+  photos.forEach((photo) => {
+    const job = jobsById.get(photo.jobId);
+    const address = job ? `${job.address}, ${job.city}, AZ` : photo.jobId;
+    const folderId = createFolderId(address) || photo.jobId;
+    const folder = folders.get(folderId) || {
+      id: folderId,
+      name: address,
+      address,
+      workType: job?.jobScope || job?.roofType || "Roofing",
+      jobId: photo.jobId,
+      customerName: job?.name || "Unknown customer",
+      updatedAt: photo.createdAt,
+      files: [],
+    };
+    folder.files.push({
+      id: photo.id,
+      name: photo.name || `${photo.photoType} photo`,
+      dataUrl: photo.dataUrl,
+      uploadedAt: photo.createdAt,
+      uploadedBy: photo.uploadedBy,
+      photoType: photo.photoType,
+      jobId: photo.jobId,
+      jobName: job?.name || "Unknown customer",
+    });
+    if (photo.createdAt > folder.updatedAt) folder.updatedAt = photo.createdAt;
+    folders.set(folderId, folder);
+  });
+
+  return Array.from(folders.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export default function FilesPage() {
-  const [folders, setFolders] = useState<CrmFileFolder[]>(() => readCrmFileFolders());
+  const [folders, setFolders] = useState<CrmFileFolder[]>([]);
   const [search, setSearch] = useState("");
   const filteredFolders = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -20,18 +60,25 @@ export default function FilesPage() {
   }, [folders, search]);
   const totalPhotos = folders.reduce((total, folder) => total + folder.files.length, 0);
 
-  useEffect(() => {
-    function refreshFolders() {
-      setFolders(readCrmFileFolders());
-    }
-
-    window.addEventListener("crm-files-updated", refreshFolders);
-    window.addEventListener("storage", refreshFolders);
-    return () => {
-      window.removeEventListener("crm-files-updated", refreshFolders);
-      window.removeEventListener("storage", refreshFolders);
-    };
+  const refreshFolders = useCallback(async () => {
+    const data = await loadCrewDataset();
+    setFolders(buildFolders(data.jobs, data.photos));
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void loadCrewDataset().then((data) => {
+      if (mounted) setFolders(buildFolders(data.jobs, data.photos));
+    }).catch(() => {});
+
+    const unsubscribe = subscribeToCrewData(() => {
+      void refreshFolders().catch(() => {});
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [refreshFolders]);
 
   return (
     <div className="space-y-5">

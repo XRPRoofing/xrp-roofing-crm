@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CalendarCheck2, CalendarPlus, Edit3, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Search, ShieldCheck, UploadCloud, Voicemail, X } from "lucide-react";
 import { customers, leadStages, leads } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
+import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { Customer, Lead } from "@/types/crm";
 
@@ -183,17 +184,23 @@ export default function CustomersPage() {
   }, [customerList, jobList, search]);
 
   useEffect(() => {
-    function refreshCustomers() {
-      setCustomerList(loadCustomerDashboardRecords());
-      setJobList(getSavedJobs());
+    let mounted = true;
+    function applyJobs(jobs: Lead[]) {
+      if (!mounted) return;
+      setJobList(jobs);
+      setCustomerList(mergeCustomerList(getSavedCustomers(), jobs.map(customerFromJob)));
     }
+    function refreshFromStore() {
+      void loadCrewDataset().then((data) => applyJobs(data.jobs)).catch(() => {});
+    }
+    refreshFromStore();
 
-    window.addEventListener("storage", refreshCustomers);
-    window.addEventListener("focus", refreshCustomers);
-
+    const unsubscribe = subscribeToCrewData(refreshFromStore);
+    window.addEventListener("focus", refreshFromStore);
     return () => {
-      window.removeEventListener("storage", refreshCustomers);
-      window.removeEventListener("focus", refreshCustomers);
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener("focus", refreshFromStore);
     };
   }, []);
 
