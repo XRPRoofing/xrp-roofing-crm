@@ -7,6 +7,7 @@ const schema = z.object({
   subject: z.string().min(1),
   message: z.string().min(1),
   invoiceNumber: z.string().min(1),
+  invoiceId: z.string().min(1).optional(),
   invoiceLink: z.string().url(),
   balance: z.string().min(1),
 });
@@ -62,6 +63,9 @@ export async function POST(req: NextRequest) {
         to: [data.toEmail],
         subject: data.subject,
         html,
+        // Tag with the invoice id so the Resend webhook can map
+        // email.delivered / email.opened events back to the invoice.
+        ...(data.invoiceId ? { tags: [{ name: "invoice_id", value: data.invoiceId }] } : {}),
       }),
     });
 

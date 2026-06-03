@@ -32,6 +32,10 @@ export type InvoiceSharePayload = {
   viewedAt?: string;
   paidAt?: string;
   failedAt?: string;
+  sentAt?: string;
+  sentBy?: string;
+  emailDeliveredAt?: string;
+  emailOpenedAt?: string;
 };
 
 type InvoiceShareRow = { id: string; payload: InvoiceSharePayload };
