@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Upload, X } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
 import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
-import { ensureSeedJobs, leadToJobRecord, loadCrewDataset, subscribeToCrewData, updateJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, subscribeToCrewData, updateJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 
 declare global {
   interface Window {
@@ -254,6 +254,14 @@ export default function LeadsPage() {
     updateJob(jobId, { stage, lastActivity: `Moved to ${leadStages.find((item) => item.id === stage)?.label || "workflow"}` });
   }
 
+  function deleteJob(job: Lead) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${job.name}"? This permanently removes the job and its photos, notes, and checklist for everyone. This cannot be undone.`)) return;
+    const previousJobs = jobs;
+    setSelectedJobId(null);
+    setJobs((currentJobs) => currentJobs.filter((item) => item.id !== job.id));
+    void deleteJobRecord(job.id).catch(() => setJobs(previousJobs));
+  }
+
   function handleAddJob(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -400,7 +408,10 @@ export default function LeadsPage() {
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
                   <p className="text-sm font-bold text-slate-500">{selectedJob.address}, {selectedJob.city}, AZ</p>
                 </div>
-                <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                </div>
               </div>
             </div>
 
