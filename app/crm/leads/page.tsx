@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVe
 import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
 import { deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, subscribeToCrewData, updateJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 declare global {
   interface Window {
@@ -197,6 +198,11 @@ export default function LeadsPage() {
       unsubscribe();
     };
   }, []);
+
+  // No manual refresh: reload jobs when returning to this tab/device.
+  useAutoRefresh(() => {
+    void loadCrewDataset().then((data) => setJobs(data.jobs.map(normalizeJob))).catch(() => {});
+  });
 
   useEffect(() => {
     if (!showForm || !addressInputRef.current) return;
