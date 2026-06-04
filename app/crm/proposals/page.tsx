@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { leads } from "@/lib/crm-data";
+import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import type { Lead } from "@/types/crm";
 
 declare global {
@@ -1254,6 +1255,7 @@ export default function ProposalsPage() {
 
   return (
     <div className="space-y-5 font-sans">
+      <BackToJobsLink />
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">

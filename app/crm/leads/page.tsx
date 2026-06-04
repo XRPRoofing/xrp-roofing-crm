@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
 import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
-import { deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, subscribeToCrewData, updateJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 declare global {
@@ -122,6 +124,11 @@ export default function LeadsPage() {
   const [showForm, setShowForm] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: "",
@@ -138,6 +145,49 @@ export default function LeadsPage() {
   });
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
+  const jobPhotosOnly = jobFiles.filter((file) => !file.name.startsWith("Document - "));
+  const jobDocuments = jobFiles.filter((file) => file.name.startsWith("Document - "));
+
+  // Load the selected job's saved files (photos + documents) from the shared
+  // crew store so they show on the card and stay in sync with the Files board.
+  useEffect(() => {
+    if (!selectedJobId) {
+      setJobFiles([]);
+      setActivityOpen(false);
+      setFileError(null);
+      return;
+    }
+    let mounted = true;
+    void loadJobPhotos(selectedJobId).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
+    return () => { mounted = false; };
+  }, [selectedJobId]);
+
+  async function handleJobFileUpload(kind: "Documents" | "Photos", files: FileList | null) {
+    if (!selectedJob || !files?.length) return;
+    setFileBusy(true);
+    setFileError(null);
+    try {
+      const selected = Array.from(files);
+      const dataUrls = await Promise.all(selected.map((file) => compressImageToDataUrl(file)));
+      await addJobPhotos(selectedJob.id, selected.map((file, index) => ({
+        photoType: "Job Photo",
+        name: kind === "Documents" ? `Document - ${file.name}` : file.name,
+        dataUrl: dataUrls[index],
+        uploadedBy: "Office",
+      })));
+      const refreshed = await loadJobPhotos(selectedJob.id);
+      setJobFiles(refreshed);
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Failed to save file.");
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  function openBoardFromJob(path: string) {
+    if (typeof window !== "undefined") window.sessionStorage.setItem("crm-return-to-jobs", "1");
+    router.push(path);
+  }
 
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -434,13 +484,87 @@ export default function LeadsPage() {
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Notes<textarea value={selectedJob.lastActivity} onChange={(event) => updateJob(selectedJob.id, { lastActivity: event.target.value })} rows={4} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {[{ icon: FileText, label: "Documents" }, { icon: Image, label: "Photos" }, { icon: DollarSign, label: "Estimates" }, { icon: CheckCircle2, label: "Invoices" }, { icon: History, label: "Activity History" }, { icon: Upload, label: "Upload Files" }].map(({ icon: Icon, label }) => (
-                  <button key={label} type="button" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                    <Icon className="h-5 w-5" />
-                    {label}
+              <div className="space-y-3">
+                {fileError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{fileError}</p>}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><FileText className="h-4 w-4" />Documents</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobDocuments.length} file(s)</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Camera className="h-4 w-4" /> Take Picture
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <UploadCloud className="h-4 w-4" /> Upload
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                  </div>
+                  {jobDocuments.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {jobDocuments.map((file) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={file.id} src={file.dataUrl} alt={file.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] font-bold text-slate-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Image className="h-4 w-4" />Photos</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobPhotosOnly.length} photo(s)</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Camera className="h-4 w-4" /> Take Photo
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <UploadCloud className="h-4 w-4" /> Upload
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                  </div>
+                  {jobPhotosOnly.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {jobPhotosOnly.map((photo) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] font-bold text-slate-400">Shown here and auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => openBoardFromJob("/crm/proposals")} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                    <DollarSign className="h-5 w-5" />Estimates
                   </button>
-                ))}
+                  <button type="button" onClick={() => openBoardFromJob("/crm/invoices")} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                    <CheckCircle2 className="h-5 w-5" />Invoices
+                  </button>
+                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:col-span-2">
+                    <History className="h-5 w-5" />Activity History
+                  </button>
+                </div>
+
+                {activityOpen && (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Activity History</p>
+                    <ul className="mt-2 space-y-2">
+                      {jobFiles.length === 0 && <li className="text-sm font-semibold text-slate-500">No document or photo activity yet.</li>}
+                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
+                        <li key={file.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate font-bold text-slate-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Document · ") : `Photo · ${file.name}`}</span>
+                          <span className="shrink-0 text-xs font-semibold text-slate-400">{new Date(file.createdAt).toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
