@@ -780,9 +780,9 @@ export default function InvoicesPage() {
 
   function renderInvoiceFields(invoice: Invoice, editable: boolean, onChange: (invoice: Invoice) => void) {
     const totals = calculateTotals(invoice);
-    const inputClass = "mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50";
+    const inputClass = "mt-1.5 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50";
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client name<input disabled={!editable} value={invoice.clientName} onChange={(event) => onChange({ ...invoice, clientName: event.target.value })} className={inputClass} placeholder="Client name" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Email<input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className={inputClass} placeholder="Email" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Phone<input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className={inputClass} placeholder="Phone" /></label>
@@ -795,8 +795,8 @@ export default function InvoicesPage() {
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Proposal reference<input disabled={!editable} value={invoice.proposalReference} onChange={(event) => onChange({ ...invoice, proposalReference: event.target.value })} className={inputClass} placeholder="Proposal reference" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-28`} placeholder="Payment terms" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-28`} placeholder="Warranty notes" /></label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></label>
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-black text-[#07183f]">Line Items</h3>
@@ -1054,26 +1054,28 @@ export default function InvoicesPage() {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4">
-          <div className="mx-auto my-6 max-w-5xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-3 sm:items-center sm:p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="my-auto flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:p-5">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
-                <h2 className="mt-2 text-3xl font-black text-[#07183f]">{createForm.invoiceNumber}</h2>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
+                <h2 className="mt-0.5 text-xl font-black text-[#07183f] sm:text-2xl">{createForm.invoiceNumber}</h2>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-2xl text-slate-500">×</button>
+              <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100">×</button>
             </div>
-            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <label className="text-xs font-black uppercase tracking-wider text-blue-700">Quick fill from roofing job</label>
-              <select onChange={(event) => handlePrefillFromJob(event.target.value)} className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none">
-                <option value="">Start blank or select a job...</option>
-                {leads.map((job) => <option key={job.id} value={job.id}>{job.name} • {job.roofType} • {currency(job.value)}</option>)}
-              </select>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
+                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Quick fill from roofing job</label>
+                <select onChange={(event) => handlePrefillFromJob(event.target.value)} className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none">
+                  <option value="">Start blank or select a job...</option>
+                  {leads.map((job) => <option key={job.id} value={job.id}>{job.name} • {job.roofType} • {currency(job.value)}</option>)}
+                </select>
+              </div>
+              <div className="mt-4">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
             </div>
-            <div className="mt-6">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowCreateModal(false)} className="rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700">Cancel</button>
-              <button onClick={handleCreateInvoice} className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white">Create Invoice</button>
+            <div className="flex justify-end gap-3 border-t border-slate-200 p-4 sm:p-5">
+              <button onClick={() => setShowCreateModal(false)} className="rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700">Cancel</button>
+              <button onClick={handleCreateInvoice} className="rounded-2xl bg-orange-500 px-5 py-2.5 font-bold text-white">Create Invoice</button>
             </div>
           </div>
         </div>
