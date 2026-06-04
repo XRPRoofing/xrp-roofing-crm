@@ -121,6 +121,7 @@ export default function CalendarPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
     name: "",
@@ -173,7 +174,15 @@ export default function CalendarPage() {
     return dateKey(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
 
+  const activeDayKey = selectedDayKey || todayKey;
+  const agendaEvents = eventsByDate[activeDayKey] || [];
+  const activeDayLabel = useMemo(() => {
+    const [year, month, day] = activeDayKey.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(year, month, day));
+  }, [activeDayKey]);
+
   function shiftMonth(delta: number) {
+    setSelectedDayKey(null);
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
@@ -356,8 +365,9 @@ export default function CalendarPage() {
             const key = dateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
             const dayEvents = eventsByDate[key] || [];
             const isToday = key === todayKey;
+            const isSelected = key === activeDayKey;
             return (
-              <div key={key} className={`min-h-16 rounded-xl border p-1.5 text-left sm:min-h-28 sm:p-2 ${isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50"}`}>
+              <div key={key} onClick={() => setSelectedDayKey(key)} className={`min-h-16 cursor-pointer rounded-xl border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50 hover:border-orange-200"}`}>
                 <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-slate-500"}`}>
                   {isToday ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white sm:h-6 sm:w-6">{cellDate.getDate()}</span> : cellDate.getDate()}
                 </div>
@@ -385,6 +395,44 @@ export default function CalendarPage() {
               </div>
             );
           })}
+        </div>
+
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-orange-600">{activeDayLabel}</h3>
+            <span className="text-xs font-bold text-slate-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"}</span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {agendaEvents.length === 0 && (
+              <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">No events on this day. Tap any date above to see its appointments.</p>
+            )}
+            {agendaEvents.map((event) => {
+              const details = getEventDetails(event);
+              const tel = telHref(details.phone);
+              return (
+                <button key={event.id} type="button" onClick={() => setSelectedEvent(event)} className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99] hover:border-orange-200">
+                  <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-orange-50 px-1.5 py-2 text-center text-orange-700">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span className="mt-0.5 text-[11px] font-black leading-tight">{formatEventTime(event)}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-[#07183f]">{event.summary || "Untitled event"}</p>
+                    {details.name !== "Not provided" && (
+                      <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
+                    )}
+                    {details.address !== "Not provided" && (
+                      <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-slate-500"><MapPin className="h-3 w-3 shrink-0 text-slate-400" />{details.address}</p>
+                    )}
+                  </div>
+                  {tel && (
+                    <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
+                      <Phone className="h-4 w-4" />
+                    </a>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
