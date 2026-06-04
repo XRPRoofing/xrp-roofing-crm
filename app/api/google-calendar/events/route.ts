@@ -8,6 +8,7 @@ const eventSchema = z.object({
   name: z.string().min(1),
   address: z.string().min(1),
   jobKind: z.string().min(1),
+  phone: z.string().optional(),
   date: z.string().min(1),
   startTime: z.string().min(1),
   endTime: z.string().min(1),
@@ -44,13 +45,14 @@ function buildGoogleEvent(data: z.infer<typeof eventSchema>) {
   return {
     summary: data.title,
     location: data.address,
-    description: `Name: ${data.name}\nAddress: ${data.address}\nKind of Job: ${data.jobKind}\nNotes: ${data.notes || ""}`,
+    description: `Name: ${data.name}\nPhone: ${data.phone || ""}\nAddress: ${data.address}\nKind of Job: ${data.jobKind}\nNotes: ${data.notes || ""}`,
     start: { dateTime: `${data.date}T${data.startTime}:00`, timeZone: "America/Phoenix" },
     end: { dateTime: `${data.date}T${data.endTime}:00`, timeZone: "America/Phoenix" },
     attendees,
     extendedProperties: {
       private: {
         crmName: data.name,
+        crmPhone: data.phone || "",
         crmAddress: data.address,
         crmJobKind: data.jobKind,
         crmNotes: data.notes || "",
