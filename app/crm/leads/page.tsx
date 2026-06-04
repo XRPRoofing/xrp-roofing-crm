@@ -407,7 +407,8 @@ export default function LeadsPage() {
         </div>
 
         {showForm && (
-          <form onSubmit={handleAddJob} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowForm(false)}>
+          <form onSubmit={handleAddJob} className="my-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
@@ -427,6 +428,7 @@ export default function LeadsPage() {
             </div>
             <button className="mt-3 rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save job</button>
           </form>
+          </div>
         )}
 
         <div className="relative">
