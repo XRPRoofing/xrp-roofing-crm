@@ -182,7 +182,11 @@ export default function CalendarPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/google-calendar/events");
+      const year = monthCursor.getFullYear();
+      const month = monthCursor.getMonth();
+      const timeMin = new Date(year, month - 1, 1).toISOString();
+      const timeMax = new Date(year, month + 2, 1).toISOString();
+      const response = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
       const data = await response.json() as { connected?: boolean; events?: GoogleCalendarEvent[]; error?: string };
 
       setConnected(Boolean(data.connected));
@@ -198,8 +202,12 @@ export default function CalendarPage() {
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get("google_calendar");
     setStatusMessage(getGoogleCalendarStatusMessage(status));
-    void loadEvents();
   }, []);
+
+  useEffect(() => {
+    void loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthCursor]);
 
   useEffect(() => {
     if (!selectedEvent) return;
