@@ -24,7 +24,7 @@ export type CrewAssignment = {
 
 export type CrewJob = Lead & CrewAssignment;
 
-export const crewMembers = ["Jonathan", "Adrian"];
+export const crewMembers = ["Jonathan", "Darwin"];
 export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "On Work", "Mark Done", "Completed", "Proceed to Invoice", "Done Payment"];
 export const crewWorkflowStorageKey = "xrp-crm-crew-workflow";
 export const jobsStorageKey = "xrp-crm-jobs-board";

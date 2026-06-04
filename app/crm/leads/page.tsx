@@ -407,12 +407,13 @@ export default function LeadsPage() {
         </div>
 
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowForm(false)}>
-          <form onSubmit={handleAddJob} className="my-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowForm(false)}>
+          <form onSubmit={handleAddJob} className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 p-4">
               <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer / job name" />
               <input ref={addressInputRef} required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Job address" />
@@ -426,7 +427,10 @@ export default function LeadsPage() {
               <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" />
               <input value={form.lastActivity} onChange={(event) => setForm({ ...form, lastActivity: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Current note" />
             </div>
-            <button className="mt-3 rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save job</button>
+            </div>
+            <div className="border-t border-slate-200 p-4">
+              <button className="w-full rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white sm:w-auto">Save job</button>
+            </div>
           </form>
           </div>
         )}
