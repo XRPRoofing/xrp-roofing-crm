@@ -264,7 +264,7 @@ export default function CustomersPage() {
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
           <h1 className="mt-2 text-3xl font-black text-[#07183f]">Customers</h1>
-          <p className="mt-2 text-slate-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
+          <p className="crm-board-subtitle mt-2 text-slate-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
         </div>
         <button onClick={() => setShowForm(true)} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
       </div>

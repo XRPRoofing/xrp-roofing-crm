@@ -282,12 +282,12 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <div className="sticky top-20 z-30 rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="sticky top-16 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-8 lg:top-20">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Scheduling</p>
             <h1 className="mt-2 text-3xl font-black text-[#07183f]">Calendar & Appointments</h1>
-            <p className="mt-3 text-slate-600">Connect Google Calendar to view upcoming inspections, estimates, and team appointments.</p>
+            <p className="crm-board-subtitle mt-3 text-slate-600">Connect Google Calendar to view upcoming inspections, estimates, and team appointments.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <a href="#new-appointment" className="rounded-2xl bg-[#07183f] px-4 py-3 font-bold text-white">

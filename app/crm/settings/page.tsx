@@ -59,7 +59,7 @@ export default function SettingsPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Admin Center</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight">Settings</h1>
-            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-blue-100">Manage company setup, users, communication tools, email, payments, and CRM integrations from one place.</p>
+            <p className="crm-board-subtitle mt-2 max-w-3xl text-sm font-medium leading-6 text-blue-100">Manage company setup, users, communication tools, email, payments, and CRM integrations from one place.</p>
           </div>
           <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-black text-white">
             <ShieldCheck className="mr-2 inline h-4 w-4 text-orange-300" />

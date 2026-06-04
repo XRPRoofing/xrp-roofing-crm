@@ -309,12 +309,12 @@ export default function LeadsPage() {
 
   return (
     <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="sticky top-20 z-30 space-y-4 border-b border-slate-200/80 bg-slate-100/95 pb-4 backdrop-blur">
+      <div className="sticky top-16 z-30 space-y-3 border-b border-slate-200/80 bg-slate-100/95 pb-3 backdrop-blur sm:space-y-4 sm:pb-4 lg:top-20">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Roofing operations</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Jobs board</h1>
-            <p className="mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
+            <p className="crm-board-subtitle mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setSearch("")} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
@@ -322,7 +322,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           {dashboardMetrics.map((metric) => (
             <div key={metric.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${metric.tone}`}>
               <p className="text-2xl font-black leading-none">{metric.value}</p>
