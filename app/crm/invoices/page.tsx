@@ -837,7 +837,7 @@ export default function InvoicesPage() {
           </div>
           <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
           {[
             ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
             ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
