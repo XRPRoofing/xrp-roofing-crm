@@ -12,6 +12,7 @@ import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/noti
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
+  { href: "/crm/tasks", label: "Tasks", shortLabel: "Tasks", icon: ClipboardList },
   { href: "/crm/conversations", label: "Conversation board", shortLabel: "Messages", icon: MessageSquareText },
   { href: "/crm/team-chat", label: "Team Chat", shortLabel: "Chat", icon: MessageCircle },
   { href: "/crm/leads", label: "Jobs", shortLabel: "Jobs", icon: BriefcaseBusiness },
@@ -20,7 +21,6 @@ const navigation = [
   { href: "/crm/proposals", label: "Proposal", shortLabel: "Proposal", icon: FileText },
   { href: "/crm/invoices", label: "Invoice", shortLabel: "Invoice", icon: ClipboardList },
   { href: "/crm/payments", label: "Payments", shortLabel: "Pay", icon: CreditCard },
-  { href: "/crm/tasks", label: "Tasks", shortLabel: "Tasks", icon: ClipboardList },
   { href: "/crm/calendar", label: "Calendar", shortLabel: "Calendar", icon: CalendarDays },
   { href: "/crm/pdf-signer-board", label: "PDF Signer Board", shortLabel: "PDF", icon: FileSignature },
   { href: "/crm/files", label: "Files", shortLabel: "Files", icon: UploadCloud },
