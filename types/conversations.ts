@@ -43,4 +43,5 @@ export interface ConversationRecord {
   isNewLead: boolean;
   channels: ConversationChannel[];
   messages: ConversationMessage[];
+  callSids?: string[];
 }

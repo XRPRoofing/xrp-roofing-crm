@@ -324,6 +324,7 @@ function createManualConversation(phone: string): ConversationRecord {
     isNewLead: !contact,
     channels: [],
     messages: [],
+    callSids: [],
   };
 }
 
@@ -374,6 +375,7 @@ function eventMatchesConversation(event: TwilioConversationEvent, conversation: 
   const eventPhone = normalizePhone(getEventPhone(event));
   if (eventPhone && eventPhone === normalizePhone(conversation.contact.phone)) return true;
   if (!event.callSid) return false;
+  if (conversation.callSids?.includes(event.callSid)) return true;
 
   return conversation.messages.some((message) => message.id.includes(event.callSid || ""));
 }
@@ -411,6 +413,10 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const nextMessages = message ? [message, ...nextConversation.messages.filter((item) => item.id !== message.id)].slice(0, 50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
+  const nextCallSids = event.callSid && !nextConversation.callSids?.includes(event.callSid)
+    ? [...(nextConversation.callSids || []), event.callSid]
+    : nextConversation.callSids || [];
+
   const updated: ConversationRecord = {
     ...nextConversation,
     id,
@@ -420,6 +426,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     isMissedCall: isMissedCallEvent(event) ? true : isAnsweredCallEvent(event) ? false : nextConversation.isMissedCall,
     channels,
     messages: nextMessages,
+    callSids: nextCallSids,
   };
 
   return [updated, ...current.filter((conversation) => conversation.id !== id)];
