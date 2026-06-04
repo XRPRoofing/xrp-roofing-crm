@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
   if (!verifyStripeSignature(rawBody, req.headers.get("stripe-signature"))) {
+    console.error("[stripe-webhook] signature verification failed — check STRIPE_WEBHOOK_SECRET matches this endpoint's signing secret");
     return NextResponse.json({ error: "Invalid Stripe signature" }, { status: 400 });
   }
 
@@ -108,7 +109,17 @@ export async function POST(req: NextRequest) {
 
   const supabase = getAdminClient();
   if (!supabase) {
+    console.error("[stripe-webhook] no Supabase key available (set SUPABASE_SERVICE_ROLE_KEY)");
     return NextResponse.json({ error: "Payment sync storage is not configured" }, { status: 503 });
+  }
+
+  // Writes to invoice_shares are protected by RLS that only allows the
+  // authenticated/service role. Without the service role key the anon key is
+  // used, reads/writes are silently blocked, and payments never sync. Surface
+  // that as a hard failure so the misconfiguration is visible in Stripe.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[stripe-webhook] SUPABASE_SERVICE_ROLE_KEY is not set — invoice_shares writes will be blocked by RLS");
+    return NextResponse.json({ error: "SUPABASE_SERVICE_ROLE_KEY is not configured" }, { status: 500 });
   }
 
   const eventType = event.type || "";
@@ -120,14 +131,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
-  const { data } = await supabase
+  const { data, error: selectError } = await supabase
     .from("invoice_shares")
     .select("payload")
     .eq("id", invoiceId)
-    .single();
+    .maybeSingle();
+
+  if (selectError) {
+    console.error(`[stripe-webhook] failed to read invoice ${invoiceId}:`, selectError.message);
+    return NextResponse.json({ error: "Unable to read invoice" }, { status: 500 });
+  }
 
   const invoice = data?.payload as StoredInvoice | undefined;
   if (!invoice) {
+    // The invoice was never published to invoice_shares (or under a different
+    // id). Don't lose the payment silently — notify the office using the data
+    // Stripe gave us, then ack so Stripe doesn't retry forever.
+    console.warn(`[stripe-webhook] ${eventType} for unknown invoice ${invoiceId} — sending fallback notification`);
+    if (successEvents.has(eventType)) {
+      const fallbackAmount = Number(object.amount_total ?? object.amount_received ?? object.amount_paid ?? object.amount ?? 0) / 100;
+      const fallbackMeta = (object.metadata as Record<string, unknown> | undefined) || {};
+      await sendInternalInvoiceEmail({
+        event: "paid",
+        customerName: typeof fallbackMeta.clientName === "string" ? fallbackMeta.clientName : "",
+        invoiceNumber: typeof fallbackMeta.invoiceNumber === "string" ? fallbackMeta.invoiceNumber : invoiceId,
+        amount: fallbackAmount,
+        customerEmail: typeof object.customer_email === "string" ? object.customer_email : undefined,
+      });
+    }
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -185,9 +216,14 @@ export async function POST(req: NextRequest) {
       activity,
     };
 
-    await supabase
+    const { error: writeError } = await supabase
       .from("invoice_shares")
       .upsert({ id: invoiceId, payload, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+    if (writeError) {
+      console.error(`[stripe-webhook] failed to mark invoice ${invoiceId} paid:`, writeError.message);
+      return NextResponse.json({ error: "Unable to update invoice" }, { status: 500 });
+    }
 
     if (!alreadyRecorded) {
       await sendInternalInvoiceEmail({ event: "paid", customerName, invoiceNumber, amount, customerEmail });
@@ -204,9 +240,14 @@ export async function POST(req: NextRequest) {
     activity: ["Notification: Failed payment", "Stripe payment failed", ...(invoice.activity || [])],
   };
 
-  await supabase
+  const { error: failWriteError } = await supabase
     .from("invoice_shares")
     .upsert({ id: invoiceId, payload, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+  if (failWriteError) {
+    console.error(`[stripe-webhook] failed to record failed payment for ${invoiceId}:`, failWriteError.message);
+    return NextResponse.json({ error: "Unable to update invoice" }, { status: 500 });
+  }
 
   await sendInternalInvoiceEmail({
     event: "failed",
