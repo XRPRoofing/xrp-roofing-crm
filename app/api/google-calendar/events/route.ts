@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getSharedGoogleTokens, saveSharedGoogleTokens } from "@/lib/google-calendar-store";
+
+export const runtime = "nodejs";
 
 const tokenCookieName = "xrp_google_calendar_tokens";
 
@@ -103,7 +106,9 @@ function callGoogle(accessToken: string, path: string, init?: RequestInit) {
 }
 
 async function googleCalendarFetch(req: NextRequest, path: string, init?: RequestInit): Promise<GoogleCall> {
-  const tokens = parseTokens(req);
+  // Prefer the shared server-side connection (works across all devices), then
+  // fall back to a cookie set on the connecting device.
+  const tokens = (await getSharedGoogleTokens()) || parseTokens(req);
 
   if (!tokens?.access_token) {
     return { connected: false, response: null, refreshedTokens: null };
@@ -116,7 +121,10 @@ async function googleCalendarFetch(req: NextRequest, path: string, init?: Reques
     const refreshed = await refreshAccessToken(tokens.refresh_token);
     if (refreshed?.access_token) {
       response = await callGoogle(refreshed.access_token, path, init);
-      return { connected: true, response, refreshedTokens: { ...tokens, ...refreshed, refresh_token: refreshed.refresh_token || tokens.refresh_token } };
+      const merged = { ...tokens, ...refreshed, refresh_token: refreshed.refresh_token || tokens.refresh_token };
+      // Keep the shared store fresh so other devices reuse the renewed token.
+      await saveSharedGoogleTokens(merged);
+      return { connected: true, response, refreshedTokens: merged };
     }
   }
 
