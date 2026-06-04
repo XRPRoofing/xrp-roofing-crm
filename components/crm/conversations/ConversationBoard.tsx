@@ -485,9 +485,52 @@ function ContactPanel({ conversation, onDial, onContactChange }: { conversation:
   );
 }
 
+type RingtoneController = { stop: () => void };
+
+function playRingtone(): RingtoneController | null {
+  if (typeof window === "undefined") return null;
+  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return null;
+
+  let stopped = false;
+  const ctx = new AudioCtx();
+  void ctx.resume();
+
+  function ringOnce() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.05);
+    gain.gain.setValueAtTime(0.3, now + 1.9);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2);
+
+    for (const frequency of [440, 480]) {
+      const oscillator = ctx.createOscillator();
+      oscillator.frequency.value = frequency;
+      oscillator.connect(gain);
+      oscillator.start(now);
+      oscillator.stop(now + 2);
+    }
+  }
+
+  ringOnce();
+  const interval = window.setInterval(ringOnce, 6000);
+
+  return {
+    stop() {
+      stopped = true;
+      window.clearInterval(interval);
+      ctx.close().catch(() => undefined);
+    },
+  };
+}
+
 export default function ConversationBoard() {
   const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
+  const ringtoneRef = useRef<RingtoneController | null>(null);
   const messageBoardRef = useRef<HTMLDivElement | null>(null);
   const initialConversations = useMemo<ConversationRecord[]>(() => [], []);
   const [conversations, setConversations] = useState<ConversationRecord[]>(initialConversations);
@@ -525,6 +568,8 @@ export default function ConversationBoard() {
 
   function stopIncomingAlert() {
     navigator.vibrate?.(0);
+    ringtoneRef.current?.stop();
+    ringtoneRef.current = null;
   }
 
   const notifyIncomingCall = useCallback((from: string) => {
@@ -581,6 +626,8 @@ export default function ConversationBoard() {
   const startIncomingAlert = useCallback((from: string) => {
     navigator.vibrate?.([500, 200, 500, 200, 500, 200, 500]);
     notifyIncomingCall(from);
+    ringtoneRef.current?.stop();
+    ringtoneRef.current = playRingtone();
   }, [notifyIncomingCall]);
 
   function markConversationRead(conversationId: string) {
@@ -747,6 +794,8 @@ export default function ConversationBoard() {
       setInboundReady(false);
       voiceDeviceRef.current?.destroy();
       voiceDeviceRef.current = null;
+      ringtoneRef.current?.stop();
+      ringtoneRef.current = null;
     };
   }, [startIncomingAlert]);
 
