@@ -16,6 +16,19 @@ export type BrowserVoiceCall = {
   parameters?: Record<string, string>;
 };
 
+export function proxyRecordingUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "api.twilio.com") {
+      return `/api/twilio/recording?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    return undefined;
+  }
+  return url;
+}
+
 export async function getVoiceToken(identity = "crm-agent") {
   const response = await fetch("/api/twilio/voice/token", {
     method: "POST",

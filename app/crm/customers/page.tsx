@@ -6,6 +6,7 @@ import { customers, leadStages, leads } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
+import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 
 const customersStorageKey = "xrp-crm-customers";
@@ -405,7 +406,7 @@ export default function CustomersPage() {
                             </div>
                             <p className="mt-1 text-sm font-medium leading-5 text-slate-700">{message.body}</p>
                             <p className="mt-2 text-xs font-bold text-slate-500">Customer #{conversation.customerId || selectedCustomer.id} • Conversation #{conversation.id}</p>
-                            {message.recordingUrl && <a href={message.recordingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700 hover:text-blue-800">Open recording</a>}
+                            {message.recordingUrl && <a href={proxyRecordingUrl(message.recordingUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700 hover:text-blue-800">Open recording</a>}
                           </div>
                         </div>
                       </div>
