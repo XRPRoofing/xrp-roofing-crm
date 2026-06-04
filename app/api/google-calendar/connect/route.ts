@@ -18,12 +18,13 @@ function getAppOrigin(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const { clientId, clientSecret, redirectUri } = getGoogleConfig();
+  const { clientId, clientSecret, redirectUri: configuredRedirectUri } = getGoogleConfig();
   const origin = getAppOrigin(req);
+  const redirectUri = configuredRedirectUri || `${origin}/api/google-calendar/connect`;
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret) {
     return NextResponse.redirect(`${origin}/crm/calendar?google_calendar=missing_env`);
   }
 
