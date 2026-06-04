@@ -9,7 +9,7 @@ import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twili
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneOff, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -81,9 +81,35 @@ function ConversationInbox({ conversations, active, onSelect }: { conversations:
   );
 }
 
+function CallRow({ message }: { message: ConversationMessage }) {
+  const missed = message.status === "missed";
+  const outbound = message.direction === "outbound";
+  const tone = missed
+    ? { border: "border-red-200", bg: "bg-red-50", text: "text-red-700", ring: "ring-red-100", Icon: PhoneMissed }
+    : outbound
+    ? { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", ring: "ring-blue-100", Icon: PhoneOutgoing }
+    : { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", ring: "ring-emerald-100", Icon: PhoneIncoming };
+  const Icon = tone.Icon;
+
+  return (
+    <div className="flex justify-center">
+      <div className={`flex w-full max-w-[86%] items-center gap-3 rounded-xl border ${tone.border} ${tone.bg} px-4 py-3`}>
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ${tone.text} ring-1 ${tone.ring}`}><Icon className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-semibold ${tone.text}`}>{message.body}</p>
+          <p className="mt-0.5 truncate text-xs text-slate-500">{message.author} · {message.timestamp}</p>
+        </div>
+        {message.recordingUrl && <audio controls src={message.recordingUrl} className="h-8 w-40 max-w-[40%]" />}
+      </div>
+    </div>
+  );
+}
+
 function MessageRow({ message }: { message: ConversationMessage }) {
   const outbound = message.direction === "outbound";
   const internal = message.direction === "internal";
+
+  if (message.channel === "call") return <CallRow message={message} />;
 
   if (internal) {
     return (
@@ -356,7 +382,7 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
   const direction = event.direction || "internal";
-  const callLabel = direction === "outbound" ? "Outgoing Call" : isMissedCallEvent(event) ? "Missed Call" : "Incoming Call";
+  const callLabel = direction === "outbound" ? "Outbound call" : isMissedCallEvent(event) ? "Missed call" : "Inbound call";
   const duration = getCallDurationLabel(event);
   const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
 
