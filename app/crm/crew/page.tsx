@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForCompletedJob } from "@/lib/office-tasks";
 import { crewMembers, crewStatuses, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 import {
@@ -11,6 +12,7 @@ import {
   addJobNote,
   addJobPhotos,
   assembleCrewJobs,
+  buildOptimisticPhotos,
   deleteJobRecord,
   ensureSeedJobs,
   joinCrewPresence,
@@ -48,14 +50,6 @@ const statusStyles: Record<CrewJobStatus, string> = {
   "Done Payment": "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 function formatAddress(job: CrewJob) {
   return `${job.address}, ${job.city}, AZ`;
 }
@@ -180,17 +174,31 @@ export default function CrewWorkflowPage() {
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
-    const uploadedPhotos = await Promise.all(selectedFiles.map(fileToDataUrl));
+    const uploadedBy = job.assignedCrew[0] || "Crew";
+    let uploadedPhotos: string[];
     try {
-      await addJobPhotos(job.id, selectedFiles.map((file, index) => ({ photoType: type, name: file.name, dataUrl: uploadedPhotos[index], uploadedBy: job.assignedCrew[0] || "Crew" })));
+      uploadedPhotos = await Promise.all(selectedFiles.map((file) => compressImageToDataUrl(file)));
+    } catch (compressError) {
+      reportError(compressError instanceof Error ? compressError.message : "Failed to process photos.");
+      return;
+    }
+
+    // Show the photos immediately, then save/sync in the background.
+    const optimisticPhotos = buildOptimisticPhotos(job.id, type, selectedFiles, uploadedPhotos, uploadedBy);
+    const previousPhotos = photos;
+    setPhotos((current) => [...current, ...optimisticPhotos]);
+
+    try {
+      await addJobPhotos(job.id, selectedFiles.map((file, index) => ({ photoType: type, name: file.name, dataUrl: uploadedPhotos[index], uploadedBy })));
       await refresh();
       addCrmNotification({
         title: "Crew photos uploaded",
         message: `${selectedFiles.length} ${type.toLowerCase()} photo(s) uploaded for ${job.name}.`,
-        actor: job.assignedCrew[0] || "Crew",
+        actor: uploadedBy,
         module: "Crew Workflow",
       });
     } catch (uploadError) {
+      setPhotos(previousPhotos);
       reportError(uploadError instanceof Error ? uploadError.message : "Failed to upload photos.");
     }
   }

@@ -407,6 +407,30 @@ export async function deleteJobRecord(jobId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Build local JobPhoto records for optimistic UI so captured photos appear
+ * instantly while the real save/sync happens in the background. These get
+ * replaced by the canonical records on the next refresh.
+ */
+export function buildOptimisticPhotos(
+  jobId: string,
+  photoType: JobPhotoType,
+  files: File[],
+  dataUrls: string[],
+  uploadedBy: string,
+): JobPhoto[] {
+  const now = Date.now();
+  return files.map((file, index) => ({
+    id: `local-${now}-${index}`,
+    jobId,
+    photoType,
+    name: file.name,
+    dataUrl: dataUrls[index],
+    uploadedBy,
+    createdAt: new Date(now + index).toISOString(),
+  }));
+}
+
 export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoType; name: string; dataUrl: string; uploadedBy: string }[]): Promise<void> {
   if (photos.length === 0) return;
   if (!hasSupabaseConfig()) {

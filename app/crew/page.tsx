@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 import { crewMembers, type CrewJob } from "@/lib/crew-workflow";
 import {
   addJobPhotos,
   assembleCrewJobs,
+  buildOptimisticPhotos,
   ensureSeedJobs,
   joinCrewPresence,
   loadCrewDataset,
@@ -17,15 +19,6 @@ import {
   type JobPhoto,
   type JobRecord,
 } from "@/lib/crew-sync";
-
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function CrewPortalPage() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
@@ -107,7 +100,19 @@ export default function CrewPortalPage() {
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
-    const uploadedPhotos = await Promise.all(selectedFiles.map(fileToDataUrl));
+    let uploadedPhotos: string[];
+    try {
+      uploadedPhotos = await Promise.all(selectedFiles.map((file) => compressImageToDataUrl(file)));
+    } catch (compressError) {
+      reportError(compressError instanceof Error ? compressError.message : "Failed to process photos.");
+      return;
+    }
+
+    // Show the photos immediately, then save/sync in the background.
+    const optimisticPhotos = buildOptimisticPhotos(job.id, type, selectedFiles, uploadedPhotos, selectedCrew);
+    const previousPhotos = photos;
+    setPhotos((current) => [...current, ...optimisticPhotos]);
+
     try {
       await addJobPhotos(job.id, selectedFiles.map((file, index) => ({ photoType: type, name: file.name, dataUrl: uploadedPhotos[index], uploadedBy: selectedCrew })));
       await refresh();
@@ -118,6 +123,7 @@ export default function CrewPortalPage() {
         module: "Crew Portal",
       });
     } catch (uploadError) {
+      setPhotos(previousPhotos);
       reportError(uploadError instanceof Error ? uploadError.message : "Failed to upload photos.");
     }
   }
