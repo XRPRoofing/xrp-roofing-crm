@@ -8,6 +8,7 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import type { Customer } from "@/types/crm";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
@@ -828,6 +829,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
+      <BackToJobsLink />
       <div className="sticky top-16 z-20 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:top-20">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
