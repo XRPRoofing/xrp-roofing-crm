@@ -1069,8 +1069,8 @@ export default function InvoicesPage() {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-3 sm:items-center sm:p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="my-auto flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:p-5">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
