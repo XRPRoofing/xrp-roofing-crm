@@ -27,7 +27,7 @@ const navigation = [
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 
-const mobilePrimaryNavigation = ["/crm", "/crm/leads", "/crm/crew", "/crm/team-chat", "/crm/files"];
+const mobilePrimaryNavigation = ["/crm", "/crm/team-chat", "/crm/leads", "/crm/calendar", "/crm/crew", "/crm/files"];
 
 const quickStats = [
   { label: "Live jobs", value: "24" },
@@ -54,7 +54,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
-  const mobileNavigation = isCrewUser ? visibleNavigation : navigation.filter((item) => mobilePrimaryNavigation.includes(item.href));
+  const mobileNavigation = isCrewUser
+    ? visibleNavigation
+    : mobilePrimaryNavigation
+        .map((href) => navigation.find((item) => item.href === href))
+        .filter((item): item is (typeof navigation)[number] => Boolean(item));
   const activeModule = visibleNavigation.find((item) => pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href)));
 
   useEffect(() => {
@@ -383,7 +387,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          <div className={`mx-auto grid max-w-md gap-1 ${mobileNavigation.length >= 6 ? "grid-cols-6" : "grid-cols-5"}`}>
             {mobileNavigation.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
