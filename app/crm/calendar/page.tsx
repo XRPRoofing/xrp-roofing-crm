@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlignLeft, Bell, Briefcase, CalendarDays, Clock, ExternalLink, Loader2, MapPin, Plus, RefreshCw, User, X } from "lucide-react";
+import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 
 type GoogleCalendarEvent = {
   id: string;
@@ -12,6 +12,7 @@ type GoogleCalendarEvent = {
   extendedProperties?: {
     private?: {
       crmName?: string;
+      crmPhone?: string;
       crmAddress?: string;
       crmJobKind?: string;
       crmNotes?: string;
@@ -40,12 +41,6 @@ function formatEventDate(event: GoogleCalendarEvent) {
     hour: event.start?.dateTime ? "numeric" : undefined,
     minute: event.start?.dateTime ? "2-digit" : undefined,
   }).format(new Date(dateValue));
-}
-
-function getEventDay(event: GoogleCalendarEvent) {
-  const dateValue = event.start?.dateTime || event.start?.date;
-  if (!dateValue) return null;
-  return new Date(dateValue).getDate();
 }
 
 function formatEventTime(event: GoogleCalendarEvent) {
@@ -79,10 +74,29 @@ function getEventDetails(event: GoogleCalendarEvent) {
 
   return {
     name: privateDetails?.crmName || getDescriptionValue(event.description, "Name") || event.summary || "Not provided",
+    phone: privateDetails?.crmPhone || getDescriptionValue(event.description, "Phone") || "",
     address: privateDetails?.crmAddress || getDescriptionValue(event.description, "Address") || event.location || "Not provided",
     jobKind: privateDetails?.crmJobKind || getDescriptionValue(event.description, "Kind of Job") || "Not specified",
     notes: privateDetails?.crmNotes || getDescriptionValue(event.description, "Notes") || event.description || "No notes",
   };
+}
+
+function telHref(phone: string) {
+  const cleaned = (phone || "").replace(/[^\d+]/g, "");
+  return cleaned ? `tel:${cleaned}` : "";
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function dateKey(year: number, month: number, day: number) {
+  return `${year}-${month}-${day}`;
+}
+
+function eventDateKey(event: GoogleCalendarEvent) {
+  const value = event.start?.dateTime || event.start?.date;
+  if (!value) return null;
+  const date = new Date(value);
+  return dateKey(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function getGoogleCalendarStatusMessage(status: string | null) {
@@ -103,9 +117,14 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<GoogleCalendarEvent | null>(null);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [monthCursor, setMonthCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [form, setForm] = useState({
     title: "",
     name: "",
+    phone: "",
     address: "",
     jobKind: "Repair",
     date: "",
@@ -117,6 +136,7 @@ export default function CalendarPage() {
   const [eventForm, setEventForm] = useState({
     title: "",
     name: "",
+    phone: "",
     address: "",
     jobKind: "Repair",
     date: "",
@@ -126,16 +146,36 @@ export default function CalendarPage() {
     guestEmails: "",
   });
 
-  const days = useMemo(() => Array.from({ length: 35 }, (_, index) => index + 1), []);
-  const eventsByDay = useMemo(() => {
-    return events.reduce<Record<number, GoogleCalendarEvent[]>>((groupedEvents, event) => {
-      const day = getEventDay(event);
-      if (!day) return groupedEvents;
+  const calendarCells = useMemo(() => {
+    const year = monthCursor.getFullYear();
+    const month = monthCursor.getMonth();
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<Date | null> = [];
+    for (let i = 0; i < startWeekday; i += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) cells.push(new Date(year, month, day));
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [monthCursor]);
 
-      groupedEvents[day] = [...(groupedEvents[day] || []), event];
-      return groupedEvents;
+  const eventsByDate = useMemo(() => {
+    return events.reduce<Record<string, GoogleCalendarEvent[]>>((grouped, event) => {
+      const key = eventDateKey(event);
+      if (!key) return grouped;
+      grouped[key] = [...(grouped[key] || []), event];
+      return grouped;
     }, {});
   }, [events]);
+
+  const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(monthCursor), [monthCursor]);
+  const todayKey = useMemo(() => {
+    const now = new Date();
+    return dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+
+  function shiftMonth(delta: number) {
+    setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }
 
   async function loadEvents() {
     setLoading(true);
@@ -169,6 +209,7 @@ export default function CalendarPage() {
     setEventForm({
       title: selectedEvent.summary || "",
       name: details.name === "Not provided" ? "" : details.name,
+      phone: details.phone,
       address: details.address === "Not provided" ? "" : details.address,
       jobKind: details.jobKind === "Not specified" ? "Repair" : details.jobKind,
       date: getDateInputValue(selectedEvent.start?.dateTime || selectedEvent.start?.date),
@@ -199,7 +240,7 @@ export default function CalendarPage() {
       }
 
       setStatusMessage("Appointment created in Google Calendar.");
-      setForm({ title: "", name: "", address: "", jobKind: "Repair", date: "", startTime: "", endTime: "", notes: "", guestEmails: "" });
+      setForm({ title: "", name: "", phone: "", address: "", jobKind: "Repair", date: "", startTime: "", endTime: "", notes: "", guestEmails: "" });
       await loadEvents();
     } catch {
       setError("Unable to create appointment.");
@@ -276,23 +317,66 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mt-8 grid grid-cols-7 gap-2 text-sm">
-          {days.map((day) => (
-            <div key={day} className="min-h-28 rounded-2xl bg-slate-50 p-3 text-slate-500">
-              <div className="text-center">{day}</div>
-              <div className="mt-2 space-y-1 text-left">
-                {(eventsByDay[day] || []).slice(0, 3).map((event) => (
-                  <button key={event.id} type="button" onClick={() => setSelectedEvent(event)} className="block w-full rounded-lg bg-orange-50 px-2 py-1 text-left text-[11px] font-bold text-orange-700 ring-1 ring-orange-100">
-                    <span className="block truncate">{formatEventTime(event)} · {event.summary || "Untitled event"}</span>
-                  </button>
-                ))}
-                {(eventsByDay[day] || []).length > 3 && (
-                  <p className="text-[11px] font-bold text-slate-500">+{(eventsByDay[day] || []).length - 3} more</p>
-                )}
-              </div>
+      <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-black text-[#07183f] sm:text-2xl">{monthLabel}</h2>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button type="button" onClick={() => setMonthCursor(() => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1); })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
+              Today
+            </button>
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400 sm:text-xs">
+          {WEEKDAYS.map((weekday) => (
+            <div key={weekday} className="py-1">
+              <span className="sm:hidden">{weekday.charAt(0)}</span>
+              <span className="hidden sm:inline">{weekday}</span>
             </div>
           ))}
+        </div>
+
+        <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-2">
+          {calendarCells.map((cellDate, index) => {
+            if (!cellDate) return <div key={`empty-${index}`} className="min-h-16 rounded-xl bg-slate-50/40 sm:min-h-28" />;
+            const key = dateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+            const dayEvents = eventsByDate[key] || [];
+            const isToday = key === todayKey;
+            return (
+              <div key={key} className={`min-h-16 rounded-xl border p-1.5 text-left sm:min-h-28 sm:p-2 ${isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50"}`}>
+                <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-slate-500"}`}>
+                  {isToday ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white sm:h-6 sm:w-6">{cellDate.getDate()}</span> : cellDate.getDate()}
+                </div>
+                <div className="mt-1 space-y-1">
+                  {dayEvents.slice(0, 3).map((event) => {
+                    const phone = getEventDetails(event).phone;
+                    const tel = telHref(phone);
+                    return (
+                      <div key={event.id} className="group flex items-center gap-1 rounded-lg bg-orange-50 px-1.5 py-1 ring-1 ring-orange-100">
+                        <button type="button" onClick={() => setSelectedEvent(event)} className="min-w-0 flex-1 text-left text-[10px] font-bold text-orange-700 sm:text-[11px]">
+                          <span className="block truncate">{formatEventTime(event)} · {event.summary || "Untitled event"}</span>
+                        </button>
+                        {tel && (
+                          <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} aria-label={`Call ${phone}`} title={`Call ${phone}`} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
+                            <Phone className="h-2.5 w-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {dayEvents.length > 3 && (
+                    <p className="text-[10px] font-bold text-slate-500 sm:text-[11px]">+{dayEvents.length - 3} more</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -309,6 +393,7 @@ export default function CalendarPage() {
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Appointment title" />
           <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Customer name" />
+          <input type="tel" inputMode="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Phone number (for click-to-call)" />
           <input required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Job address" />
           <select required value={form.jobKind} onChange={(event) => setForm({ ...form, jobKind: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none">
             <option>Repair</option>
@@ -331,7 +416,10 @@ export default function CalendarPage() {
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-black text-[#07183f]">Upcoming Google Calendar events</h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {events.map((event) => (
+          {events.map((event) => {
+            const phone = getEventDetails(event).phone;
+            const tel = telHref(phone);
+            return (
             <article key={event.id} onClick={() => setSelectedEvent(event)} className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -339,14 +427,20 @@ export default function CalendarPage() {
                   <p className="mt-1 text-sm font-semibold text-orange-600">{formatEventDate(event)}</p>
                 </div>
                 {event.htmlLink && (
-                  <a href={event.htmlLink} target="_blank" rel="noreferrer" className="rounded-xl bg-white p-2 text-slate-500 hover:text-orange-600">
+                  <a href={event.htmlLink} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="rounded-xl bg-white p-2 text-slate-500 hover:text-orange-600">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
               </div>
+              {tel && (
+                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600">
+                  <Phone className="h-4 w-4" />{phone}
+                </a>
+              )}
               {event.description && <p className="mt-3 line-clamp-2 text-sm text-slate-600">{event.description}</p>}
             </article>
-          ))}
+            );
+          })}
           {!loading && connected && events.length === 0 && (
             <p className="rounded-2xl bg-slate-50 p-4 font-semibold text-slate-600">No upcoming events found.</p>
           )}
@@ -389,6 +483,17 @@ export default function CalendarPage() {
                     <User className="h-5 w-5 text-slate-500" />
                     <input required value={eventForm.name} onChange={(event) => setEventForm({ ...eventForm, name: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Customer name" />
                   </label>
+                  <div className="grid grid-cols-[28px_1fr] items-center gap-4">
+                    <Phone className="h-5 w-5 text-slate-500" />
+                    <div className="flex items-center gap-2">
+                      <input type="tel" inputMode="tel" value={eventForm.phone} onChange={(event) => setEventForm({ ...eventForm, phone: event.target.value })} className="flex-1 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Phone number" />
+                      {telHref(eventForm.phone) && (
+                        <a href={telHref(eventForm.phone)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 font-bold text-white hover:bg-emerald-600">
+                          <Phone className="h-4 w-4" />Call
+                        </a>
+                      )}
+                    </div>
+                  </div>
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
                     <MapPin className="h-5 w-5 text-slate-500" />
                     <input required value={eventForm.address} onChange={(event) => setEventForm({ ...eventForm, address: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Job address" />
