@@ -17,6 +17,7 @@ import {
   ensureSeedJobs,
   joinCrewPresence,
   loadCrewDataset,
+  loadJobPhotos,
   setChecklistItemDone,
   subscribeToCrewData,
   supabaseSyncEnabled,
@@ -57,6 +58,8 @@ function formatAddress(job: CrewJob) {
 export default function CrewWorkflowPage() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<JobPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const [notes, setNotes] = useState<JobNote[]>([]);
   const [checklist, setChecklist] = useState<JobChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,6 +141,31 @@ export default function CrewWorkflowPage() {
     presenceRef.current?.update({ action: selectedJobId ? "editing" : "viewing", jobId: selectedJobId });
   }, [selectedJobId]);
 
+  // Fetch the heavy image data only for the job that's open, on demand.
+  useEffect(() => {
+    let active = true;
+    async function loadSelected() {
+      if (!selectedJobId) {
+        setSelectedPhotos([]);
+        return;
+      }
+      setPhotosLoading(true);
+      setSelectedPhotos([]);
+      try {
+        const jobPhotos = await loadJobPhotos(selectedJobId);
+        if (active) setSelectedPhotos(jobPhotos);
+      } catch {
+        if (active) setSelectedPhotos([]);
+      } finally {
+        if (active) setPhotosLoading(false);
+      }
+    }
+    void loadSelected();
+    return () => {
+      active = false;
+    };
+  }, [selectedJobId]);
+
   const reportError = useCallback((message: string) => {
     setError(message);
     void refresh().catch(() => {});
@@ -186,11 +214,16 @@ export default function CrewWorkflowPage() {
     // Show the photos immediately, then save/sync in the background.
     const optimisticPhotos = buildOptimisticPhotos(job.id, type, selectedFiles, uploadedPhotos, uploadedBy);
     const previousPhotos = photos;
-    setPhotos((current) => [...current, ...optimisticPhotos]);
+    const previousSelected = selectedPhotos;
+    setPhotos((current) => [...current, ...optimisticPhotos.map((photo) => ({ ...photo, dataUrl: "" }))]);
+    if (job.id === selectedJobId) setSelectedPhotos((current) => [...current, ...optimisticPhotos]);
 
     try {
       await addJobPhotos(job.id, selectedFiles.map((file, index) => ({ photoType: type, name: file.name, dataUrl: uploadedPhotos[index], uploadedBy })));
       await refresh();
+      if (job.id === selectedJobId) {
+        setSelectedPhotos(await loadJobPhotos(job.id));
+      }
       addCrmNotification({
         title: "Crew photos uploaded",
         message: `${selectedFiles.length} ${type.toLowerCase()} photo(s) uploaded for ${job.name}.`,
@@ -199,6 +232,7 @@ export default function CrewWorkflowPage() {
       });
     } catch (uploadError) {
       setPhotos(previousPhotos);
+      setSelectedPhotos(previousSelected);
       reportError(uploadError instanceof Error ? uploadError.message : "Failed to upload photos.");
     }
   }
@@ -485,8 +519,12 @@ export default function CrewWorkflowPage() {
                     );
                   })}
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...selectedJob.completion.beforePhotos, ...selectedJob.completion.progressPhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Crew uploaded completion" width={400} height={240} unoptimized className="h-32 w-full rounded-xl object-cover" />)}</div>
-                {selectedJob.completion.beforePhotos.length + selectedJob.completion.progressPhotos.length + selectedJob.completion.afterPhotos.length === 0 && <p className="mt-2 text-sm font-semibold text-slate-500">No photos uploaded yet.</p>}
+                {photosLoading ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-32 w-full animate-pulse rounded-xl bg-slate-200" />)}</div>
+                ) : (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">{selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-32 w-full rounded-xl object-cover" />)}</div>
+                )}
+                {!photosLoading && selectedPhotos.length === 0 && <p className="mt-2 text-sm font-semibold text-slate-500">No photos uploaded yet.</p>}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">

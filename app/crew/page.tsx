@@ -13,6 +13,7 @@ import {
   ensureSeedJobs,
   joinCrewPresence,
   loadCrewDataset,
+  loadJobPhotos,
   subscribeToCrewData,
   updateJobRecord,
   type CrewPresenceState,
@@ -23,6 +24,8 @@ import {
 export default function CrewPortalPage() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<JobPhoto[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedCrew, setSelectedCrew] = useState(crewMembers[0]);
   const [selectedJobId, setSelectedJobId] = useState("");
@@ -34,12 +37,38 @@ export default function CrewPortalPage() {
     [jobs, photos, selectedCrew],
   );
   const selectedJob = crewJobs.find((job) => job.id === selectedJobId) || crewJobs[0];
+  const activeJobId = selectedJob?.id ?? "";
 
   const refresh = useCallback(async () => {
     const data = await loadCrewDataset();
     setJobs(data.jobs);
     setPhotos(data.photos);
   }, []);
+
+  // Fetch the heavy image data only for the job that's open, on demand.
+  useEffect(() => {
+    let active = true;
+    async function loadSelected() {
+      if (!activeJobId) {
+        setSelectedPhotos([]);
+        return;
+      }
+      setPhotosLoading(true);
+      setSelectedPhotos([]);
+      try {
+        const jobPhotos = await loadJobPhotos(activeJobId);
+        if (active) setSelectedPhotos(jobPhotos);
+      } catch {
+        if (active) setSelectedPhotos([]);
+      } finally {
+        if (active) setPhotosLoading(false);
+      }
+    }
+    void loadSelected();
+    return () => {
+      active = false;
+    };
+  }, [activeJobId]);
 
   useEffect(() => {
     let mounted = true;
@@ -111,11 +140,16 @@ export default function CrewPortalPage() {
     // Show the photos immediately, then save/sync in the background.
     const optimisticPhotos = buildOptimisticPhotos(job.id, type, selectedFiles, uploadedPhotos, selectedCrew);
     const previousPhotos = photos;
-    setPhotos((current) => [...current, ...optimisticPhotos]);
+    const previousSelected = selectedPhotos;
+    setPhotos((current) => [...current, ...optimisticPhotos.map((photo) => ({ ...photo, dataUrl: "" }))]);
+    if (job.id === activeJobId) setSelectedPhotos((current) => [...current, ...optimisticPhotos]);
 
     try {
       await addJobPhotos(job.id, selectedFiles.map((file, index) => ({ photoType: type, name: file.name, dataUrl: uploadedPhotos[index], uploadedBy: selectedCrew })));
       await refresh();
+      if (job.id === activeJobId) {
+        setSelectedPhotos(await loadJobPhotos(job.id));
+      }
       addCrmNotification({
         title: "Crew photos uploaded",
         message: `${selectedCrew} uploaded ${selectedFiles.length} ${type.toLowerCase()} photo(s) for ${job.name}.`,
@@ -124,6 +158,7 @@ export default function CrewPortalPage() {
       });
     } catch (uploadError) {
       setPhotos(previousPhotos);
+      setSelectedPhotos(previousSelected);
       reportError(uploadError instanceof Error ? uploadError.message : "Failed to upload photos.");
     }
   }
@@ -243,9 +278,13 @@ export default function CrewPortalPage() {
                   })}
                 </div>
 
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {[...selectedJob.completion.beforePhotos, ...selectedJob.completion.progressPhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Uploaded job completion" width={400} height={260} unoptimized className="h-36 w-full rounded-2xl object-cover" />)}
-                </div>
+                {photosLoading ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-36 w-full animate-pulse rounded-2xl bg-slate-200" />)}</div>
+                ) : (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Uploaded job completion"} width={400} height={260} loading="lazy" unoptimized className="h-36 w-full rounded-2xl object-cover" />)}
+                  </div>
+                )}
 
                 <label className="mt-4 grid gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
                   Completion Notes Required

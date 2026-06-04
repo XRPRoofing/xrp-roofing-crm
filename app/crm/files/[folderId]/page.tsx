@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Check, Copy, FolderOpen, Lock, Share2, X } from "lucide-react";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
-import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
 
 function formatDate(value: string) {
@@ -17,24 +17,43 @@ export default function FolderGalleryPage() {
   const folderId = decodeURIComponent(params.folderId);
 
   const [folder, setFolder] = useState<CrmFileFolder | null>(null);
+  const [imagesById, setImagesById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showShare, setShowShare] = useState(false);
+
+  // The crew dataset is metadata-only (no image bytes), so fetch the actual
+  // images for this folder's job(s) on demand and key them by photo id.
+  const loadFolderImages = useCallback(async (target: CrmFileFolder | null) => {
+    if (!target) {
+      setImagesById({});
+      return;
+    }
+    const jobIds = Array.from(new Set(target.files.map((file) => file.jobId)));
+    const results = await Promise.all(jobIds.map((jobId) => loadJobPhotos(jobId)));
+    const map: Record<string, string> = {};
+    results.flat().forEach((photo) => {
+      if (photo.dataUrl) map[photo.id] = photo.dataUrl;
+    });
+    setImagesById(map);
+  }, []);
 
   const refresh = useCallback(async () => {
     const data = await loadCrewDataset();
     const match = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
     setFolder(match);
+    await loadFolderImages(match);
     setLoading(false);
-  }, [folderId]);
+  }, [folderId, loadFolderImages]);
 
   useEffect(() => {
     let mounted = true;
     void loadCrewDataset()
-      .then((data) => {
+      .then(async (data) => {
         if (!mounted) return;
         const match = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
         setFolder(match);
-        setLoading(false);
+        await loadFolderImages(match);
+        if (mounted) setLoading(false);
       })
       .catch(() => setLoading(false));
 
@@ -45,19 +64,19 @@ export default function FolderGalleryPage() {
       mounted = false;
       unsubscribe();
     };
-  }, [folderId, refresh]);
+  }, [folderId, refresh, loadFolderImages]);
 
   const photos = useMemo<GalleryPhoto[]>(
     () =>
       (folder?.files || []).map((file) => ({
         id: file.id,
         name: file.name,
-        dataUrl: file.dataUrl,
+        dataUrl: imagesById[file.id] || file.dataUrl,
         photoType: file.photoType,
         uploadedBy: file.uploadedBy,
         uploadedAt: file.uploadedAt,
       })),
-    [folder],
+    [folder, imagesById],
   );
 
   return (
