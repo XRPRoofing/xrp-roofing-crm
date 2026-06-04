@@ -733,32 +733,47 @@ export default function InvoicesPage() {
   function handleDownloadPdf(invoice: Invoice) {
     const totals = calculateTotals(invoice);
     const paid = getPaidAmount(invoice);
-    const paidStamp = getComputedStatus(invoice) === "Paid" ? "PAID\n" : "";
-    const offlinePayment = invoice.payments.some((payment) => payment.offline) ? "Payment Received Offline\n" : "";
+    const isPaid = getComputedStatus(invoice) === "Paid";
+    const isOffline = invoice.payments.some((payment) => payment.offline);
+    const logoUrl = `${window.location.origin}/images/logo.jpeg`;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     printWindow.document.write(`
       <html>
         <head>
           <title>${invoice.invoiceNumber}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
           <style>
-            body { font-family: Georgia, serif; color: #0f172a; padding: 40px; }
-            .header { display: flex; justify-content: space-between; border-bottom: 4px solid #07183f; padding-bottom: 20px; }
-            .brand { font-size: 32px; font-weight: 900; color: #07183f; }
-            .stamp { position: fixed; top: 170px; right: 70px; color: #dc2626; border: 6px solid #dc2626; padding: 12px 28px; font-size: 44px; font-weight: 900; transform: rotate(-14deg); opacity: .75; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { font-family: Georgia, serif; color: #0f172a; padding: 40px; position: relative; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 4px solid #07183f; padding-bottom: 20px; }
+            .logo { height: 84px; width: auto; display: block; }
+            .roc { margin-top: 8px; font-weight: 700; color: #475569; }
+            .doc-title { text-align: right; }
+            .doc-title h1 { margin: 0; color: #07183f; }
+            .stamp { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%) rotate(-22deg); color: #16a34a; border: 10px solid #16a34a; border-radius: 18px; padding: 6px 56px; font-size: 120px; font-weight: 900; letter-spacing: 10px; opacity: .20; text-transform: uppercase; pointer-events: none; z-index: 999; }
+            .stamp small { display: block; text-align: center; font-size: 22px; letter-spacing: 3px; margin-top: 6px; }
             table { width: 100%; border-collapse: collapse; margin-top: 28px; }
             th, td { border-bottom: 1px solid #e2e8f0; padding: 12px; text-align: left; }
             th { background: #f8fafc; color: #07183f; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
             .box { background: #f8fafc; border-radius: 18px; padding: 18px; }
             .total { text-align: right; font-size: 22px; font-weight: 900; color: #07183f; }
-            @media print { button { display: none; } }
+            .print-btn { margin-bottom: 20px; padding: 12px 20px; font-size: 16px; font-weight: 700; background: #07183f; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+            @media print { .print-btn { display: none; } body { padding: 24px; } }
+            @media (max-width: 640px) {
+              body { padding: 20px; }
+              .logo { height: 60px; }
+              .stamp { font-size: 64px; padding: 6px 30px; border-width: 6px; letter-spacing: 6px; }
+              .stamp small { font-size: 16px; }
+              .grid { grid-template-columns: 1fr; }
+            }
           </style>
         </head>
         <body>
-          ${paidStamp ? '<div class="stamp">PAID</div>' : ""}
-          <button onclick="window.print()">Download / Save PDF</button>
-          <div class="header"><div><div class="brand">XRP Roofing</div><p>ROC #350898</p></div><div><h1>Invoice</h1><p>${invoice.invoiceNumber}</p>${offlinePayment ? "<strong>Payment Received Offline</strong>" : ""}</div></div>
+          ${isPaid ? `<div class="stamp">PAID${isOffline ? "<small>Received Offline</small>" : ""}</div>` : ""}
+          <button class="print-btn" onclick="window.print()">Download / Save PDF</button>
+          <div class="header"><div><img class="logo" src="${logoUrl}" alt="XRP Roofing" /><p class="roc">ROC #350898</p></div><div class="doc-title"><h1>Invoice</h1><p>${invoice.invoiceNumber}</p>${isOffline ? "<strong>Payment Received Offline</strong>" : ""}</div></div>
           <div class="grid"><div class="box"><h3>Client Details</h3><p>${invoice.clientName}</p><p>${invoice.email}</p><p>${invoice.phone}</p><p>${invoice.propertyAddress}</p></div><div class="box"><h3>Job Details</h3><p>${invoice.jobName}</p><p>Roof Type: ${invoice.roofType}</p><p>Proposal: ${invoice.proposalReference}</p><p>Completion: ${invoice.projectCompletionDate}</p></div></div>
           <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Tax</th><th>Total</th></tr></thead><tbody>${invoice.lineItems.map((item) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${currency(item.unitPrice)}</td><td>${item.tax}%</td><td>${currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</td></tr>`).join("")}</tbody></table>
           <p class="total">Total: ${currency(totals.finalTotal)}<br/>Paid: ${currency(paid)}<br/>Balance: ${currency(Math.max(totals.finalTotal - paid, 0))}</p>
