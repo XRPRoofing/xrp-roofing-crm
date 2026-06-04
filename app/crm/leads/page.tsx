@@ -397,11 +397,11 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:grid-cols-5">
           {dashboardMetrics.map((metric) => (
-            <div key={metric.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${metric.tone}`}>
-              <p className="text-2xl font-black leading-none">{metric.value}</p>
-              <p className="mt-1 text-[11px] font-black uppercase tracking-wide">{metric.label}</p>
+            <div key={metric.label} className={`rounded-xl border px-2 py-1.5 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3 ${metric.tone}`}>
+              <p className="text-base font-black leading-none sm:text-2xl">{metric.value}</p>
+              <p className="mt-0.5 text-[9px] font-black uppercase leading-tight tracking-wide sm:mt-1 sm:text-[11px]">{metric.label}</p>
             </div>
           ))}
         </div>
