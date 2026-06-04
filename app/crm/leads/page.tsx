@@ -7,6 +7,7 @@ import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
@@ -128,6 +129,9 @@ export default function LeadsPage() {
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
+  const [annotatorKind, setAnnotatorKind] = useState<"Documents" | "Photos">("Photos");
+  const [annotatorKey, setAnnotatorKey] = useState(0);
   const [activityOpen, setActivityOpen] = useState(false);
   const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -170,10 +174,26 @@ export default function LeadsPage() {
     try {
       const selected = Array.from(files);
       const dataUrls = await Promise.all(selected.map((file) => compressImageToDataUrl(file)));
-      await addJobPhotos(selectedJob.id, selected.map((file, index) => ({
+      setAnnotatorKind(kind);
+      setAnnotatorKey((key) => key + 1);
+      setAnnotatorImages(selected.map((file, index) => ({ name: file.name, dataUrl: dataUrls[index] })));
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Failed to load file.");
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  async function handleAnnotatorComplete(results: AnnotatedResult[]) {
+    setAnnotatorImages(null);
+    if (!selectedJob || results.length === 0) return;
+    setFileBusy(true);
+    setFileError(null);
+    try {
+      await addJobPhotos(selectedJob.id, results.map((result) => ({
         photoType: "Job Photo",
-        name: kind === "Documents" ? `Document - ${file.name}` : file.name,
-        dataUrl: dataUrls[index],
+        name: annotatorKind === "Documents" ? `Document - ${result.name}` : result.name,
+        dataUrl: result.dataUrl,
         uploadedBy: "Office",
       })));
       const refreshed = await loadJobPhotos(selectedJob.id);
@@ -581,6 +601,7 @@ export default function LeadsPage() {
           </aside>
         </div>
       )}
+      <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotatorComplete} onCancel={() => setAnnotatorImages(null)} />
     </div>
   );
 }

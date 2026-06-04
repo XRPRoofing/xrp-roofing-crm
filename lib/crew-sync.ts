@@ -449,13 +449,22 @@ export function buildOptimisticPhotos(
   dataUrls: string[],
   uploadedBy: string,
 ): JobPhoto[] {
+  return buildOptimisticPhotosFromData(jobId, photoType, files.map((file, index) => ({ name: file.name, dataUrl: dataUrls[index] })), uploadedBy);
+}
+
+export function buildOptimisticPhotosFromData(
+  jobId: string,
+  photoType: JobPhotoType,
+  items: { name: string; dataUrl: string }[],
+  uploadedBy: string,
+): JobPhoto[] {
   const now = Date.now();
-  return files.map((file, index) => ({
+  return items.map((item, index) => ({
     id: `local-${now}-${index}`,
     jobId,
     photoType,
-    name: file.name,
-    dataUrl: dataUrls[index],
+    name: item.name,
+    dataUrl: item.dataUrl,
     uploadedBy,
     createdAt: new Date(now + index).toISOString(),
   }));
