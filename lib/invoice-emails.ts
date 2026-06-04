@@ -42,6 +42,7 @@ export async function sendInternalInvoiceEmail(input: InvoiceEmailInput): Promis
   if (!apiKey) return false;
 
   const recipient = process.env.INVOICE_NOTIFICATION_EMAIL || "info@xrproofing.com";
+  const logoUrl = `${(process.env.NEXT_PUBLIC_APP_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "")}/images/logo.jpeg`;
   const copy = eventCopy[input.event];
   const when = new Date().toLocaleString("en-US", {
     dateStyle: "medium",
@@ -67,6 +68,9 @@ export async function sendInternalInvoiceEmail(input: InvoiceEmailInput): Promis
   const html = `
     <div style="margin:0;background:#f1f5f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
       <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+        <div style="background:#e9eef3;padding:18px 28px;text-align:center;">
+          <img src="${logoUrl}" alt="XRP Roofing" width="140" style="width:140px;max-width:55%;height:auto;display:inline-block;" />
+        </div>
         <div style="background:${copy.accent};padding:20px 28px;color:#fff;">
           <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.16em;opacity:.85;">XRP Roofing CRM</div>
           <div style="font-size:22px;font-weight:900;margin-top:4px;">${escapeHtml(copy.label)}</div>
