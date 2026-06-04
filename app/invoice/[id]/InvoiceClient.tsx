@@ -166,10 +166,10 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                 {(invoice.lineItems || []).map((item, index) => (
                   <div key={index} className="grid gap-1 border-b border-slate-100 p-4 last:border-b-0 sm:grid-cols-[1fr_120px] sm:gap-3">
                     <div className="min-w-0">
-                      <p className="break-words font-black text-slate-900">{item.description}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">Qty {item.quantity} · Tax {item.tax}%</p>
+                      <p className="whitespace-pre-line break-words text-sm font-normal leading-relaxed text-slate-700">{item.description}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-400">Qty {item.quantity} · Tax {item.tax}%</p>
                     </div>
-                    <p className="font-black text-blue-700 sm:text-right">{currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</p>
+                    <p className="text-sm font-semibold text-slate-700 sm:text-right">{currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</p>
                   </div>
                 ))}
               </div>
