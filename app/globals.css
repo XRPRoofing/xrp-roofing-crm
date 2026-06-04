@@ -134,3 +134,12 @@
     display: none;
   }
 }
+
+/* Horizontal filter pill row: scrollable on small screens without a visible scrollbar. */
+.crm-filter-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.crm-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
