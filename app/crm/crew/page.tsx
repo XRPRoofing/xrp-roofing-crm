@@ -176,7 +176,7 @@ export default function CrewWorkflowPage() {
     updateAssignment(job.id, { assignedCrew });
   }
 
-  async function handlePhotoUpload(job: CrewJob, type: "Before" | "After", files: FileList | null) {
+  async function handlePhotoUpload(job: CrewJob, type: "Before" | "Progress" | "After", files: FileList | null) {
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
@@ -453,18 +453,32 @@ export default function CrewWorkflowPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-black text-[#07183f]">Uploaded Photos</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 text-center text-sm font-black text-blue-700">
-                    <Camera className="mb-2 h-5 w-5" />Upload before photos
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "Before", event.target.files)} />
-                  </label>
-                  <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-blue-300 bg-blue-50 p-4 text-center text-sm font-black text-blue-700">
-                    <UploadCloud className="mb-2 h-5 w-5" />Upload after photos
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, "After", event.target.files)} />
-                  </label>
+                <p className="mt-1 text-xs font-bold text-slate-500">Take photos directly from the camera or upload from the gallery. Each photo saves automatically to this job&apos;s folder.</p>
+                <div className="mt-3 space-y-3">
+                  {(["Before", "Progress", "After"] as const).map((type) => {
+                    const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
+                    return (
+                      <div key={type} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">{type} Photos</p>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{count} photo(s)</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#07183f] px-3 py-3 text-sm font-black text-white transition hover:bg-blue-800">
+                            <Camera className="h-5 w-5" /> Take Photo
+                            <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
+                          </label>
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100">
+                            <UploadCloud className="h-5 w-5" /> Upload Photo
+                            <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...selectedJob.completion.beforePhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Crew uploaded completion" width={400} height={240} unoptimized className="h-32 w-full rounded-xl object-cover" />)}</div>
-                {selectedJob.completion.beforePhotos.length + selectedJob.completion.afterPhotos.length === 0 && <p className="mt-2 text-sm font-semibold text-slate-500">No photos uploaded yet.</p>}
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">{[...selectedJob.completion.beforePhotos, ...selectedJob.completion.progressPhotos, ...selectedJob.completion.afterPhotos].map((photo) => <Image key={photo} src={photo} alt="Crew uploaded completion" width={400} height={240} unoptimized className="h-32 w-full rounded-xl object-cover" />)}</div>
+                {selectedJob.completion.beforePhotos.length + selectedJob.completion.progressPhotos.length + selectedJob.completion.afterPhotos.length === 0 && <p className="mt-2 text-sm font-semibold text-slate-500">No photos uploaded yet.</p>}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
