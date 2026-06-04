@@ -40,7 +40,7 @@ export default function TasksPage() {
       <div>
         <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
         <h1 className="mt-1 text-3xl font-black text-[#07183f]">Task Board</h1>
-        <p className="crm-board-subtitle mt-2 text-sm font-semibold text-slate-600">Completed crew jobs automatically create invoice tasks for the office team.</p>
+        <p className="crm-board-subtitle mt-2 text-sm font-semibold text-slate-600">Completed jobs (from Jobs or Crew Workflow) automatically create invoice tasks. Use each card&apos;s dropdown to move it through Invoice Sent, Follow Up, Paid, and beyond.</p>
       </div>
       <div className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-6">
         {groupedTasks.map((group) => (

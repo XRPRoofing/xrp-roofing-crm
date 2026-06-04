@@ -263,7 +263,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)]">
+    <div className="min-h-screen overflow-x-clip bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)]">
       {globalIncomingCall && !isCrewUser && (
         <div className="fixed right-4 top-24 z-[80] w-[min(92vw,380px)] rounded-3xl border border-orange-200 bg-white p-5 text-slate-950 shadow-2xl shadow-slate-950/25">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Incoming Call</p>

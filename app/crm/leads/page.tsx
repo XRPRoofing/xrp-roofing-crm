@@ -7,6 +7,7 @@ import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 declare global {
@@ -308,6 +309,10 @@ export default function LeadsPage() {
 
   function updateJobStage(jobId: string, stage: LeadStage) {
     updateJob(jobId, { stage, lastActivity: `Moved to ${leadStages.find((item) => item.id === stage)?.label || "workflow"}` });
+    if (stage === "completed") {
+      const job = jobs.find((item) => item.id === jobId);
+      if (job) ensureInvoiceTaskForJob({ id: job.id, name: job.name, address: job.address, city: job.city, value: job.value, jobLink: "/crm/leads" });
+    }
   }
 
   function deleteJob(job: Lead) {

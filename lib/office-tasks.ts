@@ -35,31 +35,39 @@ export function saveOfficeTasks(tasks: OfficeTask[]) {
   window.dispatchEvent(new Event("crm-office-tasks-updated"));
 }
 
-function formatJobAddress(job: CrewJob) {
-  return [job.address, job.city, "AZ"].filter(Boolean).join(", ");
+function formatJobAddress(parts: { address?: string; city?: string }) {
+  return [parts.address, parts.city, "AZ"].filter(Boolean).join(", ");
 }
 
-export function ensureInvoiceTaskForCompletedJob(job: CrewJob) {
+// Creates a "For Invoice" office task for a completed job (idempotent per job).
+// Works for both crew-workflow jobs and Jobs-board leads.
+export function ensureInvoiceTaskForJob(input: {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  value?: number;
+  jobLink?: string;
+}) {
   if (typeof window === "undefined") return;
-  if (job.status !== "Completed") return;
 
   const tasks = readOfficeTasks();
-  const invoiceTaskId = `invoice-${job.id}`;
+  const invoiceTaskId = `invoice-${input.id}`;
   if (tasks.some((task) => task.id === invoiceTaskId)) return;
 
   const now = new Date().toISOString();
   saveOfficeTasks([
     {
       id: invoiceTaskId,
-      jobId: job.id,
+      jobId: input.id,
       title: "Invoice Customer",
-      customerName: job.name,
-      jobAddress: formatJobAddress(job),
-      invoiceAmount: job.value ? String(job.value) : "TBD",
+      customerName: input.name,
+      jobAddress: formatJobAddress(input),
+      invoiceAmount: input.value ? String(input.value) : "TBD",
       assignedUser: "Office Staff / Admin",
       dueDate: "Immediately",
       status: "For Invoice",
-      jobLink: `/crm/crew?job=${encodeURIComponent(job.id)}`,
+      jobLink: input.jobLink || `/crm/crew?job=${encodeURIComponent(input.id)}`,
       createdAt: now,
       updatedAt: now,
     },
@@ -67,13 +75,17 @@ export function ensureInvoiceTaskForCompletedJob(job: CrewJob) {
   ]);
 }
 
+export function ensureInvoiceTaskForCompletedJob(job: CrewJob) {
+  if (job.status !== "Completed") return;
+  ensureInvoiceTaskForJob({ id: job.id, name: job.name, address: job.address, city: job.city, value: job.value });
+}
+
 export function updateOfficeTaskStatus(taskId: string, status: OfficeTaskStatus) {
   const tasks = readOfficeTasks();
   const now = new Date().toISOString();
   const nextTasks = tasks.map((task) => {
     if (task.id !== taskId) return task;
-    const nextStatus = status === "Invoice Sent" ? "Invoice Follow Up" : status;
-    return { ...task, status: nextStatus, updatedAt: now };
+    return { ...task, status, updatedAt: now };
   });
 
   const paidTask = nextTasks.find((task) => task.id === taskId && task.status === "Paid");
