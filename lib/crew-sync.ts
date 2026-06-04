@@ -75,6 +75,7 @@ export const jobsTable = "jobs";
 export const jobPhotosTable = "job_photos";
 export const jobNotesTable = "job_notes";
 export const jobChecklistTable = "job_checklist_items";
+export const jobPhotoBucket = "job-photos";
 
 const crewSyncPhotosKey = "xrp-crm-job-photos";
 const crewSyncNotesKey = "xrp-crm-job-notes";
@@ -223,10 +224,15 @@ function jobRecordToRow(record: JobRecord) {
   };
 }
 
-type PhotoRow = { id: string; job_id: string; photo_type: string; name: string; data_url: string; uploaded_by: string; created_at: string };
+// `data_url` is intentionally optional: board reads omit it so the heavy image
+// payload is only fetched per-job, on demand (see loadJobPhotos).
+type PhotoRow = { id: string; job_id: string; photo_type: string; name: string; data_url?: string; uploaded_by: string; created_at: string };
 function rowToPhoto(row: PhotoRow): JobPhoto {
-  return { id: row.id, jobId: row.job_id, photoType: (row.photo_type as JobPhotoType) || "Job Photo", name: row.name, dataUrl: row.data_url, uploadedBy: row.uploaded_by, createdAt: row.created_at };
+  return { id: row.id, jobId: row.job_id, photoType: (row.photo_type as JobPhotoType) || "Job Photo", name: row.name, dataUrl: row.data_url ?? "", uploadedBy: row.uploaded_by, createdAt: row.created_at };
 }
+
+// Columns needed to render the board (counts, sections) WITHOUT the image bytes.
+const photoMetaColumns = "id, job_id, photo_type, name, uploaded_by, created_at";
 
 type NoteRow = { id: string; job_id: string; author: string; body: string; created_at: string };
 function rowToNote(row: NoteRow): JobNote {
@@ -316,7 +322,10 @@ export async function loadCrewDataset(): Promise<CrewDataset> {
   if (!hasSupabaseConfig()) {
     return {
       jobs: readLocalJobs(),
-      photos: readLocal<JobPhoto[]>(crewSyncPhotosKey, []),
+      // Strip the image bytes from the board dataset; the heavy `dataUrl` is
+      // loaded per-job via loadJobPhotos when a job is opened. Counts/sections
+      // still work because only the array length matters here.
+      photos: readLocal<JobPhoto[]>(crewSyncPhotosKey, []).map((photo) => ({ ...photo, dataUrl: "" })),
       notes: readLocal<JobNote[]>(crewSyncNotesKey, []),
       checklist: readLocal<JobChecklistItem[]>(crewSyncChecklistKey, []),
     };
@@ -325,7 +334,8 @@ export async function loadCrewDataset(): Promise<CrewDataset> {
   const supabase = createClient();
   const [jobsResult, photosResult, notesResult, checklistResult] = await Promise.all([
     supabase.from(jobsTable).select("*").order("created_at", { ascending: true }),
-    supabase.from(jobPhotosTable).select("*").order("created_at", { ascending: true }),
+    // Metadata only — never download every photo's image bytes for the board.
+    supabase.from(jobPhotosTable).select(photoMetaColumns).order("created_at", { ascending: true }),
     supabase.from(jobNotesTable).select("*").order("created_at", { ascending: true }),
     supabase.from(jobChecklistTable).select("*").order("position", { ascending: true }),
   ]);
@@ -341,6 +351,26 @@ export async function loadCrewDataset(): Promise<CrewDataset> {
     notes: (notesResult.data as NoteRow[]).map(rowToNote),
     checklist: (checklistResult.data as ChecklistRow[]).map(rowToChecklist),
   };
+}
+
+/**
+ * Load the full photos (including image data) for a single job. Called only
+ * when a job is opened, so the board itself never pays the cost of downloading
+ * every image. Works in both Supabase and localStorage modes.
+ */
+export async function loadJobPhotos(jobId: string): Promise<JobPhoto[]> {
+  if (!jobId) return [];
+  if (!hasSupabaseConfig()) {
+    return readLocal<JobPhoto[]>(crewSyncPhotosKey, []).filter((photo) => photo.jobId === jobId);
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from(jobPhotosTable)
+    .select("*")
+    .eq("job_id", jobId)
+    .order("created_at", { ascending: true });
+  if (error || !data) return [];
+  return (data as PhotoRow[]).map(rowToPhoto);
 }
 
 /** Seed Supabase with the demo jobs if the table is empty (best effort). */
@@ -448,14 +478,67 @@ export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoT
     return;
   }
   const supabase = createClient();
-  const { error } = await supabase.from(jobPhotosTable).insert(photos.map((photo) => ({
-    job_id: jobId,
-    photo_type: photo.photoType,
-    name: photo.name,
-    data_url: photo.dataUrl,
-    uploaded_by: photo.uploadedBy,
-  })));
+  // Store each image as a file in Supabase Storage and keep only its (small)
+  // URL in the row, so reads stay tiny. If Storage isn't set up yet (bucket
+  // missing / upload fails) we fall back to the base64 value so saving never
+  // breaks — the row just stays heavy until migrated.
+  const rows = await Promise.all(
+    photos.map(async (photo) => ({
+      job_id: jobId,
+      photo_type: photo.photoType,
+      name: photo.name,
+      data_url: await uploadPhotoToStorage(supabase, jobId, photo.photoType, photo.dataUrl),
+      uploaded_by: photo.uploadedBy,
+    })),
+  );
+  const { error } = await supabase.from(jobPhotosTable).insert(rows);
   if (error) throw new Error(error.message);
+}
+
+type StorageClient = Pick<ReturnType<typeof createClient>, "storage">;
+
+/**
+ * Upload a base64 data URL to the job-photos Storage bucket and return its
+ * public URL. Returns the original value unchanged if it isn't base64 (already
+ * a URL) or if the upload fails for any reason (e.g. bucket not created yet).
+ */
+async function uploadPhotoToStorage(
+  supabase: StorageClient,
+  jobId: string,
+  photoType: JobPhotoType,
+  dataUrl: string,
+): Promise<string> {
+  const parsed = dataUrlToBytes(dataUrl);
+  if (!parsed) return dataUrl;
+  try {
+    const ext = parsed.mime.split("/")[1]?.split("+")[0] || "jpg";
+    const safeType = photoType.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const path = `${jobId}/${safeType}-${unique}.${ext}`;
+    const { error } = await supabase.storage
+      .from(jobPhotoBucket)
+      .upload(path, parsed.bytes, { contentType: parsed.mime, upsert: false });
+    if (error) return dataUrl;
+    const { data } = supabase.storage.from(jobPhotoBucket).getPublicUrl(path);
+    return data.publicUrl || dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
+/** Decode a `data:<mime>;base64,<payload>` URL into raw bytes, or null if not base64. */
+function dataUrlToBytes(dataUrl: string): { mime: string; bytes: Uint8Array } | null {
+  const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl);
+  if (!match) return null;
+  try {
+    const mime = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return { mime, bytes };
+  } catch {
+    return null;
+  }
 }
 
 export async function addJobNote(jobId: string, author: string, body: string): Promise<void> {
