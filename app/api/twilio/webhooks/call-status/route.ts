@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createCallRecordingInsights } from "@/lib/twilio/recording-insights";
 import { normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
@@ -39,37 +39,40 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      createCallRecordingInsights({
-        callSid: event.callSid,
-        recordingSid: event.recordingSid,
-        recordingUrl: event.recordingUrl,
-        from: event.from,
-        to: event.to,
-        direction: event.direction,
-        payload: event.payload,
-      }).then((insights) => {
-        if (insights) {
-          console.log("[Twilio Recording] Publishing transcript and summary", { callSid: insights.callSid, recordingSid: insights.recordingSid });
-          void publishConversationEvent(insights);
-        }
-      }).catch((error) => {
-        void publishConversationEvent({
-          ...event,
-          id: `${event.id}-recording-summary-failed`,
-          type: "call_recording",
-          status: "failed",
-          body: error instanceof Error ? `Recording saved, but summary failed: ${error.message}` : "Recording saved, but summary failed.",
-          recordingSid: event.recordingSid,
-          recordingUrl: event.recordingUrl,
-          payload: {
-            ...event.payload,
+      after(async () => {
+        try {
+          const insights = await createCallRecordingInsights({
+            callSid: event.callSid,
             recordingSid: event.recordingSid,
             recordingUrl: event.recordingUrl,
-            summary: "Recording saved, but transcript and summary could not be created.",
-            processingError: error instanceof Error ? error.message : "Unknown processing error",
-          },
-        });
-        console.error("Unable to process call recording", error);
+            from: event.from,
+            to: event.to,
+            direction: event.direction,
+            payload: event.payload,
+          });
+          if (insights) {
+            console.log("[Twilio Recording] Publishing transcript and summary", { callSid: insights.callSid, recordingSid: insights.recordingSid });
+            await publishConversationEvent(insights);
+          }
+        } catch (error) {
+          await publishConversationEvent({
+            ...event,
+            id: `${event.id}-recording-summary-failed`,
+            type: "call_recording",
+            status: "failed",
+            body: error instanceof Error ? `Recording saved, but summary failed: ${error.message}` : "Recording saved, but summary failed.",
+            recordingSid: event.recordingSid,
+            recordingUrl: event.recordingUrl,
+            payload: {
+              ...event.payload,
+              recordingSid: event.recordingSid,
+              recordingUrl: event.recordingUrl,
+              summary: "Recording saved, but transcript and summary could not be created.",
+              processingError: error instanceof Error ? error.message : "Unknown processing error",
+            },
+          });
+          console.error("Unable to process call recording", error);
+        }
       });
     }
 
