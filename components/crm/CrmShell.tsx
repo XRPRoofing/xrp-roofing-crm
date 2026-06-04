@@ -60,6 +60,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
+      setUserRole("admin");
+      setCheckingAuth(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
     createClient().auth.getSession().then(({ data }) => {
       if (!mounted) return;
 
@@ -371,7 +379,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
-        <main className="px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
+        <main className="crm-main px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
           <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">

@@ -839,7 +839,7 @@ export default function ProposalsPage() {
   if (activeProposal) {
     return (
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8">
-        <div className="sticky top-20 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm">
+        <div className="sticky top-16 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm lg:top-20">
           <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
           <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
           <div className="flex items-center gap-2">
@@ -1260,7 +1260,7 @@ export default function ProposalsPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Proposal Center</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight">Proposals</h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
+            <p className="crm-board-subtitle mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
           </div>
           <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-600">⊕ Proposal</button>
         </div>

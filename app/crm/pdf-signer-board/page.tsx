@@ -11,7 +11,7 @@ export default function PdfSignerBoardPage() {
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
           <h1 className="mt-2 text-3xl font-black text-[#07183f]">PDF Signer Board</h1>
-          <p className="mt-2 text-slate-600">Track PDF contracts, proposals, change orders, and documents waiting for signatures.</p>
+          <p className="crm-board-subtitle mt-2 text-slate-600">Track PDF contracts, proposals, change orders, and documents waiting for signatures.</p>
         </div>
         <button className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200">+ Upload PDF</button>
       </div>

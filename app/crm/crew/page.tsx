@@ -353,7 +353,7 @@ export default function CrewWorkflowPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Production Workflow</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Roofing Crew Workflow</h1>
-            <p className="mt-1 text-sm font-semibold text-slate-600">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
+            <p className="crm-board-subtitle mt-1 text-sm font-semibold text-slate-600">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${supabaseSyncEnabled() ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                 <CircleDot className="h-3.5 w-3.5" />{supabaseSyncEnabled() ? "Live sync on" : "Local mode (configure Supabase for live sync)"}

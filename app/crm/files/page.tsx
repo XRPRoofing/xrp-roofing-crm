@@ -48,7 +48,7 @@ export default function FilesPage() {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
             <h1 className="mt-2 text-3xl font-black text-[#07183f]">Files & Photo Uploads</h1>
-            <p className="mt-2 text-slate-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
+            <p className="crm-board-subtitle mt-2 text-slate-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="rounded-2xl bg-blue-50 px-5 py-3"><p className="text-2xl font-black text-blue-700">{folders.length}</p><p className="text-xs font-black uppercase text-blue-600">Folders</p></div>

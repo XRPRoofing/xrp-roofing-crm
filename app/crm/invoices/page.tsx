@@ -7,7 +7,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload }
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import type { Customer } from "@/types/crm";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
@@ -485,6 +485,7 @@ export default function InvoicesPage() {
 
   // Identify the signed-in CRM user so "Sent By" can be recorded on send.
   useEffect(() => {
+    if (!hasSupabaseConfig()) return;
     createClient()
       .auth.getSession()
       .then(({ data }) => {
@@ -832,11 +833,11 @@ export default function InvoicesPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
+            <p className="crm-board-subtitle mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
           </div>
           <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
           {[
             ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
             ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],

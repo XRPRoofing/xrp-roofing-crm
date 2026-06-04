@@ -179,7 +179,7 @@ export default function TeamChatPage() {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Team Chat</p>
             <h1 className="mt-2 text-3xl font-black text-[#07183f]">General Chat</h1>
-            <p className="mt-2 text-slate-600">One shared room for authenticated CRM users. No private messages, channels, or team setup.</p>
+            <p className="crm-board-subtitle mt-2 text-slate-600">One shared room for authenticated CRM users. No private messages, channels, or team setup.</p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-black text-blue-700">
             <UsersRound className="h-5 w-5" /> All CRM Users
