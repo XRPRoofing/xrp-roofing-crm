@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
@@ -99,7 +99,7 @@ function CallRow({ message }: { message: ConversationMessage }) {
           <p className={`text-sm font-semibold ${tone.text}`}>{message.body}</p>
           <p className="mt-0.5 truncate text-xs text-slate-500">{message.author} · {message.timestamp}</p>
         </div>
-        {message.recordingUrl && <audio controls src={message.recordingUrl} className="h-8 w-40 max-w-[40%]" />}
+        {message.recordingUrl && <audio controls src={proxyRecordingUrl(message.recordingUrl)} className="h-8 w-40 max-w-[40%]" />}
       </div>
     </div>
   );
@@ -145,7 +145,7 @@ function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; o
           <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
         </div>
       </div>
-      {event.recordingUrl && <audio controls src={event.recordingUrl} className="mt-3 w-full" />}
+      {event.recordingUrl && <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="mt-3 w-full" />}
       <button onClick={() => onOpen(event)} className="mt-3 inline-flex rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">Click here for call transcript</button>
     </div>
   );
@@ -168,7 +168,7 @@ function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEven
           <button onClick={onClose} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="max-h-[calc(86vh-5rem)] space-y-4 overflow-y-auto p-4">
-          {event.recordingUrl && <a href={event.recordingUrl} target="_blank" rel="noreferrer" className="inline-flex text-xs font-bold text-blue-700 underline">Open call recording</a>}
+          {event.recordingUrl && <a href={proxyRecordingUrl(event.recordingUrl)} target="_blank" rel="noreferrer" className="inline-flex text-xs font-bold text-blue-700 underline">Open call recording</a>}
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary Call</p>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{summary || "Summary is still processing or unavailable."}</p>
