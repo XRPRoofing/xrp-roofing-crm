@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createOutboundCall } from "@/lib/twilio/server";
+import { createOutboundCall, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 
 const callSchema = z.object({
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const call = await createOutboundCall(parsed.data);
+    const call = await createOutboundCall(parsed.data, resolveCallStatusCallbackUrl(req.nextUrl.origin));
     await publishConversationEvent({
       id: call.sid,
       type: "call_status",

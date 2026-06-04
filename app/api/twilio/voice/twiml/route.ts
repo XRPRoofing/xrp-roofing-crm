@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
-import { buildOutboundBrowserCallTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
+import { buildOutboundBrowserCallTwiml, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     to: to || event.to,
     status: event.status || "initiated",
   });
-  const callbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL || new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
+  const callbackUrl = resolveCallStatusCallbackUrl(req.nextUrl.origin);
   const actionUrl = new URL("/api/twilio/webhooks/call-ended", req.nextUrl.origin).toString();
   const twiml = buildOutboundBrowserCallTwiml(to, callbackUrl, actionUrl);
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     to: to || event.to,
     status: event.status || "initiated",
   });
-  const callbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL || new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
+  const callbackUrl = resolveCallStatusCallbackUrl(req.nextUrl.origin);
   const actionUrl = new URL("/api/twilio/webhooks/call-ended", req.nextUrl.origin).toString();
   const twiml = buildOutboundBrowserCallTwiml(to, callbackUrl, actionUrl);
 

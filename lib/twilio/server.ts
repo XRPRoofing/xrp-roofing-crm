@@ -40,7 +40,23 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   });
 }
 
-export async function createOutboundCall(payload: TwilioCallPayload) {
+// The status-callback env var (TWILIO_CALL_STATUS_WEBHOOK_URL) sometimes still
+// points at an old/third-party CRM (e.g. roofercrm-api.onrender.com), which
+// silently steals recording + call-status callbacks. Only honor it when it
+// points at this app; otherwise fall back to this app's own endpoint.
+export function resolveCallStatusCallbackUrl(origin: string): string {
+  const fallback = new URL("/api/twilio/webhooks/call-status", origin).toString();
+  const configured = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL?.trim();
+  if (!configured) return fallback;
+  try {
+    if (new URL(configured).host === new URL(origin).host) return configured;
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
+export async function createOutboundCall(payload: TwilioCallPayload, callbackUrl?: string) {
   if (!hasTwilioVoiceConfig()) throw new Error("Twilio voice is not configured");
 
   const client = getTwilioClient();
@@ -48,14 +64,16 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
+  const statusCallback = callbackUrl || process.env.TWILIO_CALL_STATUS_WEBHOOK_URL;
+
   return client.calls.create({
     to: payload.to,
     from: config.phoneNumber,
     url: process.env.TWILIO_OUTBOUND_VOICE_WEBHOOK_URL,
-    statusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    statusCallback,
     statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     record: true,
-    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallback: statusCallback,
     recordingStatusCallbackEvent: ["completed"],
   });
 }
@@ -82,8 +100,10 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
 
   dial.client("crm-agent");
 
+  // Forwarding to the Twilio number itself would loop the call back into this
+  // webhook, so only forward to a different (real) phone.
   const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
-  if (inboundForwardNumber) {
+  if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
     dial.number(inboundForwardNumber);
   }
 
