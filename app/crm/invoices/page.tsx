@@ -845,16 +845,16 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-16 z-20 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:top-20">
+      <div className="sticky top-16 z-20 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5 lg:top-20">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Invoice Board</h1>
             <p className="crm-board-subtitle mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
           </div>
           <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
           {[
             ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
             ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
@@ -863,9 +863,9 @@ export default function InvoicesPage() {
             ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
             ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
           ].map(([label, value, valueClass]) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-              <p className={`mt-2 text-xl font-bold tracking-tight ${valueClass}`}>{value}</p>
+            <div key={label} className="rounded-xl border border-slate-200 bg-slate-50/70 p-2 sm:rounded-2xl sm:p-4">
+              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-500 sm:text-xs">{label}</p>
+              <p className={`mt-0.5 text-sm font-bold tracking-tight sm:mt-2 sm:text-xl ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
