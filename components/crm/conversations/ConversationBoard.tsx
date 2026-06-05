@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
@@ -399,7 +399,17 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
     recordingUrl: event.recordingUrl,
   };
 }
-function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent) {
+// Decide whether a missed call is still "outstanding" (i.e. should show the
+// Missed call badge). It stays outstanding until the team reviews it (opens the
+// conversation, which advances readAt) or a later answered call supersedes it.
+function isMissedCallOutstanding(lastMissedAt?: string, lastAnsweredAt?: string, readAt?: string) {
+  if (!lastMissedAt) return false;
+  if (lastAnsweredAt && lastAnsweredAt >= lastMissedAt) return false;
+  if (readAt && readAt >= lastMissedAt) return false;
+  return true;
+}
+
+function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent, readStates?: Record<string, string>) {
   const phone = getEventPhone(event);
   const existing = event.conversationId ? current.find((conversation) => conversation.id === event.conversationId) : current.find((conversation) => eventMatchesConversation(event, conversation));
   if (!phone && !existing) return current;
@@ -417,13 +427,26 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     ? [...(nextConversation.callSids || []), event.callSid]
     : nextConversation.callSids || [];
 
+  // Read state comes from the shared DB (conversation_read_states) so unread /
+  // missed status is consistent across devices and survives a refresh. An
+  // inbound message/call only counts as unread if it arrived AFTER the last
+  // time the conversation was opened.
+  const readAt = nextConversation.readAt ?? readStates?.[id];
+  const isAfterRead = !readAt || event.createdAt > readAt;
+  const countsAsUnread = Boolean(message) && event.direction === "inbound" && !isMissedCallEvent(event) && isAfterRead;
+  const lastMissedAt = isMissedCallEvent(event) ? event.createdAt : nextConversation.lastMissedAt;
+  const lastAnsweredAt = isAnsweredCallEvent(event) ? event.createdAt : nextConversation.lastAnsweredAt;
+
   const updated: ConversationRecord = {
     ...nextConversation,
     id,
     lastMessage: message?.body || nextConversation.lastMessage,
     lastActivityAt: message ? "Now" : nextConversation.lastActivityAt,
-    unreadCount: message && event.direction === "inbound" && !isMissedCallEvent(event) ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
-    isMissedCall: isMissedCallEvent(event) ? true : isAnsweredCallEvent(event) ? false : nextConversation.isMissedCall,
+    unreadCount: countsAsUnread ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
+    isMissedCall: isMissedCallOutstanding(lastMissedAt, lastAnsweredAt, readAt),
+    readAt,
+    lastMissedAt,
+    lastAnsweredAt,
     channels,
     messages: nextMessages,
     callSids: nextCallSids,
@@ -648,7 +671,11 @@ export default function ConversationBoard() {
   }, [notifyIncomingCall]);
 
   function markConversationRead(conversationId: string) {
-    setConversations((current) => current.map((conversation) => conversation.id === conversationId && !conversation.isMissedCall ? { ...conversation, unreadCount: 0 } : conversation));
+    // Opening a conversation marks it read AND reviews any missed call. We stamp
+    // readAt locally for instant feedback and persist to the shared DB so every
+    // device (and a refresh) reflects the same state.
+    const readAt = new Date().toISOString();
+    setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, unreadCount: 0, isMissedCall: false, readAt } : conversation));
     void persistConversationRead(conversationId);
   }
 
@@ -786,7 +813,7 @@ export default function ConversationBoard() {
     Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
       if (!mounted) return;
 
-      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event), []).map((conversation) => readStates[conversation.id] && !conversation.isMissedCall ? { ...conversation, unreadCount: 0 } : conversation);
+      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
       const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
       setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
       setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());
@@ -823,6 +850,18 @@ export default function ConversationBoard() {
       queueMicrotask(() => setTwilioNotice("Call history syncs automatically after each call"));
     }
   }, [activeConversationId, notifyIncomingCall]);
+
+  // When another device opens a conversation, mark it read here too (in real
+  // time) so read/unread + missed status stays consistent across all devices.
+  useEffect(() => {
+    try {
+      return subscribeToConversationReadStates((conversationId, readAt) => {
+        setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, unreadCount: 0, isMissedCall: false, readAt } : conversation));
+      });
+    } catch {
+      /* realtime read-state sync unavailable; falls back to per-load read state */
+    }
+  }, []);
 
 
   useEffect(() => {

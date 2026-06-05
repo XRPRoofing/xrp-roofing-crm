@@ -44,4 +44,12 @@ export interface ConversationRecord {
   channels: ConversationChannel[];
   messages: ConversationMessage[];
   callSids?: string[];
+  // ISO timestamp the conversation was last opened/reviewed (from the shared
+  // conversation_read_states table). Used to derive read/unread + missed-call
+  // status consistently across devices and across refreshes.
+  readAt?: string;
+  // ISO timestamp of the most recent missed call / most recent answered call,
+  // used to decide whether a missed call is still outstanding (unreviewed).
+  lastMissedAt?: string;
+  lastAnsweredAt?: string;
 }
