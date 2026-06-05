@@ -444,7 +444,19 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const nextConversation = existing || createManualConversation(phone);
   const shouldDisplayMessage = isVisibleCallTimelineEvent(event);
   const message = shouldDisplayMessage ? createMessageFromEvent(event) : null;
-  const nextMessages = message ? [message, ...nextConversation.messages.filter((item) => item.id !== message.id)].slice(0, 50) : nextConversation.messages;
+
+  // Twilio's parent call leg often reports completed/0-duration even when the
+  // child leg (the actual conversation) was answered via <Dial>. That produces
+  // a false "Missed call" that would overwrite the correct "Inbound call" from
+  // the earlier Dial action callback. Detect and suppress the false positive.
+  let isFalsePositiveMissed = false;
+  if (message && message.status === "missed" && event.callSid) {
+    const messageId = message.id;
+    isFalsePositiveMissed = nextConversation.messages.some((m) => m.id === messageId && m.status !== "missed");
+  }
+  const effectiveMessage = isFalsePositiveMissed ? null : message;
+
+  const nextMessages = effectiveMessage ? [effectiveMessage, ...nextConversation.messages.filter((item) => item.id !== effectiveMessage.id)].slice(0, 50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
   const nextCallSids = event.callSid && !nextConversation.callSids?.includes(event.callSid)
@@ -457,15 +469,15 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   // time the conversation was opened.
   const readAt = nextConversation.readAt ?? readStates?.[id];
   const isAfterRead = !readAt || event.createdAt > readAt;
-  const countsAsUnread = Boolean(message) && event.direction === "inbound" && !isMissedCallEvent(event) && isAfterRead;
-  const lastMissedAt = isMissedCallEvent(event) ? event.createdAt : nextConversation.lastMissedAt;
+  const countsAsUnread = Boolean(effectiveMessage) && event.direction === "inbound" && !isMissedCallEvent(event) && isAfterRead;
+  const lastMissedAt = (isMissedCallEvent(event) && !isFalsePositiveMissed) ? event.createdAt : nextConversation.lastMissedAt;
   const lastAnsweredAt = isAnsweredCallEvent(event) ? event.createdAt : nextConversation.lastAnsweredAt;
 
   const updated: ConversationRecord = {
     ...nextConversation,
     id,
-    lastMessage: message?.body || nextConversation.lastMessage,
-    lastActivityAt: message ? "Now" : nextConversation.lastActivityAt,
+    lastMessage: effectiveMessage?.body || nextConversation.lastMessage,
+    lastActivityAt: effectiveMessage ? "Now" : nextConversation.lastActivityAt,
     unreadCount: countsAsUnread ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
     isMissedCall: isMissedCallOutstanding(lastMissedAt, lastAnsweredAt, readAt),
     readAt,
