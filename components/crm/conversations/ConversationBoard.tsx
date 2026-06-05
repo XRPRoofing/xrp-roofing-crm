@@ -1000,10 +1000,10 @@ export default function ConversationBoard() {
         </div>
       )}
 
-      <div className="sticky top-20 z-30 mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Communication center</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Conversations</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>{notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Enable mobile notifications</button>}<p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
-          <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button>{pipelineStages.slice(0, 3).map((stage) => <Button key={stage}>{stage}</Button>)}</div>
+      <div className={`${showMobileThread ? "hidden xl:block" : ""} z-30 mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:mb-5 sm:p-5 xl:sticky xl:top-20`}>
+        <div className="flex flex-col justify-between gap-3 sm:gap-4 lg:flex-row lg:items-end">
+          <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-xs">Communication center</p><h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:mt-1 sm:text-3xl">Conversations</h1><p className="mt-2 hidden max-w-3xl text-sm leading-6 text-slate-600 sm:block">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>{notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Enable notifications</button>}<p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
+          <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button><div className="hidden flex-wrap gap-2 sm:flex">{pipelineStages.slice(0, 3).map((stage) => <Button key={stage}>{stage}</Button>)}</div></div>
         </div>
       </div>
 
@@ -1011,12 +1011,12 @@ export default function ConversationBoard() {
         <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
           <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} />
         </div>
-        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100vh-9rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
           {active ? (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
-                <div className="flex flex-wrap gap-2"><Button variant="primary">Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div>
+                <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><div className="hidden flex-wrap gap-2 sm:flex"><Button>Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div></div>
               </div>
               <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
@@ -1041,7 +1041,7 @@ export default function ConversationBoard() {
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
 
       {!isDialerOpen && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        <div className={`fixed bottom-6 right-6 z-40 flex-col items-end gap-3 ${showMobileThread ? "hidden xl:flex" : "flex"}`}>
           <Link href="/crm/team-chat" className="inline-flex items-center rounded-full bg-[#07183f] px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-900">
             <MessageCircle className="mr-2 h-5 w-5" />Team Chat
           </Link>
