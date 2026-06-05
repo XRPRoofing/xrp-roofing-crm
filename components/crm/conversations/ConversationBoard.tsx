@@ -11,7 +11,7 @@ import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -36,7 +36,17 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[tone]}`}>{children}</span>;
 }
 
-function ConversationInbox({ conversations, active, onSelect, onNew }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void }) {
+function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: () => void }) {
+  return (
+    <Card className="hidden h-full flex-col items-center gap-2 overflow-hidden p-2 xl:flex">
+      <button type="button" onClick={onExpand} aria-label="Expand inbox" title="Show conversations" className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"><ChevronRight className="h-4 w-4" /></button>
+      <button type="button" onClick={onNew} aria-label="New conversation" title="New conversation" className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"><Plus className="h-4 w-4" /></button>
+      <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 [writing-mode:vertical-rl]">Inbox</span>
+    </Card>
+  );
+}
+
+function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void; onCollapse?: () => void }) {
   return (
     <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
       <div className="border-b border-slate-200 p-4">
@@ -45,7 +55,10 @@ function ConversationInbox({ conversations, active, onSelect, onNew }: { convers
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Inbox</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">Conversations</h2>
           </div>
-          <Button variant="primary" className="h-10 w-10 p-0" onClick={onNew} aria-label="New conversation"><Plus className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-2">
+            {onCollapse && <button type="button" onClick={onCollapse} aria-label="Minimize inbox" title="Minimize inbox" className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 xl:flex"><ChevronLeft className="h-4 w-4" /></button>}
+            <Button variant="primary" className="h-10 w-10 p-0" onClick={onNew} aria-label="New conversation"><Plus className="h-4 w-4" /></Button>
+          </div>
         </div>
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -621,6 +634,7 @@ export default function ConversationBoard() {
   const [callNotes, setCallNotes] = useState("");
   const [callDisposition, setCallDisposition] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
+  const [inboxCollapsed, setInboxCollapsed] = useState(false);
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
@@ -641,6 +655,17 @@ export default function ConversationBoard() {
     return Notification.permission;
   });
   const matchedDialContact = findCrmContactByPhone(dialNumber) || conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
+
+  useEffect(() => {
+    try { if (localStorage.getItem("xrp.conv.inboxCollapsed") === "1") setInboxCollapsed(true); } catch {}
+  }, []);
+  const toggleInboxCollapsed = useCallback(() => {
+    setInboxCollapsed((value) => {
+      const next = !value;
+      try { localStorage.setItem("xrp.conv.inboxCollapsed", next ? "1" : "0"); } catch {}
+      return next;
+    });
+  }, []);
 
   function stopIncomingAlert() {
     navigator.vibrate?.(0);
@@ -1241,18 +1266,21 @@ export default function ConversationBoard() {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_minmax(0,1fr)_340px] xl:overflow-hidden">
+      <div className={`grid gap-5 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_340px]" : "xl:grid-cols-[320px_minmax(0,1fr)_340px]"}`}>
         <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:min-h-0`}>
-          <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} />
+          <div className={inboxCollapsed ? "xl:hidden" : ""}>
+            <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
+          </div>
+          {inboxCollapsed && <CollapsedInboxRail onExpand={toggleInboxCollapsed} onNew={openNewConversation} />}
         </div>
         <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-full`}> 
           {active ? (
             <>
-              <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
+              <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
                 <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-slate-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
-              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
+              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-8 text-center">
@@ -1263,9 +1291,9 @@ export default function ConversationBoard() {
               </div>
             </div>
           )}
-          <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-4">
-            <div className="mb-3 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
-            <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />
+          <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-3">
+            <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
+            {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
