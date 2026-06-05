@@ -1,5 +1,6 @@
-import { Activity, CalendarClock, CircleDollarSign, ClipboardCheck, Plus, TrendingUp, UsersRound } from "lucide-react";
+import { Activity, CalendarClock, CircleDollarSign, ClipboardCheck, TrendingUp, UsersRound } from "lucide-react";
 import { customers, leads, tasks } from "@/lib/crm-data";
+import DashboardHeroActions from "@/components/crm/dashboard/DashboardHeroActions";
 
 const revenue = leads.reduce((total, lead) => total + lead.value, 0);
 const openEstimates = leads.filter((lead) => lead.stage === "estimate_sent" || lead.stage === "waiting_approval").length;
@@ -35,10 +36,7 @@ export default function CrmDashboardPage() {
               ))}
             </div>
           </div>
-          <div className="relative flex flex-wrap gap-3">
-            <button className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white shadow-lg shadow-orange-950/30 transition hover:bg-orange-600"><Plus className="mr-2 inline h-4 w-4" />New lead</button>
-            <button className="rounded-2xl bg-white/10 px-5 py-3 font-bold text-white ring-1 ring-white/15 transition hover:bg-white/15">Schedule inspection</button>
-          </div>
+          <DashboardHeroActions />
         </div>
       </section>
 
