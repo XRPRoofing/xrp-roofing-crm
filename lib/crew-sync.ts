@@ -73,6 +73,12 @@ export type CrewDataset = {
 
 export const jobsTable = "jobs";
 export const jobPhotosTable = "job_photos";
+
+// Manually-created Files folders are backed by a hidden job row (so their photos
+// satisfy the job_photos -> jobs foreign key and reuse the normal photo
+// pipeline). These rows are tagged with this source and filtered out of every
+// job-listing board via loadCrewDataset.
+export const MANUAL_FOLDER_SOURCE = "Manual Folder";
 export const jobNotesTable = "job_notes";
 export const jobChecklistTable = "job_checklist_items";
 export const jobPhotoBucket = "job-photos";
@@ -321,7 +327,7 @@ function writeLocalJobs(records: JobRecord[]) {
 export async function loadCrewDataset(): Promise<CrewDataset> {
   if (!hasSupabaseConfig()) {
     return {
-      jobs: readLocalJobs(),
+      jobs: readLocalJobs().filter((job) => job.source !== MANUAL_FOLDER_SOURCE),
       // Strip the image bytes from the board dataset; the heavy `dataUrl` is
       // loaded per-job via loadJobPhotos when a job is opened. Counts/sections
       // still work because only the array length matters here.
@@ -346,7 +352,7 @@ export async function loadCrewDataset(): Promise<CrewDataset> {
   }
 
   return {
-    jobs: (jobsResult.data as JobRow[]).map(rowToJobRecord),
+    jobs: (jobsResult.data as JobRow[]).map(rowToJobRecord).filter((job) => job.source !== MANUAL_FOLDER_SOURCE),
     photos: (photosResult.data as PhotoRow[]).map(rowToPhoto),
     notes: (notesResult.data as NoteRow[]).map(rowToNote),
     checklist: (checklistResult.data as ChecklistRow[]).map(rowToChecklist),

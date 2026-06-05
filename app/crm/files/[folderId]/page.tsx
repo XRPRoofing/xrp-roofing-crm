@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Camera, Check, Copy, FolderOpen, Lock, Share2, UploadCloud, X } from "lucide-react";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
 import { addJobPhotos, loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
-import { loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
+import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
 import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
@@ -82,6 +82,20 @@ export default function FolderGalleryPage() {
     };
   }, [refresh]);
 
+  // Manual folders need their backing job row to exist before photos can be
+  // saved (foreign key). Idempotent + heals folders made before this existed.
+  const ensureBackingJob = useCallback(async () => {
+    if (!folder || !folder.id.startsWith("manual-")) return;
+    await ensureManualFolderJob({
+      id: folder.id,
+      name: folder.name,
+      address: folder.address,
+      workType: folder.workType,
+      customerName: folder.customerName,
+      createdAt: folder.updatedAt || new Date().toISOString(),
+    });
+  }, [folder]);
+
   // Capture/upload photos straight into this folder — saved instantly, no forced
   // markup step. (Markup/notes are available later per-photo from the gallery.)
   const addPhotos = useCallback(async (files: FileList | null) => {
@@ -90,6 +104,7 @@ export default function FolderGalleryPage() {
     setUploading(true);
     setError("");
     try {
+      await ensureBackingJob();
       const dataUrls = await Promise.all(list.map((file) => compressImageToDataUrl(file)));
       await addJobPhotos(folder.jobId, dataUrls.map((dataUrl, index) => ({
         photoType: "Job Photo" as const,
@@ -103,7 +118,7 @@ export default function FolderGalleryPage() {
     } finally {
       setUploading(false);
     }
-  }, [folder, refresh]);
+  }, [folder, refresh, ensureBackingJob]);
 
   // Open the markup editor for an existing photo. Saving produces a NEW flattened
   // image (drawing + note baked in) added back into this same folder.
@@ -121,6 +136,7 @@ export default function FolderGalleryPage() {
     if (!folder || results.length === 0) return;
     setError("");
     try {
+      await ensureBackingJob();
       await addJobPhotos(folder.jobId, results.map((result) => ({
         photoType: (target?.photoType as "Before" | "Progress" | "After" | "Job Photo") || "Job Photo",
         name: result.name,
@@ -131,7 +147,7 @@ export default function FolderGalleryPage() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Failed to save edited photo.");
     }
-  }, [folder, refresh]);
+  }, [folder, refresh, ensureBackingJob]);
 
   const photos = useMemo<GalleryPhoto[]>(
     () =>
