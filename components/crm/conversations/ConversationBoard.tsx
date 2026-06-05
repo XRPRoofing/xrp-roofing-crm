@@ -97,11 +97,11 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
     <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Inbox</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">Conversations</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {onCollapse && <button type="button" onClick={onCollapse} aria-label="Minimize inbox" title="Minimize inbox" className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 xl:flex"><ChevronLeft className="h-4 w-4" /></button>}
             <Button variant="primary" className="h-10 w-10 p-0" onClick={onNew} aria-label="New conversation"><Plus className="h-4 w-4" /></Button>
           </div>
@@ -1331,8 +1331,8 @@ export default function ConversationBoard() {
         </div>
       </div>
 
-      <div className={`grid gap-4 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
-        <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:h-full xl:min-h-0`}>
+      <div className={`grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
+        <div className={`${showMobileThread ? "hidden xl:block" : "block"} min-w-0 xl:h-full xl:min-h-0`}>
           <div className={inboxCollapsed ? "xl:hidden" : "xl:h-full xl:min-h-0"}>
             <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
           </div>

@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { leadStages } from "@/lib/crm-data";
-import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
+import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCustomerRecordsResult, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
-import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
+import type { ConversationChannel, ConversationMessage } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 
@@ -48,26 +49,48 @@ function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   );
 }
 
-function getCustomerCommunications(customer: Customer, jobs: Lead[]) {
-  const relatedJobs = getCustomerJobs(customer, jobs);
-  const relatedJobIds = new Set(relatedJobs.map((job) => job.id));
-  const relatedCustomerIds = new Set(relatedJobs.map((job) => `C-${job.id}`));
-  const conversations = jobs.map((job) => createConversationFromLead(job, customer));
+// A real communication entry shown on the customer profile. Only the few
+// fields the renderer needs are kept (no fabricated ConversationRecord).
+type CommunicationEntry = {
+  conversation: { id: string; jobId?: string; customerId?: string };
+  message: ConversationMessage;
+};
 
-  return conversations
-    .filter((conversation) =>
-      (conversation.customerId && relatedCustomerIds.has(conversation.customerId)) ||
-      (conversation.jobId && relatedJobIds.has(conversation.jobId)) ||
-      conversation.contact.email === customer.email ||
-      conversation.contact.phone === customer.phone ||
-      conversation.contact.name.toLowerCase() === customer.name.toLowerCase()
-    )
-    .flatMap((conversation) =>
-      conversation.messages.map((message) => ({
-        conversation,
-        message,
-      }))
-    );
+function eventChannel(event: TwilioConversationEvent): ConversationChannel {
+  if (event.type === "incoming_sms" || event.type === "message_status") return "sms";
+  if (event.type === "call_note") return "note";
+  return "call";
+}
+
+function eventBody(event: TwilioConversationEvent): string {
+  if (event.body) return event.body;
+  if (event.type === "call_recording") return "Call recording";
+  if (event.type === "incoming_call") return event.direction === "outbound" ? "Outbound call" : "Inbound call";
+  if (event.type === "call_status") return `Call ${event.status || "update"}`;
+  return "Communication";
+}
+
+// Build the customer's communication history from REAL Twilio conversation
+// events (calls, SMS, recordings, notes), matched by phone number. Returns an
+// empty list when there is no real activity — never fabricated/sample data.
+function getCustomerCommunications(customer: Customer, events: TwilioConversationEvent[]): CommunicationEntry[] {
+  const phone = digitsOnly(customer.phone);
+  if (!phone) return [];
+  return events
+    .filter((event) => digitsOnly(event.from) === phone || digitsOnly(event.to) === phone)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .map((event) => ({
+      conversation: { id: event.conversationId || event.id, jobId: event.jobId, customerId: event.customerId },
+      message: {
+        id: event.id,
+        channel: eventChannel(event),
+        direction: event.direction === "outbound" ? "outbound" : "inbound",
+        author: event.from || customer.name,
+        body: eventBody(event),
+        timestamp: new Date(event.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        recordingUrl: event.recordingUrl,
+      },
+    }));
 }
 
 function getCommunicationLabel(message: ConversationMessage) {
@@ -240,6 +263,9 @@ export default function CustomersPage() {
   const [storedProposals, setStoredProposals] = useState<StoredProposal[]>([]);
   const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState("");
+  // Real Twilio conversation events (calls/SMS/recordings) powering the profile
+  // Communication History tab — matched to a customer by phone number.
+  const [conversationEvents, setConversationEvents] = useState<TwilioConversationEvent[]>([]);
   // Surfaced to the user when Supabase can't load/save (e.g. the customer_records
   // table hasn't been created yet) so saves never fail silently.
   const [customersError, setCustomersError] = useState<string | null>(null);
@@ -256,7 +282,7 @@ export default function CustomersPage() {
 
   const selectedCustomer = customerList.find((customer) => customer.id === selectedCustomerId) || null;
   const selectedCustomerJobs = selectedCustomer ? getCustomerJobs(selectedCustomer, jobList) : [];
-  const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, jobList) : [];
+  const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, conversationEvents) : [];
   const selectedCustomerInvoices = selectedCustomer ? getCustomerInvoices(selectedCustomer, storedInvoices) : [];
   const selectedCustomerProposals = selectedCustomer ? getCustomerProposals(selectedCustomer, storedProposals) : [];
 
@@ -316,6 +342,20 @@ export default function CustomersPage() {
       mounted = false;
       unsubscribe();
       window.removeEventListener("focus", refreshFromStore);
+    };
+  }, []);
+
+  // Load + live-subscribe to real conversation events so the Communication
+  // History reflects actual calls/messages across devices (never sample data).
+  useEffect(() => {
+    let mounted = true;
+    void listConversationEvents().then((events) => { if (mounted) setConversationEvents(events); }).catch(() => {});
+    const unsubscribe = subscribeToConversationEvents(() => {
+      void listConversationEvents().then((events) => { if (mounted) setConversationEvents(events); }).catch(() => {});
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -662,7 +702,7 @@ export default function CustomersPage() {
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Calls, Messages &amp; Recordings</h3></div>
                   <div className="mt-4 space-y-3">
-                    {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: { conversation: ConversationRecord; message: ConversationMessage }) => {
+                    {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: CommunicationEntry) => {
                       const Icon = getCommunicationIcon(message);
                       return (
                         <div key={`${conversation.id}-${message.id}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
