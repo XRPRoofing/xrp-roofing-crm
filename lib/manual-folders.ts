@@ -32,32 +32,46 @@ export function newManualFolderId() {
 // A manual folder is backed by a hidden job row so its photos satisfy the
 // job_photos -> jobs foreign key and flow through the normal photo pipeline.
 // The row is tagged MANUAL_FOLDER_SOURCE so loadCrewDataset hides it from every
-// job board. Idempotent: also heals folders created before this backing existed.
+// job board.
+//
+// In Supabase mode the backing job is created server-side by the manual-folders
+// API route (service role), because the browser's anon client is blocked by RLS
+// from writing to `jobs`. POSTing the folder is idempotent (upsert by id), so
+// this also heals folders created before the backing row existed. Only pure
+// local/dev mode (no Supabase) writes the job via the client.
 export async function ensureManualFolderJob(folder: ManualFolder): Promise<void> {
-  const backingJob: JobRecord = {
-    id: folder.id,
-    name: folder.customerName || folder.name,
-    email: "",
-    phone: "",
-    address: folder.address || folder.name,
-    city: "",
-    stage: "new_lead",
-    value: 0,
-    assignedTo: "",
-    roofType: folder.workType || "General",
-    source: MANUAL_FOLDER_SOURCE,
-    lastActivity: "Manual folder",
-    nextAction: "",
-    dueDate: "",
-    status: "Assigned",
-    assignedCrew: [],
-    scheduleDate: "",
-    jobScope: folder.workType || "General",
-    jobNotes: "",
-    completionNotes: "",
-    materialsUsed: "",
-  };
-  await upsertJobRecord(backingJob);
+  if (!hasSupabaseConfig()) {
+    const backingJob: JobRecord = {
+      id: folder.id,
+      name: folder.customerName || folder.name,
+      email: "",
+      phone: "",
+      address: folder.address || folder.name,
+      city: "",
+      stage: "new_lead",
+      value: 0,
+      assignedTo: "",
+      roofType: folder.workType || "General",
+      source: MANUAL_FOLDER_SOURCE,
+      lastActivity: "Manual folder",
+      nextAction: "",
+      dueDate: "",
+      status: "Assigned",
+      assignedCrew: [],
+      scheduleDate: "",
+      jobScope: folder.workType || "General",
+      jobNotes: "",
+      completionNotes: "",
+      materialsUsed: "",
+    };
+    await upsertJobRecord(backingJob);
+    return;
+  }
+  await fetch("/api/manual-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(folder),
+  });
 }
 
 function readLocal(): ManualFolder[] {
@@ -103,15 +117,16 @@ export async function createManualFolder(input: {
     createdAt: new Date().toISOString(),
   };
 
-  // Create the backing job row first so photos can be saved into the folder.
-  await ensureManualFolderJob(folder);
-
   if (!hasSupabaseConfig()) {
+    // Local/dev mode: create the backing job in localStorage, then the folder.
+    await ensureManualFolderJob(folder);
     writeLocal([folder, ...readLocal()]);
     return folder;
   }
 
   try {
+    // The API route creates the backing `jobs` row (service role) and the
+    // folder metadata together, so photos can be saved immediately.
     const response = await fetch("/api/manual-folders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -130,9 +145,10 @@ export async function createManualFolder(input: {
 }
 
 export async function deleteManualFolder(id: string): Promise<void> {
-  // Remove the backing job (cascades its photos) alongside the folder metadata.
-  await deleteJobRecord(id).catch(() => {});
   if (!hasSupabaseConfig()) {
+    // Local/dev mode: drop the backing job too (the API route does this in
+    // Supabase mode via the service role).
+    await deleteJobRecord(id).catch(() => {});
     writeLocal(readLocal().filter((folder) => folder.id !== id));
     return;
   }
