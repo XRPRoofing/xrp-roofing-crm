@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CalendarCheck2, CalendarPlus, Edit3, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Search, ShieldCheck, UploadCloud, Voicemail, X } from "lucide-react";
-import { customers, leadStages, leads } from "@/lib/crm-data";
+import { leadStages, leads } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { customerSyncEnabled, loadCustomerRecords, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
@@ -12,18 +13,14 @@ import type { Customer, Lead } from "@/types/crm";
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
 
-function saveCustomers(nextCustomers: Customer[]) {
-  window.localStorage.setItem(customersStorageKey, JSON.stringify(nextCustomers));
-}
-
-function getSavedCustomers() {
-  const savedCustomers = window.localStorage.getItem(customersStorageKey);
-  if (!savedCustomers) return customers;
-
+function readRawLocalCustomers(): Customer[] {
+  if (typeof window === "undefined") return [];
+  const saved = window.localStorage.getItem(customersStorageKey);
+  if (!saved) return [];
   try {
-    return JSON.parse(savedCustomers) as Customer[];
+    return JSON.parse(saved) as Customer[];
   } catch {
-    return customers;
+    return [];
   }
 }
 
@@ -136,22 +133,19 @@ function getStageLabel(job: Lead) {
   return leadStages.find((stage) => stage.id === job.stage)?.label || job.stage.replace(/_/g, " ");
 }
 
-function loadCustomerDashboardRecords() {
-  const savedCustomers = getSavedCustomers();
-  const jobCustomers = getSavedJobs().map(customerFromJob);
-
-  return mergeCustomerList(savedCustomers, jobCustomers);
-}
-
 export default function CustomersPage() {
-  const [customerList, setCustomerList] = useState<Customer[]>(() => {
-    if (typeof window === "undefined") return customers;
-    return loadCustomerDashboardRecords();
+  const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => {
+    if (typeof window === "undefined") return [];
+    return readRawLocalCustomers();
   });
   const [jobList, setJobList] = useState<Lead[]>(() => {
     if (typeof window === "undefined") return leads;
     return getSavedJobs();
   });
+  const customerList = useMemo(
+    () => mergeCustomerList(savedCustomers, jobList.map(customerFromJob)),
+    [savedCustomers, jobList],
+  );
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -186,13 +180,8 @@ export default function CustomersPage() {
 
   useEffect(() => {
     let mounted = true;
-    function applyJobs(jobs: Lead[]) {
-      if (!mounted) return;
-      setJobList(jobs);
-      setCustomerList(mergeCustomerList(getSavedCustomers(), jobs.map(customerFromJob)));
-    }
     function refreshFromStore() {
-      void loadCrewDataset().then((data) => applyJobs(data.jobs)).catch(() => {});
+      void loadCrewDataset().then((data) => { if (mounted) setJobList(data.jobs); }).catch(() => {});
     }
     refreshFromStore();
 
@@ -202,6 +191,39 @@ export default function CustomersPage() {
       mounted = false;
       unsubscribe();
       window.removeEventListener("focus", refreshFromStore);
+    };
+  }, []);
+
+  // Shared, device-synced customer records (manually added / edited). Loads from
+  // the server, migrates any local-only customers up once, and live-updates via
+  // realtime so a change on one device appears on every device.
+  useEffect(() => {
+    let mounted = true;
+    async function refreshCustomers() {
+      const records = await loadCustomerRecords();
+      if (mounted) setSavedCustomers(records);
+    }
+    async function init() {
+      const records = await loadCustomerRecords();
+      if (!mounted) return;
+      if (customerSyncEnabled() && records.length === 0) {
+        const local = readRawLocalCustomers();
+        if (local.length) {
+          await Promise.all(local.map(upsertCustomerRecord));
+          if (mounted) setSavedCustomers(local);
+          return;
+        }
+      }
+      setSavedCustomers(records);
+    }
+    void init();
+
+    const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
+    window.addEventListener("focus", refreshCustomers);
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener("focus", refreshCustomers);
     };
   }, []);
 
@@ -222,11 +244,8 @@ export default function CustomersPage() {
       lifetimeValue: Number(form.lifetimeValue) || 0,
     };
 
-    setCustomerList((currentCustomers) => {
-      const nextCustomers = [newCustomer, ...currentCustomers];
-      saveCustomers(nextCustomers);
-      return nextCustomers;
-    });
+    setSavedCustomers((current) => [newCustomer, ...current.filter((item) => item.id !== newCustomer.id)]);
+    void upsertCustomerRecord(newCustomer);
     setForm({
       name: "",
       email: "",
@@ -249,11 +268,12 @@ export default function CustomersPage() {
     event.preventDefault();
     if (!editForm) return;
 
-    setCustomerList((currentCustomers) => {
-      const nextCustomers = currentCustomers.map((customer) => customer.id === editForm.id ? editForm : customer);
-      saveCustomers(nextCustomers);
-      return nextCustomers;
-    });
+    setSavedCustomers((current) =>
+      current.some((customer) => customer.id === editForm.id)
+        ? current.map((customer) => (customer.id === editForm.id ? editForm : customer))
+        : [editForm, ...current],
+    );
+    void upsertCustomerRecord(editForm);
     setEditingCustomerId(null);
     setEditForm(null);
   }
