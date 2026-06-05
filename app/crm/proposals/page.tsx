@@ -5,6 +5,7 @@ import Image from "next/image";
 import { leads } from "@/lib/crm-data";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
 import type { Lead } from "@/types/crm";
 
 declare global {
@@ -659,6 +660,17 @@ export default function ProposalsPage() {
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    // Estimates are a lead source: find-or-create the customer (match by
+    // phone -> email -> address, no duplicates) so it appears on the Customer board.
+    void findOrCreateCustomer({
+      name: newProposal.customerName,
+      email: newProposal.customerEmail,
+      phone: newProposal.customerPhone,
+      propertyAddress: newProposal.address,
+      status: "Estimate",
+      lifetimeValue: newProposal.total,
+      source: "Estimate",
+    }).catch(() => {});
     openProposal(newProposal);
     setShowCreateForm(false);
     setCustomerName("");

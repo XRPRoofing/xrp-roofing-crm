@@ -40,7 +40,11 @@ function missingTable(message: string | undefined) {
 export async function GET() {
   const admin = getAdminClient();
   if (!admin) return NextResponse.json({ customers: [] });
-  const { data, error } = await admin.from(customersTable).select("id, payload");
+  // Newest first: customer_records.updated_at is bumped on every upsert.
+  const { data, error } = await admin
+    .from(customersTable)
+    .select("id, payload, updated_at")
+    .order("updated_at", { ascending: false });
   if (error) {
     return NextResponse.json(
       missingTable(error.message)

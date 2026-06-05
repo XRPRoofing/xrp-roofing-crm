@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
-import { customers, leadStages } from "@/lib/crm-data";
-import type { Customer, Lead, LeadStage } from "@/types/crm";
+import { leadStages } from "@/lib/crm-data";
+import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
 
 declare global {
   interface Window {
@@ -40,7 +41,7 @@ const arizonaBounds = {
   east: -109.0452,
   west: -114.8184,
 };
-const customersStorageKey = "xrp-crm-customers";
+
 const legacyStageMap: Partial<Record<string, LeadStage>> = {
   insurance_review: "waiting_approval",
 };
@@ -82,41 +83,23 @@ function getCityFromAddress(address: string) {
   return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
 }
 
-function getSavedCustomers() {
-  const savedCustomers = window.localStorage.getItem(customersStorageKey);
-  if (!savedCustomers) return customers;
-
-  try {
-    return JSON.parse(savedCustomers) as Customer[];
-  } catch {
-    return customers;
-  }
-}
-
-function syncCustomerFromJob(job: Lead) {
-  const customerFromJob: Customer = {
-    id: `C-${job.id}`,
-    name: job.name,
-    email: job.email,
-    phone: job.phone,
-    propertyAddress: `${job.address}${job.city && !job.address.includes(job.city) ? `, ${job.city}, AZ` : ""}`,
-    roofDetails: job.roofType || "Roof details pending",
-    insuranceCarrier: "Not provided",
-    status: "New job",
-    lifetimeValue: job.value,
-  };
-  const currentCustomers = getSavedCustomers();
-  const matchingCustomer = currentCustomers.find((customer) =>
-    customer.id === customerFromJob.id ||
-    (customer.email && customer.email === job.email) ||
-    (customer.phone && customer.phone === job.phone)
-  );
-  const nextCustomers = matchingCustomer
-    ? currentCustomers.map((customer) => customer.id === matchingCustomer.id ? { ...customer, ...customerFromJob, id: customer.id, insuranceCarrier: customer.insuranceCarrier || customerFromJob.insuranceCarrier } : customer)
-    : [customerFromJob, ...currentCustomers];
-
-  window.localStorage.setItem(customersStorageKey, JSON.stringify(nextCustomers));
-  window.dispatchEvent(new StorageEvent("storage", { key: customersStorageKey, newValue: JSON.stringify(nextCustomers) }));
+// Auto-create/update the shared customer for a new job/lead. Uses the central
+// find-or-create helper (match by phone -> email -> address, no duplicates) so
+// the customer lands on the Customer board across every device. Placeholder
+// contact defaults are passed through as blanks to avoid false matches.
+function syncCustomerFromJob(contact: { name: string; email?: string; phone?: string; address?: string; city?: string; roofType?: string; value?: number; source?: string }) {
+  const address = contact.address || "";
+  const propertyAddress = `${address}${contact.city && address && !address.includes(contact.city) ? `, ${contact.city}, AZ` : ""}`;
+  void findOrCreateCustomer({
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    propertyAddress,
+    roofDetails: contact.roofType,
+    status: "New lead",
+    lifetimeValue: contact.value,
+    source: contact.source,
+  }).catch(() => {});
 }
 
 export default function LeadsPage() {
@@ -347,7 +330,16 @@ export default function LeadsPage() {
 
     setJobs((currentJobs) => [newJob, ...currentJobs]);
     void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
-    syncCustomerFromJob(newJob);
+    syncCustomerFromJob({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      city: getCityFromAddress(form.address),
+      roofType: form.roofType,
+      value: Number(form.value) || 0,
+      source: form.source,
+    });
     setForm({
       name: "",
       email: "",

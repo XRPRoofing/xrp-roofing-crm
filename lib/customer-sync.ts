@@ -77,6 +77,88 @@ export async function deleteCustomerRecord(id: string): Promise<void> {
   }
 }
 
+/** Contact details from any lead source used to find-or-create a customer. */
+export type CustomerLeadInput = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  propertyAddress?: string;
+  roofDetails?: string;
+  insuranceCarrier?: string;
+  status?: string;
+  lifetimeValue?: number;
+  source?: string;
+};
+
+function normalizeText(value?: string) {
+  return (value || "").toLowerCase().trim();
+}
+
+function digitsOnly(value?: string) {
+  return (value || "").replace(/\D/g, "");
+}
+
+/** Match an existing customer by phone, then email, then property address. */
+function matchExistingCustomer(existing: Customer[], input: CustomerLeadInput): Customer | undefined {
+  const phone = digitsOnly(input.phone);
+  if (phone) {
+    const byPhone = existing.find((customer) => digitsOnly(customer.phone) === phone);
+    if (byPhone) return byPhone;
+  }
+  const email = normalizeText(input.email);
+  if (email) {
+    const byEmail = existing.find((customer) => normalizeText(customer.email) === email);
+    if (byEmail) return byEmail;
+  }
+  const address = normalizeText(input.propertyAddress);
+  if (address) {
+    const byAddress = existing.find((customer) => normalizeText(customer.propertyAddress) === address);
+    if (byAddress) return byAddress;
+  }
+  return undefined;
+}
+
+/**
+ * Find-or-create the customer for an incoming lead from any source
+ * (manual entry, conversations, calls, SMS, web form, estimates, CSV import).
+ *
+ * Matches an existing customer by phone -> email -> property address. If found,
+ * fills in any blanks and updates the record; otherwise creates a new one. This
+ * is the single choke point that guarantees no duplicate customers and that
+ * every lead lands on the shared Customers board across all devices.
+ */
+export async function findOrCreateCustomer(input: CustomerLeadInput): Promise<Customer> {
+  const existing = await loadCustomerRecords();
+  const match = matchExistingCustomer(existing, input);
+
+  const merged: Customer = match
+    ? {
+        ...match,
+        name: match.name || input.name || "New customer",
+        email: match.email || input.email || "",
+        phone: match.phone || input.phone || "",
+        propertyAddress: match.propertyAddress || input.propertyAddress || "",
+        roofDetails: match.roofDetails || input.roofDetails || "",
+        insuranceCarrier: match.insuranceCarrier || input.insuranceCarrier || "",
+        status: match.status || input.status || "New customer",
+        lifetimeValue: input.lifetimeValue ?? match.lifetimeValue ?? 0,
+      }
+    : {
+        id: `C-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: input.name || "New customer",
+        email: input.email || "",
+        phone: input.phone || "",
+        propertyAddress: input.propertyAddress || "",
+        roofDetails: input.roofDetails || "",
+        insuranceCarrier: input.insuranceCarrier || "",
+        status: input.status || "New lead",
+        lifetimeValue: input.lifetimeValue || 0,
+      };
+
+  await upsertCustomerRecord(merged);
+  return merged;
+}
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on `customer_records`. The callback
  * fires whenever any device changes a customer. Returns an unsubscribe fn.
