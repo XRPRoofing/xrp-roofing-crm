@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { Download, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 
 export type GalleryPhoto = {
   id: string;
@@ -22,7 +22,7 @@ function downloadPhoto(photo: GalleryPhoto) {
   document.body.removeChild(link);
 }
 
-export default function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
+export default function PhotoGallery({ photos, onEditPhoto }: { photos: GalleryPhoto[]; onEditPhoto?: (photo: GalleryPhoto) => void }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
@@ -65,9 +65,16 @@ export default function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
                 <p className="truncate text-xs font-black text-slate-800">{photo.name}</p>
                 {photo.photoType && <p className="truncate text-[11px] font-semibold text-slate-400">{photo.photoType}{photo.uploadedBy ? ` · ${photo.uploadedBy}` : ""}</p>}
               </div>
-              <button type="button" onClick={() => downloadPhoto(photo)} className="shrink-0 rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-blue-50 hover:text-blue-700" aria-label={`Download ${photo.name}`}>
-                <Download className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {onEditPhoto && (
+                  <button type="button" onClick={() => onEditPhoto(photo)} className="rounded-full bg-orange-50 p-2 text-orange-600 transition hover:bg-orange-100" aria-label={`Edit or add note to ${photo.name}`} title="Edit / Note">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                <button type="button" onClick={() => downloadPhoto(photo)} className="rounded-full bg-slate-100 p-2 text-slate-600 transition hover:bg-blue-50 hover:text-blue-700" aria-label={`Download ${photo.name}`}>
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -84,6 +91,11 @@ export default function PhotoGallery({ photos }: { photos: GalleryPhoto[] }) {
               <button type="button" onClick={() => setZoomed((value) => !value)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Toggle zoom">
                 {zoomed ? <ZoomOut className="h-5 w-5" /> : <ZoomIn className="h-5 w-5" />}
               </button>
+              {onEditPhoto && (
+                <button type="button" onClick={() => { onEditPhoto(active); close(); }} className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-2 text-sm font-black hover:bg-orange-600" aria-label="Edit or add note">
+                  <Pencil className="h-4 w-4" /> Edit / Note
+                </button>
+              )}
               <button type="button" onClick={() => downloadPhoto(active)} className="rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label="Download photo">
                 <Download className="h-5 w-5" />
               </button>

@@ -7,7 +7,6 @@ import { customers, leadStages } from "@/lib/crm-data";
 import type { Customer, Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
@@ -129,9 +128,6 @@ export default function LeadsPage() {
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
-  const [annotatorKind, setAnnotatorKind] = useState<"Documents" | "Photos">("Photos");
-  const [annotatorKey, setAnnotatorKey] = useState(0);
   const [activityOpen, setActivityOpen] = useState(false);
   const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +163,8 @@ export default function LeadsPage() {
     return () => { mounted = false; };
   }, [selectedJobId]);
 
+  // Capture/upload saves instantly — no forced markup step. Drawings and notes
+  // can be added later per-photo from the job's Files folder.
   async function handleJobFileUpload(kind: "Documents" | "Photos", files: FileList | null) {
     if (!selectedJob || !files?.length) return;
     setFileBusy(true);
@@ -174,26 +172,10 @@ export default function LeadsPage() {
     try {
       const selected = Array.from(files);
       const dataUrls = await Promise.all(selected.map((file) => compressImageToDataUrl(file)));
-      setAnnotatorKind(kind);
-      setAnnotatorKey((key) => key + 1);
-      setAnnotatorImages(selected.map((file, index) => ({ name: file.name, dataUrl: dataUrls[index] })));
-    } catch (error) {
-      setFileError(error instanceof Error ? error.message : "Failed to load file.");
-    } finally {
-      setFileBusy(false);
-    }
-  }
-
-  async function handleAnnotatorComplete(results: AnnotatedResult[]) {
-    setAnnotatorImages(null);
-    if (!selectedJob || results.length === 0) return;
-    setFileBusy(true);
-    setFileError(null);
-    try {
-      await addJobPhotos(selectedJob.id, results.map((result) => ({
+      await addJobPhotos(selectedJob.id, selected.map((file, index) => ({
         photoType: "Job Photo",
-        name: annotatorKind === "Documents" ? `Document - ${result.name}` : result.name,
-        dataUrl: result.dataUrl,
+        name: kind === "Documents" ? `Document - ${file.name || `file-${index + 1}`}` : (file.name || `photo-${Date.now()}-${index + 1}.jpg`),
+        dataUrl: dataUrls[index],
         uploadedBy: "Office",
       })));
       const refreshed = await loadJobPhotos(selectedJob.id);
@@ -607,7 +589,6 @@ export default function LeadsPage() {
           </aside>
         </div>
       )}
-      <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotatorComplete} onCancel={() => setAnnotatorImages(null)} />
     </div>
   );
 }

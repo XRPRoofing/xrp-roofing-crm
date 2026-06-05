@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 import { crewMembers, type CrewJob } from "@/lib/crew-workflow";
 import {
   addJobPhotos,
@@ -31,9 +30,6 @@ export default function CrewPortalPage() {
   const [selectedCrew, setSelectedCrew] = useState(crewMembers[0]);
   const [selectedJobId, setSelectedJobId] = useState("");
   const [presence, setPresence] = useState<CrewPresenceState[]>([]);
-  const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
-  const [annotatorKey, setAnnotatorKey] = useState(0);
-  const pendingPhotoRef = useRef<{ job: CrewJob; type: "Before" | "Progress" | "After" } | null>(null);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(
@@ -129,6 +125,8 @@ export default function CrewPortalPage() {
     });
   }
 
+  // Capture/upload saves the photo instantly — no forced markup step. Crews can
+  // add drawings/notes later per-photo from the job's Files folder.
   async function handlePhotoUpload(job: CrewJob, type: "Before" | "Progress" | "After", files: FileList | null) {
     if (!files?.length) return;
 
@@ -141,34 +139,24 @@ export default function CrewPortalPage() {
       return;
     }
 
-    pendingPhotoRef.current = { job, type };
-    setAnnotatorKey((key) => key + 1);
-    setAnnotatorImages(selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })));
-  }
-
-  async function handleAnnotatedPhotos(results: AnnotatedResult[]) {
-    setAnnotatorImages(null);
-    const pending = pendingPhotoRef.current;
-    pendingPhotoRef.current = null;
-    if (!pending || results.length === 0) return;
-    const { job, type } = pending;
+    const items = selectedFiles.map((file, index) => ({ name: file.name || `photo-${Date.now()}-${index + 1}.jpg`, dataUrl: uploadedPhotos[index] }));
 
     // Show the photos immediately, then save/sync in the background.
-    const optimisticPhotos = buildOptimisticPhotosFromData(job.id, type, results.map((result) => ({ name: result.name, dataUrl: result.dataUrl })), selectedCrew);
+    const optimisticPhotos = buildOptimisticPhotosFromData(job.id, type, items, selectedCrew);
     const previousPhotos = photos;
     const previousSelected = selectedPhotos;
     setPhotos((current) => [...current, ...optimisticPhotos.map((photo) => ({ ...photo, dataUrl: "" }))]);
     if (job.id === activeJobId) setSelectedPhotos((current) => [...current, ...optimisticPhotos]);
 
     try {
-      await addJobPhotos(job.id, results.map((result) => ({ photoType: type, name: result.name, dataUrl: result.dataUrl, uploadedBy: selectedCrew })));
+      await addJobPhotos(job.id, items.map((item) => ({ photoType: type, name: item.name, dataUrl: item.dataUrl, uploadedBy: selectedCrew })));
       await refresh();
       if (job.id === activeJobId) {
         setSelectedPhotos(await loadJobPhotos(job.id));
       }
       addCrmNotification({
         title: "Crew photos uploaded",
-        message: `${selectedCrew} uploaded ${results.length} ${type.toLowerCase()} photo(s) for ${job.name}.`,
+        message: `${selectedCrew} uploaded ${items.length} ${type.toLowerCase()} photo(s) for ${job.name}.`,
         actor: selectedCrew,
         module: "Crew Portal",
       });
@@ -320,7 +308,6 @@ export default function CrewPortalPage() {
           )}
         </div>
       </section>
-      <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotatedPhotos} onCancel={() => { pendingPhotoRef.current = null; setAnnotatorImages(null); }} />
     </main>
   );
 }
