@@ -32,7 +32,16 @@ create policy "Allow realtime read conversation events"
   for select
   using (true);
 
-alter publication supabase_realtime add table public.conversation_events;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'conversation_events'
+  ) then
+    alter publication supabase_realtime add table public.conversation_events;
+  end if;
+end;
+$$;
 
 
 create table if not exists public.conversation_read_states (
@@ -50,6 +59,21 @@ create policy "Allow read conversation read states"
   using (true);
 
 create index if not exists conversation_read_states_updated_at_idx on public.conversation_read_states (updated_at desc);
+
+-- Broadcast read-state changes in real time so opening a conversation on one
+-- device immediately marks it Read on every other device.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'conversation_read_states'
+  ) then
+    alter publication supabase_realtime add table public.conversation_read_states;
+  end if;
+end;
+$$;
+
+alter table public.conversation_read_states replica identity full;
 
 
 alter table public.conversation_events add column if not exists recording_sid text;

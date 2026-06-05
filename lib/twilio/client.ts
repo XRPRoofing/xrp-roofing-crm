@@ -157,6 +157,26 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
 }
 
 
+export function subscribeToConversationReadStates(onRead: (conversationId: string, readAt: string) => void) {
+  const supabase = createClient();
+  const channel = supabase
+    .channel("crm-conversation-read-states")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "conversation_read_states" },
+      (payload) => {
+        const row = (payload.new || {}) as Record<string, unknown>;
+        if (!row.conversation_id) return;
+        onRead(String(row.conversation_id), row.read_at ? String(row.read_at) : new Date().toISOString());
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 export async function listConversationReadStates() {
   const response = await fetch("/api/twilio/conversations/read-state");
   const data = await response.json().catch(() => null) as { readStates?: Record<string, string> } | null;
