@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { leads } from "@/lib/crm-data";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
+import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import type { Lead } from "@/types/crm";
 
 declare global {
@@ -95,6 +96,7 @@ type ProposalTemplate = {
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
 const trashRetentionDays = 30;
 const trashRetentionMs = trashRetentionDays * 24 * 60 * 60 * 1000;
+const proposalsLocalKey = "xrp-crm-proposals";
 const defaultInspectionPhotos: InspectionPhoto[] = [
   { label: "Front elevation", image: "", note: "" },
   { label: "Roof condition", image: "", note: "" },
@@ -352,6 +354,7 @@ export default function ProposalsPage() {
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
   const [selectedJobId, setSelectedJobId] = useState(leads[0]?.id || "");
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
+  const prevProposalsRef = useRef<Proposal[]>(initialProposals);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -435,57 +438,118 @@ export default function ProposalsPage() {
   }, [proposalFilter, proposalSearch, proposals]);
   const trashedProposals = useMemo(() => proposals.filter((proposal) => Boolean(proposal.deletedAt)), [proposals]);
 
+  // Load proposals (estimates) and keep them in sync across every device.
+  // Source of truth is the shared `proposal_shares` table; localStorage is a
+  // fast first paint + offline fallback. On first load, any local-only
+  // proposals are migrated up so nothing is lost, then realtime + focus keep
+  // all devices consistent.
   useEffect(() => {
-    const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-    const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
+    let mounted = true;
 
-    queueMicrotask(() => {
-      if (savedProposals) {
-        const restoredProposals = (JSON.parse(savedProposals) as Proposal[])
-          .filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
-        setProposals(restoredProposals);
+    function retain(list: Proposal[]) {
+      return list.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+    }
+    function readLocalProposals(): Proposal[] {
+      try {
+        return JSON.parse(window.localStorage.getItem(proposalsLocalKey) || "[]") as Proposal[];
+      } catch {
+        return [];
+      }
+    }
+
+    async function reloadFromServer() {
+      if (!proposalSyncEnabled()) return;
+      const server = await loadProposalRecords<Proposal>();
+      if (!mounted) return;
+      setProposals((current) => {
+        const serverIds = new Set(server.map((proposal) => proposal.id));
+        const localOnly = current.filter((proposal) => !serverIds.has(proposal.id));
+        const merged = retain([...server, ...localOnly]);
+        // Treat server data as already-synced so the diff effect doesn't echo it
+        // back (jsonb reorders keys, which would otherwise look like a change).
+        prevProposalsRef.current = merged;
+        return merged;
+      });
+      setActiveProposal((currentProposal) => {
+        if (!currentProposal) return currentProposal;
+        const updated = server.find((proposal) => proposal.id === currentProposal.id);
+        return updated ? { ...currentProposal, ...updated } : currentProposal;
+      });
+    }
+
+    async function init() {
+      const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
+      if (savedTemplates && mounted) {
+        try {
+          setTemplates(JSON.parse(savedTemplates) as ProposalTemplate[]);
+        } catch {
+          /* keep defaults */
+        }
       }
 
-      if (savedTemplates) {
-        setTemplates(JSON.parse(savedTemplates) as ProposalTemplate[]);
+      const local = retain(readLocalProposals());
+      if (local.length && mounted) setProposals(local);
+
+      if (proposalSyncEnabled()) {
+        const server = await loadProposalRecords<Proposal>();
+        if (!mounted) return;
+        const serverIds = new Set(server.map((proposal) => proposal.id));
+        const localOnly = local.filter((proposal) => !serverIds.has(proposal.id));
+        if (localOnly.length) await Promise.all(localOnly.map((proposal) => upsertProposalRecord(proposal)));
+        if (!mounted) return;
+        const merged = retain([...server, ...localOnly]);
+        prevProposalsRef.current = merged;
+        setProposals(merged);
+      } else if (local.length) {
+        prevProposalsRef.current = local;
       }
 
-      setDataLoaded(true);
-    });
+      if (mounted) setDataLoaded(true);
+    }
+
+    void init();
+
+    const unsubscribe = subscribeToProposalRecords(() => void reloadFromServer());
+    window.addEventListener("focus", reloadFromServer);
+    window.addEventListener("storage", reloadFromServer);
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener("focus", reloadFromServer);
+      window.removeEventListener("storage", reloadFromServer);
+    };
   }, []);
 
   useEffect(() => {
     if (!dataLoaded) return;
-    window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(proposals));
+    window.localStorage.setItem(proposalsLocalKey, JSON.stringify(proposals));
   }, [dataLoaded, proposals]);
 
+  // Push every local change to the shared store so other devices see it. Diffing
+  // against the previous list keeps the many existing handlers untouched: any
+  // create/edit becomes an upsert, and a permanent delete (row removed from the
+  // list) becomes a server delete. Trashing keeps the row (with deletedAt) so it
+  // syncs as an upsert.
   useEffect(() => {
-    async function refreshProposalUpdates() {
-      const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-      if (savedProposals) {
-        const localProposals = JSON.parse(savedProposals) as Proposal[];
-        const serverProposals = await Promise.all(localProposals.map(async (proposal) => {
-          const response = await fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`).catch(() => null);
-          if (!response?.ok) return proposal;
-          const data = await response.json().catch(() => null) as { proposal?: Proposal } | null;
-          return data?.proposal ? { ...proposal, ...data.proposal, deletedAt: proposal.deletedAt } : proposal;
-        }));
-        const retainedProposals = serverProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+    if (!dataLoaded || !proposalSyncEnabled()) {
+      prevProposalsRef.current = proposals;
+      return;
+    }
+    const previous = prevProposalsRef.current;
+    const previousById = new Map(previous.map((proposal) => [proposal.id, proposal]));
+    const currentIds = new Set(proposals.map((proposal) => proposal.id));
 
-        window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(retainedProposals));
-        setProposals(retainedProposals);
-        setActiveProposal((currentProposal) => currentProposal ? retainedProposals.find((proposal) => proposal.id === currentProposal.id && !proposal.deletedAt) || null : currentProposal);
+    for (const proposal of proposals) {
+      const before = previousById.get(proposal.id);
+      if (!before || JSON.stringify(before) !== JSON.stringify(proposal)) {
+        void upsertProposalRecord(proposal);
       }
     }
-
-    void refreshProposalUpdates();
-    window.addEventListener("focus", refreshProposalUpdates);
-    window.addEventListener("storage", refreshProposalUpdates);
-    return () => {
-      window.removeEventListener("focus", refreshProposalUpdates);
-      window.removeEventListener("storage", refreshProposalUpdates);
-    };
-  }, []);
+    for (const proposal of previous) {
+      if (!currentIds.has(proposal.id)) void deleteProposalRecord(proposal.id);
+    }
+    prevProposalsRef.current = proposals;
+  }, [proposals, dataLoaded]);
 
   useEffect(() => {
     if (!dataLoaded) return;
