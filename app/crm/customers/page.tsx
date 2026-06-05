@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
-import { leadStages, leads } from "@/lib/crm-data";
+import { leadStages } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
@@ -25,46 +25,18 @@ function readRawLocalCustomers(): Customer[] {
   }
 }
 
-function getSavedJobs() {
+// Real crew jobs power the profile tabs (Jobs / Communication History) and the
+// active-job count on each card. Falls back to an empty list (never demo data)
+// until the live crew dataset loads.
+function getSavedJobs(): Lead[] {
   const savedJobs = window.localStorage.getItem(jobsStorageKey);
-  if (!savedJobs) return leads;
+  if (!savedJobs) return [];
 
   try {
     return JSON.parse(savedJobs) as Lead[];
   } catch {
-    return leads;
+    return [];
   }
-}
-
-function customerFromJob(job: Lead): Customer {
-  return {
-    id: `C-${job.id}`,
-    name: job.name,
-    email: job.email,
-    phone: job.phone,
-    propertyAddress: `${job.address}${job.city && !job.address.includes(job.city) ? `, ${job.city}, AZ` : ""}`,
-    roofDetails: job.roofType || "Roof details pending",
-    insuranceCarrier: "Not provided",
-    status: "New job",
-    lifetimeValue: job.value,
-  };
-}
-
-function mergeCustomerList(savedCustomers: Customer[], jobCustomers: Customer[]) {
-  return [...jobCustomers, ...savedCustomers].reduce<Customer[]>((mergedCustomers, nextCustomer) => {
-    const matchingIndex = mergedCustomers.findIndex((customer) =>
-      customer.id === nextCustomer.id ||
-      (customer.email && customer.email === nextCustomer.email) ||
-      (customer.phone && customer.phone === nextCustomer.phone) ||
-      customer.name.toLowerCase() === nextCustomer.name.toLowerCase()
-    );
-
-    if (matchingIndex === -1) return [...mergedCustomers, nextCustomer];
-
-    const currentCustomer = mergedCustomers[matchingIndex];
-    mergedCustomers[matchingIndex] = { ...nextCustomer, ...currentCustomer };
-    return mergedCustomers;
-  }, []);
 }
 
 function getCustomerJobs(customer: Customer, jobs: Lead[]) {
@@ -252,13 +224,12 @@ export default function CustomersPage() {
     return readRawLocalCustomers();
   });
   const [jobList, setJobList] = useState<Lead[]>(() => {
-    if (typeof window === "undefined") return leads;
+    if (typeof window === "undefined") return [];
     return getSavedJobs();
   });
-  const customerList = useMemo(
-    () => mergeCustomerList(savedCustomers, jobList.map(customerFromJob)),
-    [savedCustomers, jobList],
-  );
+  // Customer board shows ONLY live Supabase customer records (newest first from
+  // /api/customers) — never seeded/demo customers derived from jobs.
+  const customerList = savedCustomers;
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -462,7 +433,7 @@ export default function CustomersPage() {
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
-          <h1 className="mt-2 text-3xl font-black text-[#07183f]">Customers</h1>
+          <h1 className="mt-2 text-3xl font-black text-[#07183f]">Customers ({customerList.length})</h1>
           <p className="crm-board-subtitle mt-2 text-slate-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
         </div>
         <button onClick={() => setShowForm(true)} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>

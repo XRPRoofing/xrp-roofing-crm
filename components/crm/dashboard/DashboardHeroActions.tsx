@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Plus, X } from "lucide-react";
 import { appointmentTypes } from "@/lib/crm-conversations";
-import { upsertCustomerRecord } from "@/lib/customer-sync";
-import type { Customer } from "@/types/crm";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
 
 const emptyLead = { name: "", phone: "", email: "", propertyAddress: "", roofDetails: "", insuranceCarrier: "" };
 
@@ -45,19 +44,19 @@ export default function DashboardHeroActions() {
     }
     setLeadSaving(true);
     setLeadError("");
-    const customer: Customer = {
-      id: `C-${Date.now()}`,
-      name: leadForm.name.trim(),
-      email: leadForm.email.trim() || "customer@xrproofing.com",
-      phone: leadForm.phone.trim() || "(602) 555-0000",
-      propertyAddress: leadForm.propertyAddress.trim() || "Address pending",
-      roofDetails: leadForm.roofDetails.trim() || "Roof details pending",
-      insuranceCarrier: leadForm.insuranceCarrier.trim() || "Not provided",
-      status: "New lead",
-      lifetimeValue: 0,
-    };
     try {
-      await upsertCustomerRecord(customer);
+      // Find-or-create so a New lead never duplicates an existing customer
+      // (matched by phone -> email -> address) and lands on the Customer board.
+      await findOrCreateCustomer({
+        name: leadForm.name.trim(),
+        email: leadForm.email.trim(),
+        phone: leadForm.phone.trim(),
+        propertyAddress: leadForm.propertyAddress.trim(),
+        roofDetails: leadForm.roofDetails.trim(),
+        insuranceCarrier: leadForm.insuranceCarrier.trim(),
+        status: "New lead",
+        source: "Dashboard",
+      });
       setLeadOpen(false);
       router.push("/crm/customers");
     } catch {
