@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
-import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
+import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
@@ -46,7 +46,53 @@ function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: 
   );
 }
 
+const inboxFilters = ["All", "Unread", "Read", "Missed Calls", "New Leads", "Assigned"] as const;
+type InboxFilter = (typeof inboxFilters)[number];
+
+function conversationIsAssigned(conversation: ConversationRecord) {
+  const rep = conversation.contact.assignedRep?.trim().toLowerCase();
+  return Boolean(rep && rep !== "unassigned");
+}
+
+function conversationMatchesFilter(conversation: ConversationRecord, filter: InboxFilter) {
+  const unreadCount = conversation.isMissedCall ? 0 : conversation.unreadCount;
+  switch (filter) {
+    case "Unread":
+      return !conversation.isMissedCall && unreadCount > 0;
+    case "Read":
+      return !conversation.isMissedCall && unreadCount === 0;
+    case "Missed Calls":
+      return conversation.isMissedCall;
+    case "New Leads":
+      return conversation.isNewLead;
+    case "Assigned":
+      return conversationIsAssigned(conversation);
+    case "All":
+    default:
+      return true;
+  }
+}
+
 function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void; onCollapse?: () => void }) {
+  const [filter, setFilter] = useState<InboxFilter>("All");
+  const [search, setSearch] = useState("");
+
+  const counts = useMemo(() => {
+    const result = {} as Record<InboxFilter, number>;
+    for (const name of inboxFilters) result[name] = conversations.filter((conversation) => conversationMatchesFilter(conversation, name)).length;
+    return result;
+  }, [conversations]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return conversations.filter((conversation) => {
+      if (!conversationMatchesFilter(conversation, filter)) return false;
+      if (!query) return true;
+      return [conversation.contact.name, conversation.contact.phone, conversation.contact.address, conversation.lastMessage]
+        .some((value) => value?.toLowerCase().includes(query));
+    });
+  }, [conversations, filter, search]);
+
   return (
     <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
       <div className="border-b border-slate-200 p-4">
@@ -62,31 +108,44 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
         </div>
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search contacts" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search contacts" />
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {conversationFilters.slice(0, 4).map((filter) => <button key={filter} className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-blue-50 hover:text-blue-700">{filter}</button>)}
+          {inboxFilters.map((name) => {
+            const activeFilter = filter === name;
+            return (
+              <button key={name} type="button" onClick={() => setFilter(name)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeFilter ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
+                {name} <span className={activeFilter ? "text-blue-100" : "text-slate-400"}>({counts[name]})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {conversations.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">No conversations yet. Dial, receive a call, or send a text to create an accurate client conversation.</div>}
-        {conversations.map((conversation) => {
+        {conversations.length > 0 && visible.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">No conversations match {filter === "All" ? "your search" : `"${filter}"`}.</div>}
+        {visible.map((conversation) => {
           const selected = conversation.id === active?.id;
           const unreadCount = conversation.isMissedCall ? 0 : conversation.unreadCount;
           const status = conversation.isMissedCall ? "Missed call" : unreadCount > 0 ? "Unread" : "Read";
-          const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-emerald-700" : "text-orange-600";
+          const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-emerald-700" : "text-blue-600";
           return (
             <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-xl border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"}`}>
               <div className="flex items-start justify-between gap-3">
-                <p className="truncate text-base font-bold text-slate-950">{conversation.contact.name}</p>
-                <span className="shrink-0 text-xs text-slate-500">{conversation.lastActivityAt}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  {unreadCount > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden />}
+                  <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-slate-950" : "font-semibold text-slate-800"}`}>{conversation.contact.name}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {unreadCount > 0 && <Badge tone="blue">{unreadCount}</Badge>}
+                  <span className="text-xs text-slate-500">{conversation.lastActivityAt}</span>
+                </div>
               </div>
               <p className="mt-1 truncate text-sm font-medium text-slate-700">{conversation.contact.phone}</p>
               <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{conversation.contact.address}</p>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{conversation.lastMessage}</p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
-                {unreadCount > 0 && <Badge tone="orange">{unreadCount} new</Badge>}
               </div>
             </button>
           );
@@ -1260,14 +1319,19 @@ export default function ConversationBoard() {
         </div>
       )}
 
-      <div className={`${showMobileThread ? "hidden xl:block" : ""} z-30 mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:mb-5 sm:p-5 xl:shrink-0`}>
-        <div className="flex flex-col justify-between gap-3 sm:gap-4 lg:flex-row lg:items-end">
-          <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-xs">Communication center</p><h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:mt-1 sm:text-3xl">Conversations</h1><p className="mt-2 hidden max-w-3xl text-sm leading-6 text-slate-600 sm:block">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>{notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Enable notifications</button>}<p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
-          <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button></div>
+      <div className={`${showMobileThread ? "hidden xl:flex" : "flex"} z-30 mb-3 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm xl:shrink-0`}>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Conversations</h1>
+          <Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>
+          {notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="hidden rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 sm:inline">Enable notifications</button>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {twilioNotice && <p className="hidden max-w-xs truncate text-xs font-medium text-blue-700 lg:block">{twilioNotice}</p>}
+          <Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button>
         </div>
       </div>
 
-      <div className={`grid gap-5 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_340px]" : "xl:grid-cols-[320px_minmax(0,1fr)_340px]"}`}>
+      <div className={`grid gap-4 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
         <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:h-full xl:min-h-0`}>
           <div className={inboxCollapsed ? "xl:hidden" : "xl:h-full xl:min-h-0"}>
             <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
