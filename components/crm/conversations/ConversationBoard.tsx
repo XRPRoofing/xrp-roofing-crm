@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, conversationFilters, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
+import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, CheckCheck, Clock, FileImage, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCheck, ChevronDown, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -226,17 +228,12 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, callNotes, cal
   );
 }
 
-function SchedulerPanel() {
+function SchedulerPanel({ onSchedule }: { onSchedule: () => void }) {
   return (
     <Card className="p-4">
       <p className="text-sm font-semibold text-slate-950">Schedule appointment</p>
-      <div className="mt-3 grid gap-2">
-        <input type="date" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none" />
-        <input type="time" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none" />
-        <select className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none"><option>Johnny Roofer</option><option>Office Coordinator</option></select>
-        <select className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none">{appointmentTypes.map((type) => <option key={type}>{type}</option>)}</select>
-        <Button variant="primary">Save appointment</Button>
-      </div>
+      <p className="mt-1 text-xs leading-5 text-slate-500">Create an appointment for this contact. It syncs to the CRM calendar.</p>
+      <Button variant="primary" className="mt-3 w-full" onClick={onSchedule}><Calendar className="mr-1.5 h-4 w-4" />New appointment</Button>
     </Card>
   );
 }
@@ -446,7 +443,7 @@ function createLocalCommunicationEvent(type: TwilioConversationEvent["type"], ph
   };
 }
 
-function ContactPanel({ conversation, onDial, onContactChange }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void }) {
+function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void; onSchedule: () => void }) {
   const contact = conversation.contact;
   return (
     <aside className="space-y-4 xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-1">
@@ -487,7 +484,7 @@ function ContactPanel({ conversation, onDial, onContactChange }: { conversation:
         </div>
       </Card>
 
-      <SchedulerPanel />
+      <SchedulerPanel onSchedule={onSchedule} />
     </aside>
   );
 }
@@ -567,6 +564,12 @@ export default function ConversationBoard() {
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const [inboundReady, setInboundReady] = useState(false);
   const [selectedCallInsight, setSelectedCallInsight] = useState<TwilioConversationEvent | null>(null);
+  const router = useRouter();
+  const [stageMenuOpen, setStageMenuOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleForm, setScheduleForm] = useState({ title: "", date: "", startTime: "", endTime: "", jobKind: appointmentTypes[0], notes: "" });
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return "default";
     return Notification.permission;
@@ -653,6 +656,113 @@ export default function ConversationBoard() {
     if (!active) return;
 
     setConversations((current) => current.map((conversation) => conversation.id === active.id ? { ...conversation, contact: { ...conversation.contact, [field]: value } } : conversation));
+
+    // Persist the edit so it survives a refresh/relaunch (loaded back in via
+    // "crm-conversation-contact-edits" on mount).
+    if (typeof window !== "undefined") {
+      try {
+        const edits = JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>>;
+        edits[active.id] = { ...(edits[active.id] || {}), [field]: value };
+        window.localStorage.setItem("crm-conversation-contact-edits", JSON.stringify(edits));
+      } catch {
+        /* ignore storage failures */
+      }
+    }
+  }
+
+  function handleMoveStage(stage: string) {
+    handleContactChange("jobStatus", stage);
+    setStageMenuOpen(false);
+    setTwilioNotice(`Stage moved to ${stage}`);
+  }
+
+  function openScheduleModal() {
+    if (!active) return;
+    const today = new Date().toISOString().slice(0, 10);
+    setScheduleForm({
+      title: `Roof inspection — ${active.contact.name}`,
+      date: today,
+      startTime: "09:00",
+      endTime: "10:00",
+      jobKind: appointmentTypes[0],
+      notes: active.contact.notes || "",
+    });
+    setScheduleError("");
+    setScheduleOpen(true);
+  }
+
+  async function handleSaveSchedule(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (!active) return;
+    setScheduleSaving(true);
+    setScheduleError("");
+    try {
+      const response = await fetch("/api/google-calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: scheduleForm.title.trim() || `Appointment — ${active.contact.name}`,
+          name: active.contact.name,
+          phone: active.contact.phone,
+          address: active.contact.address || active.contact.name,
+          jobKind: scheduleForm.jobKind,
+          date: scheduleForm.date,
+          startTime: scheduleForm.startTime,
+          endTime: scheduleForm.endTime,
+          notes: scheduleForm.notes,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        setScheduleError(data.error || "Unable to create the appointment. Connect Google Calendar on the Calendar board first.");
+        return;
+      }
+      setScheduleOpen(false);
+      setTwilioNotice("Appointment added to the CRM calendar");
+    } catch {
+      setScheduleError("Unable to create the appointment.");
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  function handleCreateEstimate() {
+    if (!active) return;
+    const contact = active.contact;
+    const id = `P-${Date.now()}`;
+    const history = active.messages
+      .filter((message) => message.body)
+      .slice(-8)
+      .map((message) => `${message.author}: ${message.body}`)
+      .join("\n");
+    // A proposal IS the estimate + proposal draft on the Estimates board. Created
+    // as a Draft (never auto-sent) and fully editable there.
+    const proposal = {
+      id,
+      customerName: contact.name,
+      customerEmail: contact.email || "",
+      customerPhone: contact.phone || "",
+      address: contact.address || "",
+      scope: `Roofing scope for ${contact.roofType || "the property"} at ${contact.address || contact.name}. Edit to add line items and pricing.`,
+      total: 0,
+      status: "Draft" as const,
+      template: "Standard",
+      title: `${contact.name} Roofing Estimate`,
+      summary: `Prepared for ${contact.name}${contact.roofType ? ` — ${contact.roofType}` : ""}.`,
+      coverPhoto: "",
+      coverText: "",
+      notes: history ? `From conversation:\n${history}` : "",
+      terms: "",
+    };
+    try {
+      const existing = JSON.parse(window.localStorage.getItem("xrp-crm-proposals") || "[]") as unknown[];
+      window.localStorage.setItem("xrp-crm-proposals", JSON.stringify([proposal, ...existing]));
+    } catch {
+      /* ignore storage failures; server upsert still runs */
+    }
+    void upsertProposalRecord(proposal);
+    setTwilioNotice(`Estimate draft created for ${contact.name}`);
+    router.push("/crm/proposals");
   }
 
   function applyLocalEvent(event: TwilioConversationEvent) {
@@ -1003,7 +1113,7 @@ export default function ConversationBoard() {
       <div className={`${showMobileThread ? "hidden xl:block" : ""} z-30 mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:mb-5 sm:p-5 xl:sticky xl:top-20`}>
         <div className="flex flex-col justify-between gap-3 sm:gap-4 lg:flex-row lg:items-end">
           <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-xs">Communication center</p><h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:mt-1 sm:text-3xl">Conversations</h1><p className="mt-2 hidden max-w-3xl text-sm leading-6 text-slate-600 sm:block">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>{notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Enable notifications</button>}<p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
-          <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button><div className="hidden flex-wrap gap-2 sm:flex">{pipelineStages.slice(0, 3).map((stage) => <Button key={stage}>{stage}</Button>)}</div></div>
+          <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button><div className="hidden flex-wrap gap-2 sm:flex">{pipelineStages.slice(0, 3).map((stage) => <Button key={stage} onClick={() => active && handleMoveStage(stage)}>{stage}</Button>)}</div></div>
         </div>
       </div>
 
@@ -1016,7 +1126,7 @@ export default function ConversationBoard() {
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
-                <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><div className="hidden flex-wrap gap-2 sm:flex"><Button>Move stage</Button><Button>Schedule</Button><Button>Create estimate</Button></div></div>
+                <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-slate-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
               <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-5 overflow-y-auto overscroll-contain scroll-smooth p-5 pb-20">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
@@ -1035,10 +1145,37 @@ export default function ConversationBoard() {
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
-        {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} /></div>}
+        {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
       </div>
 
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
+
+      {scheduleOpen && active && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setScheduleOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+              <p className="text-base font-bold text-slate-950">Schedule appointment</p>
+              <button type="button" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              <p className="text-xs text-slate-500">For {active.contact.name}{active.contact.address ? ` · ${active.contact.address}` : ""}</p>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span><input value={scheduleForm.title} onChange={(event) => setScheduleForm((form) => ({ ...form, title: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Appointment title" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</span><select value={scheduleForm.jobKind} onChange={(event) => setScheduleForm((form) => ({ ...form, jobKind: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white">{appointmentTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Date</span><input type="date" value={scheduleForm.date} onChange={(event) => setScheduleForm((form) => ({ ...form, date: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start</span><input type="time" value={scheduleForm.startTime} onChange={(event) => setScheduleForm((form) => ({ ...form, startTime: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">End</span><input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((form) => ({ ...form, endTime: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+              </div>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</span><textarea value={scheduleForm.notes} onChange={(event) => setScheduleForm((form) => ({ ...form, notes: event.target.value }))} rows={3} className="resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Optional details" /></label>
+              {scheduleError && <p className="text-sm font-medium text-red-600">{scheduleError}</p>}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+              <Button onClick={() => setScheduleOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => handleSaveSchedule()} className={scheduleSaving ? "pointer-events-none opacity-60" : ""}>{scheduleSaving ? "Saving…" : "Save appointment"}</Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {!isDialerOpen && (
         <div className={`fixed bottom-6 right-6 z-40 flex-col items-end gap-3 ${showMobileThread ? "hidden xl:flex" : "flex"}`}>
