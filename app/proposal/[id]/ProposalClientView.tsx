@@ -22,6 +22,13 @@ type PublicProposal = {
   signedAt?: string;
   signedBy?: string;
   signatureDataUrl?: string;
+  signatureData?: string;
+  acceptedPackage?: "good" | "better" | "best";
+  acceptedPackageName?: string;
+  acceptedPrice?: number;
+  acceptedAt?: string;
+  proposalVersion?: number;
+  locked?: boolean;
   packages?: {
     good?: string | { scope?: string; price?: number };
     better?: string | { scope?: string; price?: number };
@@ -100,6 +107,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }, [proposal.id, proposal.status]);
 
   async function handleSelectOption(option: "good" | "better" | "best") {
+    if (isAccepted) return; // a signed proposal is locked; selection can't change
     const packageOption = packages[option];
     setSelectedOption(option);
     setProposal((currentProposal) => ({ ...currentProposal, selectedOption: option, total: packageOption.price }));
@@ -110,13 +118,22 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     if (!agreementAccepted || !signatureDataUrl) return;
 
     const signedAt = new Date().toISOString();
+    // Lock the accepted record: package, name, price and signature become the
+    // immutable source of truth. These are never recalculated from templates.
     const updates = {
       selectedOption,
+      acceptedPackage: selectedOption,
+      acceptedPackageName: packageMeta[selectedOption].label,
+      acceptedPrice: selectedPackage.price,
       total: selectedPackage.price,
       status: "Won",
       signedAt,
+      acceptedAt: signedAt,
       signedBy: proposal.customerName || "Customer",
       signatureDataUrl,
+      signatureData: signatureDataUrl,
+      proposalVersion: proposal.proposalVersion ?? 1,
+      locked: true,
     };
 
     setProposal((currentProposal) => ({ ...currentProposal, ...updates }));
@@ -207,7 +224,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                         <li className="text-sm leading-6 text-slate-500">Professional roofing option prepared by XRP Roofing.</li>
                       )}
                     </ul>
-                    <button type="button" onClick={() => handleSelectOption(option)} className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold transition ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "✓ Selected" : "Select this option"}</button>
+                    <button type="button" disabled={isAccepted} onClick={() => handleSelectOption(option)} className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold transition ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"} ${isAccepted && !selected ? "cursor-not-allowed opacity-50" : ""} ${isAccepted ? "cursor-default" : ""}`}>{selected ? (isAccepted ? "✓ Accepted" : "✓ Selected") : "Select this option"}</button>
                   </article>
                 );
               })}

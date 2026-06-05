@@ -5,6 +5,7 @@ import Image from "next/image";
 import { leads } from "@/lib/crm-data";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
+import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import type { Lead } from "@/types/crm";
@@ -64,6 +65,13 @@ type Proposal = {
   signedAt?: string;
   signedBy?: string;
   signatureData?: string;
+  signatureDataUrl?: string;
+  acceptedPackage?: "good" | "better" | "best";
+  acceptedPackageName?: string;
+  acceptedPrice?: number;
+  acceptedAt?: string;
+  proposalVersion?: number;
+  locked?: boolean;
   deletedAt?: string;
   selectedOption?: "good" | "better" | "best";
   inspectionPhotos?: InspectionPhoto[];
@@ -577,6 +585,9 @@ export default function ProposalsPage() {
 
   useEffect(() => {
     if (!dataLoaded || !activeProposal) return;
+    // A signed proposal is locked: never auto-overwrite its package/price/
+    // signature from the editor form (those are the immutable accepted values).
+    if (isProposalLocked(activeProposal)) return;
 
     const timeout = window.setTimeout(() => {
       const updatedProposal: Proposal = {
@@ -856,6 +867,7 @@ export default function ProposalsPage() {
       sendSubject: sendForm.subject,
       sendMessage: sendForm.message,
       sentToEmail: sendForm.toEmail,
+      proposalVersion: (activeProposal.proposalVersion ?? 0) + 1,
     });
     const proposalForLink = sentProposal || activeProposal;
     const proposalLink = `${window.location.origin}/proposal/${encodeURIComponent(proposalForLink.id)}`;
@@ -945,10 +957,21 @@ export default function ProposalsPage() {
   function handleAcceptProposal() {
     if (!activeProposal || !agreementAccepted || !typedSignature.trim()) return;
 
+    const acceptedOption = activeProposal.selectedOption || "best";
+    const acceptedPrice = Number(editorForm.total) || activeProposal.total || 0;
+    const signedAt = new Date().toISOString();
     const signedProposal = saveActiveProposal({
       status: "Won",
-      signedAt: new Date().toISOString(),
+      signedAt,
+      acceptedAt: signedAt,
       signedBy: typedSignature.trim(),
+      selectedOption: acceptedOption,
+      acceptedPackage: acceptedOption,
+      acceptedPackageName: acceptedOption.charAt(0).toUpperCase() + acceptedOption.slice(1),
+      acceptedPrice,
+      total: acceptedPrice,
+      proposalVersion: activeProposal.proposalVersion ?? 1,
+      locked: true,
     });
 
     if (signedProposal) {
@@ -987,9 +1010,26 @@ export default function ProposalsPage() {
         {(activeProposal.status === "Won" || activeProposal.status === "Signed") && (
           <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4">
             <div className="mx-auto max-w-5xl rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Signed proposal copy</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Signed proposal copy</p>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">🔒 Locked</span>
+              </div>
               <p className="mt-2 text-sm font-bold text-slate-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
-              {activeProposal.signatureData && <Image src={activeProposal.signatureData} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted package</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted price</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Version</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">v{activeProposal.proposalVersion ?? 1}</p>
+                </div>
+              </div>
+              {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
             </div>
           </div>
         )}
@@ -1044,7 +1084,8 @@ export default function ProposalsPage() {
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total
-                <input type="number" value={editorForm.total} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" />
+                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[10px] font-bold normal-case tracking-normal text-emerald-700">🔒 Locked at the signed amount</span>}
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Customer notes
@@ -1618,8 +1659,8 @@ export default function ProposalsPage() {
             </button>
             <div className="flex items-center justify-end gap-3">
               <div className="text-right">
-                <p className="font-black text-slate-600">${proposal.total.toLocaleString()}</p>
-                <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.selectedOption || "BEST"}</p>
+                <p className="font-black text-slate-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
+                <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" ? "bg-emerald-500 text-white" : "bg-yellow-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
               <button type="button" onClick={() => handleDeleteProposal(proposal)} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">Delete</button>

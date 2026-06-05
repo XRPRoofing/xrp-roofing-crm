@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
+import { applyProposalLock } from "@/lib/proposal-lock";
 
 export const runtime = "nodejs";
 
@@ -57,9 +58,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid proposal" }, { status: 400 });
   }
 
+  // Never let a stale board copy overwrite a signed proposal's locked
+  // package/price/signature — re-impose the locked fields from the stored row.
+  const { data: existing } = await admin
+    .from(proposalsTable)
+    .select("payload")
+    .eq("id", proposal.id)
+    .single();
+  const payload = applyProposalLock(existing?.payload ?? null, proposal);
+
   const { error } = await admin
     .from(proposalsTable)
-    .upsert({ id: proposal.id, payload: proposal, updated_at: new Date().toISOString() }, { onConflict: "id" });
+    .upsert({ id: proposal.id, payload, updated_at: new Date().toISOString() }, { onConflict: "id" });
 
   if (error) {
     return NextResponse.json(
@@ -71,7 +81,7 @@ export async function POST(req: NextRequest) {
       { status: 503 },
     );
   }
-  return NextResponse.json({ ok: true, proposal });
+  return NextResponse.json({ ok: true, proposal: payload });
 }
 
 export async function DELETE(req: NextRequest) {
