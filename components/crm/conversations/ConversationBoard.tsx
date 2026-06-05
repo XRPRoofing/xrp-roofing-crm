@@ -11,7 +11,7 @@ import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, Calendar, CheckCheck, ChevronDown, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -36,7 +36,7 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[tone]}`}>{children}</span>;
 }
 
-function ConversationInbox({ conversations, active, onSelect }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void }) {
+function ConversationInbox({ conversations, active, onSelect, onNew }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void }) {
   return (
     <Card className="flex min-h-0 flex-col overflow-hidden xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
       <div className="border-b border-slate-200 p-4">
@@ -45,7 +45,7 @@ function ConversationInbox({ conversations, active, onSelect }: { conversations:
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Inbox</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">Conversations</h2>
           </div>
-          <Button variant="primary" className="h-10 w-10 p-0"><Plus className="h-4 w-4" /></Button>
+          <Button variant="primary" className="h-10 w-10 p-0" onClick={onNew} aria-label="New conversation"><Plus className="h-4 w-4" /></Button>
         </div>
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -137,47 +137,50 @@ function MessageRow({ message }: { message: ConversationMessage }) {
 
 function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; onOpen: (event: TwilioConversationEvent) => void }) {
   const isProcessing = event.status === "processing";
+  const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
 
   return (
-    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-950">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-bold">{isProcessing ? "Call recording saved" : "Call recording available"}</p>
-        <div className="flex items-center gap-2">
-          {isProcessing && <Badge tone="slate">Processing summary</Badge>}
-          <span className="text-xs font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleString()}</span>
-        </div>
+    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-950">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 font-bold"><Sparkles className="h-3.5 w-3.5" />Call summary</p>
+        <span className="text-[11px] font-semibold text-emerald-700">{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
       </div>
-      {event.recordingUrl && <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="mt-3 w-full" />}
-      <button onClick={() => onOpen(event)} className="mt-3 inline-flex rounded-full bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">Click here for call transcript</button>
+      {isProcessing ? (
+        <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />Generating summary…</p>
+      ) : (
+        <p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words leading-5 text-emerald-900">{summary || "Summary unavailable."}</p>
+      )}
+      <button onClick={() => onOpen(event)} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-emerald-800 underline-offset-2 hover:underline">Details &amp; recording<ChevronRight className="h-3.5 w-3.5" /></button>
     </div>
   );
 }
 
 function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEvent | null; onClose: () => void }) {
+  const [showTranscript, setShowTranscript] = useState(false);
   if (!event) return null;
 
   const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="max-h-[86vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4" onClick={onClose}>
+      <div onClick={(clickEvent) => clickEvent.stopPropagation()} className="flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <div>
-            <p className="text-sm font-bold text-slate-950">Call summary and transcript</p>
+            <p className="text-sm font-bold text-slate-950">Call summary</p>
             <p className="text-xs font-semibold text-slate-500">{new Date(event.createdAt).toLocaleString()}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"><X className="h-5 w-5" /></button>
         </div>
-        <div className="max-h-[calc(86vh-5rem)] space-y-4 overflow-y-auto p-4">
-          {event.recordingUrl && <a href={proxyRecordingUrl(event.recordingUrl)} target="_blank" rel="noreferrer" className="inline-flex text-xs font-bold text-blue-700 underline">Open call recording</a>}
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Summary Call</p>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{summary || "Summary is still processing or unavailable."}</p>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-700"><Sparkles className="h-3.5 w-3.5" />Summary</p>
+            <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{summary || "Summary is still processing or unavailable."}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Call Transcript</p>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{transcript || "Transcript is still processing or unavailable."}</p>
+          {event.recordingUrl && <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="w-full" />}
+          <div className="rounded-xl border border-slate-200 bg-slate-50">
+            <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
+            {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-slate-800">{transcript || "Transcript is still processing or unavailable."}</p>}
           </div>
         </div>
       </div>
@@ -570,6 +573,10 @@ export default function ConversationBoard() {
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleForm, setScheduleForm] = useState({ title: "", date: "", startTime: "", endTime: "", jobKind: appointmentTypes[0], notes: "" });
+  const [newConvoOpen, setNewConvoOpen] = useState(false);
+  const [newConvoName, setNewConvoName] = useState("");
+  const [newConvoPhone, setNewConvoPhone] = useState("");
+  const [newConvoError, setNewConvoError] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return "default";
     return Notification.permission;
@@ -1087,6 +1094,48 @@ export default function ConversationBoard() {
     }
   }
 
+  function startNewConversation(event?: React.FormEvent) {
+    event?.preventDefault();
+    const phone = newConvoPhone.trim();
+    if (!phone) {
+      setNewConvoError("Enter a phone number");
+      return;
+    }
+    const name = newConvoName.trim();
+    const base = createManualConversation(phone);
+    const conversation = name ? { ...base, contact: { ...base.contact, name } } : base;
+
+    setConversations((current) => current.some((item) => item.id === conversation.id)
+      ? current.map((item) => item.id === conversation.id ? { ...item, contact: { ...item.contact, ...(name ? { name } : {}) } } : item)
+      : [conversation, ...current]);
+    setActiveConversationId(conversation.id);
+    setDialNumber(phone);
+    setShowMobileThread(true);
+
+    if (name && typeof window !== "undefined") {
+      try {
+        const edits = JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>>;
+        edits[conversation.id] = { ...(edits[conversation.id] || {}), name };
+        window.localStorage.setItem("crm-conversation-contact-edits", JSON.stringify(edits));
+      } catch {
+        /* ignore storage failures */
+      }
+    }
+
+    setNewConvoOpen(false);
+    setNewConvoName("");
+    setNewConvoPhone("");
+    setNewConvoError("");
+    setTwilioNotice(`New conversation started with ${name || phone}`);
+  }
+
+  function openNewConversation() {
+    setNewConvoName("");
+    setNewConvoPhone("");
+    setNewConvoError("");
+    setNewConvoOpen(true);
+  }
+
   function openDialerForConversation(conversation: ConversationRecord) {
     setActiveConversationId(conversation.id);
     setDialNumber(conversation.contact.phone);
@@ -1119,7 +1168,7 @@ export default function ConversationBoard() {
 
       <div className="grid gap-5 xl:grid-cols-[320px_minmax(520px,1fr)_340px]">
         <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
-          <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} />
+          <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} />
         </div>
         <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
           {active ? (
@@ -1149,6 +1198,27 @@ export default function ConversationBoard() {
       </div>
 
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
+
+      {newConvoOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setNewConvoOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={startNewConversation} className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+              <p className="text-base font-bold text-slate-950">New conversation</p>
+              <button type="button" onClick={() => setNewConvoOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone number</span><input value={newConvoPhone} onChange={(event) => { setNewConvoPhone(event.target.value); setNewConvoError(""); }} inputMode="tel" autoFocus className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Name (optional)</span><input value={newConvoName} onChange={(event) => setNewConvoName(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Customer name" /></label>
+              {newConvoError && <p className="text-sm font-medium text-red-600">{newConvoError}</p>}
+              <p className="text-xs leading-5 text-slate-500">Starts a new SMS conversation. Type your message and tap send.</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+              <Button onClick={() => setNewConvoOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => startNewConversation()}><MessageCircle className="mr-1.5 h-4 w-4" />Start conversation</Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {scheduleOpen && active && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setScheduleOpen(false)}>
