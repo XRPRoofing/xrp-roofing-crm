@@ -1220,7 +1220,7 @@ export default function ConversationBoard() {
   }
 
   return (
-    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] overflow-x-clip bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       {incomingCall && (
         <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
@@ -1241,11 +1241,11 @@ export default function ConversationBoard() {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[320px_minmax(520px,1fr)_340px]">
+      <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
         <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
           <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} />
         </div>
-        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
           {active ? (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
