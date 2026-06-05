@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, CalendarCheck2, CalendarPlus, Edit3, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Search, ShieldCheck, UploadCloud, Voicemail, X } from "lucide-react";
+import Link from "next/link";
+import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { leadStages, leads } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
-import { customerSyncEnabled, loadCustomerRecords, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
+import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
@@ -133,6 +134,118 @@ function getStageLabel(job: Lead) {
   return leadStages.find((stage) => stage.id === job.stage)?.label || job.stage.replace(/_/g, " ");
 }
 
+const profileTabs = ["Contact Info", "Jobs", "Estimates", "Invoices", "Files", "Notes", "Communication History"] as const;
+type ProfileTab = (typeof profileTabs)[number];
+
+const customerNotesKey = "xrp-crm-customer-notes";
+
+type StoredProposal = {
+  id: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  address?: string;
+  title?: string;
+  scope?: string;
+  total?: number;
+  status?: string;
+};
+type StoredInvoiceLineItem = { quantity?: number; unitPrice?: number; tax?: number };
+type StoredInvoice = {
+  id: string;
+  invoiceNumber?: string;
+  clientName?: string;
+  email?: string;
+  phone?: string;
+  propertyAddress?: string;
+  status?: string;
+  discount?: number;
+  lineItems?: StoredInvoiceLineItem[];
+};
+
+function normalizeText(value?: string) {
+  return (value || "").toLowerCase().trim();
+}
+
+function digitsOnly(value?: string) {
+  return (value || "").replace(/\D/g, "");
+}
+
+// Match an external record (invoice / proposal / search field) to a customer by
+// email, phone, or name so the profile tabs show only that customer's records.
+function customerMatchesContact(customer: Customer, fields: { name?: string; email?: string; phone?: string }) {
+  const customerPhone = digitsOnly(customer.phone);
+  const customerEmail = normalizeText(customer.email);
+  if (fields.email && customerEmail && normalizeText(fields.email) === customerEmail) return true;
+  if (fields.phone && customerPhone && digitsOnly(fields.phone) === customerPhone) return true;
+  if (fields.name && normalizeText(fields.name) === normalizeText(customer.name)) return true;
+  return false;
+}
+
+function getActiveJobCount(customer: Customer, jobs: Lead[]) {
+  return getCustomerJobs(customer, jobs).filter((job) => !["completed", "paid"].includes(job.stage)).length;
+}
+
+function readStoredInvoices(): StoredInvoice[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem("xrp-crm-invoices") || "[]") as StoredInvoice[];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredProposals(): StoredProposal[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem("xrp-crm-proposals") || "[]") as StoredProposal[];
+  } catch {
+    return [];
+  }
+}
+
+function invoiceTotal(invoice: StoredInvoice) {
+  const items = invoice.lineItems || [];
+  const subtotal = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0);
+  const tax = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0) * ((item.tax || 0) / 100), 0);
+  return Math.max(subtotal + tax - (invoice.discount || 0), 0);
+}
+
+function getCustomerInvoices(customer: Customer, invoices: StoredInvoice[]) {
+  return invoices.filter((invoice) => customerMatchesContact(customer, { name: invoice.clientName, email: invoice.email, phone: invoice.phone }));
+}
+
+function getCustomerProposals(customer: Customer, proposals: StoredProposal[]) {
+  return proposals.filter((proposal) => customerMatchesContact(customer, { name: proposal.customerName, email: proposal.customerEmail, phone: proposal.customerPhone }));
+}
+
+function readCustomerNotes(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(customerNotesKey) || "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function writeCustomerNote(id: string, note: string) {
+  if (typeof window === "undefined") return;
+  const all = readCustomerNotes();
+  if (note.trim()) all[id] = note;
+  else delete all[id];
+  window.localStorage.setItem(customerNotesKey, JSON.stringify(all));
+}
+
+function statusTone(status?: string) {
+  const value = normalizeText(status);
+  if (!value) return "bg-slate-100 text-slate-600";
+  if (["paid", "won", "complete", "completed"].some((token) => value.includes(token))) return "bg-emerald-100 text-emerald-700";
+  if (["progress", "active", "scheduled"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
+  if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-rose-100 text-rose-700";
+  if (value.includes("new")) return "bg-orange-100 text-orange-700";
+  return "bg-slate-100 text-slate-600";
+}
+
 export default function CustomersPage() {
   const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => {
     if (typeof window === "undefined") return [];
@@ -149,8 +262,13 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("Contact Info");
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Customer | null>(null);
+  const [storedInvoices, setStoredInvoices] = useState<StoredInvoice[]>([]);
+  const [storedProposals, setStoredProposals] = useState<StoredProposal[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
+  const [noteDraft, setNoteDraft] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -165,6 +283,16 @@ export default function CustomersPage() {
   const selectedCustomer = customerList.find((customer) => customer.id === selectedCustomerId) || null;
   const selectedCustomerJobs = selectedCustomer ? getCustomerJobs(selectedCustomer, jobList) : [];
   const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, jobList) : [];
+  const selectedCustomerInvoices = selectedCustomer ? getCustomerInvoices(selectedCustomer, storedInvoices) : [];
+  const selectedCustomerProposals = selectedCustomer ? getCustomerProposals(selectedCustomer, storedProposals) : [];
+
+  function openCustomer(customer: Customer) {
+    setSelectedCustomerId(customer.id);
+    setActiveTab("Contact Info");
+    setEditingCustomerId(null);
+    setEditForm(null);
+    setNoteDraft(readCustomerNotes()[customer.id] || "");
+  }
 
   const filteredCustomers = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -173,10 +301,33 @@ export default function CustomersPage() {
 
     return customerList.filter((customer) => {
       const relatedJobs = getCustomerJobs(customer, jobList);
-      return [customer.name, ...relatedJobs.map((job) => `${job.name} ${job.city} ${job.stage} ${job.roofType}`)]
-        .some((value) => value.toLowerCase().includes(query));
+      return [
+        customer.name,
+        customer.phone,
+        customer.email,
+        customer.propertyAddress,
+        ...relatedJobs.map((job) => `${job.name} ${job.city} ${job.stage} ${job.roofType} ${job.address}`),
+      ].some((value) => normalizeText(value).includes(query));
     });
   }, [customerList, jobList, search]);
+
+  // Estimates (proposals), invoices, and per-customer notes power the profile
+  // tabs. They are re-read on mount, on window focus, and on cross-tab storage
+  // changes so the profile always reflects the latest records without a refresh.
+  useEffect(() => {
+    function refreshRecords() {
+      setStoredInvoices(readStoredInvoices());
+      setStoredProposals(readStoredProposals());
+      setCustomerNotes(readCustomerNotes());
+    }
+    refreshRecords();
+    window.addEventListener("focus", refreshRecords);
+    window.addEventListener("storage", refreshRecords);
+    return () => {
+      window.removeEventListener("focus", refreshRecords);
+      window.removeEventListener("storage", refreshRecords);
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -227,25 +378,35 @@ export default function CustomersPage() {
     };
   }, []);
 
-  function handleAddCustomer(event: React.FormEvent<HTMLFormElement>) {
+  // After every create/update/delete we await persistence then re-fetch the
+  // authoritative list from Supabase so the board never shows stale data. The
+  // optimistic update keeps the change instant; the re-fetch reconciles it.
+  async function syncFromServer(expectId?: string, keepIfMissing = false) {
+    const records = await loadCustomerRecords();
+    setSavedCustomers((current) => {
+      if (keepIfMissing && expectId && !records.some((record) => record.id === expectId)) return current;
+      return records;
+    });
+  }
+
+  async function handleAddCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const shouldKeepAdding = submitter?.value === "add-another";
 
     const newCustomer: Customer = {
       id: `C-${Date.now()}`,
-      name: form.name,
-      email: form.email || "customer@xrproofing.com",
-      phone: form.phone || "(602) 555-0000",
-      propertyAddress: form.propertyAddress || "Address pending",
-      roofDetails: form.roofDetails || "Roof details pending",
-      insuranceCarrier: form.insuranceCarrier || "Not provided",
-      status: form.status || "New customer",
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      propertyAddress: form.propertyAddress.trim(),
+      roofDetails: form.roofDetails.trim(),
+      insuranceCarrier: form.insuranceCarrier.trim(),
+      status: form.status.trim() || "New customer",
       lifetimeValue: Number(form.lifetimeValue) || 0,
     };
 
     setSavedCustomers((current) => [newCustomer, ...current.filter((item) => item.id !== newCustomer.id)]);
-    void upsertCustomerRecord(newCustomer);
     setForm({
       name: "",
       email: "",
@@ -257,25 +418,43 @@ export default function CustomersPage() {
       lifetimeValue: "",
     });
     setShowForm(shouldKeepAdding);
+    await upsertCustomerRecord(newCustomer);
+    await syncFromServer(newCustomer.id, true);
   }
 
   function handleEditCustomer(customer: Customer) {
     setEditingCustomerId(customer.id);
     setEditForm(customer);
+    setActiveTab("Contact Info");
   }
 
-  function handleSaveCustomer(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSaveCustomer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editForm) return;
 
+    const edited = editForm;
     setSavedCustomers((current) =>
-      current.some((customer) => customer.id === editForm.id)
-        ? current.map((customer) => (customer.id === editForm.id ? editForm : customer))
-        : [editForm, ...current],
+      current.some((customer) => customer.id === edited.id)
+        ? current.map((customer) => (customer.id === edited.id ? edited : customer))
+        : [edited, ...current],
     );
-    void upsertCustomerRecord(editForm);
     setEditingCustomerId(null);
     setEditForm(null);
+    await upsertCustomerRecord(edited);
+    await syncFromServer(edited.id, true);
+  }
+
+  async function handleDeleteCustomer(id: string) {
+    if (typeof window !== "undefined" && !window.confirm("Delete this customer? This cannot be undone.")) return;
+    setSavedCustomers((current) => current.filter((customer) => customer.id !== id));
+    setSelectedCustomerId(null);
+    await deleteCustomerRecord(id);
+    await syncFromServer();
+  }
+
+  function handleSaveNote(id: string) {
+    writeCustomerNote(id, noteDraft);
+    setCustomerNotes(readCustomerNotes());
   }
 
   return (
@@ -314,31 +493,25 @@ export default function CustomersPage() {
 
       <div className="relative max-w-xl">
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 outline-none" placeholder="Search customer name or related jobs..." />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 outline-none" placeholder="Search by name, phone, email, or property address..." />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3 2xl:grid-cols-4">
         {filteredCustomers.map((customer) => {
-          const relatedJobs = getCustomerJobs(customer, jobList);
-          const primaryJob = relatedJobs[0];
+          const activeJobs = getActiveJobCount(customer, jobList);
           return (
-            <button key={customer.id} type="button" onClick={() => setSelectedCustomerId(customer.id)} className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
-              <h2 className="text-lg font-black text-[#07183f]">{customer.name}</h2>
-              <div className="mt-4 grid gap-3 text-sm">
-                <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                  <CalendarPlus className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Date Job Added</p>
-                    <p className="font-bold text-slate-900">{getJobAddedDate(primaryJob)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-                  <CalendarCheck2 className="h-5 w-5 text-emerald-600" />
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Date Job Completed</p>
-                    <p className="font-bold text-slate-900">{getJobCompletedDate(relatedJobs)}</p>
-                  </div>
-                </div>
+            <button key={customer.id} type="button" onClick={() => openCustomer(customer)} className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-lg font-black leading-tight text-[#07183f]">{customer.name}</h2>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(customer.status)}`}>{customer.status || "New customer"}</span>
+              </div>
+              <div className="mt-3 space-y-2 text-sm">
+                <p className="flex items-start gap-2 text-slate-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold">{customer.propertyAddress || "Address pending"}</span></p>
+                <p className="flex items-center gap-2 text-slate-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold">{customer.phone || "No phone on file"}</span></p>
+              </div>
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                <BriefcaseBusiness className="h-4 w-4 text-blue-700" />
+                <span className="text-sm font-bold text-slate-900">{activeJobs} active job{activeJobs === 1 ? "" : "s"}</span>
               </div>
             </button>
           );
@@ -348,98 +521,184 @@ export default function CustomersPage() {
       {selectedCustomer && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={() => setSelectedCustomerId(null)}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
-              <div className="flex items-start justify-between gap-4">
+            <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
+              <div className="flex items-start justify-between gap-4 p-5 pb-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Customer profile</p>
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedCustomer.name}</h2>
-                  <p className="text-sm font-bold text-slate-500">{selectedCustomerJobs.length} related job{selectedCustomerJobs.length === 1 ? "" : "s"}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusTone(selectedCustomer.status)}`}>{selectedCustomer.status || "New customer"}</span>
+                    <span className="text-sm font-bold text-slate-500">{getActiveJobCount(selectedCustomer, jobList)} active • {selectedCustomerJobs.length} total job{selectedCustomerJobs.length === 1 ? "" : "s"}</span>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => handleEditCustomer(selectedCustomer)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100"><Edit3 className="h-5 w-5" /></button>
+                  {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
+                    <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-5 w-5" /></button>
+                  )}
                   <button type="button" onClick={() => setSelectedCustomerId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
+              </div>
+              <div className="flex gap-1 overflow-x-auto px-3">
+                {profileTabs.map((tab) => {
+                  const count =
+                    tab === "Jobs" ? selectedCustomerJobs.length :
+                    tab === "Estimates" ? selectedCustomerProposals.length :
+                    tab === "Invoices" ? selectedCustomerInvoices.length :
+                    tab === "Communication History" ? selectedCustomerCommunications.length :
+                    null;
+                  return (
+                    <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === tab ? "border-orange-500 text-orange-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                      {tab}{count ? ` (${count})` : ""}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="space-y-5 p-5">
-              {editingCustomerId === selectedCustomer.id && editForm ? (
-                <form onSubmit={handleSaveCustomer} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
-                  <input required value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer name" />
-                  <input type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
-                  <input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
-                  <input value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Status" />
-                  <input required value={editForm.propertyAddress} onChange={(event) => setEditForm({ ...editForm, propertyAddress: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none sm:col-span-2" placeholder="Property address" />
-                  <input value={editForm.roofDetails} onChange={(event) => setEditForm({ ...editForm, roofDetails: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Roof details" />
-                  <input value={editForm.insuranceCarrier} onChange={(event) => setEditForm({ ...editForm, insuranceCarrier: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Insurance carrier" />
-                  <input type="number" value={editForm.lifetimeValue} onChange={(event) => setEditForm({ ...editForm, lifetimeValue: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Lifetime value" />
-                  <button className="rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save changes</button>
-                </form>
-              ) : null}
+              {activeTab === "Contact Info" && (
+                <>
+                  {editingCustomerId === selectedCustomer.id && editForm ? (
+                    <form onSubmit={handleSaveCustomer} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                      <input required value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer name" />
+                      <input type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
+                      <input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
+                      <input value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Status" />
+                      <input required value={editForm.propertyAddress} onChange={(event) => setEditForm({ ...editForm, propertyAddress: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none sm:col-span-2" placeholder="Property address" />
+                      <input value={editForm.roofDetails} onChange={(event) => setEditForm({ ...editForm, roofDetails: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Roof details" />
+                      <input value={editForm.insuranceCarrier} onChange={(event) => setEditForm({ ...editForm, insuranceCarrier: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Insurance carrier" />
+                      <input type="number" value={editForm.lifetimeValue} onChange={(event) => setEditForm({ ...editForm, lifetimeValue: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Lifetime value" />
+                      <div className="flex gap-2 sm:col-span-2">
+                        <button className="rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save changes</button>
+                        <button type="button" onClick={() => { setEditingCustomerId(null); setEditForm(null); }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Cancel</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <section className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Phone Number</p><p className="font-bold text-slate-900">{selectedCustomer.phone || "Not provided"}</p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Email Address</p><p className="font-bold text-slate-900">{selectedCustomer.email || "Not provided"}</p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Full Property Address</p><p className="font-bold text-slate-900">{selectedCustomer.propertyAddress || "Not provided"}</p></div>
+                      </section>
+                      <section className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Roof details</p><p className="mt-2 font-bold text-slate-900">{selectedCustomer.roofDetails || "Not provided"}</p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="h-5 w-5 text-orange-600" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Insurance status</p><p className="font-bold text-slate-900">{selectedCustomer.insuranceCarrier || "Not provided"}</p></div>
+                      </section>
+                    </>
+                  )}
+                </>
+              )}
 
-              <section className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Phone Number</p><p className="font-bold text-slate-900">{selectedCustomer.phone}</p></div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Email Address</p><p className="font-bold text-slate-900">{selectedCustomer.email}</p></div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Full Property Address</p><p className="font-bold text-slate-900">{selectedCustomer.propertyAddress}</p></div>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Related Jobs</h3></div>
-                <div className="mt-4 space-y-3">
-                  {selectedCustomerJobs.length > 0 ? selectedCustomerJobs.map((job) => (
-                    <div key={job.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-                        <div>
-                          <p className="font-black text-slate-900">{job.roofType}</p>
-                          <p className="text-sm font-bold text-slate-500">{getStageLabel(job)} • {job.city}, AZ</p>
+              {activeTab === "Jobs" && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Jobs</h3></div>
+                  <div className="mt-4 space-y-3">
+                    {selectedCustomerJobs.length > 0 ? selectedCustomerJobs.map((job) => (
+                      <div key={job.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                          <div>
+                            <p className="font-black text-slate-900">{job.roofType}</p>
+                            <p className="text-sm font-bold text-slate-500">{getStageLabel(job)} • {job.city}, AZ</p>
+                          </div>
+                          <p className="font-black text-[#07183f]">${job.value.toLocaleString()}</p>
                         </div>
-                        <p className="font-black text-[#07183f]">${job.value.toLocaleString()}</p>
+                        <div className="mt-3 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3">
+                          <p className="flex items-center gap-1"><CalendarCheck2 className="h-3.5 w-3.5 text-slate-400" />Added: {getJobAddedDate(job)}</p>
+                          <p>Due: {formatDate(job.dueDate)}</p>
+                          <p>Completed: {getJobCompletedDate([job])}</p>
+                        </div>
                       </div>
-                      <div className="mt-3 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3">
-                        <p>Added: {getJobAddedDate(job)}</p>
-                        <p>Due: {formatDate(job.dueDate)}</p>
-                        <p>Completed: {getJobCompletedDate([job])}</p>
+                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No related jobs found yet.</p>}
+                  </div>
+                </section>
+              )}
+
+              {activeTab === "Estimates" && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center gap-2"><FileSignature className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Estimates &amp; Proposals</h3></div>
+                  <div className="mt-4 space-y-3">
+                    {selectedCustomerProposals.length > 0 ? selectedCustomerProposals.map((proposal) => (
+                      <div key={proposal.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-900">{proposal.title || proposal.scope || "Estimate"}</p>
+                          <p className="truncate text-sm font-bold text-slate-500">{proposal.address || selectedCustomer.propertyAddress}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-black text-[#07183f]">${(proposal.total || 0).toLocaleString()}</p>
+                          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(proposal.status)}`}>{proposal.status || "Draft"}</span>
+                        </div>
                       </div>
-                    </div>
-                  )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No related jobs found yet.</p>}
-                </div>
-              </section>
+                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No estimates linked to this customer yet. <Link href="/crm/proposals" className="text-blue-700 hover:text-blue-800">Open Estimates board →</Link></p>}
+                  </div>
+                </section>
+              )}
 
-              <section className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Roof details</p><p className="mt-2 font-bold text-slate-900">{selectedCustomer.roofDetails}</p></div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><ShieldCheck className="h-5 w-5 text-orange-600" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Insurance status</p><p className="font-bold text-slate-900">{selectedCustomer.insuranceCarrier}</p></div>
-              </section>
+              {activeTab === "Invoices" && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center gap-2"><Receipt className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Invoices</h3></div>
+                  <div className="mt-4 space-y-3">
+                    {selectedCustomerInvoices.length > 0 ? selectedCustomerInvoices.map((invoice) => (
+                      <div key={invoice.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-slate-900">{invoice.invoiceNumber || `Invoice ${invoice.id}`}</p>
+                          <p className="truncate text-sm font-bold text-slate-500">{invoice.propertyAddress || selectedCustomer.propertyAddress}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-black text-[#07183f]">${invoiceTotal(invoice).toLocaleString()}</p>
+                          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(invoice.status)}`}>{invoice.status || "Draft"}</span>
+                        </div>
+                      </div>
+                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No invoices linked to this customer yet. <Link href="/crm/invoices" className="text-blue-700 hover:text-blue-800">Open Invoices board →</Link></p>}
+                  </div>
+                </section>
+              )}
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Calls, Messages & Recordings</h3></div>
-                <div className="mt-4 space-y-3">
-                  {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: { conversation: ConversationRecord; message: ConversationMessage }) => {
-                    const Icon = getCommunicationIcon(message);
-                    return (
-                      <div key={`${conversation.id}-${message.id}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-blue-50 p-2 text-blue-700"><Icon className="h-4 w-4" /></div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-sm font-black text-slate-900">{getCommunicationLabel(message)} • Job #{conversation.jobId || "Unassigned"}</p>
-                              <p className="text-xs font-bold text-slate-500">{message.timestamp}</p>
+              {activeTab === "Files" && (
+                <section className="grid gap-3 sm:grid-cols-3">
+                  <Link href="/crm/files" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><ImageIcon className="mb-2 h-5 w-5 text-blue-700" />Photos</Link>
+                  <Link href="/crm/files" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><FileText className="mb-2 h-5 w-5 text-blue-700" />Documents</Link>
+                  <Link href="/crm/files" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><UploadCloud className="mb-2 h-5 w-5 text-blue-700" />Upload Files</Link>
+                </section>
+              )}
+
+              {activeTab === "Notes" && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Notes</h3></div>
+                  <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows={6} className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none" placeholder="Add internal notes about this customer..." />
+                  <div className="mt-3 flex items-center gap-2">
+                    <button type="button" onClick={() => handleSaveNote(selectedCustomer.id)} className="rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save note</button>
+                    {customerNotes[selectedCustomer.id] && noteDraft === customerNotes[selectedCustomer.id] && <span className="text-xs font-bold text-emerald-600">Saved</span>}
+                  </div>
+                </section>
+              )}
+
+              {activeTab === "Communication History" && (
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Calls, Messages &amp; Recordings</h3></div>
+                  <div className="mt-4 space-y-3">
+                    {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: { conversation: ConversationRecord; message: ConversationMessage }) => {
+                      const Icon = getCommunicationIcon(message);
+                      return (
+                        <div key={`${conversation.id}-${message.id}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-blue-50 p-2 text-blue-700"><Icon className="h-4 w-4" /></div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-black text-slate-900">{getCommunicationLabel(message)} • Job #{conversation.jobId || "Unassigned"}</p>
+                                <p className="text-xs font-bold text-slate-500">{message.timestamp}</p>
+                              </div>
+                              <p className="mt-1 text-sm font-medium leading-5 text-slate-700">{message.body}</p>
+                              <p className="mt-2 text-xs font-bold text-slate-500">Customer #{conversation.customerId || selectedCustomer.id} • Conversation #{conversation.id}</p>
+                              {message.recordingUrl && <a href={proxyRecordingUrl(message.recordingUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700 hover:text-blue-800">Open recording</a>}
                             </div>
-                            <p className="mt-1 text-sm font-medium leading-5 text-slate-700">{message.body}</p>
-                            <p className="mt-2 text-xs font-bold text-slate-500">Customer #{conversation.customerId || selectedCustomer.id} • Conversation #{conversation.id}</p>
-                            {message.recordingUrl && <a href={proxyRecordingUrl(message.recordingUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-black text-blue-700 hover:text-blue-800">Open recording</a>}
                           </div>
                         </div>
-                      </div>
-                    );
-                  }) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No linked calls, messages, or recordings yet.</p>}
-                </div>
-              </section>
-
-              <section className="grid gap-3 sm:grid-cols-3">
-                <button type="button" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><ImageIcon className="mb-2 h-5 w-5 text-blue-700" />Photos</button>
-                <button type="button" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><FileText className="mb-2 h-5 w-5 text-blue-700" />Documents</button>
-                <button type="button" className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50"><UploadCloud className="mb-2 h-5 w-5 text-blue-700" />Upload Files</button>
-              </section>
+                      );
+                    }) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No linked calls, messages, or recordings yet.</p>}
+                  </div>
+                </section>
+              )}
             </div>
           </aside>
         </div>
