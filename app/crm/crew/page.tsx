@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 import { ensureInvoiceTaskForCompletedJob } from "@/lib/office-tasks";
 import { crewMembers, crewStatuses, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 import {
@@ -73,9 +72,6 @@ export default function CrewWorkflowPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [checklistDraft, setChecklistDraft] = useState("");
   const [newJob, setNewJob] = useState({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
-  const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
-  const [annotatorKey, setAnnotatorKey] = useState(0);
-  const pendingPhotoRef = useRef<{ job: CrewJob; type: "Before" | "Progress" | "After" } | null>(null);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
@@ -202,6 +198,8 @@ export default function CrewWorkflowPage() {
     updateAssignment(job.id, { assignedCrew });
   }
 
+  // Capture/upload saves the photo instantly — no forced markup step. Drawings
+  // and notes can be added later per-photo from the job's Files folder.
   async function handlePhotoUpload(job: CrewJob, type: "Before" | "Progress" | "After", files: FileList | null) {
     if (!files?.length) return;
 
@@ -214,35 +212,25 @@ export default function CrewWorkflowPage() {
       return;
     }
 
-    pendingPhotoRef.current = { job, type };
-    setAnnotatorKey((key) => key + 1);
-    setAnnotatorImages(selectedFiles.map((file, index) => ({ name: file.name, dataUrl: uploadedPhotos[index] })));
-  }
-
-  async function handleAnnotatedPhotos(results: AnnotatedResult[]) {
-    setAnnotatorImages(null);
-    const pending = pendingPhotoRef.current;
-    pendingPhotoRef.current = null;
-    if (!pending || results.length === 0) return;
-    const { job, type } = pending;
+    const items = selectedFiles.map((file, index) => ({ name: file.name || `photo-${Date.now()}-${index + 1}.jpg`, dataUrl: uploadedPhotos[index] }));
     const uploadedBy = job.assignedCrew[0] || "Crew";
 
     // Show the photos immediately, then save/sync in the background.
-    const optimisticPhotos = buildOptimisticPhotosFromData(job.id, type, results.map((result) => ({ name: result.name, dataUrl: result.dataUrl })), uploadedBy);
+    const optimisticPhotos = buildOptimisticPhotosFromData(job.id, type, items, uploadedBy);
     const previousPhotos = photos;
     const previousSelected = selectedPhotos;
     setPhotos((current) => [...current, ...optimisticPhotos.map((photo) => ({ ...photo, dataUrl: "" }))]);
     if (job.id === selectedJobId) setSelectedPhotos((current) => [...current, ...optimisticPhotos]);
 
     try {
-      await addJobPhotos(job.id, results.map((result) => ({ photoType: type, name: result.name, dataUrl: result.dataUrl, uploadedBy })));
+      await addJobPhotos(job.id, items.map((item) => ({ photoType: type, name: item.name, dataUrl: item.dataUrl, uploadedBy })));
       await refresh();
       if (job.id === selectedJobId) {
         setSelectedPhotos(await loadJobPhotos(job.id));
       }
       addCrmNotification({
         title: "Crew photos uploaded",
-        message: `${results.length} ${type.toLowerCase()} photo(s) uploaded for ${job.name}.`,
+        message: `${items.length} ${type.toLowerCase()} photo(s) uploaded for ${job.name}.`,
         actor: uploadedBy,
         module: "Crew Workflow",
       });
@@ -607,7 +595,6 @@ export default function CrewWorkflowPage() {
           </aside>
         </div>
       )}
-      <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotatedPhotos} onCancel={() => { pendingPhotoRef.current = null; setAnnotatorImages(null); }} />
     </div>
   );
 }

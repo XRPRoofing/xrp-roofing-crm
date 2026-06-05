@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 
 type GoogleCalendarEvent = {
@@ -122,6 +122,7 @@ export default function CalendarPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const agendaRef = useRef<HTMLDivElement>(null);
   const [newScheduleOpen, setNewScheduleOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -185,6 +186,16 @@ export default function CalendarPage() {
   function shiftMonth(delta: number) {
     setSelectedDayKey(null);
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }
+
+  // Select a day (and optionally open one event). Scrolls the openable day strip
+  // into view so every event on that day is reachable without hunting.
+  function openDay(key: string, event?: GoogleCalendarEvent) {
+    setSelectedDayKey(key);
+    if (event) setSelectedEvent(event);
+    window.requestAnimationFrame(() => {
+      agendaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   }
 
   async function loadEvents() {
@@ -369,30 +380,34 @@ export default function CalendarPage() {
             const isToday = key === todayKey;
             const isSelected = key === activeDayKey;
             return (
-              <div key={key} onClick={() => setSelectedDayKey(key)} className={`min-h-16 cursor-pointer rounded-xl border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50 hover:border-orange-200"}`}>
+              <div key={key} onClick={() => openDay(key)} className={`min-h-16 cursor-pointer rounded-xl border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50 hover:border-orange-200"}`}>
                 <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-slate-500"}`}>
                   {isToday ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white sm:h-6 sm:w-6">{cellDate.getDate()}</span> : cellDate.getDate()}
                 </div>
                 <div className="mt-1 space-y-1">
-                  {dayEvents.slice(0, 3).map((event) => {
-                    const phone = getEventDetails(event).phone;
-                    const tel = telHref(phone);
-                    return (
-                      <div key={event.id} className="group flex items-center gap-1 rounded-lg bg-orange-50 px-1.5 py-1 ring-1 ring-orange-100">
-                        <button type="button" onClick={(clickEvent) => { clickEvent.stopPropagation(); setSelectedEvent(event); }} className="min-w-0 flex-1 text-left text-orange-700">
-                          <span className="block truncate text-[10px] font-black leading-tight sm:text-[11px]">{event.summary || "Untitled event"}</span>
-                          <span className="block truncate text-[9px] font-semibold text-orange-500 sm:text-[10px]">{formatEventTime(event)}</span>
-                        </button>
-                        {tel && (
-                          <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} aria-label={`Call ${phone}`} title={`Call ${phone}`} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
-                            <Phone className="h-2.5 w-2.5" />
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {dayEvents.length > 3 && (
-                    <p className="text-[10px] font-bold text-slate-500 sm:text-[11px]">+{dayEvents.length - 3} more</p>
+                  {/* Desktop: show up to 2 readable chips. Tapping the day opens
+                      the full openable strip below so nothing is ever hidden. */}
+                  {dayEvents.slice(0, 2).map((event) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      onClick={(clickEvent) => { clickEvent.stopPropagation(); openDay(key, event); }}
+                      className="hidden w-full truncate rounded-lg bg-orange-50 px-1.5 py-1 text-left text-[11px] font-black leading-tight text-orange-700 ring-1 ring-orange-100 sm:block"
+                    >
+                      {formatEventTime(event)} · {event.summary || "Untitled event"}
+                    </button>
+                  ))}
+                  {/* A single readable "N events" pill works on every screen size
+                      (replaces the cramped chips + hidden "+N more"). */}
+                  {dayEvents.length > 0 && (
+                    <span
+                      className={`block rounded-lg bg-orange-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white sm:hidden`}
+                    >
+                      {dayEvents.length}
+                    </span>
+                  )}
+                  {dayEvents.length > 2 && (
+                    <span className="hidden text-[11px] font-bold text-orange-600 sm:block">{dayEvents.length} events →</span>
                   )}
                 </div>
               </div>
@@ -400,42 +415,50 @@ export default function CalendarPage() {
           })}
         </div>
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div ref={agendaRef} className="mt-4 scroll-mt-20 border-t border-slate-100 pt-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black uppercase tracking-[0.16em] text-orange-600">{activeDayLabel}</h3>
-            <span className="text-xs font-bold text-slate-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"}</span>
+            <span className="text-xs font-bold text-slate-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"} · swipe →</span>
           </div>
-          <div className="mt-3 space-y-2">
-            {agendaEvents.length === 0 && (
-              <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">No events on this day. Tap any date above to see its appointments.</p>
-            )}
-            {agendaEvents.map((event) => {
-              const details = getEventDetails(event);
-              const tel = telHref(details.phone);
-              return (
-                <button key={event.id} type="button" onClick={() => setSelectedEvent(event)} className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99] hover:border-orange-200">
-                  <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-orange-50 px-1.5 py-2 text-center text-orange-700">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span className="mt-0.5 text-[11px] font-black leading-tight">{formatEventTime(event)}</span>
+          {agendaEvents.length === 0 ? (
+            <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">No events on this day. Tap any date above to see its appointments.</p>
+          ) : (
+            // Horizontal, swipeable strip: every event on the day is its own card
+            // you can scroll to and open — nothing is hidden behind "+N more".
+            <div className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+              {agendaEvents.map((event) => {
+                const details = getEventDetails(event);
+                const tel = telHref(details.phone);
+                return (
+                  <div key={event.id} className="flex w-[80%] max-w-[20rem] shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:w-72">
+                    <button type="button" onClick={() => setSelectedEvent(event)} className="flex flex-1 items-start gap-3 text-left">
+                      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-orange-50 px-1.5 py-2 text-center text-orange-700">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="mt-0.5 text-[11px] font-black leading-tight">{formatEventTime(event)}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-[#07183f]">{event.summary || "Untitled event"}</p>
+                        {details.name !== "Not provided" && (
+                          <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
+                        )}
+                        {details.address !== "Not provided" && (
+                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-slate-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />{details.address}</p>
+                        )}
+                      </div>
+                    </button>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button type="button" onClick={() => setSelectedEvent(event)} className="flex-1 rounded-xl bg-orange-500 px-3 py-2 text-xs font-black text-white transition hover:bg-orange-600">Open</button>
+                      {tel && (
+                        <a href={tel} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
+                          <Phone className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-black text-[#07183f]">{event.summary || "Untitled event"}</p>
-                    {details.name !== "Not provided" && (
-                      <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
-                    )}
-                    {details.address !== "Not provided" && (
-                      <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-slate-500"><MapPin className="h-3 w-3 shrink-0 text-slate-400" />{details.address}</p>
-                    )}
-                  </div>
-                  {tel && (
-                    <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

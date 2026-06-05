@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Calendar, Check, Copy, FolderOpen, Lock, Share2, X } from "lucide-react";
+import { ArrowLeft, Calendar, Camera, Check, Copy, FolderOpen, Lock, Share2, UploadCloud, X } from "lucide-react";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
-import { loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
+import { addJobPhotos, loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
+import { loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
+import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
@@ -20,6 +23,11 @@ export default function FolderGalleryPage() {
   const [imagesById, setImagesById] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showShare, setShowShare] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
+  const [annotatorKey, setAnnotatorKey] = useState(0);
+  const editTargetRef = useRef<{ photoType: GalleryPhoto["photoType"] } | null>(null);
 
   // The crew dataset is metadata-only (no image bytes), so fetch the actual
   // images for this folder's job(s) on demand and key them by photo id.
@@ -38,33 +46,92 @@ export default function FolderGalleryPage() {
   }, []);
 
   const refresh = useCallback(async () => {
-    const data = await loadCrewDataset();
-    const match = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
-    setFolder(match);
-    await loadFolderImages(match);
+    const [data, manual] = await Promise.all([loadCrewDataset(), loadManualFolders()]);
+    const crewMatch = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
+    const meta = manual.find((item) => item.id === folderId) || null;
+    // Manual folder metadata (nice name/address) wins; fall back to the
+    // crew-derived folder for auto folders.
+    const resolved: CrmFileFolder | null = meta
+      ? {
+          id: meta.id,
+          name: meta.name,
+          address: meta.address,
+          workType: meta.workType,
+          jobId: meta.id,
+          customerName: meta.customerName || crewMatch?.customerName || "",
+          updatedAt: crewMatch?.updatedAt || meta.createdAt,
+          files: crewMatch?.files || [],
+        }
+      : crewMatch;
+    setFolder(resolved);
+    await loadFolderImages(resolved);
     setLoading(false);
   }, [folderId, loadFolderImages]);
 
   useEffect(() => {
-    let mounted = true;
-    void loadCrewDataset()
-      .then(async (data) => {
-        if (!mounted) return;
-        const match = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
-        setFolder(match);
-        await loadFolderImages(match);
-        if (mounted) setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    void refresh().catch(() => setLoading(false));
 
     const unsubscribe = subscribeToCrewData(() => {
       void refresh().catch(() => {});
     });
+    const onManual = () => { void refresh().catch(() => {}); };
+    window.addEventListener(manualFoldersUpdatedEvent, onManual);
     return () => {
-      mounted = false;
       unsubscribe();
+      window.removeEventListener(manualFoldersUpdatedEvent, onManual);
     };
-  }, [folderId, refresh, loadFolderImages]);
+  }, [refresh]);
+
+  // Capture/upload photos straight into this folder — saved instantly, no forced
+  // markup step. (Markup/notes are available later per-photo from the gallery.)
+  const addPhotos = useCallback(async (files: FileList | null) => {
+    if (!files?.length || !folder) return;
+    const list = Array.from(files);
+    setUploading(true);
+    setError("");
+    try {
+      const dataUrls = await Promise.all(list.map((file) => compressImageToDataUrl(file)));
+      await addJobPhotos(folder.jobId, dataUrls.map((dataUrl, index) => ({
+        photoType: "Job Photo" as const,
+        name: list[index].name || `photo-${Date.now()}-${index + 1}.jpg`,
+        dataUrl,
+        uploadedBy: "Office",
+      })));
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to add photos.");
+    } finally {
+      setUploading(false);
+    }
+  }, [folder, refresh]);
+
+  // Open the markup editor for an existing photo. Saving produces a NEW flattened
+  // image (drawing + note baked in) added back into this same folder.
+  const editPhoto = useCallback((photo: GalleryPhoto) => {
+    if (!photo.dataUrl) return;
+    editTargetRef.current = { photoType: photo.photoType };
+    setAnnotatorKey((key) => key + 1);
+    setAnnotatorImages([{ name: photo.name, dataUrl: photo.dataUrl }]);
+  }, []);
+
+  const handleAnnotated = useCallback(async (results: AnnotatedResult[]) => {
+    setAnnotatorImages(null);
+    const target = editTargetRef.current;
+    editTargetRef.current = null;
+    if (!folder || results.length === 0) return;
+    setError("");
+    try {
+      await addJobPhotos(folder.jobId, results.map((result) => ({
+        photoType: (target?.photoType as "Before" | "Progress" | "After" | "Job Photo") || "Job Photo",
+        name: result.name,
+        dataUrl: result.dataUrl,
+        uploadedBy: "Office",
+      })));
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to save edited photo.");
+    }
+  }, [folder, refresh]);
 
   const photos = useMemo<GalleryPhoto[]>(
     () =>
@@ -104,23 +171,37 @@ export default function FolderGalleryPage() {
                   <p className="mt-2 text-xs font-bold text-slate-400">{folder.files.length} photos · Last updated {formatDate(folder.updatedAt)}</p>
                 </div>
               </div>
-              <button onClick={() => setShowShare(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white shadow-sm transition hover:bg-blue-700">
-                <Share2 className="h-4 w-4" /> Share Folder
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#07183f] px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-900 ${uploading ? "opacity-60" : ""}`}>
+                  <Camera className="h-4 w-4" /> Take Photo
+                  <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files); event.target.value = ""; }} />
+                </label>
+                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
+                  <UploadCloud className="h-4 w-4" /> Upload
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files); event.target.value = ""; }} />
+                </label>
+                <button onClick={() => setShowShare(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-700">
+                  <Share2 className="h-4 w-4" /> Share
+                </button>
+              </div>
             </div>
+            {error && <p className="mt-3 rounded-2xl bg-red-50 px-4 py-2 text-sm font-bold text-red-700">{error}</p>}
+            {uploading && <p className="mt-3 text-sm font-bold text-blue-600">Saving photos…</p>}
+            <p className="mt-3 text-xs font-semibold text-slate-500">Tip: photos save instantly. To draw or add a note, open a photo below and tap <span className="font-black text-slate-700">Edit / Note</span>.</p>
           </section>
 
           {photos.length === 0 ? (
-            <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">No photos in this folder yet.</section>
+            <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">No photos in this folder yet. Use <span className="font-black text-slate-700">Take Photo</span> or <span className="font-black text-slate-700">Upload</span> above to add some.</section>
           ) : (
             <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-              <PhotoGallery photos={photos} />
+              <PhotoGallery photos={photos} onEditPhoto={editPhoto} />
             </section>
           )}
         </>
       )}
 
       {showShare && folder && <ShareFolderModal folder={folder} onClose={() => setShowShare(false)} />}
+      <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotated} onCancel={() => { editTargetRef.current = null; setAnnotatorImages(null); }} />
     </div>
   );
 }
