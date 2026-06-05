@@ -6,6 +6,7 @@ import { leads } from "@/lib/crm-data";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import type { Lead } from "@/types/crm";
 
 declare global {
@@ -356,6 +357,7 @@ export default function ProposalsPage() {
   const [selectedJobId, setSelectedJobId] = useState(leads[0]?.id || "");
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
   const prevProposalsRef = useRef<Proposal[]>(initialProposals);
+  const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -526,6 +528,22 @@ export default function ProposalsPage() {
     window.localStorage.setItem(proposalsLocalKey, JSON.stringify(proposals));
   }, [dataLoaded, proposals]);
 
+  // One-click handoff from a Job / customer profile: open the requested estimate
+  // editor directly, or create one from the job and open it (linked by job id).
+  // Consume-once so a normal later visit isn't hijacked.
+  useEffect(() => {
+    if (!dataLoaded || boardIntentHandledRef.current) return;
+    const intent = takeEstimateIntent();
+    boardIntentHandledRef.current = true;
+    if (!intent) return;
+    if (intent.kind === "open") {
+      const existing = proposals.find((proposal) => proposal.id === intent.id);
+      if (existing) openProposal(existing);
+      return;
+    }
+    createEstimateFromLead(payloadToLead(intent.job));
+  }, [dataLoaded, proposals]);
+
   // Push every local change to the shared store so other devices see it. Diffing
   // against the previous list keeps the many existing handlers untouched: any
   // create/edit becomes an upsert, and a permanent delete (row removed from the
@@ -677,6 +695,44 @@ export default function ProposalsPage() {
     setAddress("");
     setScope("");
     setTotal("");
+  }
+
+  // Create an estimate directly from a job (one-click from the Jobs board /
+  // customer profile) and open its editor. The job is stored on the proposal so
+  // future clicks open this same estimate instead of creating another.
+  function createEstimateFromLead(job: Lead) {
+    const newProposal: Proposal = {
+      id: `P-${1001 + proposals.length}`,
+      job,
+      customerName: job.name,
+      customerEmail: job.email,
+      customerPhone: job.phone,
+      address: job.city ? `${job.address}, ${job.city}` : job.address,
+      scope: `${job.roofType || "Roofing"} roofing proposal`,
+      total: job.value || 0,
+      status: "Draft",
+      template: "executive",
+      title: "BEST ROOFING PROPOSAL",
+      summary: "A professional roofing proposal prepared for review and approval.",
+      coverPhoto: "/images/logo.jpeg",
+      coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
+      notes: "Includes professional roof assessment, materials, labor, cleanup, and customer-ready project documentation.",
+      terms: defaultTerms,
+      inspectionPhotos: defaultInspectionPhotos,
+      packages: defaultPackages,
+    };
+
+    setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    void findOrCreateCustomer({
+      name: newProposal.customerName,
+      email: newProposal.customerEmail,
+      phone: newProposal.customerPhone,
+      propertyAddress: newProposal.address,
+      status: "Estimate",
+      lifetimeValue: newProposal.total,
+      source: "Estimate",
+    }).catch(() => {});
+    openProposal(newProposal);
   }
 
   function applyTemplateToEditor(template: ProposalTemplate) {
