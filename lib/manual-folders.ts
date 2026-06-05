@@ -1,6 +1,7 @@
 "use client";
 
 import { hasSupabaseConfig } from "@/lib/supabase/client";
+import { MANUAL_FOLDER_SOURCE, deleteJobRecord, upsertJobRecord, type JobRecord } from "@/lib/crew-sync";
 
 /**
  * Manually-created Files folders.
@@ -26,6 +27,37 @@ export const manualFoldersUpdatedEvent = "crm-manual-folders-updated";
 
 export function newManualFolderId() {
   return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// A manual folder is backed by a hidden job row so its photos satisfy the
+// job_photos -> jobs foreign key and flow through the normal photo pipeline.
+// The row is tagged MANUAL_FOLDER_SOURCE so loadCrewDataset hides it from every
+// job board. Idempotent: also heals folders created before this backing existed.
+export async function ensureManualFolderJob(folder: ManualFolder): Promise<void> {
+  const backingJob: JobRecord = {
+    id: folder.id,
+    name: folder.customerName || folder.name,
+    email: "",
+    phone: "",
+    address: folder.address || folder.name,
+    city: "",
+    stage: "new_lead",
+    value: 0,
+    assignedTo: "",
+    roofType: folder.workType || "General",
+    source: MANUAL_FOLDER_SOURCE,
+    lastActivity: "Manual folder",
+    nextAction: "",
+    dueDate: "",
+    status: "Assigned",
+    assignedCrew: [],
+    scheduleDate: "",
+    jobScope: folder.workType || "General",
+    jobNotes: "",
+    completionNotes: "",
+    materialsUsed: "",
+  };
+  await upsertJobRecord(backingJob);
 }
 
 function readLocal(): ManualFolder[] {
@@ -71,6 +103,9 @@ export async function createManualFolder(input: {
     createdAt: new Date().toISOString(),
   };
 
+  // Create the backing job row first so photos can be saved into the folder.
+  await ensureManualFolderJob(folder);
+
   if (!hasSupabaseConfig()) {
     writeLocal([folder, ...readLocal()]);
     return folder;
@@ -95,6 +130,8 @@ export async function createManualFolder(input: {
 }
 
 export async function deleteManualFolder(id: string): Promise<void> {
+  // Remove the backing job (cascades its photos) alongside the folder metadata.
+  await deleteJobRecord(id).catch(() => {});
   if (!hasSupabaseConfig()) {
     writeLocal(readLocal().filter((folder) => folder.id !== id));
     return;
