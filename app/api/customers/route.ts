@@ -33,9 +33,26 @@ function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function missingTable(message: string | undefined) {
-  return Boolean(message && message.includes("does not exist"));
+// Detect "table/column not found" across both Postgres ("does not exist") and
+// PostgREST (schema-cache) error shapes so a missing migration is reported
+// clearly instead of a generic failure.
+function missingSchema(error: { message?: string; code?: string } | null | undefined) {
+  if (!error) return false;
+  const message = (error.message || "").toLowerCase();
+  const code = error.code || "";
+  return (
+    message.includes("does not exist") ||
+    message.includes("could not find the table") ||
+    message.includes("could not find the") ||
+    message.includes("schema cache") ||
+    code === "PGRST205" ||
+    code === "PGRST204" ||
+    code === "42P01"
+  );
 }
+
+const MISSING_TABLE_MESSAGE =
+  "The customer_records table is missing. Run supabase/customer-records.sql in your Supabase project, then try again.";
 
 export async function GET() {
   const admin = getAdminClient();
@@ -46,11 +63,12 @@ export async function GET() {
     .select("id, payload, updated_at")
     .order("updated_at", { ascending: false });
   if (error) {
-    return NextResponse.json(
-      missingTable(error.message)
-        ? { customers: [], error: "The customer_records table is missing. Run supabase/customer-records.sql." }
-        : { customers: [] },
-    );
+    return NextResponse.json({
+      customers: [],
+      error: missingSchema(error) ? MISSING_TABLE_MESSAGE : "Unable to load customers.",
+      detail: error.message,
+      code: error.code,
+    });
   }
   const customers = (data as CustomerRow[])
     .map((row) => (row.payload ? { ...row.payload, id: row.id } : null))
@@ -78,9 +96,9 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json(
       {
-        error: missingTable(error.message)
-          ? "The customer_records table is missing. Run supabase/customer-records.sql, then try again."
-          : "Unable to save customer.",
+        error: missingSchema(error) ? MISSING_TABLE_MESSAGE : "Unable to save customer.",
+        detail: error.message,
+        code: error.code,
       },
       { status: 503 },
     );
@@ -94,8 +112,8 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const { error } = await admin.from(customersTable).delete().eq("id", id);
-  if (error && !missingTable(error.message)) {
-    return NextResponse.json({ error: "Unable to delete customer." }, { status: 503 });
+  if (error && !missingSchema(error)) {
+    return NextResponse.json({ error: "Unable to delete customer.", detail: error.message, code: error.code }, { status: 503 });
   }
   return NextResponse.json({ ok: true });
 }

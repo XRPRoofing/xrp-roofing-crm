@@ -34,33 +34,60 @@ function writeLocal(customers: Customer[]) {
   window.localStorage.setItem(customersLocalKey, JSON.stringify(customers));
 }
 
-/** Load every shared manual customer record. */
-export async function loadCustomerRecords(): Promise<Customer[]> {
-  if (!hasSupabaseConfig()) return readLocal();
+/** Result of a write, so callers can surface a clear error to the user. */
+export type CustomerSyncResult = { ok: boolean; error?: string };
+/** Result of a load, including any server-reported error (e.g. missing table). */
+export type CustomerLoadResult = { customers: Customer[]; error?: string };
+
+/**
+ * Load every shared customer record, surfacing any server error. The API
+ * returns 200 with an `error` field (and empty list) when the Supabase table
+ * is missing, so we propagate it for the board to display.
+ */
+export async function loadCustomerRecordsResult(): Promise<CustomerLoadResult> {
+  if (!hasSupabaseConfig()) return { customers: readLocal() };
   try {
     const response = await fetch("/api/customers", { cache: "no-store" });
-    if (!response.ok) return readLocal();
-    const data = (await response.json()) as { customers?: Customer[] };
-    return data.customers || [];
+    const data = (await response.json().catch(() => ({}))) as { customers?: Customer[]; error?: string };
+    if (!response.ok) return { customers: readLocal(), error: data.error || "Unable to load customers." };
+    return { customers: data.customers || [], error: data.error };
   } catch {
-    return readLocal();
+    return { customers: readLocal(), error: "Network error loading customers." };
   }
 }
 
-/** Create or update one customer record (shared across devices). */
-export async function upsertCustomerRecord(customer: Customer): Promise<void> {
+/** Load every shared manual customer record. */
+export async function loadCustomerRecords(): Promise<Customer[]> {
+  return (await loadCustomerRecordsResult()).customers;
+}
+
+/**
+ * Create or update one customer record (shared across devices). Returns a
+ * result so the UI can show a real error instead of silently dropping the
+ * record: a non-OK HTTP response does NOT throw, so the old code lost data
+ * whenever the server returned an error (e.g. missing table). We now report it
+ * and keep a local copy as a safety net so the entry is never lost.
+ */
+export async function upsertCustomerRecord(customer: Customer): Promise<CustomerSyncResult> {
   if (!hasSupabaseConfig()) {
     writeLocal([customer, ...readLocal().filter((item) => item.id !== customer.id)]);
-    return;
+    return { ok: true };
   }
   try {
-    await fetch("/api/customers", {
+    const response = await fetch("/api/customers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(customer),
     });
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      writeLocal([customer, ...readLocal().filter((item) => item.id !== customer.id)]);
+      return { ok: false, error: data.error || "Unable to save customer." };
+    }
+    return { ok: true };
   } catch {
     writeLocal([customer, ...readLocal().filter((item) => item.id !== customer.id)]);
+    return { ok: false, error: "Network error saving customer." };
   }
 }
 
