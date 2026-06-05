@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { leadStages } from "@/lib/crm-data";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
@@ -11,6 +12,7 @@ import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCus
 import type { ConversationChannel, ConversationMessage } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
+import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -253,6 +255,7 @@ export default function CustomersPage() {
   // Customer board shows ONLY live Supabase customer records (newest first from
   // /api/customers) — never seeded/demo customers derived from jobs.
   const customerList = savedCustomers;
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -285,6 +288,44 @@ export default function CustomersPage() {
   const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, conversationEvents) : [];
   const selectedCustomerInvoices = selectedCustomer ? getCustomerInvoices(selectedCustomer, storedInvoices) : [];
   const selectedCustomerProposals = selectedCustomer ? getCustomerProposals(selectedCustomer, storedProposals) : [];
+
+  // Build a job payload for create-and-link: prefer the customer's first job (so
+  // the new estimate/invoice links by job id), otherwise synthesize from the
+  // customer's own contact details.
+  function customerBoardPayload(customer: Customer): BoardJobPayload {
+    const job = getCustomerJobs(customer, jobList)[0];
+    if (job) return jobToBoardPayload(job);
+    return {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.propertyAddress,
+      city: "",
+      roofType: customer.roofDetails || "Roofing",
+      value: customer.lifetimeValue || 0,
+    };
+  }
+
+  function openEstimate(id: string) {
+    requestOpenEstimate(id);
+    router.push("/crm/proposals");
+  }
+
+  function createEstimate(customer: Customer) {
+    requestCreateEstimate(customerBoardPayload(customer));
+    router.push("/crm/proposals");
+  }
+
+  function openInvoice(id: string) {
+    requestOpenInvoice(id);
+    router.push("/crm/invoices");
+  }
+
+  function createInvoice(customer: Customer) {
+    requestCreateInvoice(customerBoardPayload(customer));
+    router.push("/crm/invoices");
+  }
 
   function openCustomer(customer: Customer) {
     setSelectedCustomerId(customer.id);
@@ -641,10 +682,13 @@ export default function CustomersPage() {
 
               {activeTab === "Estimates" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><FileSignature className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Estimates &amp; Proposals</h3></div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2"><FileSignature className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Estimates &amp; Proposals</h3></div>
+                    <button type="button" onClick={() => createEstimate(selectedCustomer)} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-black text-white transition hover:bg-blue-700"><Plus className="h-4 w-4" />Create estimate</button>
+                  </div>
                   <div className="mt-4 space-y-3">
                     {selectedCustomerProposals.length > 0 ? selectedCustomerProposals.map((proposal) => (
-                      <div key={proposal.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <button type="button" key={proposal.id} onClick={() => openEstimate(proposal.id)} className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
                         <div className="min-w-0">
                           <p className="font-black text-slate-900">{proposal.title || proposal.scope || "Estimate"}</p>
                           <p className="truncate text-sm font-bold text-slate-500">{proposal.address || selectedCustomer.propertyAddress}</p>
@@ -653,18 +697,21 @@ export default function CustomersPage() {
                           <p className="font-black text-[#07183f]">${(proposal.total || 0).toLocaleString()}</p>
                           <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(proposal.status)}`}>{proposal.status || "Draft"}</span>
                         </div>
-                      </div>
-                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No estimates linked to this customer yet. <Link href="/crm/proposals" className="text-blue-700 hover:text-blue-800">Open Estimates board →</Link></p>}
+                      </button>
+                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No estimates yet. Click <span className="font-black text-blue-700">Create estimate</span> to open the estimate editor for this customer.</p>}
                   </div>
                 </section>
               )}
 
               {activeTab === "Invoices" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><Receipt className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Invoices</h3></div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2"><Receipt className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Invoices</h3></div>
+                    <button type="button" onClick={() => createInvoice(selectedCustomer)} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-black text-white transition hover:bg-blue-700"><Plus className="h-4 w-4" />Create invoice</button>
+                  </div>
                   <div className="mt-4 space-y-3">
                     {selectedCustomerInvoices.length > 0 ? selectedCustomerInvoices.map((invoice) => (
-                      <div key={invoice.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <button type="button" key={invoice.id} onClick={() => openInvoice(invoice.id)} className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
                         <div className="min-w-0">
                           <p className="font-black text-slate-900">{invoice.invoiceNumber || `Invoice ${invoice.id}`}</p>
                           <p className="truncate text-sm font-bold text-slate-500">{invoice.propertyAddress || selectedCustomer.propertyAddress}</p>
@@ -673,8 +720,8 @@ export default function CustomersPage() {
                           <p className="font-black text-[#07183f]">${invoiceTotal(invoice).toLocaleString()}</p>
                           <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(invoice.status)}`}>{invoice.status || "Draft"}</span>
                         </div>
-                      </div>
-                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No invoices linked to this customer yet. <Link href="/crm/invoices" className="text-blue-700 hover:text-blue-800">Open Invoices board →</Link></p>}
+                      </button>
+                    )) : <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">No invoices yet. Click <span className="font-black text-blue-700">Create invoice</span> to open the invoice editor for this customer.</p>}
                   </div>
                 </section>
               )}

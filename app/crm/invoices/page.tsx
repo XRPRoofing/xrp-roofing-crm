@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
+import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
@@ -479,6 +480,29 @@ export default function InvoicesPage() {
   });
 
   const paidPropagatedRef = useRef<Set<string>>(new Set());
+  const intentHandledRef = useRef(false);
+
+  // One-click handoff from a Job / customer profile: open the requested invoice
+  // editor directly, or create one from the job and open it (linked by
+  // jobReference). Consume-once so a normal later visit isn't hijacked.
+  useEffect(() => {
+    if (intentHandledRef.current) return;
+    const intent = takeInvoiceIntent();
+    if (!intent) return;
+    intentHandledRef.current = true;
+    if (intent.kind === "open") {
+      setSelectedInvoiceId(intent.id);
+      return;
+    }
+    setInvoices((current) => {
+      const created: Invoice = {
+        ...createInvoiceFromJob(payloadToLead(intent.job), current.length),
+        id: `inv-${Date.now()}`,
+      };
+      setSelectedInvoiceId(created.id);
+      return [created, ...current];
+    });
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
