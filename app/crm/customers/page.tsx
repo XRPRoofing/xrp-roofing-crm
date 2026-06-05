@@ -6,7 +6,7 @@ import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Imag
 import { leadStages } from "@/lib/crm-data";
 import { createConversationFromLead } from "@/lib/crm-conversations";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
-import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
+import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCustomerRecordsResult, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
 import type { ConversationMessage, ConversationRecord } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
@@ -240,6 +240,9 @@ export default function CustomersPage() {
   const [storedProposals, setStoredProposals] = useState<StoredProposal[]>([]);
   const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState("");
+  // Surfaced to the user when Supabase can't load/save (e.g. the customer_records
+  // table hasn't been created yet) so saves never fail silently.
+  const [customersError, setCustomersError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -322,13 +325,16 @@ export default function CustomersPage() {
   useEffect(() => {
     let mounted = true;
     async function refreshCustomers() {
-      const records = await loadCustomerRecords();
-      if (mounted) setSavedCustomers(records);
+      const result = await loadCustomerRecordsResult();
+      if (!mounted) return;
+      setSavedCustomers(result.customers);
+      setCustomersError(result.error ?? null);
     }
     async function init() {
-      const records = await loadCustomerRecords();
+      const result = await loadCustomerRecordsResult();
       if (!mounted) return;
-      if (customerSyncEnabled() && records.length === 0) {
+      setCustomersError(result.error ?? null);
+      if (customerSyncEnabled() && result.customers.length === 0) {
         const local = readRawLocalCustomers();
         if (local.length) {
           await Promise.all(local.map(upsertCustomerRecord));
@@ -336,7 +342,7 @@ export default function CustomersPage() {
           return;
         }
       }
-      setSavedCustomers(records);
+      setSavedCustomers(result.customers);
     }
     void init();
 
@@ -389,7 +395,8 @@ export default function CustomersPage() {
       lifetimeValue: "",
     });
     setShowForm(shouldKeepAdding);
-    await upsertCustomerRecord(newCustomer);
+    const result = await upsertCustomerRecord(newCustomer);
+    setCustomersError(result.ok ? null : result.error ?? "Unable to save customer.");
     await syncFromServer(newCustomer.id, true);
   }
 
@@ -411,7 +418,8 @@ export default function CustomersPage() {
     );
     setEditingCustomerId(null);
     setEditForm(null);
-    await upsertCustomerRecord(edited);
+    const result = await upsertCustomerRecord(edited);
+    setCustomersError(result.ok ? null : result.error ?? "Unable to save customer.");
     await syncFromServer(edited.id, true);
   }
 
@@ -439,6 +447,12 @@ export default function CustomersPage() {
         <button onClick={() => setShowForm(true)} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
       </div>
 
+      {customersError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {customersError}
+        </div>
+      )}
+
       {showForm && (
         <form onSubmit={handleAddCustomer} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -450,7 +464,7 @@ export default function CustomersPage() {
             <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Email" />
             <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Phone" />
             <input value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Status" />
-            <input required value={form.propertyAddress} onChange={(event) => setForm({ ...form, propertyAddress: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Property address" />
+            <input value={form.propertyAddress} onChange={(event) => setForm({ ...form, propertyAddress: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Property address" />
             <input value={form.insuranceCarrier} onChange={(event) => setForm({ ...form, insuranceCarrier: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Insurance carrier" />
             <input type="number" value={form.lifetimeValue} onChange={(event) => setForm({ ...form, lifetimeValue: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Lifetime value" />
             <input value={form.roofDetails} onChange={(event) => setForm({ ...form, roofDetails: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Roof details" />
@@ -536,7 +550,7 @@ export default function CustomersPage() {
                       <input type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
                       <input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
                       <input value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Status" />
-                      <input required value={editForm.propertyAddress} onChange={(event) => setEditForm({ ...editForm, propertyAddress: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none sm:col-span-2" placeholder="Property address" />
+                      <input value={editForm.propertyAddress} onChange={(event) => setEditForm({ ...editForm, propertyAddress: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none sm:col-span-2" placeholder="Property address" />
                       <input value={editForm.roofDetails} onChange={(event) => setEditForm({ ...editForm, roofDetails: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Roof details" />
                       <input value={editForm.insuranceCarrier} onChange={(event) => setEditForm({ ...editForm, insuranceCarrier: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Insurance carrier" />
                       <input type="number" value={editForm.lifetimeValue} onChange={(event) => setEditForm({ ...editForm, lifetimeValue: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Lifetime value" />
