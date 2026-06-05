@@ -61,10 +61,11 @@ async function summarizeTranscript(transcript: string) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.2,
+      max_tokens: 220,
       messages: [
         {
           role: "system",
-          content: "You summarize roofing CRM phone calls for a production CRM. Return exactly these sections with concise bullets when possible: Summary, Key Discussion Points, Customer Concerns, Next Steps, Follow-Up Tasks. If a section is not mentioned, write Not discussed.",
+          content: "You summarize roofing CRM phone calls. Be extremely concise. Return ONLY this format and nothing else:\nSummary: one short sentence (max 25 words).\nNext steps:\n- up to 3 short bullets (omit the line entirely if there are none).\nNo other sections, no preamble.",
         },
         {
           role: "user",
