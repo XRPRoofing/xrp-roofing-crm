@@ -342,7 +342,10 @@ function isAnsweredCallEvent(event: TwilioConversationEvent) {
 
 function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
   if (!event.type.includes("call")) return true;
-  if (event.type === "call_note" || event.type === "call_recording") return true;
+  // Call recordings are rendered once as a dedicated CallInsightsCard, not as a
+  // timeline message bubble — rendering both is what caused duplicate summaries.
+  if (event.type === "call_recording") return false;
+  if (event.type === "call_note") return true;
 
   const status = (event.status || String(event.payload.CallStatus || "")).toLowerCase();
   const label = getTwilioCallOutcomeLabel(event);
@@ -360,6 +363,27 @@ function getCallMessageId(event: TwilioConversationEvent) {
   if (event.type === "call_recording") return "recording-" + event.callSid;
   if (event.type === "call_note") return event.id;
   return "call-" + event.callSid;
+}
+
+// A single call produces several call_recording events (a "processing"
+// placeholder, then the final transcript+summary, possibly a failure). They
+// share a callSid but have different ids, so collapse them to one entry per call
+// — preferring the completed summary, then the most recent — so the summary
+// shows exactly once and stays unique after refresh / realtime sync.
+function isMoreCompleteInsight(candidate: TwilioConversationEvent, current: TwilioConversationEvent) {
+  const rank = (event: TwilioConversationEvent) => (event.status === "processing" ? 0 : 1);
+  if (rank(candidate) !== rank(current)) return rank(candidate) > rank(current);
+  return new Date(candidate.createdAt).getTime() >= new Date(current.createdAt).getTime();
+}
+
+function dedupeCallInsights(events: TwilioConversationEvent[]) {
+  const byCall = new Map<string, TwilioConversationEvent>();
+  for (const event of events) {
+    const key = event.callSid || event.id;
+    const existing = byCall.get(key);
+    if (!existing || isMoreCompleteInsight(event, existing)) byCall.set(key, event);
+  }
+  return Array.from(byCall.values());
 }
 
 function getCallDurationLabel(event: TwilioConversationEvent) {
@@ -816,7 +840,7 @@ export default function ConversationBoard() {
       const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
       const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
       setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
-      setCallInsights(events.filter((event) => event.type === "call_recording").slice(-5).reverse());
+      setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
       setActiveConversationId((current) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
     }).catch((error) => {
@@ -839,7 +863,7 @@ export default function ConversationBoard() {
           return next;
         });
         if (event.type === "call_recording") {
-          setCallInsights((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, 5));
+          setCallInsights((current) => dedupeCallInsights([event, ...current]).slice(0, 5));
         }
         if (event.type === "incoming_call") {
           notifyIncomingCall(getEventPhone(event));
