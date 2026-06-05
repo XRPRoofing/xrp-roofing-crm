@@ -38,7 +38,7 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
 
 function ConversationInbox({ conversations, active, onSelect, onNew }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void }) {
   return (
-    <Card className="flex min-h-0 flex-col overflow-hidden xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)]">
+    <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -508,7 +508,7 @@ function createLocalCommunicationEvent(type: TwilioConversationEvent["type"], ph
 function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void; onSchedule: () => void }) {
   const contact = conversation.contact;
   return (
-    <aside className="space-y-4 xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-1">
+    <aside className="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-1">
       <Card className="p-5">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
@@ -1220,7 +1220,7 @@ export default function ConversationBoard() {
   }
 
   return (
-    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] overflow-x-clip bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] overflow-x-clip bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:flex xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:flex-col xl:overflow-hidden">
       {incomingCall && (
         <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
@@ -1234,18 +1234,18 @@ export default function ConversationBoard() {
         </div>
       )}
 
-      <div className={`${showMobileThread ? "hidden xl:block" : ""} z-30 mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:mb-5 sm:p-5 xl:sticky xl:top-20`}>
+      <div className={`${showMobileThread ? "hidden xl:block" : ""} z-30 mb-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:mb-5 sm:p-5 xl:shrink-0`}>
         <div className="flex flex-col justify-between gap-3 sm:gap-4 lg:flex-row lg:items-end">
           <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-xs">Communication center</p><h1 className="mt-0.5 text-xl font-bold tracking-tight text-slate-950 sm:mt-1 sm:text-3xl">Conversations</h1><p className="mt-2 hidden max-w-3xl text-sm leading-6 text-slate-600 sm:block">Manage roofing calls, SMS follow-ups, scheduling, and customer activity in a clean three-panel workspace.</p><div className="mt-2 flex flex-wrap items-center gap-2"><Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>{notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Enable notifications</button>}<p className="text-xs font-medium text-blue-700">{twilioNotice}</p></div></div>
           <div className="flex flex-wrap gap-2"><Button variant="primary" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}><Phone className="mr-2 h-4 w-4" />Dial</Button></div>
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <div className={`${showMobileThread ? "hidden xl:block" : "block"}`}>
+      <div className="grid gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_minmax(0,1fr)_340px] xl:overflow-hidden">
+        <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:min-h-0`}>
           <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} />
         </div>
-        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-[calc(100vh-7rem)]`}> 
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-full`}> 
           {active ? (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
@@ -1269,7 +1269,7 @@ export default function ConversationBoard() {
             <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
-        {active && <div className="hidden xl:block"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
+        {active && <div className="hidden xl:block xl:min-h-0"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
       </div>
 
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
