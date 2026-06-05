@@ -634,6 +634,7 @@ export default function ConversationBoard() {
   const [callNotes, setCallNotes] = useState("");
   const [callDisposition, setCallDisposition] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
+  const [showMobileContact, setShowMobileContact] = useState(false);
   const [inboxCollapsed, setInboxCollapsed] = useState(false);
   const [incomingCall, setIncomingCall] = useState<BrowserVoiceCall | null>(null);
   const [incomingFrom, setIncomingFrom] = useState("");
@@ -1277,8 +1278,8 @@ export default function ConversationBoard() {
           {active ? (
             <>
               <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-3"><button type="button" onClick={() => setShowMobileThread(false)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
-                <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-slate-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
+                <div className="flex items-start gap-3"><button type="button" onClick={() => { setShowMobileThread(false); setShowMobileContact(false); }} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500">{active.contact.address}</p></div></div>
+                <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><Button className="xl:hidden" onClick={() => setShowMobileContact(true)}><UserRound className="mr-1.5 h-4 w-4" />Contact</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-slate-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
               <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
             </>
@@ -1298,6 +1299,15 @@ export default function ConversationBoard() {
           </div>
         </main>
         {active && <div className="hidden xl:block xl:min-h-0"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
+        {active && showMobileContact && (
+          <div className="fixed inset-0 z-[60] flex flex-col bg-slate-100 xl:hidden">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Contact</p><p className="text-base font-bold text-slate-950">{active.contact.name}</p></div>
+              <button type="button" onClick={() => setShowMobileContact(false)} aria-label="Close contact" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>
+          </div>
+        )}
       </div>
 
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
