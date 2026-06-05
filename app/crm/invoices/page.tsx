@@ -845,16 +845,12 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-16 z-20 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5 lg:top-20">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Invoice Board</h1>
-            <p className="crm-board-subtitle mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
-          </div>
-          <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
+      <div className="sticky top-16 z-20 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:px-4 sm:py-3 lg:top-20">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Invoice Board</h1>
+          <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-5 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:grid-cols-6 sm:gap-2">
           {[
             ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
             ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
@@ -863,19 +859,19 @@ export default function InvoicesPage() {
             ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
             ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
           ].map(([label, value, valueClass]) => (
-            <div key={label} className="rounded-xl border border-slate-200 bg-slate-50/70 p-2 sm:rounded-2xl sm:p-4">
-              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-500 sm:text-xs">{label}</p>
-              <p className={`mt-0.5 text-sm font-bold tracking-tight sm:mt-2 sm:text-xl ${valueClass}`}>{value}</p>
+            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1.5">
+              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-500">{label}</p>
+              <p className={`mt-0.5 text-sm font-bold tracking-tight ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
-        <div className="mt-5 flex flex-col items-stretch justify-between gap-3 xl:flex-row xl:items-center">
-          <div className="mx-auto w-full max-w-2xl">
-            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search invoices by client, invoice number, or property..." />
+        <div className="mt-2.5 flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
+          <div className="w-full flex-1">
+            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search invoices by client, invoice number, or property..." />
           </div>
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
+          <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-100 p-0.5">
             {filterOptions.map((option) => (
-              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
+              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
             ))}
           </div>
         </div>
@@ -886,7 +882,7 @@ export default function InvoicesPage() {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
           return (
-            <section key={stage} className="flex max-h-[68vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-20rem)]">
+            <section key={stage} className="flex max-h-[72vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-15rem)]">
               <div className={`flex shrink-0 items-center justify-between border-b p-4 ${stageHeaderClass(stage)}`}>
                 <div>
                   <h2 className="text-base font-bold text-slate-950">{stage}</h2>
