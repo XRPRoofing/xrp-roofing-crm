@@ -1268,8 +1268,8 @@ export default function ConversationBoard() {
       </div>
 
       <div className={`grid gap-5 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_340px]" : "xl:grid-cols-[320px_minmax(0,1fr)_340px]"}`}>
-        <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:min-h-0`}>
-          <div className={inboxCollapsed ? "xl:hidden" : ""}>
+        <div className={`${showMobileThread ? "hidden xl:block" : "block"} xl:h-full xl:min-h-0`}>
+          <div className={inboxCollapsed ? "xl:hidden" : "xl:h-full xl:min-h-0"}>
             <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
           </div>
           {inboxCollapsed && <CollapsedInboxRail onExpand={toggleInboxCollapsed} onNew={openNewConversation} />}
