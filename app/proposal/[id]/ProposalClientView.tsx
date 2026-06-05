@@ -44,6 +44,30 @@ function normalizePackage(value?: string | PackageOption): Required<PackageOptio
   return { scope: value.scope || "Package details pending.", price: Number(value.price || 0) };
 }
 
+// Turn a package scope blob into comparable bullet features. Splits on line
+// breaks / common separators first, then falls back to sentences so a single
+// paragraph still renders as scannable points.
+function toFeatures(scope?: string): string[] {
+  if (!scope) return [];
+  let parts = scope
+    .split(/\r?\n|•|·|;/)
+    .map((part) => part.replace(/^[-*\s]+/, "").trim())
+    .filter(Boolean);
+  if (parts.length <= 1) {
+    parts = scope
+      .split(/\.\s+/)
+      .map((part) => part.trim().replace(/\.$/, ""))
+      .filter(Boolean);
+  }
+  return parts;
+}
+
+const packageMeta: Record<"good" | "better" | "best", { label: string; tagline: string }> = {
+  good: { label: "Good", tagline: "Essential coverage" },
+  better: { label: "Better", tagline: "Enhanced protection" },
+  best: { label: "Best", tagline: "Premium, fully loaded" },
+};
+
 async function updateSharedProposal(id: string, updates: Record<string, unknown>) {
   await fetch(`/api/proposals/share?id=${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -60,6 +84,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [isSigning, setIsSigning] = useState(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notice, setNotice] = useState("");
+  const [termsOpen, setTermsOpen] = useState(false);
   const isAccepted = proposal.status === "Won";
 
   const packages = useMemo(() => ({
@@ -100,130 +125,160 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950">
-      <section className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-        <div className="grid gap-6 border-b border-slate-200 bg-white p-6 sm:p-8 md:grid-cols-2">
-          <div>
-            <div className="mb-6 flex h-20 w-40 items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={140} height={64} className="max-h-14 w-auto object-contain" priority />
+    <main className="min-h-screen bg-slate-100 px-3 py-5 text-slate-950 sm:px-4 sm:py-8">
+      <section className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Compact header: small logo + title on one row, meta badges aligned right */}
+        <header className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-[#07183f] to-[#13316b] p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm">
+              <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={44} height={44} className="h-full w-auto object-contain" priority />
             </div>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Client Info</p>
-            <p className="mt-3 text-2xl font-bold tracking-tight">{proposal.customerName || "Customer"}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{proposal.address || proposal.id}</p>
-            {proposal.customerPhone && <p className="mt-2 text-sm font-bold text-slate-700">{proposal.customerPhone}</p>}
-            {proposal.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{proposal.customerEmail}</p>}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-blue-200">XRP Roofing</p>
+              <h1 className="text-lg font-black tracking-tight sm:text-xl">Roofing Proposal</h1>
+            </div>
           </div>
-          <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Prepared By</p>
-            <p className="mt-3 text-2xl font-bold tracking-tight">XRP Roofing</p>
-            <p className="mt-2 text-sm font-semibold text-slate-700">Jonathan Gonzalez</p>
-            <p className="mt-2 text-sm text-slate-600">(623) 300-8097</p>
-            <p className="mt-1 text-sm text-blue-700">info@xrproofing.com</p>
-            <p className="mt-1 text-sm text-slate-600">xrproofing.com</p>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+            <span className="rounded-full bg-white/10 px-2.5 py-1">ID {proposal.id}</span>
+            <span className="rounded-full bg-white/10 px-2.5 py-1">Issued {new Date().toLocaleDateString()}</span>
+            <span className="rounded-full bg-blue-500 px-2.5 py-1 text-white">{proposal.status || "Sent"}</span>
+          </div>
+        </header>
+
+        {/* Prepared for / Prepared by — tight two-column strip */}
+        <div className="grid gap-4 border-b border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:p-5">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Prepared for</p>
+            <p className="mt-1 text-lg font-black tracking-tight">{proposal.customerName || "Customer"}</p>
+            <p className="mt-0.5 text-sm text-slate-600">{proposal.address || proposal.id}</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
+              {proposal.customerPhone && <span className="font-semibold text-slate-700">{proposal.customerPhone}</span>}
+              {proposal.customerEmail && <span className="font-semibold text-blue-700">{proposal.customerEmail}</span>}
+            </div>
+          </div>
+          <div className="sm:text-right">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Prepared by</p>
+            <p className="mt-1 text-lg font-black tracking-tight">XRP Roofing</p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-700">Jonathan Gonzalez</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm sm:justify-end">
+              <span className="text-slate-600">(623) 300-8097</span>
+              <span className="text-blue-700">info@xrproofing.com</span>
+            </div>
           </div>
         </div>
 
-        <div className="border-b border-slate-200 p-6 text-center sm:p-8">
-          <div className="mx-auto mb-5 flex h-24 w-52 items-center justify-center rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-            <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={180} height={80} className="max-h-16 w-auto object-contain" priority />
-          </div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-600">XRP Roofing Proposal</p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">ROOFING PROPOSAL</h1>
-          <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wide">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">ID {proposal.id}</span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">Issued {new Date().toLocaleDateString()}</span>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{proposal.status || "Sent"}</span>
-          </div>
-        </div>
-
-        <div className="space-y-8 p-6 sm:p-8">
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <h2 className="text-lg font-bold">Project Summary</h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.summary || proposal.coverText || "Your customized XRP Roofing proposal is ready for review."}</p>
-          </section>
-
-          <section className="rounded-3xl border border-slate-200 bg-white p-5">
-            <h2 className="text-lg font-bold">Scope of Work</h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.scope || "Scope details are included in the proposal prepared by XRP Roofing."}</p>
+        <div className="space-y-6 p-4 sm:p-6">
+          {/* Summary + scope combined into one tidy card */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <h2 className="text-base font-black text-[#07183f]">Project Summary</h2>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.summary || proposal.coverText || "Your customized XRP Roofing proposal is ready for review."}</p>
+            <h3 className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Scope of Work</h3>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.scope || "Scope details are included in the proposal prepared by XRP Roofing."}</p>
           </section>
 
           <section>
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Package Options</p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <div className="flex items-end justify-between gap-2">
+              <div>
+                <p className="text-base font-black text-[#07183f]">Choose your package</p>
+                <p className="text-sm text-slate-500">Pick the option that best fits your home.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-3">
               {(["good", "better", "best"] as const).map((option) => {
                 const packageOption = packages[option];
                 const selected = selectedOption === option;
+                const popular = option === "best";
+                const features = toFeatures(packageOption.scope);
                 return (
-                  <article key={option} className={`rounded-3xl border p-5 ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{option}</p>
-                    <h3 className="mt-2 text-xl font-bold uppercase">{option} Package</h3>
-                    <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option prepared by XRP Roofing.</p>
-                    <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{packageOption.scope}</p>
-                    <p className="mt-5 text-3xl font-bold text-blue-700">{currency(packageOption.price)}</p>
-                    <button type="button" onClick={() => handleSelectOption(option)} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
+                  <article key={option} className={`relative flex flex-col rounded-2xl border-2 bg-white p-5 transition ${selected ? "border-blue-500 shadow-lg shadow-blue-100" : popular ? "border-blue-200" : "border-slate-200"}`}>
+                    {popular && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow">Most Popular</span>
+                    )}
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">{packageMeta[option].label}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">{packageMeta[option].tagline}</p>
+                    <p className="mt-4 text-3xl font-black text-[#07183f]">{currency(packageOption.price)}</p>
+                    <ul className="mt-4 flex-1 space-y-2">
+                      {features.length > 0 ? features.map((feature, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                          <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 fill-blue-600" aria-hidden="true"><path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.3 6.8-6.3a1 1 0 0 1 1.9 0z" /></svg>
+                          <span>{feature}</span>
+                        </li>
+                      )) : (
+                        <li className="text-sm leading-6 text-slate-500">Professional roofing option prepared by XRP Roofing.</li>
+                      )}
+                    </ul>
+                    <button type="button" onClick={() => handleSelectOption(option)} className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold transition ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "✓ Selected" : "Select this option"}</button>
                   </article>
                 );
               })}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-blue-100 bg-blue-50 p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-700">Total Summary</p>
-            <div className="mt-4 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div>
-                <p className="text-sm font-semibold text-slate-600">Selected Package</p>
-                <p className="mt-1 text-2xl font-bold uppercase">{selectedOption}</p>
-                {proposal.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.notes}</p>}
-              </div>
-              <div className="text-left md:text-right">
-                <p className="text-sm font-semibold text-slate-600">Total Price</p>
-                <p className="mt-1 text-4xl font-bold text-blue-700">{currency(selectedPackage.price || proposal.total)}</p>
-              </div>
+          <section className="flex flex-col justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-5 md:flex-row md:items-center">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Your selection</p>
+              <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{packageMeta[selectedOption].label} Package</p>
+              {proposal.notes && <p className="mt-2 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.notes}</p>}
+            </div>
+            <div className="md:text-right">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Total price</p>
+              <p className="mt-1 text-4xl font-black text-blue-700">{currency(selectedPackage.price || proposal.total)}</p>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <h2 className="text-2xl font-bold">Terms and Conditions</h2>
-            <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700">
-              {(proposal.terms || "Please contact XRP Roofing for complete proposal terms.").split("\n\n").map((section, index) => (
-                <p key={index} className="mb-4 whitespace-pre-line">{section}</p>
-              ))}
-            </div>
+          {/* Collapsible terms to keep the page clean */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <button type="button" onClick={() => setTermsOpen((open) => !open)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+              <span className="text-base font-black text-[#07183f]">Terms &amp; Conditions</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-blue-700">
+                {termsOpen ? "Hide" : "View"}
+                <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-blue-700 transition-transform ${termsOpen ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
+              </span>
+            </button>
+            {termsOpen && (
+              <div className="max-h-[24rem] overflow-y-auto border-t border-slate-200 px-5 py-4 text-sm leading-6 text-slate-600">
+                {(proposal.terms || "Please contact XRP Roofing for complete proposal terms.").split("\n\n").map((section, index) => (
+                  <p key={index} className="mb-3 whitespace-pre-line">{section}</p>
+                ))}
+              </div>
+            )}
           </section>
 
           {isAccepted ? (
-            <section className="rounded-[2rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-8 text-center shadow-sm">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-3xl text-white">✓</div>
-              <p className="mt-5 text-xs font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted</p>
-              <h2 className="mt-3 text-4xl font-black tracking-tight text-slate-950">Thank you, {proposal.customerName || "valued customer"}!</h2>
-              <p className="mx-auto mt-4 max-w-2xl text-lg font-semibold leading-8 text-slate-700">Your proposal has been signed successfully. XRP Roofing has been notified, and our team will contact you shortly to proceed with scheduling the work.</p>
-              <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-emerald-200 bg-white p-5 text-left">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-500">Signed By</p>
-                <p className="mt-2 text-2xl font-bold italic text-slate-900">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-2 max-h-24 w-full object-contain" /> : proposal.signedBy}</p>
-                <p className="mt-4 text-xs font-black uppercase tracking-wider text-slate-500">Date Signed</p>
-                <p className="mt-2 font-bold text-slate-700">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+            <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 text-center shadow-sm sm:p-8">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-2xl text-white">✓</div>
+              <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.customerName || "valued customer"}!</h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm font-semibold leading-6 text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly to schedule the work.</p>
+              <div className="mx-auto mt-5 max-w-md rounded-xl border border-emerald-200 bg-white p-4 text-left">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Signed by</p>
+                <div className="mt-1 text-xl font-bold italic text-slate-900">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-1 max-h-20 w-full object-contain" /> : proposal.signedBy}</div>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-slate-500">Date signed</p>
+                <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
               </div>
-              {notice && <p className="mt-5 rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
+              {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
           ) : (
-            <section className="rounded-3xl border border-slate-200 p-6">
-              <label className="flex items-start gap-3 text-sm font-bold text-slate-700">
-                <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
-                <span>I agree to the Terms and Conditions</span>
-              </label>
-              <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Client Signature
-                  <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(event.clientX - rect.left, event.clientY - rect.top); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(event.clientX - rect.left, event.clientY - rect.top); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-44 w-full touch-none rounded-2xl border border-slate-200 bg-white" />
-                  <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="mt-2 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600">Clear Signature</button>
-                </label>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
-                  <p className="mt-3 font-bold">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
-                </div>
+            <section className="rounded-2xl border-2 border-blue-200 bg-white p-5 sm:p-6">
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 20 20" className="h-5 w-5 fill-blue-600" aria-hidden="true"><path d="M13.6 2.4a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L8.2 16.8l-4.6 1 1-4.6 9-9z" /></svg>
+                <h2 className="text-base font-black text-[#07183f]">Accept &amp; sign your proposal</h2>
               </div>
-              <button type="button" disabled={!agreementAccepted || !signatureDataUrl} onClick={handleSignProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
-              {notice && <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
+              <label className="mt-4 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300" />
+                <span>I have reviewed the proposal and agree to the Terms &amp; Conditions.</span>
+              </label>
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sign below</p>
+                  <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="rounded-lg px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">Clear</button>
+                </div>
+                <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(event.clientX - rect.left, event.clientY - rect.top); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(event.clientX - rect.left, event.clientY - rect.top); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-40 w-full touch-none rounded-xl border-2 border-dashed border-slate-300 bg-slate-50" />
+                <p className="mt-1 text-xs text-slate-400">Draw your signature with your finger or mouse.</p>
+              </div>
+              <button type="button" disabled={!agreementAccepted || !signatureDataUrl} onClick={handleSignProposal} className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept &amp; Sign Proposal</button>
+              {!agreementAccepted || !signatureDataUrl ? <p className="mt-2 text-center text-xs font-semibold text-slate-400">Check the box and add your signature to enable signing.</p> : null}
+              {notice && <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
             </section>
           )}
         </div>
