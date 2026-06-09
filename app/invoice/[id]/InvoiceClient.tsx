@@ -208,7 +208,17 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                 <>
                   <h2 className="text-lg font-black text-[#07183f]">Choose Payment Method</h2>
                   <InvoicePaymentButtons invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber || invoice.id} amount={totals.balance} customerEmail={invoice.email || ""} />
-                  <p className="mt-3 text-xs font-semibold leading-5 text-blue-800">Online payment supports card and ACH when Stripe is configured. You may also contact XRP Roofing for offline payment options.</p>
+                  
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-bold text-slate-700">Other Payment Options:</p>
+                    <ul className="mt-1.5 space-y-1 text-[11px] text-slate-600">
+                      <li>• Check payable to: XRP Roofing</li>
+                      <li>• Zelle: (602) 555-0199</li>
+                      <li>• Call to pay by phone: (602) 555-0199</li>
+                    </ul>
+                  </div>
+                  
+                  <p className="mt-3 text-xs font-semibold leading-5 text-blue-800">Having trouble? Contact XRP Roofing directly for assistance with payment.</p>
                 </>
               )}
             </section>

@@ -50,11 +50,18 @@ export default function InvoicePaymentButtons({ invoiceId, invoiceNumber, amount
   return (
     <div className="mt-4 space-y-3">
       <button type="button" onClick={() => startCheckout("card")} disabled={Boolean(loadingMethod) || amount <= 0 || !customerEmail} className="block w-full rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {loadingMethod === "card" ? "Opening secure checkout..." : "Pay by Card"}
+        {loadingMethod === "card" ? "Opening secure checkout..." : "Pay by Card (Instant)"}
       </button>
-      <button type="button" onClick={() => startCheckout("ach")} disabled={Boolean(loadingMethod) || amount <= 0 || !customerEmail} className="block w-full rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {loadingMethod === "ach" ? "Opening secure checkout..." : "Pay by ACH Bank Transfer"}
-      </button>
+      
+      <div className="relative">
+        <button type="button" onClick={() => startCheckout("ach")} disabled={Boolean(loadingMethod) || amount <= 0 || !customerEmail} className="block w-full rounded-2xl bg-slate-700 px-4 py-3 text-center text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+          {loadingMethod === "ach" ? "Opening secure checkout..." : "Pay by Bank Transfer (ACH)"}
+        </button>
+        <p className="mt-1.5 text-[10px] leading-tight text-slate-500">
+          Bank transfer may require 1-2 business days to verify. If the bank login freezes, please use card payment or contact XRP Roofing for other payment options.
+        </p>
+      </div>
+      
       {!customerEmail && <p className="text-xs font-bold text-red-700">Customer email is required before online payment can start.</p>}
       {error && <p className="rounded-2xl bg-red-50 p-3 text-xs font-bold leading-5 text-red-700">{error}</p>}
     </div>
