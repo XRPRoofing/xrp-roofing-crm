@@ -66,7 +66,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   const capture = useCallback(async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || saving) return;
+    if (!video || !canvas) return;
 
     const w = video.videoWidth || 1280;
     const h = video.videoHeight || 720;
@@ -87,20 +87,18 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     small.getContext("2d")?.drawImage(canvas, 0, 0, cw, ch);
     const dataUrl = small.toDataURL("image/jpeg", 0.75);
 
-    setSaving(true);
+    // Instant UI feedback — never block the shutter
     const photo: CapturedPhoto = { dataUrl, name: `${label.toLowerCase()}-${Date.now()}.jpg` };
-    try {
-      await onCapture(photo);
-      setCount((c) => c + 1);
-      setThumbs((prev) => [...prev, dataUrl]);
-      // Show toast
-      setToast(true);
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(false), 1800);
-    } finally {
-      setSaving(false);
-    }
-  }, [saving, label, onCapture]);
+    setCount((c) => c + 1);
+    setThumbs((prev) => [...prev, dataUrl]);
+    setToast(true);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(false), 1800);
+
+    // Save in background — camera stays ready immediately
+    setSaving(true);
+    void Promise.resolve(onCapture(photo)).finally(() => setSaving(false));
+  }, [label, onCapture]);
 
   // Hardware shutter button via volume keys / Enter
   useEffect(() => {

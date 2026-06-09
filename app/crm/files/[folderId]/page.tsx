@@ -239,22 +239,27 @@ export default function FolderGalleryPage() {
       {showShare && folder && <ShareFolderModal folder={folder} onClose={() => setShowShare(false)} />}
       <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotated} onCancel={() => { editTargetRef.current = null; setAnnotatorImages(null); }} />
 
-      {liveCameraOpen && (() => {
+      {liveCameraOpen && folder && (() => {
         const accentMap: Record<string, string> = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600", "Job Photo": "bg-[#07183f]" };
-        const existingCount = (folder?.files ?? []).filter((f) => f.photoType === activePhotoType).length;
+        const existingCount = (folder.files ?? []).filter((f) => f.photoType === activePhotoType).length;
         return (
           <LiveCameraCapture
             label={activePhotoType === "Job Photo" ? "General" : activePhotoType}
             accentColor={accentMap[activePhotoType] ?? "bg-[#07183f]"}
             existingCount={existingCount}
             onCapture={async (photo) => {
-              const blob = await fetch(photo.dataUrl).then((r) => r.blob());
-              const file = new File([blob], photo.name, { type: "image/jpeg" });
-              const dt = new DataTransfer();
-              dt.items.add(file);
-              await addPhotos(dt.files, activePhotoType);
+              // Save directly — no blocking setUploading so shutter stays instant
+              await ensureBackingJob();
+              await addJobPhotos(folder.jobId, [{
+                photoType: activePhotoType,
+                name: photo.name,
+                dataUrl: photo.dataUrl,
+                uploadedBy: "Office",
+              }]);
+              // Refresh gallery in background without blocking next shot
+              void refresh();
             }}
-            onClose={() => setLiveCameraOpen(false)}
+            onClose={() => { setLiveCameraOpen(false); void refresh(); }}
           />
         );
       })()}
