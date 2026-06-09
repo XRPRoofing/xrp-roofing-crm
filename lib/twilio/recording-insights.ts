@@ -3,6 +3,7 @@ import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 
 interface RecordingInsightsInput {
   callSid?: string;
+  recordingSid?: string;
   recordingUrl?: string;
   from?: string;
   to?: string;
@@ -60,10 +61,11 @@ async function summarizeTranscript(transcript: string) {
     body: JSON.stringify({
       model: "gpt-4o-mini",
       temperature: 0.2,
+      max_tokens: 220,
       messages: [
         {
           role: "system",
-          content: "You summarize roofing CRM phone calls. Return concise, useful CRM notes with customer issue, roof/job details, insurance/payment details, urgency, next steps, and follow-up tasks when mentioned.",
+          content: "You summarize roofing CRM phone calls. Be extremely concise. Return ONLY this format and nothing else:\nSummary: one short sentence (max 25 words).\nNext steps:\n- up to 3 short bullets (omit the line entirely if there are none).\nNo other sections, no preamble.",
         },
         {
           role: "user",
@@ -82,9 +84,13 @@ async function summarizeTranscript(transcript: string) {
 export async function createCallRecordingInsights(input: RecordingInsightsInput): Promise<TwilioConversationEvent | null> {
   if (!input.recordingUrl) return null;
 
+  console.log("[Twilio Recording] Downloading recording", { callSid: input.callSid, recordingSid: input.recordingSid, recordingUrl: input.recordingUrl });
   const recordingBlob = await downloadRecording(input.recordingUrl);
+  console.log("[Twilio Recording] Recording downloaded", { callSid: input.callSid, recordingSid: input.recordingSid, size: recordingBlob.size });
   const transcript = await transcribeRecording(recordingBlob);
+  console.log("[Twilio Recording] Transcript generated", { callSid: input.callSid, recordingSid: input.recordingSid, transcriptLength: transcript.length });
   const summary = transcript ? await summarizeTranscript(transcript) : "Transcript unavailable.";
+  console.log("[Twilio Recording] Summary generated", { callSid: input.callSid, recordingSid: input.recordingSid, summaryLength: summary.length });
 
   return {
     id: crypto.randomUUID(),
@@ -94,10 +100,12 @@ export async function createCallRecordingInsights(input: RecordingInsightsInput)
     to: input.to,
     status: "completed",
     callSid: input.callSid,
+    recordingSid: input.recordingSid,
     recordingUrl: input.recordingUrl,
     body: summary,
     payload: {
       ...input.payload,
+      recordingSid: input.recordingSid,
       recordingUrl: input.recordingUrl,
       transcript,
       summary,

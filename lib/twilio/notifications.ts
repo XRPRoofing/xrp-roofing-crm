@@ -51,6 +51,9 @@ export function createTwilioCrmNotification(event: TwilioConversationEvent) {
   }
 
   if (event.type === "incoming_call" || event.type === "call_status") {
+    const status = (event.status || String(event.payload.CallStatus || "")).toLowerCase();
+    if (["ringing", "initiated", "queued", "in-progress"].includes(status)) return null;
+
     return {
       title: `${direction} ${getTwilioCallOutcomeLabel(event).toLowerCase()}`,
       message: `${name}${event.status ? ` · ${event.status}` : ""}`,

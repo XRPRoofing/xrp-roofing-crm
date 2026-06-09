@@ -7,6 +7,7 @@ const noteSchema = z.object({
   callSid: z.string().min(1),
   conversationId: z.string().optional(),
   notes: z.string(),
+  disposition: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {

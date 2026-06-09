@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { leads } from "@/lib/crm-data";
+import BackToJobsLink from "@/components/crm/BackToJobsLink";
+import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
+import { isProposalLocked } from "@/lib/proposal-lock";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import type { Lead } from "@/types/crm";
 
 declare global {
@@ -60,6 +65,13 @@ type Proposal = {
   signedAt?: string;
   signedBy?: string;
   signatureData?: string;
+  signatureDataUrl?: string;
+  acceptedPackage?: "good" | "better" | "best";
+  acceptedPackageName?: string;
+  acceptedPrice?: number;
+  acceptedAt?: string;
+  proposalVersion?: number;
+  locked?: boolean;
   deletedAt?: string;
   selectedOption?: "good" | "better" | "best";
   inspectionPhotos?: InspectionPhoto[];
@@ -94,6 +106,7 @@ type ProposalTemplate = {
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
 const trashRetentionDays = 30;
 const trashRetentionMs = trashRetentionDays * 24 * 60 * 60 * 1000;
+const proposalsLocalKey = "xrp-crm-proposals";
 const defaultInspectionPhotos: InspectionPhoto[] = [
   { label: "Front elevation", image: "", note: "" },
   { label: "Roof condition", image: "", note: "" },
@@ -351,6 +364,8 @@ export default function ProposalsPage() {
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
   const [selectedJobId, setSelectedJobId] = useState(leads[0]?.id || "");
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
+  const prevProposalsRef = useRef<Proposal[]>(initialProposals);
+  const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -434,57 +449,134 @@ export default function ProposalsPage() {
   }, [proposalFilter, proposalSearch, proposals]);
   const trashedProposals = useMemo(() => proposals.filter((proposal) => Boolean(proposal.deletedAt)), [proposals]);
 
+  // Load proposals (estimates) and keep them in sync across every device.
+  // Source of truth is the shared `proposal_shares` table; localStorage is a
+  // fast first paint + offline fallback. On first load, any local-only
+  // proposals are migrated up so nothing is lost, then realtime + focus keep
+  // all devices consistent.
   useEffect(() => {
-    const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-    const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
+    let mounted = true;
 
-    queueMicrotask(() => {
-      if (savedProposals) {
-        const restoredProposals = (JSON.parse(savedProposals) as Proposal[])
-          .filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
-        setProposals(restoredProposals);
+    function retain(list: Proposal[]) {
+      return list.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+    }
+    function readLocalProposals(): Proposal[] {
+      try {
+        return JSON.parse(window.localStorage.getItem(proposalsLocalKey) || "[]") as Proposal[];
+      } catch {
+        return [];
+      }
+    }
+
+    async function reloadFromServer() {
+      if (!proposalSyncEnabled()) return;
+      const server = await loadProposalRecords<Proposal>();
+      if (!mounted) return;
+      setProposals((current) => {
+        const serverIds = new Set(server.map((proposal) => proposal.id));
+        const localOnly = current.filter((proposal) => !serverIds.has(proposal.id));
+        const merged = retain([...server, ...localOnly]);
+        // Treat server data as already-synced so the diff effect doesn't echo it
+        // back (jsonb reorders keys, which would otherwise look like a change).
+        prevProposalsRef.current = merged;
+        return merged;
+      });
+      setActiveProposal((currentProposal) => {
+        if (!currentProposal) return currentProposal;
+        const updated = server.find((proposal) => proposal.id === currentProposal.id);
+        return updated ? { ...currentProposal, ...updated } : currentProposal;
+      });
+    }
+
+    async function init() {
+      const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
+      if (savedTemplates && mounted) {
+        try {
+          setTemplates(JSON.parse(savedTemplates) as ProposalTemplate[]);
+        } catch {
+          /* keep defaults */
+        }
       }
 
-      if (savedTemplates) {
-        setTemplates(JSON.parse(savedTemplates) as ProposalTemplate[]);
+      const local = retain(readLocalProposals());
+      if (local.length && mounted) setProposals(local);
+
+      if (proposalSyncEnabled()) {
+        const server = await loadProposalRecords<Proposal>();
+        if (!mounted) return;
+        const serverIds = new Set(server.map((proposal) => proposal.id));
+        const localOnly = local.filter((proposal) => !serverIds.has(proposal.id));
+        if (localOnly.length) await Promise.all(localOnly.map((proposal) => upsertProposalRecord(proposal)));
+        if (!mounted) return;
+        const merged = retain([...server, ...localOnly]);
+        prevProposalsRef.current = merged;
+        setProposals(merged);
+      } else if (local.length) {
+        prevProposalsRef.current = local;
       }
 
-      setDataLoaded(true);
-    });
+      if (mounted) setDataLoaded(true);
+    }
+
+    void init();
+
+    const unsubscribe = subscribeToProposalRecords(() => void reloadFromServer());
+    window.addEventListener("focus", reloadFromServer);
+    window.addEventListener("storage", reloadFromServer);
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener("focus", reloadFromServer);
+      window.removeEventListener("storage", reloadFromServer);
+    };
   }, []);
 
   useEffect(() => {
     if (!dataLoaded) return;
-    window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(proposals));
+    window.localStorage.setItem(proposalsLocalKey, JSON.stringify(proposals));
   }, [dataLoaded, proposals]);
 
+  // One-click handoff from a Job / customer profile: open the requested estimate
+  // editor directly, or create one from the job and open it (linked by job id).
+  // Consume-once so a normal later visit isn't hijacked.
   useEffect(() => {
-    async function refreshProposalUpdates() {
-      const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-      if (savedProposals) {
-        const localProposals = JSON.parse(savedProposals) as Proposal[];
-        const serverProposals = await Promise.all(localProposals.map(async (proposal) => {
-          const response = await fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`).catch(() => null);
-          if (!response?.ok) return proposal;
-          const data = await response.json().catch(() => null) as { proposal?: Proposal } | null;
-          return data?.proposal ? { ...proposal, ...data.proposal, deletedAt: proposal.deletedAt } : proposal;
-        }));
-        const retainedProposals = serverProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+    if (!dataLoaded || boardIntentHandledRef.current) return;
+    const intent = takeEstimateIntent();
+    boardIntentHandledRef.current = true;
+    if (!intent) return;
+    if (intent.kind === "open") {
+      const existing = proposals.find((proposal) => proposal.id === intent.id);
+      if (existing) openProposal(existing);
+      return;
+    }
+    createEstimateFromLead(payloadToLead(intent.job));
+  }, [dataLoaded, proposals]);
 
-        window.localStorage.setItem("xrp-crm-proposals", JSON.stringify(retainedProposals));
-        setProposals(retainedProposals);
-        setActiveProposal((currentProposal) => currentProposal ? retainedProposals.find((proposal) => proposal.id === currentProposal.id && !proposal.deletedAt) || null : currentProposal);
+  // Push every local change to the shared store so other devices see it. Diffing
+  // against the previous list keeps the many existing handlers untouched: any
+  // create/edit becomes an upsert, and a permanent delete (row removed from the
+  // list) becomes a server delete. Trashing keeps the row (with deletedAt) so it
+  // syncs as an upsert.
+  useEffect(() => {
+    if (!dataLoaded || !proposalSyncEnabled()) {
+      prevProposalsRef.current = proposals;
+      return;
+    }
+    const previous = prevProposalsRef.current;
+    const previousById = new Map(previous.map((proposal) => [proposal.id, proposal]));
+    const currentIds = new Set(proposals.map((proposal) => proposal.id));
+
+    for (const proposal of proposals) {
+      const before = previousById.get(proposal.id);
+      if (!before || JSON.stringify(before) !== JSON.stringify(proposal)) {
+        void upsertProposalRecord(proposal);
       }
     }
-
-    void refreshProposalUpdates();
-    window.addEventListener("focus", refreshProposalUpdates);
-    window.addEventListener("storage", refreshProposalUpdates);
-    return () => {
-      window.removeEventListener("focus", refreshProposalUpdates);
-      window.removeEventListener("storage", refreshProposalUpdates);
-    };
-  }, []);
+    for (const proposal of previous) {
+      if (!currentIds.has(proposal.id)) void deleteProposalRecord(proposal.id);
+    }
+    prevProposalsRef.current = proposals;
+  }, [proposals, dataLoaded]);
 
   useEffect(() => {
     if (!dataLoaded) return;
@@ -493,6 +585,9 @@ export default function ProposalsPage() {
 
   useEffect(() => {
     if (!dataLoaded || !activeProposal) return;
+    // A signed proposal is locked: never auto-overwrite its package/price/
+    // signature from the editor form (those are the immutable accepted values).
+    if (isProposalLocked(activeProposal)) return;
 
     const timeout = window.setTimeout(() => {
       const updatedProposal: Proposal = {
@@ -594,12 +689,61 @@ export default function ProposalsPage() {
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    // Estimates are a lead source: find-or-create the customer (match by
+    // phone -> email -> address, no duplicates) so it appears on the Customer board.
+    void findOrCreateCustomer({
+      name: newProposal.customerName,
+      email: newProposal.customerEmail,
+      phone: newProposal.customerPhone,
+      propertyAddress: newProposal.address,
+      status: "Estimate",
+      lifetimeValue: newProposal.total,
+      source: "Estimate",
+    }).catch(() => {});
     openProposal(newProposal);
     setShowCreateForm(false);
     setCustomerName("");
     setAddress("");
     setScope("");
     setTotal("");
+  }
+
+  // Create an estimate directly from a job (one-click from the Jobs board /
+  // customer profile) and open its editor. The job is stored on the proposal so
+  // future clicks open this same estimate instead of creating another.
+  function createEstimateFromLead(job: Lead) {
+    const newProposal: Proposal = {
+      id: `P-${1001 + proposals.length}`,
+      job,
+      customerName: job.name,
+      customerEmail: job.email,
+      customerPhone: job.phone,
+      address: job.city ? `${job.address}, ${job.city}` : job.address,
+      scope: `${job.roofType || "Roofing"} roofing proposal`,
+      total: job.value || 0,
+      status: "Draft",
+      template: "executive",
+      title: "BEST ROOFING PROPOSAL",
+      summary: "A professional roofing proposal prepared for review and approval.",
+      coverPhoto: "/images/logo.jpeg",
+      coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
+      notes: "Includes professional roof assessment, materials, labor, cleanup, and customer-ready project documentation.",
+      terms: defaultTerms,
+      inspectionPhotos: defaultInspectionPhotos,
+      packages: defaultPackages,
+    };
+
+    setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    void findOrCreateCustomer({
+      name: newProposal.customerName,
+      email: newProposal.customerEmail,
+      phone: newProposal.customerPhone,
+      propertyAddress: newProposal.address,
+      status: "Estimate",
+      lifetimeValue: newProposal.total,
+      source: "Estimate",
+    }).catch(() => {});
+    openProposal(newProposal);
   }
 
   function applyTemplateToEditor(template: ProposalTemplate) {
@@ -723,6 +867,7 @@ export default function ProposalsPage() {
       sendSubject: sendForm.subject,
       sendMessage: sendForm.message,
       sentToEmail: sendForm.toEmail,
+      proposalVersion: (activeProposal.proposalVersion ?? 0) + 1,
     });
     const proposalForLink = sentProposal || activeProposal;
     const proposalLink = `${window.location.origin}/proposal/${encodeURIComponent(proposalForLink.id)}`;
@@ -812,10 +957,21 @@ export default function ProposalsPage() {
   function handleAcceptProposal() {
     if (!activeProposal || !agreementAccepted || !typedSignature.trim()) return;
 
+    const acceptedOption = activeProposal.selectedOption || "best";
+    const acceptedPrice = Number(editorForm.total) || activeProposal.total || 0;
+    const signedAt = new Date().toISOString();
     const signedProposal = saveActiveProposal({
       status: "Won",
-      signedAt: new Date().toISOString(),
+      signedAt,
+      acceptedAt: signedAt,
       signedBy: typedSignature.trim(),
+      selectedOption: acceptedOption,
+      acceptedPackage: acceptedOption,
+      acceptedPackageName: acceptedOption.charAt(0).toUpperCase() + acceptedOption.slice(1),
+      acceptedPrice,
+      total: acceptedPrice,
+      proposalVersion: activeProposal.proposalVersion ?? 1,
+      locked: true,
     });
 
     if (signedProposal) {
@@ -839,7 +995,7 @@ export default function ProposalsPage() {
   if (activeProposal) {
     return (
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8">
-        <div className="sticky top-20 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm">
+        <div className="sticky top-16 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm lg:top-20">
           <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
           <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
           <div className="flex items-center gap-2">
@@ -854,9 +1010,26 @@ export default function ProposalsPage() {
         {(activeProposal.status === "Won" || activeProposal.status === "Signed") && (
           <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4">
             <div className="mx-auto max-w-5xl rounded-2xl bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Signed proposal copy</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Signed proposal copy</p>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700">🔒 Locked</span>
+              </div>
               <p className="mt-2 text-sm font-bold text-slate-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
-              {activeProposal.signatureData && <Image src={activeProposal.signatureData} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted package</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted price</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Version</p>
+                  <p className="mt-0.5 text-sm font-black text-[#07183f]">v{activeProposal.proposalVersion ?? 1}</p>
+                </div>
+              </div>
+              {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
             </div>
           </div>
         )}
@@ -911,7 +1084,8 @@ export default function ProposalsPage() {
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total
-                <input type="number" value={editorForm.total} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" />
+                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[10px] font-bold normal-case tracking-normal text-emerald-700">🔒 Locked at the signed amount</span>}
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
                 Customer notes
@@ -1254,13 +1428,14 @@ export default function ProposalsPage() {
 
   return (
     <div className="space-y-5 font-sans">
+      <BackToJobsLink />
       <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Proposal Center</p>
             <h1 className="mt-2 text-3xl font-black tracking-tight">Proposals</h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
+            <p className="crm-board-subtitle mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
           </div>
           <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-600">⊕ Proposal</button>
         </div>
@@ -1484,8 +1659,8 @@ export default function ProposalsPage() {
             </button>
             <div className="flex items-center justify-end gap-3">
               <div className="text-right">
-                <p className="font-black text-slate-600">${proposal.total.toLocaleString()}</p>
-                <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.selectedOption || "BEST"}</p>
+                <p className="font-black text-slate-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
+                <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" ? "bg-emerald-500 text-white" : "bg-yellow-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
               <button type="button" onClick={() => handleDeleteProposal(proposal)} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">Delete</button>

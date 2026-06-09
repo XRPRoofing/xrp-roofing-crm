@@ -40,7 +40,23 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   });
 }
 
-export async function createOutboundCall(payload: TwilioCallPayload) {
+// The status-callback env var (TWILIO_CALL_STATUS_WEBHOOK_URL) sometimes still
+// points at an old/third-party CRM (e.g. roofercrm-api.onrender.com), which
+// silently steals recording + call-status callbacks. Only honor it when it
+// points at this app; otherwise fall back to this app's own endpoint.
+export function resolveCallStatusCallbackUrl(origin: string): string {
+  const fallback = new URL("/api/twilio/webhooks/call-status", origin).toString();
+  const configured = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL?.trim();
+  if (!configured) return fallback;
+  try {
+    if (new URL(configured).host === new URL(origin).host) return configured;
+  } catch {
+    return fallback;
+  }
+  return fallback;
+}
+
+export async function createOutboundCall(payload: TwilioCallPayload, callbackUrl?: string) {
   if (!hasTwilioVoiceConfig()) throw new Error("Twilio voice is not configured");
 
   const client = getTwilioClient();
@@ -48,33 +64,53 @@ export async function createOutboundCall(payload: TwilioCallPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
+  const statusCallback = callbackUrl || process.env.TWILIO_CALL_STATUS_WEBHOOK_URL;
+
   return client.calls.create({
     to: payload.to,
     from: config.phoneNumber,
     url: process.env.TWILIO_OUTBOUND_VOICE_WEBHOOK_URL,
-    statusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    statusCallback,
     statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    record: true,
+    recordingStatusCallback: statusCallback,
+    recordingStatusCallbackEvent: ["completed"],
   });
 }
 
-export function buildIncomingCallTwiml() {
+function normalizePhoneForTwiml(value?: string) {
+  const trimmed = value?.trim() || "";
+  if (!trimmed) return "";
+
+  return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
+}
+
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
   const response = new twilio.twiml.VoiceResponse();
+  const config = getTwilioConfig();
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
-    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    action: actionCallbackUrl,
     method: "POST",
-    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
   });
 
   dial.client("crm-agent");
 
+  // Forwarding to the Twilio number itself would loop the call back into this
+  // webhook, so only forward to a different (real) phone.
+  const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
+  if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
+    dial.number(inboundForwardNumber);
+  }
+
   return response.toString();
 }
 
-export function buildOutboundBrowserCallTwiml(to?: string | null) {
+export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
@@ -86,9 +122,9 @@ export function buildOutboundBrowserCallTwiml(to?: string | null) {
   response.dial({
     callerId: config.phoneNumber,
     record: "record-from-answer-dual",
-    action: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    action: actionCallbackUrl,
     method: "POST",
-    recordingStatusCallback: process.env.TWILIO_CALL_STATUS_WEBHOOK_URL,
+    recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
   }).number(to);
@@ -102,9 +138,10 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   const messageSid = String(payload.MessageSid || payload.SmsSid || "");
   const callSid = String(payload.CallSid || "");
   const status = String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || "");
+  const recordingSid = String(payload.RecordingSid || "");
 
   return {
-    id: messageSid || (callSid ? `${callSid}-${status || type}-${Date.now()}` : crypto.randomUUID()),
+    id: messageSid || recordingSid || (callSid ? `${callSid}-${status || type}` : crypto.randomUUID()),
     type,
     direction: String(payload.Direction || "").includes("outbound") ? "outbound" : "inbound",
     from: String(payload.From || ""),
@@ -116,6 +153,7 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
     conversationId: payload.conversationId ? String(payload.conversationId) : undefined,
     customerId: payload.customerId ? String(payload.customerId) : undefined,
     jobId: payload.jobId ? String(payload.jobId) : undefined,
+    recordingSid: recordingSid || undefined,
     recordingUrl: payload.RecordingUrl ? `${payload.RecordingUrl}.mp3` : undefined,
     payload,
     createdAt: now,
@@ -130,8 +168,8 @@ export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConvers
     conversationId: payload.conversationId,
     customerId: payload.customerId,
     jobId: payload.jobId,
-    body: payload.notes,
-    payload: { notes: payload.notes },
+    body: payload.disposition ? `${payload.disposition}: ${payload.notes}` : payload.notes,
+    payload: { notes: payload.notes, disposition: payload.disposition },
     createdAt: new Date().toISOString(),
   };
 }

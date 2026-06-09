@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
+import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { subscribeToConversationEvents } from "@/lib/twilio/client";
-import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
+import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
+  { href: "/crm/tasks", label: "Tasks", shortLabel: "Tasks", icon: ClipboardList },
   { href: "/crm/conversations", label: "Conversation board", shortLabel: "Messages", icon: MessageSquareText },
   { href: "/crm/team-chat", label: "Team Chat", shortLabel: "Chat", icon: MessageCircle },
   { href: "/crm/leads", label: "Jobs", shortLabel: "Jobs", icon: BriefcaseBusiness },
@@ -20,14 +21,13 @@ const navigation = [
   { href: "/crm/proposals", label: "Proposal", shortLabel: "Proposal", icon: FileText },
   { href: "/crm/invoices", label: "Invoice", shortLabel: "Invoice", icon: ClipboardList },
   { href: "/crm/payments", label: "Payments", shortLabel: "Pay", icon: CreditCard },
-  { href: "/crm/tasks", label: "Tasks", shortLabel: "Tasks", icon: ClipboardList },
   { href: "/crm/calendar", label: "Calendar", shortLabel: "Calendar", icon: CalendarDays },
   { href: "/crm/pdf-signer-board", label: "PDF Signer Board", shortLabel: "PDF", icon: FileSignature },
   { href: "/crm/files", label: "Files", shortLabel: "Files", icon: UploadCloud },
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 
-const mobilePrimaryNavigation = ["/crm", "/crm/leads", "/crm/crew", "/crm/team-chat", "/crm/files"];
+const mobilePrimaryNavigation = ["/crm", "/crm/team-chat", "/crm/leads", "/crm/calendar", "/crm/crew", "/crm/files"];
 
 const quickStats = [
   { label: "Live jobs", value: "24" },
@@ -49,13 +49,28 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CrmNotification[]>([]);
   const [unreadTeamChatCount, setUnreadTeamChatCount] = useState(0);
+  const voiceDeviceRef = useRef<BrowserVoiceDevice | null>(null);
+  const incomingCallRef = useRef<BrowserVoiceCall | null>(null);
+  const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
-  const mobileNavigation = isCrewUser ? visibleNavigation : navigation.filter((item) => mobilePrimaryNavigation.includes(item.href));
+  const mobileNavigation = isCrewUser
+    ? visibleNavigation
+    : mobilePrimaryNavigation
+        .map((href) => navigation.find((item) => item.href === href))
+        .filter((item): item is (typeof navigation)[number] => Boolean(item));
   const activeModule = visibleNavigation.find((item) => pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href)));
 
   useEffect(() => {
     let mounted = true;
+
+    if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
+      setUserRole("admin");
+      setCheckingAuth(false);
+      return () => {
+        mounted = false;
+      };
+    }
 
     createClient().auth.getSession().then(({ data }) => {
       if (!mounted) return;
@@ -105,10 +120,63 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       return subscribeToConversationEvents((event) => {
         addTwilioCrmNotification(event);
         setNotifications(readCrmNotifications());
+
+        if (event.type === "incoming_call") {
+          const phone = getTwilioEventPhone(event);
+          setGlobalIncomingCall({ name: phone || "Unknown caller", phone: phone || "Unknown number" });
+          window.setTimeout(() => setGlobalIncomingCall(null), 30000);
+        }
       });
     } catch {
       return undefined;
     }
+  }, [isCrewUser]);
+
+
+  useEffect(() => {
+    if (isCrewUser) return;
+    let mounted = true;
+
+    async function registerGlobalVoiceDevice() {
+      try {
+        const device = await createBrowserVoiceDevice("crm-agent");
+        if (!mounted) {
+          device.destroy();
+          return;
+        }
+
+        voiceDeviceRef.current = device;
+        device.on("incoming", (call) => {
+          const incoming = call as BrowserVoiceCall;
+          const phone = incoming.parameters?.From || "Unknown number";
+          incomingCallRef.current = incoming;
+          setGlobalIncomingCall({ name: phone, phone });
+          incoming.on("cancel", () => {
+            incomingCallRef.current = null;
+            setGlobalIncomingCall(null);
+          });
+          incoming.on("disconnect", () => {
+            incomingCallRef.current = null;
+            setGlobalIncomingCall(null);
+          });
+        });
+        device.on("unregistered", () => {
+          void device.register().catch(() => undefined);
+        });
+        await device.register();
+      } catch {
+        voiceDeviceRef.current = null;
+      }
+    }
+
+    registerGlobalVoiceDevice();
+
+    return () => {
+      mounted = false;
+      voiceDeviceRef.current?.destroy();
+      voiceDeviceRef.current = null;
+      incomingCallRef.current = null;
+    };
   }, [isCrewUser]);
 
   useEffect(() => {
@@ -163,7 +231,31 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setNotifications(readCrmNotifications());
   }
 
-  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+  function handleDeleteNotification(notificationId: string) {
+    deleteCrmNotification(notificationId);
+    setNotifications(readCrmNotifications());
+  }
+
+  function handleAnswerGlobalIncomingCall() {
+    const incoming = incomingCallRef.current;
+    if (!incoming) {
+      router.push("/crm/conversations");
+      return;
+    }
+
+    incoming.accept();
+    (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = incoming;
+    setGlobalIncomingCall(null);
+    router.push("/crm/conversations?activeCall=1");
+  }
+
+  function handleDeclineGlobalIncomingCall() {
+    incomingCallRef.current?.reject();
+    incomingCallRef.current = null;
+    setGlobalIncomingCall(null);
+  }
+
+  const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
   const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";
 
   if (checkingAuth) {
@@ -175,7 +267,18 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)]">
+    <div className="min-h-screen overflow-x-clip bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)]">
+      {globalIncomingCall && !isCrewUser && (
+        <div className="fixed right-4 top-24 z-[80] w-[min(92vw,380px)] rounded-3xl border border-orange-200 bg-white p-5 text-slate-950 shadow-2xl shadow-slate-950/25">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Incoming Call</p>
+          <p className="mt-2 text-xl font-black">{globalIncomingCall.name}</p>
+          <p className="mt-1 text-sm font-bold text-slate-600">{globalIncomingCall.phone}</p>
+          <div className="mt-4 flex gap-2">
+            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700">Answer</button>
+            <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
+          </div>
+        </div>
+      )}
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
@@ -260,7 +363,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                             {!notification.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-orange-500" />}
                           </div>
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{notification.message}</p>
-                          <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-red-600 hover:bg-red-50">Delete</button>
+                          </div>
                         </div>
                       ))}
                       {notifications.length === 0 && <p className="p-5 text-center text-sm font-semibold text-slate-500">No notifications yet.</p>}
@@ -277,11 +383,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </header>
-        <main className="px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
+        <main className="crm-main px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
           <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          <div className={`mx-auto grid max-w-md gap-1 ${mobileNavigation.length >= 6 ? "grid-cols-6" : "grid-cols-5"}`}>
             {mobileNavigation.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));

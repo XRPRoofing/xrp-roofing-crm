@@ -4,6 +4,7 @@ export type CrewJobStatus = "Assigned" | "In Progress" | "On Work" | "Mark Done"
 
 export type CrewJobCompletion = {
   beforePhotos: string[];
+  progressPhotos: string[];
   afterPhotos: string[];
   notes: string;
   materialsUsed?: string;
@@ -23,14 +24,18 @@ export type CrewAssignment = {
 
 export type CrewJob = Lead & CrewAssignment;
 
-export const crewMembers = ["Jonathan", "Adrian"];
+export const crewMembers = ["Jonathan", "Darwin"];
 export const crewStatuses: CrewJobStatus[] = ["Assigned", "In Progress", "On Work", "Mark Done", "Completed", "Proceed to Invoice", "Done Payment"];
 export const crewWorkflowStorageKey = "xrp-crm-crew-workflow";
 export const jobsStorageKey = "xrp-crm-jobs-board";
 
-function cleanAssignedCrew(assignedCrew: string[], index = 0) {
+export function cleanAssignedCrewMembers(assignedCrew: string[], index = 0) {
   const validCrew = assignedCrew.filter((member) => crewMembers.includes(member));
   return validCrew.length > 0 ? validCrew : [crewMembers[index % crewMembers.length]];
+}
+
+function cleanAssignedCrew(assignedCrew: string[], index = 0) {
+  return cleanAssignedCrewMembers(assignedCrew, index);
 }
 
 export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignment {
@@ -43,6 +48,7 @@ export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignmen
     jobNotes: job.lastActivity || "Review job details before starting work.",
     completion: {
       beforePhotos: [],
+      progressPhotos: [],
       afterPhotos: [],
       notes: "",
       materialsUsed: "",

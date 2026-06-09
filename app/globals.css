@@ -123,3 +123,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile: keep board headers compact so content is reachable without dragging. */
+@media (max-width: 639px) {
+  .crm-main h1 {
+    font-size: 1.5rem;
+    line-height: 1.9rem;
+  }
+  .crm-main p.crm-board-subtitle {
+    display: none;
+  }
+}
+
+/* Horizontal filter pill row: scrollable on small screens without a visible scrollbar. */
+.crm-filter-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.crm-filter-scroll::-webkit-scrollbar {
+  display: none;
+}

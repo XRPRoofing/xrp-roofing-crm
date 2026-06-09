@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { saveSharedGoogleTokens } from "@/lib/google-calendar-store";
+
+export const runtime = "nodejs";
 
 const scope = "https://www.googleapis.com/auth/calendar.events";
 const tokenCookieName = "xrp_google_calendar_tokens";
@@ -18,12 +21,13 @@ function getAppOrigin(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const { clientId, clientSecret, redirectUri } = getGoogleConfig();
+  const { clientId, clientSecret, redirectUri: configuredRedirectUri } = getGoogleConfig();
   const origin = getAppOrigin(req);
+  const redirectUri = configuredRedirectUri || `${origin}/api/google-calendar/connect`;
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret) {
     return NextResponse.redirect(`${origin}/crm/calendar?google_calendar=missing_env`);
   }
 
@@ -59,6 +63,9 @@ export async function GET(req: NextRequest) {
   }
 
   const tokens = await tokenResponse.json();
+  // Persist once on the server so every device (computer + phone) shares the
+  // same Google connection. Cookie stays as a same-device fallback.
+  await saveSharedGoogleTokens(tokens);
   const response = NextResponse.redirect(`${origin}/crm/calendar?google_calendar=connected`);
   response.cookies.set(tokenCookieName, JSON.stringify(tokens), {
     httpOnly: true,

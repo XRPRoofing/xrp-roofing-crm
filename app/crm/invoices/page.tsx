@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
+import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
+import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
+import { addCrmNotification } from "@/lib/crm-notifications";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import BackToJobsLink from "@/components/crm/BackToJobsLink";
+import type { Customer } from "@/types/crm";
 
-type InvoiceStatus = "Draft" | "Sent" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
+type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
 
 type InvoiceLineItem = {
@@ -70,10 +78,31 @@ type Invoice = {
   lineItems: InvoiceLineItem[];
   payments: Payment[];
   activity: string[];
+  viewedAt?: string;
+  paidAt?: string;
+  failedAt?: string;
+  sentAt?: string;
+  sentBy?: string;
+  emailDeliveredAt?: string;
+  emailOpenedAt?: string;
 };
+
+const customersStorageKey = "xrp-crm-customers";
 
 const today = new Date().toISOString().slice(0, 10);
 const invoicesStorageKey = "xrp-crm-invoices";
+
+/** Read the invoices persisted in this browser (written by any tab on this device). */
+function readStoredInvoices(): Invoice[] | null {
+  if (typeof window === "undefined") return null;
+  const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
+  if (!savedInvoices) return null;
+  try {
+    return JSON.parse(savedInvoices) as Invoice[];
+  } catch {
+    return null;
+  }
+}
 
 const initialInvoices: Invoice[] = [
   {
@@ -219,6 +248,7 @@ function getComputedStatus(invoice: Invoice): InvoiceStatus {
   const currentDate = new Date(`${today}T00:00:00`);
   const daysUntilDue = Math.ceil((dueDate.getTime() - currentDate.getTime()) / 86400000);
   if (daysUntilDue < 0) return "Overdue";
+  if (invoice.viewedAt || invoice.activity.includes("Viewed")) return "Viewed";
   if (daysUntilDue <= 3) return "Due Soon";
   if (invoice.status === "Sent") return "Pending";
   return invoice.status === "Pending" || invoice.status === "Due Soon" || invoice.status === "Overdue" ? invoice.status : "Pending";
@@ -296,11 +326,32 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
   if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (status === "Viewed") return "bg-indigo-50 text-indigo-700 ring-indigo-100";
+  if (status === "Sent" || status === "Pending") return "bg-blue-50 text-blue-700 ring-blue-100";
   if (status === "Due Soon") return "bg-orange-50 text-orange-700 ring-orange-100";
   if (status === "Overdue") return "bg-red-50 text-red-700 ring-red-100";
   if (status === "Voided") return "bg-slate-100 text-slate-600 ring-slate-200";
   if (status === "Draft") return "bg-slate-50 text-slate-700 ring-slate-200";
   return "bg-red-50 text-red-700 ring-red-100";
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
+type TimelineStep = { label: string; at?: string; done: boolean };
+
+function buildInvoiceTimeline(invoice: Invoice): TimelineStep[] {
+  const lastPayment = invoice.payments.length ? invoice.payments[invoice.payments.length - 1] : undefined;
+  return [
+    { label: "Invoice Created", at: invoice.issueDate, done: true },
+    { label: "Invoice Sent", at: invoice.sentAt, done: Boolean(invoice.sentAt) || invoice.status === "Sent" },
+    { label: "Invoice Viewed", at: invoice.viewedAt, done: Boolean(invoice.viewedAt) },
+    { label: "Payment Received", at: invoice.paidAt || lastPayment?.date, done: getComputedStatus(invoice) === "Paid" || invoice.payments.length > 0 },
+  ];
 }
 
 function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
@@ -309,18 +360,89 @@ function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
   return "border-red-200 bg-red-50 text-red-700";
 }
 
-export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    if (typeof window === "undefined") return initialInvoices;
-    const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
-    if (!savedInvoices) return initialInvoices;
+/**
+ * Overlay Stripe-driven payment + tracking state from `invoice_shares` onto a
+ * local invoice. Stripe is the source of truth for payment fields; everything
+ * else (line items, customer info edited locally) is preserved. Returns the
+ * same reference when nothing changed so React can skip re-renders.
+ */
+function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): Invoice {
+  const nextPayments = share.payments ? (share.payments as Payment[]) : invoice.payments;
+  const nextStatus = (share.status as InvoiceStatus) || invoice.status;
+  const nextActivity = share.activity && share.activity.length ? share.activity : invoice.activity;
+  const changed =
+    nextStatus !== invoice.status ||
+    nextPayments.length !== invoice.payments.length ||
+    share.viewedAt !== invoice.viewedAt ||
+    share.paidAt !== invoice.paidAt ||
+    share.failedAt !== invoice.failedAt ||
+    share.emailDeliveredAt !== invoice.emailDeliveredAt ||
+    share.emailOpenedAt !== invoice.emailOpenedAt ||
+    nextActivity !== invoice.activity;
 
-    try {
-      return JSON.parse(savedInvoices) as Invoice[];
-    } catch {
-      return initialInvoices;
+  if (!changed) return invoice;
+
+  return {
+    ...invoice,
+    payments: nextPayments,
+    status: nextStatus,
+    activity: nextActivity,
+    viewedAt: share.viewedAt ?? invoice.viewedAt,
+    paidAt: share.paidAt ?? invoice.paidAt,
+    failedAt: share.failedAt ?? invoice.failedAt,
+    sentAt: share.sentAt ?? invoice.sentAt,
+    sentBy: share.sentBy ?? invoice.sentBy,
+    emailDeliveredAt: share.emailDeliveredAt ?? invoice.emailDeliveredAt,
+    emailOpenedAt: share.emailOpenedAt ?? invoice.emailOpenedAt,
+  };
+}
+
+/**
+ * When an invoice is paid in Stripe, cascade the status to the customer record
+ * (Customer Status = Paid) and the linked job (Job Payment Status = Paid), and
+ * raise a CRM notification. Best-effort and guarded for SSR.
+ */
+function propagatePaidStatus(invoice: Invoice) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const raw = window.localStorage.getItem(customersStorageKey);
+    if (raw) {
+      const list = JSON.parse(raw) as Customer[];
+      let changed = false;
+      const next = list.map((customer) => {
+        const matches =
+          (customer.email && invoice.email && customer.email === invoice.email) ||
+          customer.name.toLowerCase() === invoice.clientName.toLowerCase();
+        if (matches && customer.status !== "Paid") {
+          changed = true;
+          return { ...customer, status: "Paid" };
+        }
+        return customer;
+      });
+      if (changed) {
+        window.localStorage.setItem(customersStorageKey, JSON.stringify(next));
+        window.dispatchEvent(new Event(crewSyncUpdatedEvent));
+      }
     }
+  } catch {
+    // ignore malformed customer cache
+  }
+
+  if (invoice.jobReference) {
+    void updateJobRecord(invoice.jobReference, { stage: "paid" }).catch(() => {});
+  }
+
+  addCrmNotification({
+    title: "Payment received",
+    message: `${invoice.clientName} paid ${invoice.invoiceNumber}`,
+    actor: "Stripe",
+    module: "Invoices",
   });
+}
+
+export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState<Invoice[]>(() => readStoredInvoices() ?? initialInvoices);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -329,6 +451,7 @@ export default function InvoicesPage() {
   const [invoiceFilter, setInvoiceFilter] = useState<(typeof filterOptions)[number]>("All");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [integrationNotice, setIntegrationNotice] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
@@ -356,8 +479,122 @@ export default function InvoicesPage() {
     activity: ["Invoice created"],
   });
 
+  const paidPropagatedRef = useRef<Set<string>>(new Set());
+  const intentHandledRef = useRef(false);
+
+  // One-click handoff from a Job / customer profile: open the requested invoice
+  // editor directly, or create one from the job and open it (linked by
+  // jobReference). Consume-once so a normal later visit isn't hijacked.
+  useEffect(() => {
+    if (intentHandledRef.current) return;
+    const intent = takeInvoiceIntent();
+    if (!intent) return;
+    intentHandledRef.current = true;
+    if (intent.kind === "open") {
+      setSelectedInvoiceId(intent.id);
+      return;
+    }
+    setInvoices((current) => {
+      const created: Invoice = {
+        ...createInvoiceFromJob(payloadToLead(intent.job), current.length),
+        id: `inv-${Date.now()}`,
+      };
+      setSelectedInvoiceId(created.id);
+      return [created, ...current];
+    });
+  }, []);
+
   useEffect(() => {
     window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
+  }, [invoices]);
+
+  // Identify the signed-in CRM user so "Sent By" can be recorded on send.
+  useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        const email = data.session?.user.email;
+        if (email) setCurrentUserEmail(email);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Real-time Stripe payment sync: load the shared invoice state from Supabase
+  // and subscribe to live changes written by the Stripe webhook. Stripe is the
+  // source of truth, so payment/tracking fields are merged onto local invoices
+  // without requiring a refresh.
+  useEffect(() => {
+    let active = true;
+
+    // Seed with already-paid invoices so we only cascade NEW payments.
+    paidPropagatedRef.current = new Set(
+      invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").map((invoice) => invoice.id),
+    );
+
+    function applyShare(share: InvoiceSharePayload) {
+      setInvoices((current) => {
+        const index = current.findIndex((invoice) => invoice.id === share.id);
+        if (index === -1) return current;
+        const merged = mergeShareIntoInvoice(current[index], share);
+        if (merged === current[index]) return current;
+        const next = [...current];
+        next[index] = merged;
+        return next;
+      });
+    }
+
+    void loadInvoiceShares()
+      .then((shares) => {
+        if (active) shares.forEach(applyShare);
+      })
+      .catch(() => {});
+
+    const unsubscribe = subscribeToInvoiceShares((share) => {
+      if (active) applyShare(share);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // No manual refresh: when the user returns to this tab/device (focus,
+  // visibility, or a cross-tab write), re-read invoices saved on this device and
+  // re-pull the Stripe-synced share state so the board is always current.
+  useAutoRefresh(() => {
+    const saved = readStoredInvoices();
+    if (saved) {
+      setInvoices((current) => (JSON.stringify(current) === JSON.stringify(saved) ? current : saved));
+    }
+    void loadInvoiceShares()
+      .then((shares) => {
+        setInvoices((current) => {
+          let changed = false;
+          const next = current.map((invoice) => {
+            const share = shares.find((item) => item.id === invoice.id);
+            if (!share) return invoice;
+            const merged = mergeShareIntoInvoice(invoice, share);
+            if (merged !== invoice) changed = true;
+            return merged;
+          });
+          return changed ? next : current;
+        });
+      })
+      .catch(() => {});
+  });
+
+  // Cascade Customer/Job status to Paid whenever an invoice newly becomes Paid
+  // (Stripe sync or a full manual payment). Guarded so each invoice fires once.
+  useEffect(() => {
+    invoices.forEach((invoice) => {
+      if (getComputedStatus(invoice) === "Paid" && !paidPropagatedRef.current.has(invoice.id)) {
+        paidPropagatedRef.current.add(invoice.id);
+        propagatePaidStatus(invoice);
+      }
+    });
   }, [invoices]);
 
   const selectedInvoice = invoices.find((invoice) => invoice.id === selectedInvoiceId) || null;
@@ -365,11 +602,14 @@ export default function InvoicesPage() {
     const total = invoices.reduce((sum, invoice) => sum + calculateTotals(invoice).finalTotal, 0);
     const paid = invoices.reduce((sum, invoice) => sum + getPaidAmount(invoice), 0);
     const balance = Math.max(total - paid, 0);
+    const paidCount = invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").length;
+    const unpaid = invoices.filter((invoice) => !["Paid", "Voided"].includes(getComputedStatus(invoice))).length;
     const overdue = invoices.filter((invoice) => getComputedStatus(invoice) === "Overdue").length;
     const pending = invoices.filter((invoice) => ["Pending", "Due Soon", "Overdue"].includes(getComputedStatus(invoice))).length;
     const partial = invoices.filter((invoice) => getComputedStatus(invoice) === "Partially Paid").length;
+    const viewed = invoices.filter((invoice) => invoice.viewedAt || invoice.activity.includes("Viewed")).length;
     const collectionRate = total > 0 ? Math.round((paid / total) * 100) : 0;
-    return { total, paid, balance, overdue, pending, partial, collectionRate };
+    return { total, paid, balance, paidCount, unpaid, overdue, pending, partial, viewed, collectionRate };
   }, [invoices]);
   const filteredInvoices = useMemo(() => {
     const query = invoiceSearch.toLowerCase().trim();
@@ -471,11 +711,15 @@ export default function InvoicesPage() {
 
     setSendForm((currentForm) => ({ ...currentForm, message: "Sending invoice email..." }));
 
+    const sentAt = new Date().toISOString();
+    const sentBy = currentUserEmail || "CRM user";
+    const sentInvoice: Invoice = { ...selectedInvoice, status: "Sent", sentAt, sentBy };
+
     try {
       const shareResponse = await fetch("/api/invoices/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(selectedInvoice),
+        body: JSON.stringify(sentInvoice),
       });
 
       if (!shareResponse.ok) {
@@ -491,6 +735,7 @@ export default function InvoicesPage() {
           subject: sendForm.subject,
           message: sendForm.message,
           invoiceNumber: selectedInvoice.invoiceNumber,
+          invoiceId: selectedInvoice.id,
           invoiceLink,
           balance: currency(balance),
         }),
@@ -501,7 +746,7 @@ export default function InvoicesPage() {
         throw new Error(data.error || "Unable to send invoice email");
       }
 
-      updateInvoice({ ...selectedInvoice, status: "Sent" }, `Invoice sent with online payment link using ${sendForm.template} template`);
+      updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
       setShowSendModal(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
@@ -512,32 +757,47 @@ export default function InvoicesPage() {
   function handleDownloadPdf(invoice: Invoice) {
     const totals = calculateTotals(invoice);
     const paid = getPaidAmount(invoice);
-    const paidStamp = getComputedStatus(invoice) === "Paid" ? "PAID\n" : "";
-    const offlinePayment = invoice.payments.some((payment) => payment.offline) ? "Payment Received Offline\n" : "";
+    const isPaid = getComputedStatus(invoice) === "Paid";
+    const isOffline = invoice.payments.some((payment) => payment.offline);
+    const logoUrl = `${window.location.origin}/images/logo.jpeg`;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     printWindow.document.write(`
       <html>
         <head>
           <title>${invoice.invoiceNumber}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
           <style>
-            body { font-family: Georgia, serif; color: #0f172a; padding: 40px; }
-            .header { display: flex; justify-content: space-between; border-bottom: 4px solid #07183f; padding-bottom: 20px; }
-            .brand { font-size: 32px; font-weight: 900; color: #07183f; }
-            .stamp { position: fixed; top: 170px; right: 70px; color: #dc2626; border: 6px solid #dc2626; padding: 12px 28px; font-size: 44px; font-weight: 900; transform: rotate(-14deg); opacity: .75; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { font-family: Georgia, serif; color: #0f172a; padding: 40px; position: relative; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 4px solid #07183f; padding-bottom: 20px; }
+            .logo { height: 84px; width: auto; display: block; }
+            .roc { margin-top: 8px; font-weight: 700; color: #475569; }
+            .doc-title { text-align: right; }
+            .doc-title h1 { margin: 0; color: #07183f; }
+            .stamp { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%) rotate(-22deg); color: #16a34a; border: 10px solid #16a34a; border-radius: 18px; padding: 6px 56px; font-size: 120px; font-weight: 900; letter-spacing: 10px; opacity: .20; text-transform: uppercase; pointer-events: none; z-index: 999; }
+            .stamp small { display: block; text-align: center; font-size: 22px; letter-spacing: 3px; margin-top: 6px; }
             table { width: 100%; border-collapse: collapse; margin-top: 28px; }
             th, td { border-bottom: 1px solid #e2e8f0; padding: 12px; text-align: left; }
             th { background: #f8fafc; color: #07183f; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
             .box { background: #f8fafc; border-radius: 18px; padding: 18px; }
             .total { text-align: right; font-size: 22px; font-weight: 900; color: #07183f; }
-            @media print { button { display: none; } }
+            .print-btn { margin-bottom: 20px; padding: 12px 20px; font-size: 16px; font-weight: 700; background: #07183f; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+            @media print { .print-btn { display: none; } body { padding: 24px; } }
+            @media (max-width: 640px) {
+              body { padding: 20px; }
+              .logo { height: 60px; }
+              .stamp { font-size: 64px; padding: 6px 30px; border-width: 6px; letter-spacing: 6px; }
+              .stamp small { font-size: 16px; }
+              .grid { grid-template-columns: 1fr; }
+            }
           </style>
         </head>
         <body>
-          ${paidStamp ? '<div class="stamp">PAID</div>' : ""}
-          <button onclick="window.print()">Download / Save PDF</button>
-          <div class="header"><div><div class="brand">XRP Roofing</div><p>ROC #350898</p></div><div><h1>Invoice</h1><p>${invoice.invoiceNumber}</p>${offlinePayment ? "<strong>Payment Received Offline</strong>" : ""}</div></div>
+          ${isPaid ? `<div class="stamp">PAID${isOffline ? "<small>Received Offline</small>" : ""}</div>` : ""}
+          <button class="print-btn" onclick="window.print()">Download / Save PDF</button>
+          <div class="header"><div><img class="logo" src="${logoUrl}" alt="XRP Roofing" /><p class="roc">ROC #350898</p></div><div class="doc-title"><h1>Invoice</h1><p>${invoice.invoiceNumber}</p>${isOffline ? "<strong>Payment Received Offline</strong>" : ""}</div></div>
           <div class="grid"><div class="box"><h3>Client Details</h3><p>${invoice.clientName}</p><p>${invoice.email}</p><p>${invoice.phone}</p><p>${invoice.propertyAddress}</p></div><div class="box"><h3>Job Details</h3><p>${invoice.jobName}</p><p>Roof Type: ${invoice.roofType}</p><p>Proposal: ${invoice.proposalReference}</p><p>Completion: ${invoice.projectCompletionDate}</p></div></div>
           <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Tax</th><th>Total</th></tr></thead><tbody>${invoice.lineItems.map((item) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${currency(item.unitPrice)}</td><td>${item.tax}%</td><td>${currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</td></tr>`).join("")}</tbody></table>
           <p class="total">Total: ${currency(totals.finalTotal)}<br/>Paid: ${currency(paid)}<br/>Balance: ${currency(Math.max(totals.finalTotal - paid, 0))}</p>
@@ -559,9 +819,9 @@ export default function InvoicesPage() {
 
   function renderInvoiceFields(invoice: Invoice, editable: boolean, onChange: (invoice: Invoice) => void) {
     const totals = calculateTotals(invoice);
-    const inputClass = "mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50";
+    const inputClass = "mt-1.5 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50";
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client name<input disabled={!editable} value={invoice.clientName} onChange={(event) => onChange({ ...invoice, clientName: event.target.value })} className={inputClass} placeholder="Client name" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Email<input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className={inputClass} placeholder="Email" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Phone<input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className={inputClass} placeholder="Phone" /></label>
@@ -574,8 +834,8 @@ export default function InvoicesPage() {
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Proposal reference<input disabled={!editable} value={invoice.proposalReference} onChange={(event) => onChange({ ...invoice, proposalReference: event.target.value })} className={inputClass} placeholder="Proposal reference" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-28`} placeholder="Payment terms" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-28`} placeholder="Warranty notes" /></label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></label>
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-black text-[#07183f]">Line Items</h3>
@@ -608,49 +868,34 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
-          </div>
-          <button onClick={handleStartInvoice} className="w-full sm:w-fit rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
+      <BackToJobsLink />
+      <div className="sticky top-16 z-20 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:px-4 sm:py-3 lg:top-20">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Invoice Board</h1>
+          <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
         </div>
-        <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:grid-cols-6 sm:gap-2">
           {[
+            ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
+            ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
+            ["Overdue Invoices", String(boardTotals.overdue), "text-red-700"],
+            ["Viewed Invoices", String(boardTotals.viewed), "text-blue-700"],
             ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
-            ["Paid This Month", currency(boardTotals.paid), "text-emerald-700"],
-            ["Pending", String(boardTotals.pending), "text-slate-950"],
-            ["Overdue", String(boardTotals.overdue), "text-red-700"],
-            ["Partial Payments", String(boardTotals.partial), "text-amber-700"],
             ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
           ].map(([label, value, valueClass]) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-              <p className={`mt-1 sm:mt-2 text-lg sm:text-xl font-bold tracking-tight ${valueClass}`}>{value}</p>
+            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1.5">
+              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-500">{label}</p>
+              <p className={`mt-0.5 text-sm font-bold tracking-tight ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
-        <div className="mt-5 flex flex-col items-stretch justify-between gap-3 xl:flex-row xl:items-center">
-          <div className="w-full xl:max-w-2xl xl:mx-auto">
-            <input 
-              value={invoiceSearch} 
-              onChange={(event) => setInvoiceSearch(event.target.value)} 
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" 
-              placeholder="Search by client, invoice #, or property..." 
-            />
+        <div className="mt-2.5 flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
+          <div className="w-full flex-1">
+            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search by client, invoice #, or property..." />
           </div>
-          <div className="flex overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-1 scrollbar-hide">
+          <div className="inline-flex shrink-0 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-0.5 scrollbar-hide">
             {filterOptions.map((option) => (
-              <button 
-                key={option} 
-                type="button" 
-                onClick={() => setInvoiceFilter(option)} 
-                className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-              >
-                {option.replace(" clients", "").replace(" accounts", "")}
-              </button>
+              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
             ))}
           </div>
         </div>
@@ -661,15 +906,15 @@ export default function InvoicesPage() {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
           return (
-            <section key={stage} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className={`flex items-center justify-between border-b p-3 sm:p-4 ${stageHeaderClass(stage)}`}>
+            <section key={stage} className="flex max-h-[72vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-15rem)]">
+              <div className={`flex shrink-0 items-center justify-between border-b p-3 sm:p-4 ${stageHeaderClass(stage)}`}>
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-slate-950">{stage}</h2>
                   <p className="text-xs sm:text-sm text-slate-500">{invoicesInStage.length} invoices</p>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">{currency(stageTotal)}</span>
               </div>
-              <div className="space-y-3 p-3 sm:p-4">
+              <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
                 {invoicesInStage.map((invoice) => {
                   const totals = calculateTotals(invoice);
                   const balance = Math.max(totals.finalTotal - getPaidAmount(invoice), 0);
@@ -743,6 +988,34 @@ export default function InvoicesPage() {
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
+
+            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-black text-[#07183f]">Sent To</h3>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { label: "Email Delivered", at: selectedInvoice.emailDeliveredAt, fallbackDone: Boolean(selectedInvoice.sentAt) },
+                    { label: "Email Opened", at: selectedInvoice.emailOpenedAt, fallbackDone: false },
+                    { label: "Invoice Viewed", at: selectedInvoice.viewedAt, fallbackDone: false },
+                  ] as const).map((indicator) => {
+                    const done = Boolean(indicator.at) || indicator.fallbackDone;
+                    return (
+                      <span key={indicator.label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ring-1 ${done ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>
+                        <span className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`} />
+                        {indicator.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#07183f]">{selectedInvoice.clientName || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.email || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#07183f]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.sentBy || "—"}</p></div>
+              </div>
+            </section>
+
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <section className="rounded-3xl bg-slate-50 p-5">
                 <h3 className="font-black text-[#07183f]">Payments</h3>
@@ -752,10 +1025,27 @@ export default function InvoicesPage() {
                 </div>
               </section>
               <section className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="font-black text-[#07183f]">Activity Log</h3>
-                <div className="mt-3 space-y-2">
-                  {selectedInvoice.activity.map((item, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{item}</p>)}
-                </div>
+                <h3 className="font-black text-[#07183f]">Activity Timeline</h3>
+                <ol className="mt-4 space-y-4">
+                  {buildInvoiceTimeline(selectedInvoice).map((step, index, steps) => (
+                    <li key={step.label} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ${step.done ? "bg-emerald-500" : "bg-slate-300"}`}>{step.done ? "✓" : index + 1}</span>
+                        {index < steps.length - 1 && <span className={`mt-1 w-0.5 flex-1 ${step.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
+                      </div>
+                      <div className="pb-1">
+                        <p className={`text-sm font-black ${step.done ? "text-[#07183f]" : "text-slate-400"}`}>{step.label}</p>
+                        <p className="text-xs font-semibold text-slate-500">{step.done ? (formatDateTime(step.at) || "Completed") : "Pending"}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-xs font-black uppercase tracking-wide text-slate-500">Full activity log</summary>
+                  <div className="mt-2 space-y-2">
+                    {selectedInvoice.activity.map((item, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{item}</p>)}
+                  </div>
+                </details>
               </section>
             </div>
             {clientHistory && (
@@ -801,46 +1091,48 @@ export default function InvoicesPage() {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-2 sm:p-4">
-          <div className="mx-auto my-2 sm:my-6 max-w-5xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 sm:pb-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:p-5">
               <div>
-                <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
-                <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-black text-[#07183f]">{createForm.invoiceNumber}</h2>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
+                <h2 className="mt-0.5 text-xl font-black text-[#07183f] sm:text-2xl">{createForm.invoiceNumber}</h2>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-xl sm:text-2xl text-slate-500 p-2 hover:bg-slate-100 rounded-full transition">×</button>
+              <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100">×</button>
             </div>
-            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal</label>
-              <select 
-                value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
-                onChange={(event) => handlePrefillFromJob(event.target.value)} 
-                className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none"
-              >
-                <option value="" disabled>Select a signed proposal...</option>
-                {wonProposals.length === 0 ? (
-                  <option value="" disabled>No signed proposals available</option>
-                ) : (
-                  wonProposals.map((proposal) => {
-                    const pkg = getProposalSelectedPackage(proposal);
-                    return (
-                      <option key={proposal.id} value={`proposal:${proposal.id}`}>
-                        {proposal.customerName} • {proposal.title || pkg.scope.substring(0, 30)}... • {currency(pkg.price)}
-                      </option>
-                    );
-                  })
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
+                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal</label>
+                <select 
+                  value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
+                  onChange={(event) => handlePrefillFromJob(event.target.value)} 
+                  className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none"
+                >
+                  <option value="" disabled>Select a signed proposal...</option>
+                  {wonProposals.length === 0 ? (
+                    <option value="" disabled>No signed proposals available</option>
+                  ) : (
+                    wonProposals.map((proposal) => {
+                      const pkg = getProposalSelectedPackage(proposal);
+                      return (
+                        <option key={proposal.id} value={`proposal:${proposal.id}`}>
+                          {proposal.customerName} • {proposal.title || pkg.scope.substring(0, 30)}... • {currency(pkg.price)}
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
+                {wonProposals.length === 0 && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    No signed proposals found. Create and sign a proposal first.
+                  </p>
                 )}
-              </select>
-              {wonProposals.length === 0 && (
-                <p className="mt-2 text-xs text-slate-500">
-                  No signed proposals found. Create and sign a proposal first.
-                </p>
-              )}
+              </div>
+              <div className="mt-4">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
             </div>
-            <div className="mt-6">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
-            <div className="mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={handleCreateInvoice} disabled={!createForm.proposalReference} className="w-full sm:w-auto rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2">Create Invoice</button>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-200 p-4 sm:p-5">
+              <button onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
+              <button onClick={handleCreateInvoice} disabled={!createForm.proposalReference} className="w-full sm:w-auto rounded-2xl bg-orange-500 px-5 py-2.5 font-bold text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2">Create Invoice</button>
             </div>
           </div>
         </div>

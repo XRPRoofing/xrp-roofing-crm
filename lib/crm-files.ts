@@ -1,10 +1,12 @@
+import type { JobPhoto, JobRecord } from "@/lib/crew-sync";
+
 export type CrmFileRecord = {
   id: string;
   name: string;
   dataUrl: string;
   uploadedAt: string;
   uploadedBy: string;
-  photoType: "Before" | "After" | "Job Photo";
+  photoType: "Before" | "Progress" | "After" | "Job Photo";
   jobId: string;
   jobName: string;
 };
@@ -22,8 +24,47 @@ export type CrmFileFolder = {
 
 export const crmFilesStorageKey = "xrp-crm-files-dashboard";
 
-function createFolderId(address: string) {
+export function createFolderId(address: string) {
   return address.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+/**
+ * Build job folders from the crew dataset (jobs + photos). One job = one folder,
+ * keyed by property address. Shared by the Files board and the folder gallery.
+ */
+export function buildFoldersFromCrew(jobs: JobRecord[], photos: JobPhoto[]): CrmFileFolder[] {
+  const jobsById = new Map(jobs.map((job) => [job.id, job]));
+  const folders = new Map<string, CrmFileFolder>();
+
+  photos.forEach((photo) => {
+    const job = jobsById.get(photo.jobId);
+    const address = job ? `${job.address}, ${job.city}, AZ` : photo.jobId;
+    const folderId = createFolderId(address) || photo.jobId;
+    const folder = folders.get(folderId) || {
+      id: folderId,
+      name: address,
+      address,
+      workType: job?.jobScope || job?.roofType || "Roofing",
+      jobId: photo.jobId,
+      customerName: job?.name || "Unknown customer",
+      updatedAt: photo.createdAt,
+      files: [],
+    };
+    folder.files.push({
+      id: photo.id,
+      name: photo.name || `${photo.photoType} photo`,
+      dataUrl: photo.dataUrl,
+      uploadedAt: photo.createdAt,
+      uploadedBy: photo.uploadedBy,
+      photoType: photo.photoType,
+      jobId: photo.jobId,
+      jobName: job?.name || "Unknown customer",
+    });
+    if (photo.createdAt > folder.updatedAt) folder.updatedAt = photo.createdAt;
+    folders.set(folderId, folder);
+  });
+
+  return Array.from(folders.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function readCrmFileFolders() {
@@ -50,7 +91,7 @@ export function syncCrewPhotosToFiles(input: {
   address: string;
   workType: string;
   uploadedBy: string;
-  photoType: "Before" | "After" | "Job Photo";
+  photoType: "Before" | "Progress" | "After" | "Job Photo";
   photos: { name: string; dataUrl: string }[];
 }) {
   if (typeof window === "undefined" || input.photos.length === 0) return;

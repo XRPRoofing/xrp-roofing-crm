@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Upload, X } from "lucide-react";
-import { customers, leadStages, leads } from "@/lib/crm-data";
-import type { Customer, Lead, LeadStage } from "@/types/crm";
+import { useRouter } from "next/navigation";
+import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
+import { leadStages } from "@/lib/crm-data";
+import type { Lead, LeadStage } from "@/types/crm";
+import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
+import { compressImageToDataUrl } from "@/lib/image-compress";
+import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 
 declare global {
   interface Window {
@@ -35,8 +42,7 @@ const arizonaBounds = {
   east: -109.0452,
   west: -114.8184,
 };
-const jobsStorageKey = "xrp-crm-jobs-board";
-const customersStorageKey = "xrp-crm-customers";
+
 const legacyStageMap: Partial<Record<string, LeadStage>> = {
   insurance_review: "waiting_approval",
 };
@@ -78,64 +84,36 @@ function getCityFromAddress(address: string) {
   return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
 }
 
-function saveJobs(nextJobs: Lead[]) {
-  window.localStorage.setItem(jobsStorageKey, JSON.stringify(nextJobs));
-}
-
-function getSavedCustomers() {
-  const savedCustomers = window.localStorage.getItem(customersStorageKey);
-  if (!savedCustomers) return customers;
-
-  try {
-    return JSON.parse(savedCustomers) as Customer[];
-  } catch {
-    return customers;
-  }
-}
-
-function syncCustomerFromJob(job: Lead) {
-  const customerFromJob: Customer = {
-    id: `C-${job.id}`,
-    name: job.name,
-    email: job.email,
-    phone: job.phone,
-    propertyAddress: `${job.address}${job.city && !job.address.includes(job.city) ? `, ${job.city}, AZ` : ""}`,
-    roofDetails: job.roofType || "Roof details pending",
-    insuranceCarrier: "Not provided",
-    status: "New job",
-    lifetimeValue: job.value,
-  };
-  const currentCustomers = getSavedCustomers();
-  const matchingCustomer = currentCustomers.find((customer) =>
-    customer.id === customerFromJob.id ||
-    (customer.email && customer.email === job.email) ||
-    (customer.phone && customer.phone === job.phone)
-  );
-  const nextCustomers = matchingCustomer
-    ? currentCustomers.map((customer) => customer.id === matchingCustomer.id ? { ...customer, ...customerFromJob, id: customer.id, insuranceCarrier: customer.insuranceCarrier || customerFromJob.insuranceCarrier } : customer)
-    : [customerFromJob, ...currentCustomers];
-
-  window.localStorage.setItem(customersStorageKey, JSON.stringify(nextCustomers));
-  window.dispatchEvent(new StorageEvent("storage", { key: customersStorageKey, newValue: JSON.stringify(nextCustomers) }));
+// Auto-create/update the shared customer for a new job/lead. Uses the central
+// find-or-create helper (match by phone -> email -> address, no duplicates) so
+// the customer lands on the Customer board across every device. Placeholder
+// contact defaults are passed through as blanks to avoid false matches.
+function syncCustomerFromJob(contact: { name: string; email?: string; phone?: string; address?: string; city?: string; roofType?: string; value?: number; source?: string }) {
+  const address = contact.address || "";
+  const propertyAddress = `${address}${contact.city && address && !address.includes(contact.city) ? `, ${contact.city}, AZ` : ""}`;
+  void findOrCreateCustomer({
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    propertyAddress,
+    roofDetails: contact.roofType,
+    status: "New lead",
+    lifetimeValue: contact.value,
+    source: contact.source,
+  }).catch(() => {});
 }
 
 export default function LeadsPage() {
-  const [jobs, setJobs] = useState<Lead[]>(() => {
-    if (typeof window === "undefined") return leads.map(normalizeJob);
-
-    const savedJobs = window.localStorage.getItem(jobsStorageKey);
-    if (!savedJobs) return leads.map(normalizeJob);
-
-    try {
-      return (JSON.parse(savedJobs) as Lead[]).map(normalizeJob);
-    } catch {
-      return leads.map(normalizeJob);
-    }
-  });
+  const [jobs, setJobs] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     name: "",
@@ -152,6 +130,79 @@ export default function LeadsPage() {
   });
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
+  const jobPhotosOnly = jobFiles.filter((file) => !file.name.startsWith("Document - "));
+  const jobDocuments = jobFiles.filter((file) => file.name.startsWith("Document - "));
+
+  // Load the selected job's saved files (photos + documents) from the shared
+  // crew store so they show on the card and stay in sync with the Files board.
+  useEffect(() => {
+    if (!selectedJobId) {
+      setJobFiles([]);
+      setActivityOpen(false);
+      setFileError(null);
+      return;
+    }
+    let mounted = true;
+    void loadJobPhotos(selectedJobId).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
+    return () => { mounted = false; };
+  }, [selectedJobId]);
+
+  // Capture/upload saves instantly — no forced markup step. Drawings and notes
+  // can be added later per-photo from the job's Files folder.
+  async function handleJobFileUpload(kind: "Documents" | "Photos", files: FileList | null) {
+    if (!selectedJob || !files?.length) return;
+    setFileBusy(true);
+    setFileError(null);
+    try {
+      const selected = Array.from(files);
+      const dataUrls = await Promise.all(selected.map((file) => compressImageToDataUrl(file)));
+      await addJobPhotos(selectedJob.id, selected.map((file, index) => ({
+        photoType: "Job Photo",
+        name: kind === "Documents" ? `Document - ${file.name || `file-${index + 1}`}` : (file.name || `photo-${Date.now()}-${index + 1}.jpg`),
+        dataUrl: dataUrls[index],
+        uploadedBy: "Office",
+      })));
+      const refreshed = await loadJobPhotos(selectedJob.id);
+      setJobFiles(refreshed);
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Failed to save file.");
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  function openBoardFromJob(path: string) {
+    if (typeof window !== "undefined") window.sessionStorage.setItem("crm-return-to-jobs", "1");
+    router.push(path);
+  }
+
+  function readStored<T>(key: string): T[] {
+    try {
+      return JSON.parse(window.localStorage.getItem(key) || "[]") as T[];
+    } catch {
+      return [];
+    }
+  }
+
+  // One-click from a Job to its Estimate editor: open the linked estimate if one
+  // exists, otherwise create one from the job and open it (linked by job id).
+  function openEstimateForJob(job: Lead) {
+    const proposals = readStored<{ id: string; job?: { id?: string } }>("xrp-crm-proposals");
+    const existing = proposals.find((proposal) => proposal?.job?.id === job.id);
+    if (existing) requestOpenEstimate(existing.id);
+    else requestCreateEstimate(jobToBoardPayload(job));
+    openBoardFromJob("/crm/proposals");
+  }
+
+  // One-click from a Job to its Invoice editor: open the linked invoice if one
+  // exists, otherwise create one from the job and open it (linked by jobReference).
+  function openInvoiceForJob(job: Lead) {
+    const invoices = readStored<{ id: string; jobReference?: string }>("xrp-crm-invoices");
+    const existing = invoices.find((invoice) => invoice?.jobReference === job.id);
+    if (existing) requestOpenInvoice(existing.id);
+    else requestCreateInvoice(jobToBoardPayload(job));
+    openBoardFromJob("/crm/invoices");
+  }
 
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -190,8 +241,33 @@ export default function LeadsPage() {
   }, [jobs]);
 
   useEffect(() => {
-    window.localStorage.setItem(jobsStorageKey, JSON.stringify(jobs));
-  }, [jobs]);
+    let mounted = true;
+    async function loadJobs() {
+      try {
+        const data = await loadCrewDataset();
+        const seededJobs = await ensureSeedJobs(data.jobs);
+        if (mounted) setJobs(seededJobs.map(normalizeJob));
+      } catch {
+        /* leave jobs empty when the shared store is unavailable */
+      }
+    }
+    loadJobs();
+
+    const unsubscribe = subscribeToCrewData(() => {
+      void loadCrewDataset().then((data) => {
+        if (mounted) setJobs(data.jobs.map(normalizeJob));
+      }).catch(() => {});
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // No manual refresh: reload jobs when returning to this tab/device.
+  useAutoRefresh(() => {
+    void loadCrewDataset().then((data) => setJobs(data.jobs.map(normalizeJob))).catch(() => {});
+  });
 
   useEffect(() => {
     if (!showForm || !addressInputRef.current) return;
@@ -241,15 +317,24 @@ export default function LeadsPage() {
   }, [showForm]);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
-    setJobs((currentJobs) => {
-      const nextJobs = currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job);
-      saveJobs(nextJobs);
-      return nextJobs;
-    });
+    setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
+    void updateJobRecord(jobId, updates).catch(() => {});
   }
 
   function updateJobStage(jobId: string, stage: LeadStage) {
     updateJob(jobId, { stage, lastActivity: `Moved to ${leadStages.find((item) => item.id === stage)?.label || "workflow"}` });
+    if (stage === "completed") {
+      const job = jobs.find((item) => item.id === jobId);
+      if (job) ensureInvoiceTaskForJob({ id: job.id, name: job.name, address: job.address, city: job.city, value: job.value, jobLink: "/crm/leads" });
+    }
+  }
+
+  function deleteJob(job: Lead) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${job.name}"? This permanently removes the job and its photos, notes, and checklist for everyone. This cannot be undone.`)) return;
+    const previousJobs = jobs;
+    setSelectedJobId(null);
+    setJobs((currentJobs) => currentJobs.filter((item) => item.id !== job.id));
+    void deleteJobRecord(job.id).catch(() => setJobs(previousJobs));
   }
 
   function handleAddJob(event: React.FormEvent<HTMLFormElement>) {
@@ -272,12 +357,18 @@ export default function LeadsPage() {
       dueDate: form.dueDate,
     };
 
-    setJobs((currentJobs) => {
-      const nextJobs = [newJob, ...currentJobs];
-      saveJobs(nextJobs);
-      return nextJobs;
+    setJobs((currentJobs) => [newJob, ...currentJobs]);
+    void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
+    syncCustomerFromJob({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      city: getCityFromAddress(form.address),
+      roofType: form.roofType,
+      value: Number(form.value) || 0,
+      source: form.source,
     });
-    syncCustomerFromJob(newJob);
     setForm({
       name: "",
       email: "",
@@ -296,12 +387,12 @@ export default function LeadsPage() {
 
   return (
     <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="sticky top-20 z-30 space-y-4 border-b border-slate-200/80 bg-slate-100/95 pb-4 backdrop-blur">
+      <div className="sticky top-16 z-30 space-y-3 border-b border-slate-200/80 bg-slate-100/95 pb-3 backdrop-blur sm:space-y-4 sm:pb-4 lg:top-20">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Roofing operations</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Jobs board</h1>
-            <p className="mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
+            <p className="crm-board-subtitle mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setSearch("")} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
@@ -309,21 +400,23 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:grid-cols-5">
           {dashboardMetrics.map((metric) => (
-            <div key={metric.label} className={`rounded-2xl border px-4 py-3 shadow-sm ${metric.tone}`}>
-              <p className="text-2xl font-black leading-none">{metric.value}</p>
-              <p className="mt-1 text-[11px] font-black uppercase tracking-wide">{metric.label}</p>
+            <div key={metric.label} className={`rounded-xl border px-2 py-1.5 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3 ${metric.tone}`}>
+              <p className="text-base font-black leading-none sm:text-2xl">{metric.value}</p>
+              <p className="mt-0.5 text-[9px] font-black uppercase leading-tight tracking-wide sm:mt-1 sm:text-[11px]">{metric.label}</p>
             </div>
           ))}
         </div>
 
         {showForm && (
-          <form onSubmit={handleAddJob} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowForm(false)}>
+          <form onSubmit={handleAddJob} className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 p-4">
               <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer / job name" />
               <input ref={addressInputRef} required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Job address" />
@@ -337,8 +430,12 @@ export default function LeadsPage() {
               <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" />
               <input value={form.lastActivity} onChange={(event) => setForm({ ...form, lastActivity: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Current note" />
             </div>
-            <button className="mt-3 rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save job</button>
+            </div>
+            <div className="border-t border-slate-200 p-4">
+              <button className="w-full rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white sm:w-auto">Save job</button>
+            </div>
           </form>
+          </div>
         )}
 
         <div className="relative">
@@ -401,7 +498,10 @@ export default function LeadsPage() {
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
                   <p className="text-sm font-bold text-slate-500">{selectedJob.address}, {selectedJob.city}, AZ</p>
                 </div>
-                <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                </div>
               </div>
             </div>
 
@@ -418,13 +518,87 @@ export default function LeadsPage() {
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Notes<textarea value={selectedJob.lastActivity} onChange={(event) => updateJob(selectedJob.id, { lastActivity: event.target.value })} rows={4} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {[{ icon: FileText, label: "Documents" }, { icon: Image, label: "Photos" }, { icon: DollarSign, label: "Estimates" }, { icon: CheckCircle2, label: "Invoices" }, { icon: History, label: "Activity History" }, { icon: Upload, label: "Upload Files" }].map(({ icon: Icon, label }) => (
-                  <button key={label} type="button" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                    <Icon className="h-5 w-5" />
-                    {label}
+              <div className="space-y-3">
+                {fileError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{fileError}</p>}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><FileText className="h-4 w-4" />Documents</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobDocuments.length} file(s)</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Camera className="h-4 w-4" /> Take Picture
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <UploadCloud className="h-4 w-4" /> Upload
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                  </div>
+                  {jobDocuments.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {jobDocuments.map((file) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={file.id} src={file.dataUrl} alt={file.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] font-bold text-slate-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Image className="h-4 w-4" />Photos</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobPhotosOnly.length} photo(s)</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Camera className="h-4 w-4" /> Take Photo
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <UploadCloud className="h-4 w-4" /> Upload
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
+                    </label>
+                  </div>
+                  {jobPhotosOnly.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {jobPhotosOnly.map((photo) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] font-bold text-slate-400">Shown here and auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={() => openEstimateForJob(selectedJob)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                    <DollarSign className="h-5 w-5" />Estimate
                   </button>
-                ))}
+                  <button type="button" onClick={() => openInvoiceForJob(selectedJob)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                    <CheckCircle2 className="h-5 w-5" />Invoice
+                  </button>
+                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:col-span-2">
+                    <History className="h-5 w-5" />Activity History
+                  </button>
+                </div>
+
+                {activityOpen && (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Activity History</p>
+                    <ul className="mt-2 space-y-2">
+                      {jobFiles.length === 0 && <li className="text-sm font-semibold text-slate-500">No document or photo activity yet.</li>}
+                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
+                        <li key={file.id} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="truncate font-bold text-slate-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Document · ") : `Photo · ${file.name}`}</span>
+                          <span className="shrink-0 text-xs font-semibold text-slate-400">{new Date(file.createdAt).toLocaleString()}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">

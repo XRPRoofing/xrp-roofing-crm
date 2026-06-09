@@ -6,9 +6,25 @@ export type CrmNotification = {
   module: string;
   createdAt: string;
   read: boolean;
+  status?: "unread" | "read" | "archived" | "deleted";
 };
 
 export const crmNotificationsStorageKey = "xrp-crm-notifications";
+const crmDeletedNotificationsStorageKey = "xrp-crm-deleted-notifications";
+
+function readDeletedNotificationIds() {
+  if (typeof window === "undefined") return [] as string[];
+
+  try {
+    return JSON.parse(window.localStorage.getItem(crmDeletedNotificationsStorageKey) || "[]") as string[];
+  } catch {
+    return [] as string[];
+  }
+}
+
+function saveDeletedNotificationIds(ids: string[]) {
+  window.localStorage.setItem(crmDeletedNotificationsStorageKey, JSON.stringify(Array.from(new Set(ids)).slice(0, 500)));
+}
 
 export function readCrmNotifications() {
   if (typeof window === "undefined") return [] as CrmNotification[];
@@ -17,7 +33,8 @@ export function readCrmNotifications() {
   if (!savedNotifications) return [] as CrmNotification[];
 
   try {
-    return JSON.parse(savedNotifications) as CrmNotification[];
+    const deletedIds = readDeletedNotificationIds();
+    return (JSON.parse(savedNotifications) as CrmNotification[]).filter((notification) => notification.status !== "deleted" && !deletedIds.includes(notification.id));
   } catch {
     return [] as CrmNotification[];
   }
@@ -28,7 +45,7 @@ export function saveCrmNotifications(notifications: CrmNotification[]) {
   window.dispatchEvent(new Event("crm-notifications-updated"));
 }
 
-export function addCrmNotification(input: Omit<CrmNotification, "id" | "createdAt" | "read">) {
+export function addCrmNotification(input: Omit<CrmNotification, "id" | "createdAt" | "read" | "status">) {
   if (typeof window === "undefined") return;
 
   const notification: CrmNotification = {
@@ -36,29 +53,40 @@ export function addCrmNotification(input: Omit<CrmNotification, "id" | "createdA
     id: `notification-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     createdAt: new Date().toISOString(),
     read: false,
+    status: "unread",
   };
 
+  if (readDeletedNotificationIds().includes(notification.id)) return;
   saveCrmNotifications([notification, ...readCrmNotifications()].slice(0, 80));
 }
 
-export function addUniqueCrmNotification(uniqueId: string, input: Omit<CrmNotification, "id" | "createdAt" | "read">) {
+export function addUniqueCrmNotification(uniqueId: string, input: Omit<CrmNotification, "id" | "createdAt" | "read" | "status">) {
   if (typeof window === "undefined") return;
 
   const notifications = readCrmNotifications();
   const id = `notification-${uniqueId}`;
-  if (notifications.some((notification) => notification.id === id)) return;
+  if (readDeletedNotificationIds().includes(id) || notifications.some((notification) => notification.id === id)) return;
 
-  saveCrmNotifications([
-    {
-      ...input,
-      id,
-      createdAt: new Date().toISOString(),
-      read: false,
-    },
-    ...notifications,
-  ].slice(0, 80));
+  const notification: CrmNotification = {
+    ...input,
+    id,
+    createdAt: new Date().toISOString(),
+    read: false,
+    status: "unread",
+  };
+
+  saveCrmNotifications([notification, ...notifications].slice(0, 80));
 }
 
 export function markCrmNotificationsRead() {
-  saveCrmNotifications(readCrmNotifications().map((notification) => ({ ...notification, read: true })));
+  saveCrmNotifications(readCrmNotifications().map((notification) => ({ ...notification, read: true, status: "read" })));
+}
+
+export function archiveCrmNotification(notificationId: string) {
+  saveCrmNotifications(readCrmNotifications().map((notification) => notification.id === notificationId ? { ...notification, read: true, status: "archived" } : notification));
+}
+
+export function deleteCrmNotification(notificationId: string) {
+  saveDeletedNotificationIds([...readDeletedNotificationIds(), notificationId]);
+  saveCrmNotifications(readCrmNotifications().filter((notification) => notification.id !== notificationId));
 }
