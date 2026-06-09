@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Mic, Phone, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
@@ -79,6 +79,41 @@ function getUrgency(job: Lead) {
   return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
 }
 
+function parseCallNotes(text: string): Partial<{
+  name: string; phone: string; email: string; address: string;
+  inspectionDate: string; roofYear: string; callNotes: string;
+}> {
+  const result: ReturnType<typeof parseCallNotes> = { callNotes: text.trim() };
+
+  // Phone: (602) 555-1234 or 602-555-1234 or 6025551234
+  const phoneMatch = text.match(/(\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4})/);
+  if (phoneMatch) result.phone = phoneMatch[1].trim();
+
+  // Email
+  const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) result.email = emailMatch[0];
+
+  // Roof year: 4-digit year between 1950 and current year, preceded by keywords
+  const yearMatch = text.match(/(?:roof(?:ed)?|built|installed|year|since|from)[\s:]+(?:in\s+)?((?:19|20)\d{2})/i)
+    || text.match(/\b((?:19|20)\d{2})\b(?=.*(?:roof|built|install|house))/i);
+  if (yearMatch) result.roofYear = yearMatch[1];
+
+  // Inspection date: "June 12", "6/12", "June 12th", "next Monday the 15th"
+  const dateMatch = text.match(/(?:inspection|appointment|scheduled?|meeting|come\s+out|set\s+for|on)\s+(?:for\s+)?([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
+  if (dateMatch) result.inspectionDate = dateMatch[1].replace(/(?:st|nd|rd|th)/gi, "").trim();
+
+  // Name: look for "name is X", "this is X", "speaking with X", "customer X", "for X"
+  const nameMatch = text.match(/(?:name\s+is|this\s+is|speaking\s+with|customer\s+is|for)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})/)
+    || text.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/);
+  if (nameMatch) result.name = nameMatch[1].trim();
+
+  // Address: look for street number + street name
+  const addressMatch = text.match(/(\d+\s+[A-Za-z0-9 .,'#-]+(?:St(?:reet)?|Ave(?:nue)?|Blvd|Rd|Road|Dr(?:ive)?|Ln|Lane|Ct|Court|Way|Pl(?:ace)?|Loop|Circle|Cir|Trail|Trl)[.\s,]+(?:[A-Za-z ]+,?\s*AZ)?(?:\s*\d{5})?)/i);
+  if (addressMatch) result.address = addressMatch[1].trim();
+
+  return result;
+}
+
 function getCityFromAddress(address: string) {
   const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
   return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
@@ -115,6 +150,8 @@ export default function LeadsPage() {
   const [activityOpen, setActivityOpen] = useState(false);
   const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const [showCallPaste, setShowCallPaste] = useState(false);
+  const [callPasteText, setCallPasteText] = useState("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -127,6 +164,9 @@ export default function LeadsPage() {
     lastActivity: "New job created",
     nextAction: "Schedule inspection",
     dueDate: "",
+    inspectionDate: "",
+    roofYear: "",
+    callNotes: "",
   });
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
@@ -355,6 +395,9 @@ export default function LeadsPage() {
       lastActivity: form.lastActivity || "New job created",
       nextAction: form.nextAction || "Schedule inspection",
       dueDate: form.dueDate,
+      inspectionDate: form.inspectionDate || undefined,
+      roofYear: form.roofYear || undefined,
+      callNotes: form.callNotes || undefined,
     };
 
     setJobs((currentJobs) => [newJob, ...currentJobs]);
@@ -381,7 +424,12 @@ export default function LeadsPage() {
       lastActivity: "New job created",
       nextAction: "Schedule inspection",
       dueDate: "",
+      inspectionDate: "",
+      roofYear: "",
+      callNotes: "",
     });
+    setShowCallPaste(false);
+    setCallPasteText("");
     setShowForm(false);
   }
 
@@ -416,7 +464,47 @@ export default function LeadsPage() {
               <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Add from Call section */}
+              <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+                <button type="button" onClick={() => setShowCallPaste((v) => !v)} className="flex w-full items-center gap-2 text-sm font-black text-orange-700">
+                  <Mic className="h-4 w-4" />{showCallPaste ? "Hide call notes" : "Add from Call — paste recording / transcript"}
+                </button>
+                {showCallPaste && (
+                  <div className="mt-3 space-y-2">
+                    <textarea
+                      value={callPasteText}
+                      onChange={(e) => setCallPasteText(e.target.value)}
+                      rows={4}
+                      className="w-full rounded-xl border border-orange-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400"
+                      placeholder="Paste call notes or transcript here — e.g. 'Customer John Smith, (602) 555-1234, 4521 W Oak St Phoenix AZ, roof from 2008, inspection scheduled June 12'"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parsed = parseCallNotes(callPasteText);
+                        setForm((f) => ({
+                          ...f,
+                          name: parsed.name || f.name,
+                          phone: parsed.phone || f.phone,
+                          email: parsed.email || f.email,
+                          address: parsed.address || f.address,
+                          inspectionDate: parsed.inspectionDate || f.inspectionDate,
+                          roofYear: parsed.roofYear || f.roofYear,
+                          callNotes: parsed.callNotes || f.callNotes,
+                          source: "Phone Call",
+                        }));
+                        setShowCallPaste(false);
+                      }}
+                      className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-black text-white hover:bg-orange-600"
+                    >
+                      Auto-fill from call
+                    </button>
+                    <p className="text-[11px] font-semibold text-orange-600">Pulls name, phone, address, inspection date, and roof year from the text — review and adjust before saving.</p>
+                  </div>
+                )}
+              </div>
+
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer / job name" />
               <input ref={addressInputRef} required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Job address" />
@@ -424,11 +512,14 @@ export default function LeadsPage() {
               <input type="number" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Job value" />
               <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
               <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
+              <input value={form.inspectionDate} onChange={(event) => setForm({ ...form, inspectionDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Inspection date (e.g. June 12)" />
+              <input value={form.roofYear} onChange={(event) => setForm({ ...form, roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Year of roof / house" />
               <input value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Source" />
               <input value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Assigned to" />
               <input value={form.nextAction} onChange={(event) => setForm({ ...form, nextAction: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Next action" />
               <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" />
               <input value={form.lastActivity} onChange={(event) => setForm({ ...form, lastActivity: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Current note" />
+              <textarea value={form.callNotes} onChange={(event) => setForm({ ...form, callNotes: event.target.value })} rows={2} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2 xl:col-span-4" placeholder="Call notes (optional)" />
             </div>
             </div>
             <div className="border-t border-slate-200 p-4">
@@ -509,13 +600,25 @@ export default function LeadsPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Customer Name<input value={selectedJob.name} onChange={(event) => updateJob(selectedJob.id, { name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">City<input value={selectedJob.city} onChange={(event) => updateJob(selectedJob.id, { city: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Phone
+                  <div className="flex items-center gap-1">
+                    <input value={selectedJob.phone} onChange={(event) => updateJob(selectedJob.id, { phone: event.target.value })} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" />
+                    {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white hover:bg-emerald-600"><Phone className="h-4 w-4" /></a>}
+                  </div>
+                </label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Email<input type="email" value={selectedJob.email} onChange={(event) => updateJob(selectedJob.id, { email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Address<input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Inspection Date<input value={selectedJob.inspectionDate || ""} onChange={(event) => updateJob(selectedJob.id, { inspectionDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. June 12" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. 2008" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Job Value<input type="number" value={selectedJob.value} onChange={(event) => updateJob(selectedJob.id, { value: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Assigned Rep<input value={selectedJob.assignedTo} onChange={(event) => updateJob(selectedJob.id, { assignedTo: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
-                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Address<input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Status<select value={selectedJob.stage} onChange={(event) => updateJobStage(selectedJob.id, event.target.value as LeadStage)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none">{leadStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Due Date<input type="date" value={selectedJob.dueDate || ""} onChange={(event) => updateJob(selectedJob.id, { dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Next Action<input value={selectedJob.nextAction || ""} onChange={(event) => updateJob(selectedJob.id, { nextAction: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
-                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Notes<textarea value={selectedJob.lastActivity} onChange={(event) => updateJob(selectedJob.id, { lastActivity: event.target.value })} rows={4} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Notes<textarea value={selectedJob.lastActivity} onChange={(event) => updateJob(selectedJob.id, { lastActivity: event.target.value })} rows={3} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                {selectedJob.callNotes && (
+                  <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Call Notes<textarea value={selectedJob.callNotes} onChange={(event) => updateJob(selectedJob.id, { callNotes: event.target.value })} rows={3} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                )}
               </div>
 
               <div className="space-y-3">

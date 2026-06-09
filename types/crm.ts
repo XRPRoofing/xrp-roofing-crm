@@ -19,6 +19,9 @@ export interface Lead {
   lastActivity: string;
   dueDate?: string;
   nextAction?: string;
+  inspectionDate?: string;
+  roofYear?: string;
+  callNotes?: string;
 }
 
 export interface Customer {
