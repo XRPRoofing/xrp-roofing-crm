@@ -49,34 +49,42 @@ export default function TeamChatPage() {
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string; avatarUrl: string | null } | null>(null);
 
+  const isInitialLoad = useRef(true);
+
   useEffect(() => {
     let mounted = true;
+
+    // Mark read immediately so badge clears without waiting for the full load
+    markTeamChatRead();
 
     async function loadChat() {
       setLoading(true);
       setError("");
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      // getSession() reads from local storage — no network roundtrip
+      const { data: sessionData } = await supabase.auth.getSession();
       if (!mounted) return;
 
-      if (userError || !userData.user) {
+      if (!sessionData.session?.user) {
         setError("You must be logged in to use Team Chat.");
         setLoading(false);
         return;
       }
 
+      const user = sessionData.session.user;
       setCurrentUser({
-        id: userData.user.id,
-        name: getUserName(userData.user.user_metadata, userData.user.email),
-        avatarUrl: getAvatarUrl(userData.user.user_metadata),
+        id: user.id,
+        name: getUserName(user.user_metadata, user.email),
+        avatarUrl: getAvatarUrl(user.user_metadata),
       });
 
+      // Load last 50 messages — fast initial render
       const { data, error: messagesError } = await supabase
         .from(teamChatTableName)
         .select("id, room_id, user_id, user_name, user_avatar_url, message, mentions, attachments, created_at")
         .eq("room_id", teamChatRoomId)
-        .order("created_at", { ascending: true })
-        .limit(200);
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (!mounted) return;
 
@@ -86,8 +94,9 @@ export default function TeamChatPage() {
         return;
       }
 
-      setMessages((data || []) as TeamChatMessage[]);
-      markTeamChatRead();
+      // reverse so oldest is at top
+      setMessages(((data || []) as TeamChatMessage[]).reverse());
+      isInitialLoad.current = false;
       setLoading(false);
     }
 
@@ -113,7 +122,11 @@ export default function TeamChatPage() {
   }, [supabase]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isInitialLoad.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
