@@ -224,7 +224,9 @@ export default function CalendarPage() {
   const agendaEvents = eventsByDate[activeDayKey] || [];
   const activeDayLabel = useMemo(() => {
     const [year, month, day] = activeDayKey.split("-").map(Number);
-    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: ARIZONA_TIMEZONE }).format(new Date(year, month, day));
+    // year/month/day already represent Arizona date values — format without timezone
+    // conversion to avoid a rollback on devices ahead of UTC (e.g. UTC+8).
+    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(year, month, day));
   }, [activeDayKey]);
 
   function shiftMonth(delta: number) {
@@ -249,8 +251,18 @@ export default function CalendarPage() {
     try {
       const year = monthCursor.getFullYear();
       const month = monthCursor.getMonth();
-      // Use Arizona timezone for consistent date range across all devices
-      const timeMin = new Date(year, month - 1, 1).toISOString();
+      // timeMin = start of today in Arizona so upcoming list never shows past events
+      const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: ARIZONA_TIMEZONE,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+      });
+      const todayParts = arizonaFormatter.formatToParts(new Date());
+      const todayYear = Number(todayParts.find((p) => p.type === "year")?.value);
+      const todayMonth = Number(todayParts.find((p) => p.type === "month")?.value) - 1;
+      const todayDay = Number(todayParts.find((p) => p.type === "day")?.value);
+      const timeMin = new Date(todayYear, todayMonth, todayDay).toISOString();
       const timeMax = new Date(year, month + 2, 1).toISOString();
       const response = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&timeZone=${encodeURIComponent(ARIZONA_TIMEZONE)}`);
       const data = await response.json() as { connected?: boolean; events?: GoogleCalendarEvent[]; error?: string };
