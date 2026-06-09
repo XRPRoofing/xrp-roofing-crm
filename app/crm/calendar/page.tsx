@@ -187,7 +187,7 @@ export default function CalendarPage() {
     }, {});
   }, [events]);
 
-  const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: ARIZONA_TIMEZONE }).format(monthCursor), [monthCursor]);
+  const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1)), [monthCursor]);
   const todayKey = useMemo(() => {
     const now = new Date();
     // Get Arizona timezone date parts correctly
