@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Image, Mic, Phone, Plus, Search, StickyNote, Trash2, UploadCloud, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Home, Image, Mail, Mic, Phone, Plus, Search, StickyNote, Trash2, UploadCloud, User, X } from "lucide-react";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
@@ -464,66 +464,144 @@ export default function LeadsPage() {
               <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Add from Call section */}
-              <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
-                <button type="button" onClick={() => setShowCallPaste((v) => !v)} className="flex w-full items-center gap-2 text-sm font-black text-orange-700">
-                  <Mic className="h-4 w-4" />{showCallPaste ? "Hide call notes" : "Add from Call — paste recording / transcript"}
+            <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-slate-100">
+
+              {/* Add from Call */}
+              <div className="p-4">
+                <button type="button" onClick={() => setShowCallPaste((v) => !v)} className={`flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm font-black transition ${showCallPaste ? "bg-orange-500 text-white" : "bg-orange-50 text-orange-700 hover:bg-orange-100"}`}>
+                  <Mic className="h-4 w-4 shrink-0" />
+                  <span>{showCallPaste ? "Hide — type details manually below" : "Add from Call — auto-fill from notes or transcript"}</span>
                 </button>
                 {showCallPaste && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-3">
                     <textarea
                       value={callPasteText}
                       onChange={(e) => setCallPasteText(e.target.value)}
                       rows={4}
-                      className="w-full rounded-xl border border-orange-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400"
-                      placeholder="Paste call notes or transcript here — e.g. 'Customer John Smith, (602) 555-1234, 4521 W Oak St Phoenix AZ, roof from 2008, inspection scheduled June 12'"
+                      autoFocus
+                      className="w-full rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm outline-none focus:border-orange-400 focus:bg-white placeholder:text-slate-400"
+                      placeholder={`Paste call notes or transcript — e.g.\n"John Smith, (602) 555-1234, 4521 W Oak St Phoenix AZ, roof from 2008, inspection June 12"`}
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const parsed = parseCallNotes(callPasteText);
-                        setForm((f) => ({
-                          ...f,
-                          name: parsed.name || f.name,
-                          phone: parsed.phone || f.phone,
-                          email: parsed.email || f.email,
-                          address: parsed.address || f.address,
-                          inspectionDate: parsed.inspectionDate || f.inspectionDate,
-                          roofYear: parsed.roofYear || f.roofYear,
-                          callNotes: parsed.callNotes || f.callNotes,
-                          source: "Phone Call",
-                        }));
-                        setShowCallPaste(false);
-                      }}
-                      className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-black text-white hover:bg-orange-600"
-                    >
-                      Auto-fill from call
-                    </button>
-                    <p className="text-[11px] font-semibold text-orange-600">Pulls name, phone, address, inspection date, and roof year from the text — review and adjust before saving.</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!callPasteText.trim()}
+                        onClick={() => {
+                          const parsed = parseCallNotes(callPasteText);
+                          setForm((f) => ({
+                            ...f,
+                            name: parsed.name || f.name,
+                            phone: parsed.phone || f.phone,
+                            email: parsed.email || f.email,
+                            address: parsed.address || f.address,
+                            inspectionDate: parsed.inspectionDate || f.inspectionDate,
+                            roofYear: parsed.roofYear || f.roofYear,
+                            callNotes: parsed.callNotes || f.callNotes,
+                            source: "Phone Call",
+                          }));
+                          setShowCallPaste(false);
+                        }}
+                        className="rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-black text-white hover:bg-orange-600 disabled:opacity-40"
+                      >
+                        Auto-fill from call
+                      </button>
+                      <p className="text-xs font-semibold text-slate-500">Review fields below after filling.</p>
+                    </div>
                   </div>
                 )}
               </div>
 
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Customer / job name" />
-              <input ref={addressInputRef} required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Job address" />
-              <input value={form.roofType} onChange={(event) => setForm({ ...form, roofType: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Roof type" />
-              <input type="number" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Job value" />
-              <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
-              <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
-              <input value={form.inspectionDate} onChange={(event) => setForm({ ...form, inspectionDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Inspection date (e.g. June 12)" />
-              <input value={form.roofYear} onChange={(event) => setForm({ ...form, roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Year of roof / house" />
-              <input value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Source" />
-              <input value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Assigned to" />
-              <input value={form.nextAction} onChange={(event) => setForm({ ...form, nextAction: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Next action" />
-              <input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" />
-              <input value={form.lastActivity} onChange={(event) => setForm({ ...form, lastActivity: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Current note" />
-              <textarea value={form.callNotes} onChange={(event) => setForm({ ...form, callNotes: event.target.value })} rows={2} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none md:col-span-2 xl:col-span-4" placeholder="Call notes (optional)" />
+              {/* Section: Customer Info */}
+              <div className="p-4 space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-orange-600"><User className="h-3.5 w-3.5" />Customer Info</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Full Name <span className="text-red-400">*</span></span>
+                    <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. John Smith" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Phone Number</span>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" />
+                    </div>
+                  </label>
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span className="text-xs font-bold text-slate-500">Email Address</span>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="customer@email.com" />
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Section: Property & Job */}
+              <div className="p-4 space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-orange-600"><Home className="h-3.5 w-3.5" />Property & Job</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span className="text-xs font-bold text-slate-500">Property Address <span className="text-red-400">*</span></span>
+                    <input ref={addressInputRef} required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Street, City, AZ" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Roof Type</span>
+                    <input value={form.roofType} onChange={(e) => setForm({ ...form, roofType: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. Tile, Shingle, Flat" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Year of Roof / House</span>
+                    <input value={form.roofYear} onChange={(e) => setForm({ ...form, roofYear: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. 2008" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Estimated Job Value ($)</span>
+                    <input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="0" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Lead Source</span>
+                    <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white">
+                      {["Website","Phone Call","Referral","Door Knock","Social Media","Google","Flyer","Other"].map((s) => <option key={s}>{s}</option>)}
+                    </select>
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Assigned Rep</span>
+                    <input value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Office Coordinator" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Section: Inspection Appointment */}
+              <div className="p-4 space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-orange-600"><CalendarDays className="h-3.5 w-3.5" />Inspection Appointment</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Inspection Date</span>
+                    <input value={form.inspectionDate} onChange={(e) => setForm({ ...form, inspectionDate: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. June 12" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-slate-500">Due Date</span>
+                    <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span className="text-xs font-bold text-slate-500">Next Action</span>
+                    <input value={form.nextAction} onChange={(e) => setForm({ ...form, nextAction: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. Schedule inspection" />
+                  </label>
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span className="text-xs font-bold text-slate-500">Notes</span>
+                    <textarea value={form.lastActivity} onChange={(e) => setForm({ ...form, lastActivity: e.target.value })} rows={2} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white resize-none" placeholder="Any additional notes..." />
+                  </label>
+                  {form.callNotes && (
+                    <label className="grid gap-1 sm:col-span-2">
+                      <span className="text-xs font-bold text-slate-500">Call Notes</span>
+                      <textarea value={form.callNotes} onChange={(e) => setForm({ ...form, callNotes: e.target.value })} rows={2} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white resize-none" />
+                    </label>
+                  )}
+                </div>
+              </div>
+
             </div>
-            </div>
-            <div className="border-t border-slate-200 p-4">
-              <button className="w-full rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white sm:w-auto">Save job</button>
+            <div className="flex items-center justify-between border-t border-slate-200 p-4">
+              <button type="button" onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button className="rounded-xl bg-orange-500 px-6 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-200 hover:bg-orange-600">Save Job</button>
             </div>
           </form>
           </div>
