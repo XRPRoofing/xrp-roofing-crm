@@ -31,6 +31,9 @@ type GoogleCalendarEvent = {
   }[];
 };
 
+// Arizona Mountain Time - consistent timezone across all devices
+const ARIZONA_TIMEZONE = "America/Phoenix";
+
 function formatEventDate(event: GoogleCalendarEvent) {
   const dateValue = event.start?.dateTime || event.start?.date;
   if (!dateValue) return "Date pending";
@@ -40,6 +43,7 @@ function formatEventDate(event: GoogleCalendarEvent) {
     day: "numeric",
     hour: event.start?.dateTime ? "numeric" : undefined,
     minute: event.start?.dateTime ? "2-digit" : undefined,
+    timeZone: ARIZONA_TIMEZONE,
   }).format(new Date(dateValue));
 }
 
@@ -50,6 +54,7 @@ function formatEventTime(event: GoogleCalendarEvent) {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: ARIZONA_TIMEZONE,
   }).format(new Date(dateValue));
 }
 
@@ -95,8 +100,10 @@ function dateKey(year: number, month: number, day: number) {
 function eventDateKey(event: GoogleCalendarEvent) {
   const value = event.start?.dateTime || event.start?.date;
   if (!value) return null;
+  // Use Arizona timezone for consistent date grouping across all devices
   const date = new Date(value);
-  return dateKey(date.getFullYear(), date.getMonth(), date.getDate());
+  const arizonaDate = new Date(date.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
+  return dateKey(arizonaDate.getFullYear(), arizonaDate.getMonth(), arizonaDate.getDate());
 }
 
 function getGoogleCalendarStatusMessage(status: string | null) {
@@ -119,7 +126,8 @@ export default function CalendarPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
+    return new Date(arizonaNow.getFullYear(), arizonaNow.getMonth(), 1);
   });
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const agendaRef = useRef<HTMLDivElement>(null);
@@ -170,17 +178,18 @@ export default function CalendarPage() {
     }, {});
   }, [events]);
 
-  const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(monthCursor), [monthCursor]);
+  const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: ARIZONA_TIMEZONE }).format(monthCursor), [monthCursor]);
   const todayKey = useMemo(() => {
     const now = new Date();
-    return dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+    const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
+    return dateKey(arizonaNow.getFullYear(), arizonaNow.getMonth(), arizonaNow.getDate());
   }, []);
 
   const activeDayKey = selectedDayKey || todayKey;
   const agendaEvents = eventsByDate[activeDayKey] || [];
   const activeDayLabel = useMemo(() => {
     const [year, month, day] = activeDayKey.split("-").map(Number);
-    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(year, month, day));
+    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: ARIZONA_TIMEZONE }).format(new Date(year, month, day));
   }, [activeDayKey]);
 
   function shiftMonth(delta: number) {
@@ -205,9 +214,10 @@ export default function CalendarPage() {
     try {
       const year = monthCursor.getFullYear();
       const month = monthCursor.getMonth();
+      // Use Arizona timezone for consistent date range across all devices
       const timeMin = new Date(year, month - 1, 1).toISOString();
       const timeMax = new Date(year, month + 2, 1).toISOString();
-      const response = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
+      const response = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&timeZone=${encodeURIComponent(ARIZONA_TIMEZONE)}`);
       const data = await response.json() as { connected?: boolean; events?: GoogleCalendarEvent[]; error?: string };
 
       setConnected(Boolean(data.connected));
@@ -315,9 +325,13 @@ export default function CalendarPage() {
       <div className="sticky top-16 z-30 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-8 lg:top-20">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Scheduling</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Scheduling</p>
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">Arizona MT</span>
+            </div>
             <h1 className="mt-0.5 text-lg font-black text-[#07183f] sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
-            <p className="crm-board-subtitle mt-1 hidden text-slate-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments.</p>
+            <p className="crm-board-subtitle mt-1 hidden text-slate-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments. All times shown in Arizona Mountain Time.</p>
+            <p className="mt-1 text-xs text-slate-500 sm:hidden">All times in Arizona MT</p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-xl bg-[#07183f] px-3 py-2 text-sm font-bold text-white sm:rounded-2xl sm:px-4 sm:py-3">
@@ -354,7 +368,7 @@ export default function CalendarPage() {
             <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => setMonthCursor(() => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1); })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
+            <button type="button" onClick={() => setMonthCursor(() => { const now = new Date(); const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE })); return new Date(arizonaNow.getFullYear(), arizonaNow.getMonth(), 1); })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
               Today
             </button>
             <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
