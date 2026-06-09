@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Pencil, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Download, ImageDown, Pencil, X, ZoomIn, ZoomOut } from "lucide-react";
 
 export type GalleryPhoto = {
   id: string;
@@ -42,6 +42,8 @@ export default function PhotoGallery({
   // Selected photo index for Before/After comparison slots
   const [selectedBeforeIdx, setSelectedBeforeIdx] = useState(0);
   const [selectedAfterIdx, setSelectedAfterIdx] = useState(0);
+  const [savingComparison, setSavingComparison] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // "General" or undefined → show all photos; otherwise filter by type
   const filtered = !activeFilter || activeFilter === "General" || activeFilter === "Job Photo"
@@ -84,27 +86,104 @@ export default function PhotoGallery({
 
   const active = activeIndex === null ? null : lightboxPool[activeIndex];
 
+  const saveComparison = useCallback(async (before: GalleryPhoto, after: GalleryPhoto) => {
+    setSavingComparison(true);
+    try {
+      const loadImg = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+      const [imgB, imgA] = await Promise.all([loadImg(before.dataUrl), loadImg(after.dataUrl)]);
+      const W = Math.max(imgB.naturalWidth, imgA.naturalWidth, 1080);
+      const scaleB = W / imgB.naturalWidth;
+      const scaleA = W / imgA.naturalWidth;
+      const hB = Math.round(imgB.naturalHeight * scaleB);
+      const hA = Math.round(imgA.naturalHeight * scaleA);
+      const LABEL = 44;
+      const H = hB + LABEL + hA + LABEL;
+      const canvas = canvasRef.current ?? document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d")!;
+      // Before panel
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, 0, W, LABEL);
+      ctx.drawImage(imgB, 0, LABEL, W, hB);
+      // Before label
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, 0, W, LABEL);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${Math.round(W * 0.022)}px sans-serif`;
+      ctx.textBaseline = "middle";
+      ctx.fillText("BEFORE", W * 0.025, LABEL / 2);
+      // After panel
+      const afterY = LABEL + hB;
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, afterY, W, LABEL);
+      ctx.drawImage(imgA, 0, afterY + LABEL, W, hA);
+      // After label
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, afterY, W, LABEL);
+      ctx.fillStyle = "#6ee7b7";
+      ctx.fillText("AFTER", W * 0.025, afterY + LABEL / 2);
+      // Download
+      const url = canvas.toDataURL("image/jpeg", 0.9);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `comparison-before${safeBeforeIdx + 1}-after${safeAfterIdx + 1}-${Date.now()}.jpg`;
+      a.click();
+    } finally {
+      setSavingComparison(false);
+    }
+  }, [safeBeforeIdx, safeAfterIdx]);
+
   return (
     <>
       {/* Before / After stacked comparison (CompanyCam style) */}
       {showComparison && activeBefore && activeAfter && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a]">
-          <p className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400">Before / After Comparison</p>
-
-          {/* Before slot — tap photo to open fullscreen */}
-          <div className="relative border-t border-slate-700 cursor-pointer" style={{ aspectRatio: "16/9" }} onClick={() => openLightbox(beforePhotos, safeBeforeIdx)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={activeBefore.dataUrl} alt="Before" className="h-full w-full object-cover" />
-            <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-black uppercase tracking-widest text-white backdrop-blur-sm">BEFORE</span>
-            <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{safeBeforeIdx + 1} / {beforePhotos.length}</span>
+          {/* Header row */}
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Before / After Comparison</p>
+            <button
+              type="button"
+              disabled={savingComparison}
+              onClick={() => void saveComparison(activeBefore, activeAfter)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white transition hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
+            >
+              <ImageDown className="h-3.5 w-3.5" />
+              {savingComparison ? "Saving…" : "Save as Image"}
+            </button>
           </div>
 
-          {/* After slot — tap photo to open fullscreen */}
-          <div className="relative border-t border-slate-700 cursor-pointer" style={{ aspectRatio: "16/9" }} onClick={() => openLightbox(afterPhotos, safeAfterIdx)}>
+          {/* Before slot — prev/next arrows + tap to fullscreen */}
+          <div className="relative border-t border-slate-700" style={{ aspectRatio: "16/9" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={activeAfter.dataUrl} alt="After" className="h-full w-full object-cover" />
+            <img src={activeBefore.dataUrl} alt="Before" className="h-full w-full cursor-pointer object-cover" onClick={() => openLightbox(beforePhotos, safeBeforeIdx)} />
+            <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-black uppercase tracking-widest text-white backdrop-blur-sm">BEFORE</span>
+            <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{safeBeforeIdx + 1} / {beforePhotos.length}</span>
+            {beforePhotos.length > 1 && (
+              <>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedBeforeIdx((safeBeforeIdx - 1 + beforePhotos.length) % beforePhotos.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 active:scale-90"><ChevronLeft className="h-5 w-5" /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedBeforeIdx((safeBeforeIdx + 1) % beforePhotos.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 active:scale-90"><ChevronRight className="h-5 w-5" /></button>
+              </>
+            )}
+          </div>
+
+          {/* After slot — prev/next arrows + tap to fullscreen */}
+          <div className="relative border-t border-slate-700" style={{ aspectRatio: "16/9" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={activeAfter.dataUrl} alt="After" className="h-full w-full cursor-pointer object-cover" onClick={() => openLightbox(afterPhotos, safeAfterIdx)} />
             <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-black uppercase tracking-widest text-emerald-300 backdrop-blur-sm">AFTER</span>
             <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{safeAfterIdx + 1} / {afterPhotos.length}</span>
+            {afterPhotos.length > 1 && (
+              <>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedAfterIdx((safeAfterIdx - 1 + afterPhotos.length) % afterPhotos.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 active:scale-90"><ChevronLeft className="h-5 w-5" /></button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedAfterIdx((safeAfterIdx + 1) % afterPhotos.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70 active:scale-90"><ChevronRight className="h-5 w-5" /></button>
+              </>
+            )}
           </div>
 
           {/* Edit buttons — edit the currently selected photo */}
@@ -247,6 +326,9 @@ export default function PhotoGallery({
           )}
         </div>
       )}
+
+      {/* Hidden canvas for comparison export */}
+      <canvas ref={canvasRef} className="hidden" />
     </>
   );
 }
