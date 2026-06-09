@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import { ensureInvoiceTaskForCompletedJob } from "@/lib/office-tasks";
+import { ensureInvoiceTaskForCompletedJob, syncCrewJobToTaskBoard } from "@/lib/office-tasks";
 import { crewMembers, crewStatuses, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
 import {
   addChecklistItem,
@@ -184,6 +184,23 @@ export default function CrewWorkflowPage() {
         module: "Crew Workflow",
       });
     }
+    // Sync every status change to the Task Board in real time
+    if (job) {
+      const assembled = crewJobs.find((cj) => cj.id === jobId);
+      syncCrewJobToTaskBoard({
+        id: job.id,
+        name: job.name,
+        address: job.address,
+        city: job.city,
+        value: job.value,
+        assignedCrew: Array.isArray(updates.assignedCrew ?? job.assignedCrew) ? (updates.assignedCrew ?? job.assignedCrew) : [],
+        status: (updates.status ?? job.status) as string,
+        beforePhotoCount: assembled?.completion?.beforePhotos?.length,
+        afterPhotoCount: assembled?.completion?.afterPhotos?.length,
+        progressPhotoCount: assembled?.completion?.progressPhotos?.length,
+        jobLink: `/crm/crew?job=${encodeURIComponent(job.id)}`,
+      });
+    }
 
     const previousJobs = jobs;
     setJobs((current) => current.map((item) => (item.id === jobId ? { ...item, ...updates } : item)));
@@ -234,6 +251,19 @@ export default function CrewWorkflowPage() {
         actor: uploadedBy,
         module: "Crew Workflow",
       });
+      // Sync photo counts to Task Board
+      const assembled = crewJobs.find((cj) => cj.id === job.id);
+      syncCrewJobToTaskBoard({
+        id: job.id,
+        name: job.name,
+        address: job.address,
+        city: job.city,
+        assignedCrew: Array.isArray(job.assignedCrew) ? job.assignedCrew : [],
+        status: job.status as string,
+        beforePhotoCount: type === "Before" ? (assembled?.completion?.beforePhotos?.length || 0) + items.length : assembled?.completion?.beforePhotos?.length,
+        afterPhotoCount: type === "After" ? (assembled?.completion?.afterPhotos?.length || 0) + items.length : assembled?.completion?.afterPhotos?.length,
+        progressPhotoCount: type === "Progress" ? (assembled?.completion?.progressPhotos?.length || 0) + items.length : assembled?.completion?.progressPhotos?.length,
+      }, `${items.length} ${type} photo(s) uploaded`);
     } catch (uploadError) {
       setPhotos(previousPhotos);
       setSelectedPhotos(previousSelected);
@@ -249,6 +279,7 @@ export default function CrewWorkflowPage() {
       await addJobNote(job.id, "CRM user", body);
       await refresh();
       addCrmNotification({ title: "Job note added", message: `New note on ${job.name}.`, actor: "CRM user", module: "Crew Workflow" });
+      syncCrewJobToTaskBoard({ id: job.id, name: job.name, address: job.address, city: job.city, assignedCrew: Array.isArray(job.assignedCrew) ? job.assignedCrew : [], status: job.status as string }, "Note added by crew");
     } catch (noteError) {
       setNoteDraft(body);
       reportError(noteError instanceof Error ? noteError.message : "Failed to add note.");
@@ -314,6 +345,17 @@ export default function CrewWorkflowPage() {
         actor: "CRM user",
         module: "Crew Workflow",
       });
+      // Auto-create task card on job creation
+      syncCrewJobToTaskBoard({
+        id: record.id,
+        name: record.name,
+        address: record.address,
+        city: record.city,
+        value: record.value,
+        assignedCrew: record.assignedCrew,
+        status: record.status as string,
+        jobLink: `/crm/crew?job=${encodeURIComponent(record.id)}`,
+      }, "New job created by crew");
       setNewJob({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
       setShowCreateJob(false);
     } catch (createError) {

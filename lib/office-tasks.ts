@@ -237,6 +237,100 @@ export function recordReviewReceived(taskId: string) {
   saveOfficeTasks(updated);
 }
 
+// Crew status → Task Board column mapping
+const CREW_TO_TASK_STATUS: Record<string, OfficeTaskStatus> = {
+  Assigned:           "Job Scheduled",
+  "In Progress":      "Job In Progress",
+  "On Work":          "Job In Progress",
+  "Mark Done":        "Job Completed",
+  Completed:          "Job Completed",
+  "Proceed to Invoice": "For Invoice",
+  "Done Payment":     "Paid",
+};
+
+export type CrewJobSyncInput = {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  value?: number;
+  assignedTo?: string;
+  assignedCrew?: string[];
+  status?: string;
+  jobNotes?: string;
+  completionNotes?: string;
+  beforePhotoCount?: number;
+  afterPhotoCount?: number;
+  progressPhotoCount?: number;
+  notesCount?: number;
+  jobLink?: string;
+};
+
+export function syncCrewJobToTaskBoard(input: CrewJobSyncInput, eventLabel?: string) {
+  if (typeof window === "undefined") return;
+
+  const tasks = readOfficeTasks();
+  const taskId = `invoice-${input.id}`;
+  const now = new Date().toISOString();
+  const targetStatus: OfficeTaskStatus = input.status ? (CREW_TO_TASK_STATUS[input.status] || "Job Scheduled") : "Job Scheduled";
+  const existing = tasks.find((t) => t.jobId === input.id);
+  const crewLabel = Array.isArray(input.assignedCrew) && input.assignedCrew.length > 0 ? input.assignedCrew.join(", ") : (input.assignedTo || "Crew");
+  const photoSummary = [
+    input.beforePhotoCount ? `${input.beforePhotoCount} Before` : "",
+    input.progressPhotoCount ? `${input.progressPhotoCount} Progress` : "",
+    input.afterPhotoCount ? `${input.afterPhotoCount} After` : "",
+  ].filter(Boolean).join(" · ");
+  const event = eventLabel || (input.status ? `Crew status → ${input.status}` : "Crew job updated");
+
+  if (!existing) {
+    // Create new task card
+    const task: OfficeTask = {
+      id: taskId,
+      jobId: input.id,
+      title: "Crew Job",
+      customerName: input.name,
+      jobAddress: formatJobAddress(input),
+      invoiceAmount: input.value ? `$${Number(input.value).toLocaleString()}` : "TBD",
+      assignedUser: crewLabel,
+      dueDate: "Per schedule",
+      status: targetStatus,
+      jobLink: input.jobLink || `/crm/crew?job=${encodeURIComponent(input.id)}`,
+      createdAt: now,
+      updatedAt: now,
+      timeline: [{ id: `${Date.now()}`, event, at: now, by: "Crew" }],
+    };
+    saveOfficeTasks([task, ...tasks]);
+    return;
+  }
+
+  // Update existing — only advance status if it moves forward in the workflow
+  const currentIdx = officeTaskStatuses.indexOf(existing.status);
+  const targetIdx = officeTaskStatuses.indexOf(targetStatus);
+  const nextStatus = targetIdx > currentIdx ? targetStatus : existing.status;
+
+  const updated = tasks.map((task) => {
+    if (task.jobId !== input.id) return task;
+    const withUpdate: OfficeTask = {
+      ...task,
+      status: nextStatus,
+      assignedUser: crewLabel,
+      updatedAt: now,
+      ...(input.value ? { invoiceAmount: `$${Number(input.value).toLocaleString()}` } : {}),
+      ...(photoSummary ? { invoiceStatus: photoSummary } : {}),
+    };
+    return addTimelineEntry(withUpdate, event, undefined, "Crew");
+  });
+
+  // Auto-create For Invoice task when Completed
+  const justCompleted = nextStatus === "Job Completed" && existing.status !== "Job Completed";
+  const forInvoiceId = `forinvoice-${input.id}`;
+  const withInvoice = justCompleted && !updated.some((t) => t.id === forInvoiceId)
+    ? [{ ...updated.find((t) => t.jobId === input.id)!, id: forInvoiceId, status: "For Invoice" as OfficeTaskStatus, dueDate: "Immediately", createdAt: now, updatedAt: now, timeline: [{ id: `${Date.now()}`, event: "Job Completed — Invoice Task Created", at: now }] }, ...updated]
+    : updated;
+
+  saveOfficeTasks(withInvoice);
+}
+
 export function addTaskTimelineEntry(taskId: string, event: string, note?: string, by?: string) {
   const tasks = readOfficeTasks();
   const updated = tasks.map((task) => {
