@@ -39,6 +39,10 @@ export default function PhotoGallery({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
+  // Selected photo index for Before/After comparison slots
+  const [selectedBeforeIdx, setSelectedBeforeIdx] = useState(0);
+  const [selectedAfterIdx, setSelectedAfterIdx] = useState(0);
+
   // "General" or undefined → show all photos; otherwise filter by type
   const filtered = !activeFilter || activeFilter === "General" || activeFilter === "Job Photo"
     ? photos
@@ -47,6 +51,12 @@ export default function PhotoGallery({
   const beforePhotos = photos.filter((p) => p.photoType === "Before");
   const afterPhotos  = photos.filter((p) => p.photoType === "After");
   const showComparison = (activeFilter === "Before" || activeFilter === "After") && beforePhotos.length > 0 && afterPhotos.length > 0;
+
+  // Clamp indices when photos change
+  const safeBeforeIdx = Math.min(selectedBeforeIdx, Math.max(0, beforePhotos.length - 1));
+  const safeAfterIdx  = Math.min(selectedAfterIdx,  Math.max(0, afterPhotos.length  - 1));
+  const activeBefore  = beforePhotos[safeBeforeIdx];
+  const activeAfter   = afterPhotos[safeAfterIdx];
 
   const openLightbox = useCallback((pool: GalleryPhoto[], index: number) => {
     setLightboxPool(pool);
@@ -77,46 +87,68 @@ export default function PhotoGallery({
   return (
     <>
       {/* Before / After stacked comparison (CompanyCam style) */}
-      {showComparison && (
+      {showComparison && activeBefore && activeAfter && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a]">
           <p className="px-4 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400">Before / After Comparison</p>
-          {/* Before stack */}
-          <div className="relative border-t border-slate-700" style={{ aspectRatio: "16/9" }}>
+
+          {/* Before slot — tap photo to open fullscreen */}
+          <div className="relative border-t border-slate-700 cursor-pointer" style={{ aspectRatio: "16/9" }} onClick={() => openLightbox(beforePhotos, safeBeforeIdx)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={beforePhotos[beforePhotos.length - 1].dataUrl} alt="Before" className="h-full w-full object-cover" />
+            <img src={activeBefore.dataUrl} alt="Before" className="h-full w-full object-cover" />
             <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-black uppercase tracking-widest text-white backdrop-blur-sm">BEFORE</span>
-            {beforePhotos.length > 1 && <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{beforePhotos.length} photos</span>}
+            <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{safeBeforeIdx + 1} / {beforePhotos.length}</span>
           </div>
-          {/* After stack */}
-          <div className="relative border-t border-slate-700" style={{ aspectRatio: "16/9" }}>
+
+          {/* After slot — tap photo to open fullscreen */}
+          <div className="relative border-t border-slate-700 cursor-pointer" style={{ aspectRatio: "16/9" }} onClick={() => openLightbox(afterPhotos, safeAfterIdx)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={afterPhotos[afterPhotos.length - 1].dataUrl} alt="After" className="h-full w-full object-cover" />
+            <img src={activeAfter.dataUrl} alt="After" className="h-full w-full object-cover" />
             <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-3 py-1 text-xs font-black uppercase tracking-widest text-emerald-300 backdrop-blur-sm">AFTER</span>
-            {afterPhotos.length > 1 && <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{afterPhotos.length} photos</span>}
+            <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white">{safeAfterIdx + 1} / {afterPhotos.length}</span>
           </div>
-          {/* Edit buttons */}
+
+          {/* Edit buttons — edit the currently selected photo */}
           <div className="grid grid-cols-2 gap-px border-t border-slate-700 bg-slate-700">
-            <button type="button" onClick={() => openLightbox(beforePhotos, 0)} className="flex items-center justify-center gap-2 bg-slate-800 py-3 text-xs font-black text-white hover:bg-slate-700 active:bg-slate-600">
-              <Pencil className="h-3.5 w-3.5" /> Edit Before
+            <button
+              type="button"
+              onClick={() => onEditPhoto ? onEditPhoto(activeBefore) : openLightbox(beforePhotos, safeBeforeIdx)}
+              className="flex items-center justify-center gap-2 bg-slate-800 py-3 text-xs font-black text-white hover:bg-slate-700 active:bg-slate-600"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit Before {safeBeforeIdx + 1}
             </button>
-            <button type="button" onClick={() => openLightbox(afterPhotos, 0)} className="flex items-center justify-center gap-2 bg-slate-800 py-3 text-xs font-black text-emerald-300 hover:bg-slate-700 active:bg-slate-600">
-              <Pencil className="h-3.5 w-3.5" /> Edit After
+            <button
+              type="button"
+              onClick={() => onEditPhoto ? onEditPhoto(activeAfter) : openLightbox(afterPhotos, safeAfterIdx)}
+              className="flex items-center justify-center gap-2 bg-slate-800 py-3 text-xs font-black text-emerald-300 hover:bg-slate-700 active:bg-slate-600"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit After {safeAfterIdx + 1}
             </button>
           </div>
-          {/* Thumbnail strip */}
+
+          {/* Thumbnail strip — tap to switch displayed photo */}
           <div className="flex gap-1.5 overflow-x-auto bg-slate-900 px-2 py-2">
             {beforePhotos.map((p, i) => (
-              <button key={p.id} type="button" onClick={() => openLightbox(beforePhotos, i)} className="relative shrink-0">
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedBeforeIdx(i)}
+                className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${i === safeBeforeIdx ? "border-blue-400 scale-105" : "border-transparent opacity-60 hover:opacity-90"}`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.dataUrl} alt="Before" className="h-14 w-20 rounded-lg object-cover opacity-80 hover:opacity-100" />
-                <span className="absolute bottom-1 left-1 rounded bg-blue-600/80 px-1 text-[8px] font-black text-white">B{i + 1}</span>
+                <img src={p.dataUrl} alt="Before" className="h-14 w-20 object-cover" />
+                <span className="absolute bottom-1 left-1 rounded bg-blue-600/90 px-1 text-[8px] font-black text-white">B{i + 1}</span>
               </button>
             ))}
             {afterPhotos.map((p, i) => (
-              <button key={p.id} type="button" onClick={() => openLightbox(afterPhotos, i)} className="relative shrink-0">
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setSelectedAfterIdx(i)}
+                className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${i === safeAfterIdx ? "border-emerald-400 scale-105" : "border-transparent opacity-60 hover:opacity-90"}`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.dataUrl} alt="After" className="h-14 w-20 rounded-lg object-cover opacity-80 hover:opacity-100" />
-                <span className="absolute bottom-1 left-1 rounded bg-emerald-600/80 px-1 text-[8px] font-black text-white">A{i + 1}</span>
+                <img src={p.dataUrl} alt="After" className="h-14 w-20 object-cover" />
+                <span className="absolute bottom-1 left-1 rounded bg-emerald-600/90 px-1 text-[8px] font-black text-white">A{i + 1}</span>
               </button>
             ))}
           </div>
