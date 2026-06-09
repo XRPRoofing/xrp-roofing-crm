@@ -29,7 +29,7 @@ export default function FolderGalleryPage() {
   const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
   const [annotatorKey, setAnnotatorKey] = useState(0);
   const editTargetRef = useRef<{ photoType: GalleryPhoto["photoType"] } | null>(null);
-  const [activePhotoType, setActivePhotoType] = useState<"Before" | "Progress" | "After" | "Job Photo">("Job Photo");
+  const [activePhotoType, setActivePhotoType] = useState<"Before" | "Progress" | "After" | "Job Photo" | "General">("General");
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
 
   // The crew dataset is metadata-only (no image bytes), so fetch the actual
@@ -193,16 +193,19 @@ export default function FolderGalleryPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Photo type selector */}
                 <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
-                  {(["Before", "Progress", "After", "Job Photo"] as const).map((t) => (
-                    <button key={t} type="button" onClick={() => setActivePhotoType(t)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
-                        activePhotoType === t
-                          ? t === "Before" ? "bg-blue-600 text-white" : t === "Progress" ? "bg-orange-500 text-white" : t === "After" ? "bg-emerald-600 text-white" : "bg-[#07183f] text-white"
-                          : "text-slate-500 hover:bg-white"
-                      }`}>
-                      {t === "Job Photo" ? "General" : t}
-                    </button>
-                  ))}
+                  {(["General", "Before", "Progress", "After"] as const).map((t) => {
+                    const count = t === "General" ? photos.length : photos.filter((p) => p.photoType === t).length;
+                    return (
+                      <button key={t} type="button" onClick={() => setActivePhotoType(t as typeof activePhotoType)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                          activePhotoType === t
+                            ? t === "Before" ? "bg-blue-600 text-white" : t === "Progress" ? "bg-orange-500 text-white" : t === "After" ? "bg-emerald-600 text-white" : "bg-[#07183f] text-white"
+                            : "text-slate-500 hover:bg-white"
+                        }`}>
+                        {t} {count > 0 && <span className="opacity-60">({count})</span>}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   type="button"
@@ -214,7 +217,7 @@ export default function FolderGalleryPage() {
                 </button>
                 <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
                   <UploadCloud className="h-4 w-4" /> Upload
-                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType); event.target.value = ""; }} />
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType === "General" ? "Job Photo" : activePhotoType); event.target.value = ""; }} />
                 </label>
                 <button onClick={() => setShowShare(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-700">
                   <Share2 className="h-4 w-4" /> Share
@@ -227,10 +230,10 @@ export default function FolderGalleryPage() {
           </section>
 
           {photos.length === 0 ? (
-            <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">No photos in this folder yet. Use <span className="font-black text-slate-700">Take Photo</span> or <span className="font-black text-slate-700">Upload</span> above to add some.</section>
+            <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center text-slate-500">No photos in this folder yet. Use <span className="font-black text-slate-700">Camera</span> or <span className="font-black text-slate-700">Upload</span> above to add some.</section>
           ) : (
             <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-              <PhotoGallery photos={photos} onEditPhoto={editPhoto} />
+              <PhotoGallery photos={photos} activeFilter={activePhotoType} onEditPhoto={editPhoto} />
             </section>
           )}
         </>
@@ -251,7 +254,7 @@ export default function FolderGalleryPage() {
               // Save directly — no blocking setUploading so shutter stays instant
               await ensureBackingJob();
               await addJobPhotos(folder.jobId, [{
-                photoType: activePhotoType,
+                photoType: activePhotoType === "General" ? "Job Photo" : activePhotoType,
                 name: photo.name,
                 dataUrl: photo.dataUrl,
                 uploadedBy: "Office",
