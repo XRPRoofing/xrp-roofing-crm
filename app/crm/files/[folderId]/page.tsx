@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Camera, Check, Copy, FolderOpen, Lock, Share2, UploadCloud, X } from "lucide-react";
+import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
 import { addJobPhotos, loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
 import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
@@ -29,6 +30,7 @@ export default function FolderGalleryPage() {
   const [annotatorKey, setAnnotatorKey] = useState(0);
   const editTargetRef = useRef<{ photoType: GalleryPhoto["photoType"] } | null>(null);
   const [activePhotoType, setActivePhotoType] = useState<"Before" | "Progress" | "After" | "Job Photo">("Job Photo");
+  const [liveCameraOpen, setLiveCameraOpen] = useState(false);
 
   // The crew dataset is metadata-only (no image bytes), so fetch the actual
   // images for this folder's job(s) on demand and key them by photo id.
@@ -202,10 +204,14 @@ export default function FolderGalleryPage() {
                     </button>
                   ))}
                 </div>
-                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#07183f] px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-900 ${uploading ? "opacity-60" : ""}`}>
-                  <Camera className="h-4 w-4" /> Take Photo
-                  <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType); event.target.value = ""; }} />
-                </label>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => setLiveCameraOpen(true)}
+                  className={`inline-flex items-center gap-2 rounded-2xl bg-[#07183f] px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-900 active:scale-95 ${uploading ? "opacity-60" : ""}`}
+                >
+                  <Camera className="h-4 w-4" /> Camera
+                </button>
                 <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
                   <UploadCloud className="h-4 w-4" /> Upload
                   <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType); event.target.value = ""; }} />
@@ -232,6 +238,26 @@ export default function FolderGalleryPage() {
 
       {showShare && folder && <ShareFolderModal folder={folder} onClose={() => setShowShare(false)} />}
       <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotated} onCancel={() => { editTargetRef.current = null; setAnnotatorImages(null); }} />
+
+      {liveCameraOpen && (() => {
+        const accentMap: Record<string, string> = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600", "Job Photo": "bg-[#07183f]" };
+        const existingCount = (folder?.files ?? []).filter((f) => f.photoType === activePhotoType).length;
+        return (
+          <LiveCameraCapture
+            label={activePhotoType === "Job Photo" ? "General" : activePhotoType}
+            accentColor={accentMap[activePhotoType] ?? "bg-[#07183f]"}
+            existingCount={existingCount}
+            onCapture={async (photo) => {
+              const blob = await fetch(photo.dataUrl).then((r) => r.blob());
+              const file = new File([blob], photo.name, { type: "image/jpeg" });
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              await addPhotos(dt.files, activePhotoType);
+            }}
+            onClose={() => setLiveCameraOpen(false)}
+          />
+        );
+      })()}
     </div>
   );
 }

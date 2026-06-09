@@ -849,10 +849,14 @@ export default function LeadsPage() {
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{otherPhotos.length}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-900 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                      <Camera className="h-4 w-4" /> Take Photo
-                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
-                    </label>
+                    <button
+                      type="button"
+                      disabled={fileBusy}
+                      onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
+                      className={`flex items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-900 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      <Camera className="h-4 w-4" /> Camera
+                    </button>
                     <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
                       <UploadCloud className="h-4 w-4" /> Upload
                       <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
