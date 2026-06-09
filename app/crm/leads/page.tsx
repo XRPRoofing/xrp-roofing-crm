@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, Clock, DollarSign, FileText, Filter, GripVertical, History, Home, Image, Mail, Mic, Phone, Plus, Search, StickyNote, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, Mic, Phone, Plus, Search, Square, StickyNote, Trash2, UploadCloud, User, X } from "lucide-react";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
@@ -148,6 +148,8 @@ export default function LeadsPage() {
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const addressInputRef = useRef<HTMLInputElement>(null);
   const [showCallPaste, setShowCallPaste] = useState(false);
@@ -169,9 +171,25 @@ export default function LeadsPage() {
     callNotes: "",
   });
 
+  const PHOTO_CHECKLIST_ITEMS = [
+    "Front of house",
+    "Roof overview (full)",
+    "Gutters & downspouts",
+    "Damage close-up",
+    "Ridge & hip",
+    "Flashing & vents",
+    "Skylights / chimney",
+    "Inside attic (if applicable)",
+    "Neighbor fence / property line",
+    "Street view",
+  ];
+
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
-  const jobPhotosOnly = jobFiles.filter((file) => !file.name.startsWith("Document - "));
-  const jobDocuments = jobFiles.filter((file) => file.name.startsWith("Document - "));
+  const beforePhotos = jobFiles.filter((f) => f.photoType === "Before");
+  const progressPhotos = jobFiles.filter((f) => f.photoType === "Progress");
+  const afterPhotos = jobFiles.filter((f) => f.photoType === "After");
+  const otherPhotos = jobFiles.filter((f) => f.photoType === "Job Photo");
+  const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 
   // Load the selected job's saved files (photos + documents) from the shared
   // crew store so they show on the card and stay in sync with the Files board.
@@ -179,6 +197,8 @@ export default function LeadsPage() {
     if (!selectedJobId) {
       setJobFiles([]);
       setActivityOpen(false);
+      setChecklistOpen(false);
+      setPhotoChecklist({});
       setFileError(null);
       return;
     }
@@ -189,7 +209,7 @@ export default function LeadsPage() {
 
   // Capture/upload saves instantly — no forced markup step. Drawings and notes
   // can be added later per-photo from the job's Files folder.
-  async function handleJobFileUpload(kind: "Documents" | "Photos", files: FileList | null) {
+  async function handleJobFileUpload(photoType: "Before" | "Progress" | "After" | "Job Photo", files: FileList | null) {
     if (!selectedJob || !files?.length) return;
     setFileBusy(true);
     setFileError(null);
@@ -197,8 +217,8 @@ export default function LeadsPage() {
       const selected = Array.from(files);
       const dataUrls = await Promise.all(selected.map((file) => compressImageToDataUrl(file)));
       await addJobPhotos(selectedJob.id, selected.map((file, index) => ({
-        photoType: "Job Photo",
-        name: kind === "Documents" ? `Document - ${file.name || `file-${index + 1}`}` : (file.name || `photo-${Date.now()}-${index + 1}.jpg`),
+        photoType,
+        name: file.name || `photo-${Date.now()}-${index + 1}.jpg`,
         dataUrl: dataUrls[index],
         uploadedBy: "Office",
       })));
@@ -645,6 +665,12 @@ export default function LeadsPage() {
                         <p className="truncate text-xs font-bold text-slate-700">Next: {job.nextAction || "Review job"}</p>
                         <p className="mt-0.5 text-xs font-black text-slate-500">Due: {formatDueDate(job.dueDate)}</p>
                       </div>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-600"><Camera className="h-3 w-3" />B</span>
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-1.5 py-0.5 text-[10px] font-black text-orange-600"><Camera className="h-3 w-3" />P</span>
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-600"><Camera className="h-3 w-3" />A</span>
+                        <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-500"><ListChecks className="h-3 w-3" />Checklist</span>
+                      </div>
                     </button>
                   );
                 })}
@@ -702,56 +728,90 @@ export default function LeadsPage() {
               <div className="space-y-3">
                 {fileError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{fileError}</p>}
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                {/* Photo Checklist */}
+                <div className="rounded-2xl border border-slate-200 bg-white">
+                  <button type="button" onClick={() => setChecklistOpen((v) => !v)} className="flex w-full items-center justify-between p-4">
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><ListChecks className="h-4 w-4 text-orange-500" />Photo Checklist</div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-black ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
+                  </button>
+                  {checklistOpen && (
+                    <div className="border-t border-slate-100 px-4 pb-4">
+                      <p className="pt-3 text-[11px] font-semibold text-slate-400">Tap each shot you&apos;ve taken on this job.</p>
+                      <ul className="mt-2 space-y-1">
+                        {PHOTO_CHECKLIST_ITEMS.map((item) => (
+                          <li key={item}>
+                            <button type="button" onClick={() => setPhotoChecklist((prev) => ({ ...prev, [item]: !prev[item] }))} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-slate-50">
+                              {photoChecklist[item] ? <CheckSquare className="h-5 w-5 shrink-0 text-emerald-500" /> : <Square className="h-5 w-5 shrink-0 text-slate-300" />}
+                              <span className={photoChecklist[item] ? "font-bold text-emerald-700 line-through" : "font-semibold text-slate-700"}>{item}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Before / Progress / After photo sections */}
+                {(["Before", "Progress", "After"] as const).map((type) => {
+                  const photos = type === "Before" ? beforePhotos : type === "Progress" ? progressPhotos : afterPhotos;
+                  const accent = type === "Before" ? "bg-blue-600 hover:bg-blue-700" : type === "Progress" ? "bg-orange-500 hover:bg-orange-600" : "bg-emerald-600 hover:bg-emerald-700";
+                  const badge = type === "Before" ? "bg-blue-50 text-blue-700" : type === "Progress" ? "bg-orange-50 text-orange-700" : "bg-emerald-50 text-emerald-700";
+                  const border = type === "Before" ? "border-blue-100" : type === "Progress" ? "border-orange-100" : "border-emerald-100";
+                  return (
+                    <div key={type} className={`rounded-2xl border ${border} bg-white p-4`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-lg px-2 py-0.5 text-xs font-black uppercase tracking-wide ${badge}`}>{type}</span>
+                          <span className="text-xs font-bold text-slate-400">{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black text-white transition ${accent} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                          <Camera className="h-4 w-4" /> Take Photo
+                          <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(type, input.files).finally(() => { input.value = ""; }); }} />
+                        </label>
+                        <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                          <UploadCloud className="h-4 w-4" /> Upload
+                          <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(type, input.files).finally(() => { input.value = ""; }); }} />
+                        </label>
+                      </div>
+                      {photos.length > 0 && (
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {photos.map((photo) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-slate-100 object-cover" />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* General job photos */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><FileText className="h-4 w-4" />Documents</div>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobDocuments.length} file(s)</span>
+                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Image className="h-4 w-4" />General Photos</div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{otherPhotos.length}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                      <Camera className="h-4 w-4" /> Take Picture
-                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-900 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Camera className="h-4 w-4" /> Take Photo
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
                     </label>
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
                       <UploadCloud className="h-4 w-4" /> Upload
-                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Documents", input.files).finally(() => { input.value = ""; }); }} />
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
                     </label>
                   </div>
-                  {jobDocuments.length > 0 && (
+                  {otherPhotos.length > 0 && (
                     <div className="mt-3 grid grid-cols-3 gap-2">
-                      {jobDocuments.map((file) => (
+                      {otherPhotos.map((photo) => (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={file.id} src={file.dataUrl} alt={file.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
+                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-slate-100 object-cover" />
                       ))}
                     </div>
                   )}
                   <p className="mt-2 text-[11px] font-bold text-slate-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Image className="h-4 w-4" />Photos</div>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{jobPhotosOnly.length} photo(s)</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-800 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                      <Camera className="h-4 w-4" /> Take Photo
-                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
-                    </label>
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                      <UploadCloud className="h-4 w-4" /> Upload
-                      <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Photos", input.files).finally(() => { input.value = ""; }); }} />
-                    </label>
-                  </div>
-                  {jobPhotosOnly.length > 0 && (
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {jobPhotosOnly.map((photo) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-slate-200 object-cover" />
-                      ))}
-                    </div>
-                  )}
-                  <p className="mt-2 text-[11px] font-bold text-slate-400">Shown here and auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

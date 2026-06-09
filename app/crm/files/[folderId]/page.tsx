@@ -28,6 +28,7 @@ export default function FolderGalleryPage() {
   const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
   const [annotatorKey, setAnnotatorKey] = useState(0);
   const editTargetRef = useRef<{ photoType: GalleryPhoto["photoType"] } | null>(null);
+  const [activePhotoType, setActivePhotoType] = useState<"Before" | "Progress" | "After" | "Job Photo">("Job Photo");
 
   // The crew dataset is metadata-only (no image bytes), so fetch the actual
   // images for this folder's job(s) on demand and key them by photo id.
@@ -98,7 +99,7 @@ export default function FolderGalleryPage() {
 
   // Capture/upload photos straight into this folder — saved instantly, no forced
   // markup step. (Markup/notes are available later per-photo from the gallery.)
-  const addPhotos = useCallback(async (files: FileList | null) => {
+  const addPhotos = useCallback(async (files: FileList | null, photoType: "Before" | "Progress" | "After" | "Job Photo" = "Job Photo") => {
     if (!files?.length || !folder) return;
     const list = Array.from(files);
     setUploading(true);
@@ -107,7 +108,7 @@ export default function FolderGalleryPage() {
       await ensureBackingJob();
       const dataUrls = await Promise.all(list.map((file) => compressImageToDataUrl(file)));
       await addJobPhotos(folder.jobId, dataUrls.map((dataUrl, index) => ({
-        photoType: "Job Photo" as const,
+        photoType,
         name: list[index].name || `photo-${Date.now()}-${index + 1}.jpg`,
         dataUrl,
         uploadedBy: "Office",
@@ -188,13 +189,26 @@ export default function FolderGalleryPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {/* Photo type selector */}
+                <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
+                  {(["Before", "Progress", "After", "Job Photo"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setActivePhotoType(t)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        activePhotoType === t
+                          ? t === "Before" ? "bg-blue-600 text-white" : t === "Progress" ? "bg-orange-500 text-white" : t === "After" ? "bg-emerald-600 text-white" : "bg-[#07183f] text-white"
+                          : "text-slate-500 hover:bg-white"
+                      }`}>
+                      {t === "Job Photo" ? "General" : t}
+                    </button>
+                  ))}
+                </div>
                 <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#07183f] px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-900 ${uploading ? "opacity-60" : ""}`}>
                   <Camera className="h-4 w-4" /> Take Photo
-                  <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files); event.target.value = ""; }} />
+                  <input type="file" accept="image/*" capture="environment" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType); event.target.value = ""; }} />
                 </label>
                 <label className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 font-bold text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
                   <UploadCloud className="h-4 w-4" /> Upload
-                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files); event.target.value = ""; }} />
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType); event.target.value = ""; }} />
                 </label>
                 <button onClick={() => setShowShare(true)} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 font-bold text-white shadow-sm transition hover:bg-blue-700">
                   <Share2 className="h-4 w-4" /> Share
