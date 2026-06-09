@@ -213,8 +213,8 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                     <p className="text-xs font-bold text-slate-700">Other Payment Options:</p>
                     <ul className="mt-1.5 space-y-1 text-[11px] text-slate-600">
                       <li>• Check payable to: XRP Roofing</li>
-                      <li>• Zelle: (602) 555-0199</li>
-                      <li>• Call to pay by phone: (602) 555-0199</li>
+                      <li>• Zelle: +1 (623) 300-8097</li>
+                      <li>• Call to pay by phone: +1 (623) 300-8097</li>
                     </ul>
                   </div>
                   
