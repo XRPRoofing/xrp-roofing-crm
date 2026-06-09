@@ -204,7 +204,17 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         { event: "INSERT", schema: "public", table: teamChatTableName, filter: `room_id=eq.${teamChatRoomId}` },
         (payload) => {
           const nextMessage = payload.new as TeamChatMessage;
-          if (nextMessage.user_id !== currentUserId) incrementTeamChatUnreadCount();
+          if (nextMessage.user_id !== currentUserId) {
+            incrementTeamChatUnreadCount();
+            if (Notification.permission === "granted" && typeof document !== "undefined" && document.visibilityState !== "visible") {
+              new Notification("XRP Team Chat", {
+                body: nextMessage.message ? nextMessage.message.slice(0, 80) : "New message",
+                icon: "/icons/icon-192.png",
+                badge: "/icons/icon-192.png",
+                tag: "team-chat",
+              });
+            }
+          }
         }
       )
       .subscribe();
@@ -219,6 +229,26 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       markTeamChatRead();
     }
   }, [pathname]);
+
+  // Sync unread count to the PWA app icon badge (Works on installed PWA —
+  // Android Chrome + iOS Safari 16.4+).
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    if ("setAppBadge" in navigator) {
+      if (unreadTeamChatCount > 0) {
+        void (navigator as Navigator & { setAppBadge: (n: number) => Promise<void> }).setAppBadge(unreadTeamChatCount);
+      } else {
+        void (navigator as Navigator & { clearAppBadge: () => Promise<void> }).clearAppBadge();
+      }
+    }
+  }, [unreadTeamChatCount]);
+
+  // Request notification permission once so OS push toasts work.
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  }, []);
 
   async function logout() {
     await createClient().auth.signOut();
