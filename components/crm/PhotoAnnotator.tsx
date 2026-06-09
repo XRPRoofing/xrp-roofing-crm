@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Eraser, Undo2, X } from "lucide-react";
+import { ArrowUpRight, Eraser, Square, Undo2, X } from "lucide-react";
 
 export type AnnotatorImage = { name: string; dataUrl: string };
 export type AnnotatedResult = { name: string; dataUrl: string; note: string };
 
 type Stroke = { color: string; width: number; points: { x: number; y: number }[] };
+type Shape =
+  | { kind: "box"; color: string; width: number; x: number; y: number; w: number; h: number }
+  | { kind: "arrow"; color: string; width: number; x1: number; y1: number; x2: number; y2: number };
+type Tool = "pen" | "box" | "arrow";
 
 const penColors = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#ffffff", "#0f172a"];
 const penSizes = [
@@ -58,14 +62,40 @@ export default function PhotoAnnotator({
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<AnnotatedResult[]>([]);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [shapes, setShapes] = useState<Shape[]>([]);
   const [note, setNote] = useState("");
   const [color, setColor] = useState(penColors[0]);
   const [size, setSize] = useState(penSizes[1].value);
+  const [tool, setTool] = useState<Tool>("pen");
   const [ready, setReady] = useState(false);
+  const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const current = images && images.length > 0 ? images[index] : null;
 
-  const redraw = useCallback((strokeList: Stroke[]) => {
+  const drawShapes = useCallback((ctx: CanvasRenderingContext2D, shapeList: Shape[]) => {
+    shapeList.forEach((shape) => {
+      ctx.strokeStyle = shape.color;
+      ctx.lineWidth = shape.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (shape.kind === "box") {
+        ctx.strokeRect(shape.x, shape.y, shape.w, shape.h);
+      } else if (shape.kind === "arrow") {
+        const { x1, y1, x2, y2 } = shape;
+        const headLen = Math.max(20, shape.width * 4);
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+        ctx.stroke();
+      }
+    });
+  }, []);
+
+  const redraw = useCallback((strokeList: Stroke[], shapeList: Shape[], previewShape?: Shape) => {
     const canvas = canvasRef.current;
     const image = baseImageRef.current;
     if (!canvas || !image) return;
@@ -90,7 +120,9 @@ export default function PhotoAnnotator({
         ctx.fill();
       }
     });
-  }, []);
+    drawShapes(ctx, shapeList);
+    if (previewShape) drawShapes(ctx, [previewShape]);
+  }, [drawShapes]);
 
   // Load the current image into the canvas whenever the queue advances. State
   // resets happen on advance (handleSaveCurrent) / fresh mount, so this effect
@@ -104,7 +136,7 @@ export default function PhotoAnnotator({
       canvas.width = image.naturalWidth || 1280;
       canvas.height = image.naturalHeight || 960;
       baseImageRef.current = image;
-      redraw([]);
+      redraw([], []);
       setReady(true);
     };
     image.src = current.dataUrl;
@@ -126,39 +158,74 @@ export default function PhotoAnnotator({
     canvasRef.current?.setPointerCapture(event.pointerId);
     drawingRef.current = true;
     const point = pointerPosition(event);
-    setStrokes((current) => [...current, { color, width: size, points: [point] }]);
+    if (tool === "pen") {
+      setStrokes((prev) => [...prev, { color, width: size, points: [point] }]);
+    } else {
+      shapeStartRef.current = point;
+    }
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!drawingRef.current) return;
     event.preventDefault();
     const point = pointerPosition(event);
-    setStrokes((current) => {
-      if (current.length === 0) return current;
-      const next = current.slice();
-      const last = next[next.length - 1];
-      next[next.length - 1] = { ...last, points: [...last.points, point] };
-      redraw(next);
-      return next;
-    });
+    if (tool === "pen") {
+      setStrokes((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        next[next.length - 1] = { ...last, points: [...last.points, point] };
+        redraw(next, shapes);
+        return next;
+      });
+    } else if (shapeStartRef.current) {
+      const start = shapeStartRef.current;
+      const preview: Shape = tool === "box"
+        ? { kind: "box", color, width: size, x: start.x, y: start.y, w: point.x - start.x, h: point.y - start.y }
+        : { kind: "arrow", color, width: size, x1: start.x, y1: start.y, x2: point.x, y2: point.y };
+      redraw(strokes, shapes, preview);
+    }
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
     drawingRef.current = false;
     try { canvasRef.current?.releasePointerCapture(event.pointerId); } catch { /* ignore */ }
+    if ((tool === "box" || tool === "arrow") && shapeStartRef.current) {
+      const start = shapeStartRef.current;
+      const point = pointerPosition(event);
+      shapeStartRef.current = null;
+      const newShape: Shape = tool === "box"
+        ? { kind: "box", color, width: size, x: start.x, y: start.y, w: point.x - start.x, h: point.y - start.y }
+        : { kind: "arrow", color, width: size, x1: start.x, y1: start.y, x2: point.x, y2: point.y };
+      setShapes((prev) => {
+        const next = [...prev, newShape];
+        redraw(strokes, next);
+        return next;
+      });
+    }
   }
 
   function handleUndo() {
-    setStrokes((current) => {
-      const next = current.slice(0, -1);
-      redraw(next);
-      return next;
-    });
+    if (shapes.length > 0) {
+      setShapes((prev) => {
+        const next = prev.slice(0, -1);
+        redraw(strokes, next);
+        return next;
+      });
+    } else {
+      setStrokes((prev) => {
+        const next = prev.slice(0, -1);
+        redraw(next, shapes);
+        return next;
+      });
+    }
   }
 
   function handleClear() {
     setStrokes([]);
-    redraw([]);
+    setShapes([]);
+    redraw([], []);
   }
 
   function buildResult(): AnnotatedResult | null {
@@ -204,6 +271,7 @@ export default function PhotoAnnotator({
     if (index + 1 < images.length) {
       setResults(nextResults);
       setStrokes([]);
+      setShapes([]);
       setNote("");
       setReady(false);
       setIndex(index + 1);
@@ -262,8 +330,13 @@ export default function PhotoAnnotator({
               </button>
             ))}
           </div>
-          <button type="button" onClick={handleUndo} disabled={strokes.length === 0} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"><Undo2 className="h-4 w-4" />Undo</button>
-          <button type="button" onClick={handleClear} disabled={strokes.length === 0} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"><Eraser className="h-4 w-4" />Clear</button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => setTool("pen")} className={`rounded-lg px-3 py-2 text-xs font-black transition ${tool === "pen" ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/20"}`}>Pen</button>
+            <button type="button" onClick={() => setTool("box")} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black transition ${tool === "box" ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/20"}`}><Square className="h-3.5 w-3.5" />Box</button>
+            <button type="button" onClick={() => setTool("arrow")} className={`flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black transition ${tool === "arrow" ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/20"}`}><ArrowUpRight className="h-3.5 w-3.5" />Arrow</button>
+          </div>
+          <button type="button" onClick={handleUndo} disabled={strokes.length === 0 && shapes.length === 0} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"><Undo2 className="h-4 w-4" />Undo</button>
+          <button type="button" onClick={handleClear} disabled={strokes.length === 0 && shapes.length === 0} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20 disabled:opacity-40"><Eraser className="h-4 w-4" />Clear</button>
         </div>
 
         <textarea
