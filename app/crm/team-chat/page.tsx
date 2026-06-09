@@ -27,6 +27,26 @@ function fileToDataUrl(file: File) {
   });
 }
 
+// Compress image to max 800px wide at 0.6 quality before storing in DB
+function compressForChat(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 800;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", 0.6));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 function renderMessageText(message: string) {
   return message.split(/(@[\w.-]+)/g).map((part, index) => {
     if (part.startsWith("@")) {
@@ -61,8 +81,19 @@ export default function TeamChatPage() {
       setLoading(true);
       setError("");
 
-      // getSession() reads from local storage — no network roundtrip
-      const { data: sessionData } = await supabase.auth.getSession();
+      // Run session + messages fetch in parallel — cuts cold-start latency in half
+      const [{ data: sessionData }, { data, error: messagesError }] = await Promise.all([
+        supabase.auth.getSession(),
+        // Exclude attachment dataUrls from initial fetch — they are large base64 blobs.
+        // We keep id/name/type so the UI can show a placeholder; dataUrl loads lazily.
+        supabase
+          .from(teamChatTableName)
+          .select("id, room_id, user_id, user_name, user_avatar_url, message, mentions, created_at, attachments")
+          .eq("room_id", teamChatRoomId)
+          .order("created_at", { ascending: false })
+          .limit(40),
+      ]);
+
       if (!mounted) return;
 
       if (!sessionData.session?.user) {
@@ -78,23 +109,12 @@ export default function TeamChatPage() {
         avatarUrl: getAvatarUrl(user.user_metadata),
       });
 
-      // Load last 50 messages — fast initial render
-      const { data, error: messagesError } = await supabase
-        .from(teamChatTableName)
-        .select("id, room_id, user_id, user_name, user_avatar_url, message, mentions, attachments, created_at")
-        .eq("room_id", teamChatRoomId)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (!mounted) return;
-
       if (messagesError) {
         setError(`Team Chat database is not ready: ${messagesError.message}`);
         setLoading(false);
         return;
       }
 
-      // reverse so oldest is at top
       setMessages(((data || []) as TeamChatMessage[]).reverse());
       isInitialLoad.current = false;
       setLoading(false);
@@ -176,7 +196,7 @@ export default function TeamChatPage() {
       id: `${Date.now()}-${file.name}`,
       name: file.name,
       type: file.type,
-      dataUrl: await fileToDataUrl(file),
+      dataUrl: await compressForChat(file),
     })));
     setAttachments((currentAttachments) => [...currentAttachments, ...nextAttachments].slice(0, 4));
   }
@@ -213,7 +233,17 @@ export default function TeamChatPage() {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50/70 p-4 sm:p-6 lg:h-[55vh] lg:flex-none">
           {loading ? (
-            <div className="flex h-full items-center justify-center text-sm font-bold text-slate-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading chat...</div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className={`flex gap-3 ${i % 2 === 0 ? "" : "flex-row-reverse"}`}>
+                  <div className="h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-slate-200" />
+                  <div className="space-y-2">
+                    <div className={`h-3 animate-pulse rounded-full bg-slate-200 ${i % 3 === 0 ? "w-48" : i % 3 === 1 ? "w-64" : "w-56"}`} />
+                    <div className={`h-12 animate-pulse rounded-3xl bg-slate-200 ${i % 2 === 0 ? "w-72" : "w-60"}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageCircle className="h-12 w-12 text-orange-500" />
@@ -239,9 +269,16 @@ export default function TeamChatPage() {
                     {chatMessage.attachments?.length > 0 && (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {chatMessage.attachments.map((attachment) => (
-                          <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/30 bg-white/10">
-                            <Image src={attachment.dataUrl} alt={attachment.name} width={420} height={280} unoptimized className="h-40 w-full object-cover" />
-                          </a>
+                          attachment.dataUrl ? (
+                            <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/30 bg-white/10">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={attachment.dataUrl} alt={attachment.name} loading="lazy" className="h-40 w-full object-cover" />
+                            </a>
+                          ) : (
+                            <div key={attachment.id} className="flex h-40 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xs font-bold text-white/60">
+                              📎 {attachment.name}
+                            </div>
+                          )
                         ))}
                       </div>
                     )}
