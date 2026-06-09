@@ -419,6 +419,7 @@ export async function updateJobRecord(jobId: string, patch: Partial<JobRecord>):
     lastActivity: "last_activity", nextAction: "next_action", dueDate: "due_date", status: "status",
     assignedCrew: "assigned_crew", scheduleDate: "schedule_date", jobScope: "job_scope", jobNotes: "job_notes",
     completionNotes: "completion_notes", materialsUsed: "materials_used", submittedAt: "submitted_at",
+    inspectionDate: "inspection_date", roofYear: "roof_year", callNotes: "call_notes",
   };
   (Object.keys(patch) as (keyof JobRecord)[]).forEach((key) => {
     const column = keyMap[key];
