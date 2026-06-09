@@ -94,6 +94,12 @@ export function readOfficeTasks(): OfficeTask[] {
 export function saveOfficeTasks(tasks: OfficeTask[]) {
   window.localStorage.setItem(officeTaskStorageKey, JSON.stringify(tasks));
   window.dispatchEvent(new Event("crm-office-tasks-updated"));
+  // Fire-and-forget Supabase sync so all devices update in real time
+  if (typeof window !== "undefined") {
+    import("@/lib/task-sync").then(({ saveAllTasksToSupabase }) => {
+      void saveAllTasksToSupabase(tasks);
+    }).catch(() => {});
+  }
 }
 
 function formatJobAddress(parts: { address?: string; city?: string }) {
