@@ -100,10 +100,26 @@ function dateKey(year: number, month: number, day: number) {
 function eventDateKey(event: GoogleCalendarEvent) {
   const value = event.start?.dateTime || event.start?.date;
   if (!value) return null;
-  // Use Arizona timezone for consistent date grouping across all devices
-  const date = new Date(value);
-  const arizonaDate = new Date(date.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
-  return dateKey(arizonaDate.getFullYear(), arizonaDate.getMonth(), arizonaDate.getDate());
+
+  // All-day events have a plain date string "YYYY-MM-DD" with no time/timezone.
+  // Parse directly so they always land on the correct calendar day regardless of device timezone.
+  if (event.start?.date && !event.start?.dateTime) {
+    const [y, m, d] = event.start.date.split("-").map(Number);
+    return dateKey(y, m - 1, d);
+  }
+
+  // Timed events: convert to Arizona time using formatToParts (reliable across all environments).
+  const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: ARIZONA_TIMEZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const parts = arizonaFormatter.formatToParts(new Date(value));
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  return dateKey(year, month, day);
 }
 
 function getGoogleCalendarStatusMessage(status: string | null) {
