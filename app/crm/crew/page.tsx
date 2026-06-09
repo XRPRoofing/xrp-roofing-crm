@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
+import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForCompletedJob, syncCrewJobToTaskBoard } from "@/lib/office-tasks";
@@ -72,6 +73,7 @@ export default function CrewWorkflowPage() {
   const [noteDraft, setNoteDraft] = useState("");
   const [checklistDraft, setChecklistDraft] = useState("");
   const [newJob, setNewJob] = useState({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
+  const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
@@ -554,12 +556,15 @@ export default function CrewWorkflowPage() {
                           <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{count} photo(s)</span>
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-2">
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#07183f] px-3 py-3 text-sm font-black text-white transition hover:bg-blue-800">
-                            <Camera className="h-5 w-5" /> Take Photo
-                            <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
-                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setLiveCamera({ jobId: selectedJob.id, type })}
+                            className="flex items-center justify-center gap-2 rounded-2xl bg-[#07183f] px-3 py-3 text-sm font-black text-white transition hover:bg-blue-800 active:scale-95"
+                          >
+                            <Camera className="h-5 w-5" /> Camera
+                          </button>
                           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100">
-                            <UploadCloud className="h-5 w-5" /> Upload Photo
+                            <UploadCloud className="h-5 w-5" /> Upload
                             <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
                           </label>
                         </div>
@@ -637,6 +642,30 @@ export default function CrewWorkflowPage() {
           </aside>
         </div>
       )}
+
+      {/* Live Camera Overlay */}
+      {liveCamera && (() => {
+        const camJob = crewJobs.find((j) => j.id === liveCamera.jobId);
+        if (!camJob) return null;
+        const accentMap = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600" } as const;
+        const existingCount = liveCamera.type === "Before"
+          ? camJob.completion.beforePhotos.length
+          : liveCamera.type === "Progress"
+          ? camJob.completion.progressPhotos.length
+          : camJob.completion.afterPhotos.length;
+        return (
+          <LiveCameraCapture
+            label={liveCamera.type}
+            accentColor={accentMap[liveCamera.type]}
+            existingCount={existingCount}
+            onCapture={async (photo) => {
+              const file = await fetch(photo.dataUrl).then((r) => r.blob()).then((b) => new File([b], photo.name, { type: "image/jpeg" }));
+              await handlePhotoUpload(camJob, liveCamera.type, (() => { const dt = new DataTransfer(); dt.items.add(file); return dt.files; })());
+            }}
+            onClose={() => setLiveCamera(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
