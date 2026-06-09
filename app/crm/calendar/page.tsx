@@ -126,8 +126,17 @@ export default function CalendarPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
-    const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
-    return new Date(arizonaNow.getFullYear(), arizonaNow.getMonth(), 1);
+    // Get Arizona timezone date parts correctly
+    const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: ARIZONA_TIMEZONE,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    const parts = arizonaFormatter.formatToParts(now);
+    const year = Number(parts.find((p) => p.type === "year")?.value);
+    const month = Number(parts.find((p) => p.type === "month")?.value) - 1; // 0-indexed
+    return new Date(year, month, 1);
   });
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const agendaRef = useRef<HTMLDivElement>(null);
@@ -181,8 +190,18 @@ export default function CalendarPage() {
   const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: ARIZONA_TIMEZONE }).format(monthCursor), [monthCursor]);
   const todayKey = useMemo(() => {
     const now = new Date();
-    const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE }));
-    return dateKey(arizonaNow.getFullYear(), arizonaNow.getMonth(), arizonaNow.getDate());
+    // Get Arizona timezone date parts correctly
+    const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: ARIZONA_TIMEZONE,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    const parts = arizonaFormatter.formatToParts(now);
+    const year = Number(parts.find((p) => p.type === "year")?.value);
+    const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
+    const day = Number(parts.find((p) => p.type === "day")?.value);
+    return dateKey(year, month, day);
   }, []);
 
   const activeDayKey = selectedDayKey || todayKey;
@@ -368,7 +387,18 @@ export default function CalendarPage() {
             <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => setMonthCursor(() => { const now = new Date(); const arizonaNow = new Date(now.toLocaleString("en-US", { timeZone: ARIZONA_TIMEZONE })); return new Date(arizonaNow.getFullYear(), arizonaNow.getMonth(), 1); })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
+            <button type="button" onClick={() => {
+              const now = new Date();
+              const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+                timeZone: ARIZONA_TIMEZONE,
+                year: "numeric",
+                month: "numeric",
+              });
+              const parts = arizonaFormatter.formatToParts(now);
+              const year = Number(parts.find((p) => p.type === "year")?.value);
+              const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
+              setMonthCursor(new Date(year, month, 1));
+            }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
               Today
             </button>
             <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
