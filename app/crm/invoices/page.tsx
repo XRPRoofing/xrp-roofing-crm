@@ -608,16 +608,16 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">CRM Module</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">Invoice Board</h1>
             <p className="mt-2 text-sm leading-6 text-slate-600">Create, track, send, and collect roofing invoices from one clean workspace.</p>
           </div>
-          <button onClick={handleStartInvoice} className="w-fit rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">+ New Invoice</button>
+          <button onClick={handleStartInvoice} className="w-full sm:w-fit rounded-2xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-5 grid gap-3 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {[
             ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
             ["Paid This Month", currency(boardTotals.paid), "text-emerald-700"],
@@ -626,76 +626,88 @@ export default function InvoicesPage() {
             ["Partial Payments", String(boardTotals.partial), "text-amber-700"],
             ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
           ].map(([label, value, valueClass]) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-              <p className={`mt-2 text-xl font-bold tracking-tight ${valueClass}`}>{value}</p>
+            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className={`mt-1 sm:mt-2 text-lg sm:text-xl font-bold tracking-tight ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
         <div className="mt-5 flex flex-col items-stretch justify-between gap-3 xl:flex-row xl:items-center">
-          <div className="mx-auto w-full max-w-2xl">
-            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search invoices by client, invoice number, or property..." />
+          <div className="w-full xl:max-w-2xl xl:mx-auto">
+            <input 
+              value={invoiceSearch} 
+              onChange={(event) => setInvoiceSearch(event.target.value)} 
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" 
+              placeholder="Search by client, invoice #, or property..." 
+            />
           </div>
-          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1">
+          <div className="flex overflow-x-auto rounded-2xl border border-slate-200 bg-slate-100 p-1 scrollbar-hide">
             {filterOptions.map((option) => (
-              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
+              <button 
+                key={option} 
+                type="button" 
+                onClick={() => setInvoiceFilter(option)} 
+                className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                {option.replace(" clients", "").replace(" accounts", "")}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(boardGroups) as Array<keyof typeof boardGroups>).map((stage) => {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
           return (
             <section key={stage} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div className={`flex items-center justify-between border-b p-4 ${stageHeaderClass(stage)}`}>
+              <div className={`flex items-center justify-between border-b p-3 sm:p-4 ${stageHeaderClass(stage)}`}>
                 <div>
-                  <h2 className="text-base font-bold text-slate-950">{stage}</h2>
-                  <p className="text-sm text-slate-500">{invoicesInStage.length} invoices</p>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-950">{stage}</h2>
+                  <p className="text-xs sm:text-sm text-slate-500">{invoicesInStage.length} invoices</p>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">{currency(stageTotal)}</span>
               </div>
-              <div className="space-y-3 p-4">
+              <div className="space-y-3 p-3 sm:p-4">
                 {invoicesInStage.map((invoice) => {
                   const totals = calculateTotals(invoice);
                   const balance = Math.max(totals.finalTotal - getPaidAmount(invoice), 0);
                   const status = getComputedStatus(invoice);
                   return (
-                    <article key={invoice.id} className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+                    <article key={invoice.id} className="group rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:scale-[0.98]">
                       <button type="button" onClick={() => openInvoice(invoice)} className="w-full text-left">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-bold text-slate-950">{invoice.clientName}</p>
-                            <p className="mt-1 truncate text-sm text-slate-500">{invoice.invoiceNumber} · {invoice.jobName || invoice.roofType}</p>
+                        <div className="flex items-start justify-between gap-2 sm:gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm sm:text-base font-bold text-slate-950">{invoice.clientName}</p>
+                            <p className="mt-1 truncate text-xs sm:text-sm text-slate-500">{invoice.invoiceNumber} · {invoice.jobName || invoice.roofType}</p>
                           </div>
-                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusBadgeClass(status)}`}>{status}</span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-semibold ring-1 ${statusBadgeClass(status)}`}>{status}</span>
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="mt-3 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3 text-sm">
                           <div>
-                            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Amount</p>
-                            <p className="mt-1 font-bold text-slate-950">{currency(totals.finalTotal)}</p>
+                            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-slate-400">Total</p>
+                            <p className="mt-0.5 sm:mt-1 text-sm sm:text-base font-bold text-slate-950">{currency(totals.finalTotal)}</p>
                           </div>
                           <div>
-                            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Balance Due</p>
-                            <p className={`mt-1 font-bold ${balance > 0 ? "text-red-700" : "text-emerald-700"}`}>{currency(balance)}</p>
+                            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-slate-400">Balance</p>
+                            <p className={`mt-0.5 sm:mt-1 text-sm sm:text-base font-bold ${balance > 0 ? "text-red-700" : "text-emerald-700"}`}>{currency(balance)}</p>
                           </div>
                         </div>
-                        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                        <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-slate-100 pt-2 sm:pt-3">
                           <p className="text-xs font-semibold text-slate-500">Due {invoice.dueDate}</p>
-                          <p className="text-xs font-semibold text-slate-400">View details</p>
+                          <p className="text-xs font-semibold text-slate-400 hidden sm:block">View details</p>
                         </div>
                       </button>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openInvoice(invoice)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">View</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">Edit</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100">Send Reminder</button>
+                        <button type="button" onClick={() => openInvoice(invoice)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
                       </div>
                     </article>
                   );
                 })}
-                {invoicesInStage.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-500">No invoices in this column.</div>}
+                {invoicesInStage.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 sm:p-6 text-center text-sm font-semibold text-slate-500">No invoices in this column.</div>}
               </div>
             </section>
           );
@@ -703,30 +715,32 @@ export default function InvoicesPage() {
       </div>
 
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4">
-          <div className="mx-auto my-6 max-w-6xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-2 sm:p-4">
+          <div className="mx-auto my-2 sm:my-6 max-w-6xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
+            <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-5 lg:flex-row lg:items-start">
               <div>
-                <button onClick={() => setSelectedInvoiceId(null)} className="mb-4 text-sm font-black text-blue-700">← Back to invoice board</button>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">{selectedInvoice.invoiceNumber}</p>
-                <h2 className="mt-2 text-3xl font-black text-[#07183f]">{selectedInvoice.clientName}</h2>
-                <p className="mt-1 font-semibold text-slate-600">{selectedInvoice.jobName}</p>
-                <p className="text-sm text-slate-500">{selectedInvoice.propertyAddress}</p>
+                <button onClick={() => setSelectedInvoiceId(null)} className="mb-3 sm:mb-4 text-sm font-black text-blue-700 flex items-center gap-1">
+                  <span>←</span> Back to board
+                </button>
+                <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">{selectedInvoice.invoiceNumber}</p>
+                <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-black text-[#07183f]">{selectedInvoice.clientName}</h2>
+                <p className="mt-1 font-semibold text-sm sm:text-base text-slate-600">{selectedInvoice.jobName}</p>
+                <p className="text-xs sm:text-sm text-slate-500">{selectedInvoice.propertyAddress}</p>
               </div>
               <div className="text-left lg:text-right">
-                <span className={`rounded-full px-4 py-2 text-sm font-black ring-1 ${statusBadgeClass(getComputedStatus(selectedInvoice))}`}>{getComputedStatus(selectedInvoice)}</span>
-                <p className="mt-4 text-sm font-bold text-slate-500">Total amount</p>
-                <p className="text-3xl font-black text-[#07183f]">{currency(calculateTotals(selectedInvoice).finalTotal)}</p>
-                <p className="mt-2 text-sm font-bold text-slate-600">Remaining balance {currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
+                <span className={`inline-block rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-black ring-1 ${statusBadgeClass(getComputedStatus(selectedInvoice))}`}>{getComputedStatus(selectedInvoice)}</span>
+                <p className="mt-3 sm:mt-4 text-xs sm:text-sm font-bold text-slate-500">Total amount</p>
+                <p className="text-2xl sm:text-3xl font-black text-[#07183f]">{currency(calculateTotals(selectedInvoice).finalTotal)}</p>
+                <p className="mt-1 sm:mt-2 text-xs sm:text-sm font-bold text-slate-600">Balance {currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
               </div>
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button onClick={() => setEditing((current) => !current)} className="rounded-2xl bg-blue-50 px-4 py-3 font-bold text-blue-700">{editing ? "Done Editing" : "Edit"}</button>
-              <button onClick={() => setShowSendModal(true)} className="rounded-2xl bg-blue-600 px-4 py-3 font-bold text-white">Send</button>
-              <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-2xl border border-slate-200 px-4 py-3 font-bold text-slate-700">Download PDF</button>
-              <button onClick={() => setShowPaymentModal(true)} className="rounded-2xl bg-emerald-50 px-4 py-3 font-bold text-emerald-700">Record Payment</button>
-              <button onClick={handleMarkPaidOffline} className="rounded-2xl bg-slate-100 px-4 py-3 font-bold text-slate-700">Mark Paid Offline</button>
-              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-2xl bg-red-50 px-4 py-3 font-bold text-red-700">Void Invoice</button>
+            <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 sm:gap-3">
+              <button onClick={() => setEditing((current) => !current)} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
+              <button onClick={() => setShowSendModal(true)} className="rounded-xl sm:rounded-2xl bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition">Send</button>
+              <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-slate-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">PDF</button>
+              <button onClick={() => setShowPaymentModal(true)} className="rounded-xl sm:rounded-2xl bg-emerald-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-emerald-700 active:scale-95 transition">Payment</button>
+              <button onClick={handleMarkPaidOffline} className="rounded-xl sm:rounded-2xl bg-slate-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">Mark Paid</button>
+              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -787,72 +801,92 @@ export default function InvoicesPage() {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4">
-          <div className="mx-auto my-6 max-w-5xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-2 sm:p-4">
+          <div className="mx-auto my-2 sm:my-6 max-w-5xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 sm:pb-4">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
-                <h2 className="mt-2 text-3xl font-black text-[#07183f]">{createForm.invoiceNumber}</h2>
+                <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
+                <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-black text-[#07183f]">{createForm.invoiceNumber}</h2>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-2xl text-slate-500">×</button>
+              <button onClick={() => setShowCreateModal(false)} className="text-xl sm:text-2xl text-slate-500 p-2 hover:bg-slate-100 rounded-full transition">×</button>
             </div>
             <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <label className="text-xs font-black uppercase tracking-wider text-blue-700">Quick fill from roofing job</label>
-              <select onChange={(event) => handlePrefillFromJob(event.target.value)} className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none">
-                <option value="">Start blank or select a job...</option>
-                {leads.map((job) => <option key={job.id} value={job.id}>{job.name} • {job.roofType} • {currency(job.value)}</option>)}
+              <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal</label>
+              <select 
+                value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
+                onChange={(event) => handlePrefillFromJob(event.target.value)} 
+                className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none"
+              >
+                <option value="" disabled>Select a signed proposal...</option>
+                {wonProposals.length === 0 ? (
+                  <option value="" disabled>No signed proposals available</option>
+                ) : (
+                  wonProposals.map((proposal) => {
+                    const pkg = getProposalSelectedPackage(proposal);
+                    return (
+                      <option key={proposal.id} value={`proposal:${proposal.id}`}>
+                        {proposal.customerName} • {proposal.title || pkg.scope.substring(0, 30)}... • {currency(pkg.price)}
+                      </option>
+                    );
+                  })
+                )}
               </select>
+              {wonProposals.length === 0 && (
+                <p className="mt-2 text-xs text-slate-500">
+                  No signed proposals found. Create and sign a proposal first.
+                </p>
+              )}
             </div>
             <div className="mt-6">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowCreateModal(false)} className="rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700">Cancel</button>
-              <button onClick={handleCreateInvoice} className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white">Create Invoice</button>
+            <div className="mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
+              <button onClick={handleCreateInvoice} disabled={!createForm.proposalReference} className="w-full sm:w-auto rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2">Create Invoice</button>
             </div>
           </div>
         </div>
       )}
 
       {showPaymentModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <h2 className="text-2xl font-black text-[#07183f]">Record Payment</h2>
-            <div className="mt-5 grid gap-3">
-              <input type="number" value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Payment amount" />
-              <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm({ ...paymentForm, date: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" />
-              <select value={paymentForm.method} onChange={(event) => setPaymentForm({ ...paymentForm, method: event.target.value as PaymentMethod })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
+          <div className="w-full max-w-xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
+            <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Record Payment</h2>
+            <div className="mt-4 sm:mt-5 grid gap-3">
+              <input type="number" value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" placeholder="Payment amount" />
+              <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm({ ...paymentForm, date: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" />
+              <select value={paymentForm.method} onChange={(event) => setPaymentForm({ ...paymentForm, method: event.target.value as PaymentMethod })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base">
                 {(["Cash", "Check", "Bank Transfer", "Zelle"] as PaymentMethod[]).map((method) => <option key={method}>{method}</option>)}
               </select>
-              <input value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Reference number" />
-              <textarea value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Notes" />
+              <input value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" placeholder="Reference number" />
+              <textarea value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} className="min-h-24 rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" placeholder="Notes" />
             </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowPaymentModal(false)} className="rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700">Cancel</button>
-              <button onClick={() => handleRecordPayment(false)} className="rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white">Save Payment</button>
+            <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button onClick={() => setShowPaymentModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
+              <button onClick={() => handleRecordPayment(false)} className="w-full sm:w-auto rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Save Payment</button>
             </div>
           </div>
         </div>
       )}
 
       {showSendModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] bg-white p-6 shadow-2xl">
-            <h2 className="text-2xl font-black text-[#07183f]">Send Invoice</h2>
-            <div className="mt-5 grid gap-3">
-              <select value={sendForm.template} onChange={(event) => setSendForm({ ...sendForm, template: event.target.value, message: emailTemplates[event.target.value as keyof typeof emailTemplates] })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
+          <div className="w-full max-w-2xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
+            <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Send Invoice</h2>
+            <div className="mt-4 sm:mt-5 grid gap-3">
+              <select value={sendForm.template} onChange={(event) => setSendForm({ ...sendForm, template: event.target.value, message: emailTemplates[event.target.value as keyof typeof emailTemplates] })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base">
                 {Object.keys(emailTemplates).map((template) => <option key={template}>{template}</option>)}
               </select>
-              <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Subject" />
-              <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-40 rounded-2xl border border-slate-200 px-4 py-3 outline-none" />
+              <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" placeholder="Subject" />
+              <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-32 rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" />
             </div>
-            <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+            <div className="mt-4 sm:mt-6 rounded-2xl bg-slate-50 p-3 sm:p-4 text-xs sm:text-sm leading-5 sm:leading-6 text-slate-600">
               <p className="font-black text-[#07183f]">{selectedInvoice.invoiceNumber}</p>
               <p>To: {selectedInvoice.clientName} · {selectedInvoice.email}</p>
               <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
-              <p>{sendForm.message}</p>
+              <p className="mt-1">{sendForm.message}</p>
             </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowSendModal(false)} className="rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700">Cancel</button>
-              <button onClick={handleSendInvoice} className="rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white">Send Invoice</button>
+            <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
+              <button onClick={handleSendInvoice} className="w-full sm:w-auto rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Send Invoice</button>
             </div>
           </div>
         </div>
