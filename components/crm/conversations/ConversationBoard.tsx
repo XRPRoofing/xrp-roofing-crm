@@ -458,6 +458,20 @@ function dedupeCallInsights(events: TwilioConversationEvent[]) {
   return Array.from(byCall.values());
 }
 
+function formatActivityTime(isoString: string): string {
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "Now";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 2) return "Now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function getCallDurationLabel(event: TwilioConversationEvent) {
   const seconds = Number(event.payload.CallDuration || event.payload.DialCallDuration || 0);
   if (!Number.isFinite(seconds) || seconds <= 0) return "";
@@ -549,7 +563,8 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     ...nextConversation,
     id,
     lastMessage: effectiveMessage?.body || nextConversation.lastMessage,
-    lastActivityAt: effectiveMessage ? "Now" : nextConversation.lastActivityAt,
+    lastActivityAt: effectiveMessage ? formatActivityTime(event.createdAt) : nextConversation.lastActivityAt,
+    lastActivityIso: effectiveMessage ? event.createdAt : nextConversation.lastActivityIso,
     unreadCount: countsAsUnread ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
     isMissedCall: isMissedCallOutstanding(lastMissedAt, lastAnsweredAt, readAt),
     readAt,
@@ -984,6 +999,19 @@ export default function ConversationBoard() {
     }
   }, []);
 
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.lastActivityIso
+            ? { ...conversation, lastActivityAt: formatActivityTime(conversation.lastActivityIso) }
+            : conversation
+        )
+      );
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const transferredCall = (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall;

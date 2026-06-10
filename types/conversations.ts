@@ -38,6 +38,7 @@ export interface ConversationRecord {
   contact: ConversationContact;
   lastMessage: string;
   lastActivityAt: string;
+  lastActivityIso?: string;
   unreadCount: number;
   isMissedCall: boolean;
   isNewLead: boolean;
