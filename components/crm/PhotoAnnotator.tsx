@@ -134,6 +134,8 @@ export default function PhotoAnnotator({
   const drawingRef = useRef(false);
   const shapeStartRef = useRef<Pt | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const lastDragPtRef = useRef<Pt | null>(null);
 
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<AnnotatedResult[]>([]);
@@ -145,6 +147,7 @@ export default function PhotoAnnotator({
   const [tool, setTool] = useState<Tool>("pen");
   const [ready, setReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [textPopup, setTextPopup] = useState<{ shapeId: string; value: string } | null>(null);
 
@@ -212,25 +215,57 @@ export default function PhotoAnnotator({
     if (!ready) return;
     e.preventDefault();
     canvasRef.current?.setPointerCapture(e.pointerId);
-    drawingRef.current = true;
     const pt = ptrPos(e);
 
     if (tool === "pen") {
       setSelectedId(null);
+      drawingRef.current = true;
       setStrokes((prev) => [...prev, { id: uid(), color, width: size, points: [pt] }]);
-    } else {
-      // tap existing shape to select (only in non-pen mode)
-      const hit = trySelectAt(pt);
-      if (hit) { setSelectedId(hit); drawingRef.current = false; return; }
-      setSelectedId(null);
-      shapeStartRef.current = pt;
+      return;
     }
+
+    // check if pointer lands on an existing shape — start drag
+    const hit = trySelectAt(pt);
+    if (hit) {
+      setSelectedId(hit);
+      draggingRef.current = true;
+      setIsDragging(true);
+      lastDragPtRef.current = pt;
+      return;
+    }
+
+    // deselect and start drawing a new shape
+    setSelectedId(null);
+    drawingRef.current = true;
+    shapeStartRef.current = pt;
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawingRef.current) return;
     e.preventDefault();
     const pt = ptrPos(e);
+
+    // drag-move selected shape
+    if (draggingRef.current && lastDragPtRef.current) {
+      const dx = pt.x - lastDragPtRef.current.x;
+      const dy = pt.y - lastDragPtRef.current.y;
+      lastDragPtRef.current = pt;
+      setShapes((prev) => {
+        const next = prev.map((s) => {
+          if (s.id !== selectedId) return s;
+          if (s.kind === "arrow")  return { ...s, x1: s.x1 + dx, y1: s.y1 + dy, x2: s.x2 + dx, y2: s.y2 + dy };
+          if (s.kind === "box")    return { ...s, x: s.x + dx, y: s.y + dy };
+          if (s.kind === "circle") return { ...s, cx: s.cx + dx, cy: s.cy + dy };
+          if (s.kind === "text")   return { ...s, x: s.x + dx, y: s.y + dy };
+          return s;
+        });
+        redraw(strokes, next, selectedId);
+        return next;
+      });
+      return;
+    }
+
+    if (!drawingRef.current) return;
+
     if (tool === "pen") {
       setStrokes((prev) => {
         if (!prev.length) return prev;
@@ -251,6 +286,15 @@ export default function PhotoAnnotator({
   }
 
   function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    // stop drag
+    if (draggingRef.current) {
+      draggingRef.current = false;
+      setIsDragging(false);
+      lastDragPtRef.current = null;
+      try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      return;
+    }
+
     if (!drawingRef.current) return;
     drawingRef.current = false;
     try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -433,7 +477,7 @@ export default function PhotoAnnotator({
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
           className="max-h-full max-w-full touch-none"
-          style={{ cursor: tool === "pen" ? "crosshair" : "default" }}
+          style={{ cursor: isDragging ? "grabbing" : selectedId ? "grab" : tool === "pen" ? "crosshair" : "default" }}
         />
 
         {/* Right-side vertical toolbar */}
