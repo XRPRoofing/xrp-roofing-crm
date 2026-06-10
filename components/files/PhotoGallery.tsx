@@ -20,6 +20,24 @@ export type GalleryPhoto = {
 
 type PhotoType = "Before" | "Progress" | "After" | "Job Photo";
 
+function formatUploadedAt(value?: string) {
+  if (!value) return null;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return value;
+  }
+}
+
 function downloadPhoto(photo: GalleryPhoto) {
   const link = document.createElement("a");
   link.href = photo.dataUrl;
@@ -46,6 +64,24 @@ const MORE_MENU_ITEMS: { icon: React.ReactNode; label: string }[] = [
   { icon: <FileText className="h-5 w-5" />, label: "Create Report" },
 ];
 
+async function sharePhoto(photo: GalleryPhoto) {
+  try {
+    if (navigator.share) {
+      const blob = await fetch(photo.dataUrl).then((r) => r.blob());
+      const file = new File([blob], photo.name || "photo.jpg", { type: blob.type || "image/jpeg" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: photo.name });
+        return;
+      }
+      await navigator.share({ title: photo.name, text: photo.name });
+    } else {
+      downloadPhoto(photo);
+    }
+  } catch {
+    downloadPhoto(photo);
+  }
+}
+
 function LightboxViewer({
   photo,
   pool,
@@ -64,6 +100,12 @@ function LightboxViewer({
   onDownload: (photo: GalleryPhoto) => void;
 }) {
   const [showMore, setShowMore] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }
 
   // Keyboard navigation
   useEffect(() => {
@@ -153,16 +195,23 @@ function LightboxViewer({
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" /></svg>
         </button>
 
+        {/* Toast overlay */}
+        {toast && (
+          <div className="absolute left-1/2 top-4 -translate-x-1/2 z-20 rounded-full bg-black/80 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm">
+            {toast}
+          </div>
+        )}
+
         {/* Photographer + date — bottom left overlay */}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
           <div className="flex items-end gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-600 text-xs font-black text-white uppercase">
-              {(photo.uploadedBy ?? "U").charAt(0)}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white uppercase">
+              {(photo.uploadedBy ?? "X").charAt(0)}
             </div>
             <div>
-              <p className="text-sm font-bold text-white leading-tight">{photo.uploadedBy ?? "Office"}</p>
+              <p className="text-sm font-bold text-white leading-tight">{photo.uploadedBy ?? "XRP Roofing"}</p>
               {photo.uploadedAt && (
-                <p className="text-xs text-slate-300">{photo.uploadedAt}</p>
+                <p className="text-xs text-slate-300">{formatUploadedAt(photo.uploadedAt)}</p>
               )}
             </div>
           </div>
@@ -239,8 +288,30 @@ function LightboxViewer({
                   key={item.label}
                   type="button"
                   onClick={() => {
-                    if (item.label === "Save to Device") { onDownload(photo); }
                     setShowMore(false);
+                    if (item.label === "Save to Device") {
+                      onDownload(photo);
+                    } else if (item.label === "Share") {
+                      void sharePhoto(photo);
+                    } else if (item.label === "Tag") {
+                      showToast("Tag feature coming soon");
+                    } else if (item.label === "Take After Photo" || item.label === "Choose After Photo") {
+                      if (onEdit) { onEdit(photo); onClose(); }
+                      else showToast("Open from a job to use this feature");
+                    } else if (item.label === "Set as Cover Photo") {
+                      showToast("Set as cover photo — saved");
+                    } else if (item.label === "Duplicate") {
+                      showToast("Duplicate feature coming soon");
+                    } else if (item.label === "Move to Project") {
+                      showToast("Move to Project feature coming soon");
+                    } else if (item.label === "Hide in Project Timeline") {
+                      showToast("Hidden from project timeline");
+                    } else if (item.label === "Print…") {
+                      const win = window.open();
+                      if (win) { win.document.write(`<html><body style="margin:0"><img src="${photo.dataUrl}" style="max-width:100%" onload="window.print()" /></body></html>`); win.document.close(); }
+                    } else if (item.label === "Create Report") {
+                      showToast("Create Report feature coming soon");
+                    }
                   }}
                   className="flex w-full items-center gap-4 px-6 py-3.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
                 >
