@@ -384,6 +384,8 @@ function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): In
   const nextPayments = share.payments ? (share.payments as Payment[]) : invoice.payments;
   const nextStatus = (share.status as InvoiceStatus) || invoice.status;
   const nextActivity = share.activity && share.activity.length ? share.activity : invoice.activity;
+  const sharePending = (share as unknown as { pendingPayments?: PendingPayment[] }).pendingPayments;
+  const nextPending = sharePending !== undefined ? sharePending : invoice.pendingPayments;
   const changed =
     nextStatus !== invoice.status ||
     nextPayments.length !== invoice.payments.length ||
@@ -392,7 +394,8 @@ function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): In
     share.failedAt !== invoice.failedAt ||
     share.emailDeliveredAt !== invoice.emailDeliveredAt ||
     share.emailOpenedAt !== invoice.emailOpenedAt ||
-    nextActivity !== invoice.activity;
+    nextActivity !== invoice.activity ||
+    JSON.stringify(nextPending) !== JSON.stringify(invoice.pendingPayments);
 
   if (!changed) return invoice;
 
@@ -401,6 +404,7 @@ function mergeShareIntoInvoice(invoice: Invoice, share: InvoiceSharePayload): In
     payments: nextPayments,
     status: nextStatus,
     activity: nextActivity,
+    pendingPayments: nextPending,
     viewedAt: share.viewedAt ?? invoice.viewedAt,
     paidAt: share.paidAt ?? invoice.paidAt,
     failedAt: share.failedAt ?? invoice.failedAt,
@@ -495,6 +499,9 @@ export default function InvoicesPage() {
 
   const paidPropagatedRef = useRef<Set<string>>(new Set());
   const intentHandledRef = useRef(false);
+  const [rejectModal, setRejectModal] = useState<{ pending: PendingPayment; invoiceId: string } | null>(null);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   // One-click handoff from a Job / customer profile: open the requested invoice
   // editor directly, or create one from the job and open it (linked by
@@ -847,19 +854,26 @@ export default function InvoicesPage() {
       payments: [...selectedInvoice.payments, payment],
       pendingPayments: nextPending,
     };
-    updateInvoice(nextInvoice, `${pending.method} payment of ${currency(pending.amount)} approved`);
+    const newStatus = getComputedStatus(nextInvoice);
+    updateInvoice(nextInvoice, `Payment approved by office: ${pending.method} ${currency(pending.amount)}`);
+    addCrmNotification({
+      title: "Offline payment approved",
+      message: `${selectedInvoice.clientName} — ${pending.method} ${currency(pending.amount)} approved on ${selectedInvoice.invoiceNumber}`,
+      actor: "Invoices",
+      module: "Invoices",
+    });
     try {
-      const shareResponse = await fetch("/api/invoices/share");
-      if (!shareResponse.ok) return;
-      const { invoice: stored } = await shareResponse.json().catch(() => ({ invoice: null })) as { invoice: unknown };
-      if (!stored) return;
       await fetch("/api/invoices/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...nextInvoice,
           pendingPayments: nextPending,
-          status: getComputedStatus(nextInvoice),
+          status: newStatus,
+          activity: [
+            `Payment approved by office: ${pending.method} ${currency(pending.amount)}`,
+            ...(nextInvoice.activity || []),
+          ],
         }),
       });
     } catch {
@@ -867,10 +881,42 @@ export default function InvoicesPage() {
     }
   }
 
-  function handleRejectPendingPayment(pendingId: string) {
+  async function handleRejectPendingPayment(pending: PendingPayment, notes: string) {
     if (!selectedInvoice) return;
-    const nextPending = (selectedInvoice.pendingPayments || []).filter((item: PendingPayment) => item.id !== pendingId);
-    updateInvoice({ ...selectedInvoice, pendingPayments: nextPending }, "Customer payment submission rejected");
+    setRejectSubmitting(true);
+    const nextPending = (selectedInvoice.pendingPayments || []).filter((item: PendingPayment) => item.id !== pending.id);
+    const rejectionNote = notes.trim() || "Payment could not be verified.";
+    updateInvoice(
+      { ...selectedInvoice, pendingPayments: nextPending },
+      `Payment rejected by office: ${pending.method} ${currency(pending.amount)}${notes.trim() ? ` — ${notes.trim()}` : ""}`,
+    );
+    addCrmNotification({
+      title: "Offline payment rejected",
+      message: `${selectedInvoice.clientName} — ${pending.method} ${currency(pending.amount)} rejected on ${selectedInvoice.invoiceNumber}`,
+      actor: "Invoices",
+      module: "Invoices",
+    });
+    try {
+      await fetch("/api/invoices/reject-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: selectedInvoice.id,
+          pendingId: pending.id,
+          rejectionNote,
+          customerEmail: selectedInvoice.email,
+          customerName: selectedInvoice.clientName,
+          invoiceNumber: selectedInvoice.invoiceNumber,
+          method: pending.method,
+          amount: pending.amount,
+        }),
+      });
+    } catch {
+      /* best-effort */
+    }
+    setRejectModal(null);
+    setRejectNotes("");
+    setRejectSubmitting(false);
   }
 
   function renderInvoiceFields(invoice: Invoice, editable: boolean, onChange: (invoice: Invoice) => void) {
@@ -957,6 +1003,31 @@ export default function InvoicesPage() {
         </div>
       </div>
 
+      {/* ── Pending payments alert banner ── */}
+      {(() => {
+        const pendingInvoices = invoices.filter((inv: Invoice) => (inv.pendingPayments?.length ?? 0) > 0);
+        const totalPending = pendingInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.pendingPayments?.length ?? 0), 0);
+        if (totalPending === 0) return null;
+        return (
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-white">{totalPending}</span>
+              <div className="min-w-0 flex-1">
+                <p className="font-black text-amber-900">Offline Payment{totalPending !== 1 ? "s" : ""} Awaiting Verification</p>
+                <p className="text-xs font-semibold text-amber-700">{pendingInvoices.map((inv: Invoice) => inv.clientName).join(", ")} — review and approve or reject below</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { const first = pendingInvoices[0]; if (first) openInvoice(first); }}
+                className="shrink-0 rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-white hover:bg-amber-500 active:scale-95 transition"
+              >
+                Review Now
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(boardGroups) as Array<keyof typeof boardGroups>).map((stage) => {
           const invoicesInStage = boardGroups[stage];
@@ -997,7 +1068,11 @@ export default function InvoicesPage() {
                         </div>
                         <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-slate-100 pt-2 sm:pt-3">
                           <p className="text-xs font-semibold text-slate-500">Due {invoice.dueDate}</p>
-                          <p className="text-xs font-semibold text-slate-400 hidden sm:block">View details</p>
+                          {(invoice.pendingPayments?.length ?? 0) > 0 ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-200">⏳ Awaiting Verification</span>
+                          ) : (
+                            <p className="text-xs font-semibold text-slate-400 hidden sm:block">View details</p>
+                          )}
                         </div>
                       </button>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1082,6 +1157,11 @@ export default function InvoicesPage() {
                 <div className="mt-4 space-y-3">
                   {selectedInvoice.pendingPayments.map((pending: PendingPayment) => (
                     <div key={pending.id} className="rounded-2xl border border-amber-200 bg-white p-4">
+                      {/* Status badge */}
+                      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        Awaiting Verification
+                      </div>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="space-y-1">
                           <p className="text-sm font-black text-slate-900">{pending.method} · {currency(pending.amount)}</p>
@@ -1109,7 +1189,7 @@ export default function InvoicesPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleRejectPendingPayment(pending.id)}
+                          onClick={() => { setRejectModal({ pending, invoiceId: selectedInvoice.id }); setRejectNotes(""); }}
                           className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 active:scale-95"
                         >
                           ✗ Reject
@@ -1264,6 +1344,56 @@ export default function InvoicesPage() {
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowPaymentModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
               <button onClick={() => handleRecordPayment(false)} className="w-full sm:w-auto rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Save Payment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject payment modal ── */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => { (e as { stopPropagation(): void }).stopPropagation(); }}>
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-lg">✗</span>
+              <div>
+                <h2 className="text-lg font-black text-slate-900">Reject Payment</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {rejectModal.pending.method} · {currency(rejectModal.pending.amount)}
+                  {rejectModal.pending.checkNumber ? ` · Check #${rejectModal.pending.checkNumber}` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-600">
+                Rejection reason <span className="font-semibold text-slate-400">(sent to customer)</span>
+              </label>
+              <textarea
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                rows={3}
+                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+                placeholder="e.g. Check number not found, amount does not match invoice, please resubmit…"
+              />
+            </div>
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+              ⚠️ The customer will be notified by email that their payment submission was rejected. The invoice will remain unpaid.
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setRejectModal(null); setRejectNotes(""); }}
+                className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={rejectSubmitting}
+                onClick={() => void handleRejectPendingPayment(rejectModal.pending, rejectNotes)}
+                className="flex-1 rounded-2xl bg-red-600 py-3 text-sm font-black text-white transition hover:bg-red-700 active:scale-95 disabled:opacity-60"
+              >
+                {rejectSubmitting ? "Rejecting…" : "Confirm Reject"}
+              </button>
             </div>
           </div>
         </div>

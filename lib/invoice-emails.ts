@@ -2,7 +2,7 @@
 // (viewed / paid / failed). Sent to the XRP Roofing office via Resend so the
 // team is alerted the moment a customer interacts with an invoice.
 
-export type InvoiceEmailEvent = "viewed" | "paid" | "failed" | "payment_submitted";
+export type InvoiceEmailEvent = "viewed" | "paid" | "failed" | "payment_submitted" | "payment_rejected";
 
 type InvoiceEmailInput = {
   event: InvoiceEmailEvent;
@@ -13,6 +13,7 @@ type InvoiceEmailInput = {
   method?: string;
   checkNumber?: string;
   customerEmail?: string;
+  rejectionNote?: string;
 };
 
 function escapeHtml(value: string) {
@@ -33,6 +34,7 @@ const eventCopy: Record<InvoiceEmailEvent, { label: string; subject: string; acc
   paid: { label: "Payment Received", subject: "completed payment", accent: "#16a34a" },
   failed: { label: "Payment Failed", subject: "had a failed payment", accent: "#dc2626" },
   payment_submitted: { label: "Offline Payment Submitted", subject: "submitted an offline payment", accent: "#d97706" },
+  payment_rejected: { label: "Offline Payment Rejected", subject: "had an offline payment rejected", accent: "#dc2626" },
 };
 
 /**
@@ -62,6 +64,7 @@ export async function sendInternalInvoiceEmail(input: InvoiceEmailInput): Promis
   ];
   if (input.method) rows.push(["Payment Method", input.method]);
   if (input.checkNumber) rows.push(["Check Number", input.checkNumber]);
+  if (input.rejectionNote) rows.push(["Rejection Reason", input.rejectionNote]);
   if (input.totalAmount) rows.push(["Invoice Total", currency(input.totalAmount)]);
   if (input.customerEmail) rows.push(["Customer Email", input.customerEmail]);
 
