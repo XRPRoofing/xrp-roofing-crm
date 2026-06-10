@@ -2,13 +2,16 @@
 // (viewed / paid / failed). Sent to the XRP Roofing office via Resend so the
 // team is alerted the moment a customer interacts with an invoice.
 
-export type InvoiceEmailEvent = "viewed" | "paid" | "failed";
+export type InvoiceEmailEvent = "viewed" | "paid" | "failed" | "payment_submitted";
 
 type InvoiceEmailInput = {
   event: InvoiceEmailEvent;
   customerName: string;
   invoiceNumber: string;
   amount: number;
+  totalAmount?: number;
+  method?: string;
+  checkNumber?: string;
   customerEmail?: string;
 };
 
@@ -29,6 +32,7 @@ const eventCopy: Record<InvoiceEmailEvent, { label: string; subject: string; acc
   viewed: { label: "Invoice Viewed", subject: "viewed their invoice", accent: "#1768c9" },
   paid: { label: "Payment Received", subject: "completed payment", accent: "#16a34a" },
   failed: { label: "Payment Failed", subject: "had a failed payment", accent: "#dc2626" },
+  payment_submitted: { label: "Offline Payment Submitted", subject: "submitted an offline payment", accent: "#d97706" },
 };
 
 /**
@@ -56,6 +60,9 @@ export async function sendInternalInvoiceEmail(input: InvoiceEmailInput): Promis
     ["Amount", currency(input.amount)],
     ["Date & Time", when],
   ];
+  if (input.method) rows.push(["Payment Method", input.method]);
+  if (input.checkNumber) rows.push(["Check Number", input.checkNumber]);
+  if (input.totalAmount) rows.push(["Invoice Total", currency(input.totalAmount)]);
   if (input.customerEmail) rows.push(["Customer Email", input.customerEmail]);
 
   const tableRows = rows

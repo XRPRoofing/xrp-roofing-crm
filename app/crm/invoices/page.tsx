@@ -31,6 +31,19 @@ type Payment = {
   offline: boolean;
 };
 
+type PendingPayment = {
+  id: string;
+  amount: number;
+  method: string;
+  checkNumber?: string;
+  checkAmount?: number;
+  checkImageBase64?: string;
+  checkImageMimeType?: string;
+  notes?: string;
+  submittedAt: string;
+  status: "pending_verification";
+};
+
 
 type ProposalPackageOption = {
   scope?: string;
@@ -85,6 +98,7 @@ type Invoice = {
   sentBy?: string;
   emailDeliveredAt?: string;
   emailOpenedAt?: string;
+  pendingPayments?: PendingPayment[];
 };
 
 const customersStorageKey = "xrp-crm-customers";
@@ -817,6 +831,48 @@ export default function InvoicesPage() {
     updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, "Payment Received Offline");
   }
 
+  async function handleApprovePendingPayment(pending: PendingPayment) {
+    if (!selectedInvoice) return;
+    const payment: Payment = {
+      amount: pending.amount,
+      date: today,
+      method: pending.method as PaymentMethod,
+      reference: pending.checkNumber ? `Check #${pending.checkNumber}` : pending.id.slice(0, 8),
+      notes: pending.notes || `${pending.method} payment submitted by customer`,
+      offline: true,
+    };
+    const nextPending = (selectedInvoice.pendingPayments || []).filter((item: PendingPayment) => item.id !== pending.id);
+    const nextInvoice: Invoice = {
+      ...selectedInvoice,
+      payments: [...selectedInvoice.payments, payment],
+      pendingPayments: nextPending,
+    };
+    updateInvoice(nextInvoice, `${pending.method} payment of ${currency(pending.amount)} approved`);
+    try {
+      const shareResponse = await fetch("/api/invoices/share");
+      if (!shareResponse.ok) return;
+      const { invoice: stored } = await shareResponse.json().catch(() => ({ invoice: null })) as { invoice: unknown };
+      if (!stored) return;
+      await fetch("/api/invoices/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...nextInvoice,
+          pendingPayments: nextPending,
+          status: getComputedStatus(nextInvoice),
+        }),
+      });
+    } catch {
+      /* best-effort share sync */
+    }
+  }
+
+  function handleRejectPendingPayment(pendingId: string) {
+    if (!selectedInvoice) return;
+    const nextPending = (selectedInvoice.pendingPayments || []).filter((item: PendingPayment) => item.id !== pendingId);
+    updateInvoice({ ...selectedInvoice, pendingPayments: nextPending }, "Customer payment submission rejected");
+  }
+
   function renderInvoiceFields(invoice: Invoice, editable: boolean, onChange: (invoice: Invoice) => void) {
     const totals = calculateTotals(invoice);
     const inputClass = "mt-1.5 w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50";
@@ -1016,12 +1072,66 @@ export default function InvoicesPage() {
               </div>
             </section>
 
+            {selectedInvoice.pendingPayments && selectedInvoice.pendingPayments.length > 0 && (
+              <section className="mt-6 rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-white">{selectedInvoice.pendingPayments.length}</span>
+                  <h3 className="font-black text-amber-900">Pending Customer Payments — Action Required</h3>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-amber-700">Customer submitted these payments offline. Review and approve or reject each one.</p>
+                <div className="mt-4 space-y-3">
+                  {selectedInvoice.pendingPayments.map((pending: PendingPayment) => (
+                    <div key={pending.id} className="rounded-2xl border border-amber-200 bg-white p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-black text-slate-900">{pending.method} · {currency(pending.amount)}</p>
+                          {pending.checkNumber && <p className="text-xs font-semibold text-slate-600">Check #{pending.checkNumber}{pending.checkAmount ? ` · written for ${currency(pending.checkAmount)}` : ""}</p>}
+                          {pending.notes && <p className="text-xs font-semibold text-slate-500">Note: {pending.notes}</p>}
+                          <p className="text-xs text-slate-400">Submitted {new Date(pending.submittedAt).toLocaleString()}</p>
+                        </div>
+                        {pending.checkImageBase64 && pending.checkImageMimeType && (
+                          <a
+                            href={`data:${pending.checkImageMimeType};base64,${pending.checkImageBase64}`}
+                            download={`check-${pending.checkNumber || pending.id.slice(0, 8)}.${pending.checkImageMimeType.split("/")[1] || "jpg"}`}
+                            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-50"
+                          >
+                            📎 View Check
+                          </a>
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleApprovePendingPayment(pending)}
+                          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-700 active:scale-95"
+                        >
+                          ✓ Approve Payment
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRejectPendingPayment(pending.id)}
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 active:scale-95"
+                        >
+                          ✗ Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <section className="rounded-3xl bg-slate-50 p-5">
                 <h3 className="font-black text-[#07183f]">Payments</h3>
                 <div className="mt-3 space-y-2">
-                  {selectedInvoice.payments.map((payment, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{currency(payment.amount)} · {payment.method} · {payment.date}{payment.offline ? " · Payment Received Offline" : ""}</p>)}
+                  {selectedInvoice.payments.map((payment, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{currency(payment.amount)} · {payment.method} · {payment.date}{payment.offline ? " · Offline" : ""}{payment.reference ? ` · ${payment.reference}` : ""}</p>)}
                   {selectedInvoice.payments.length === 0 && <p className="text-sm font-semibold text-slate-500">No payments recorded yet.</p>}
+                </div>
+                <div className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold">
+                  <div className="flex justify-between gap-3 text-slate-600"><span>Total Invoice</span><span>{currency(calculateTotals(selectedInvoice).finalTotal)}</span></div>
+                  <div className="flex justify-between gap-3 text-emerald-700"><span>Total Deposits Paid</span><span>{currency(getPaidAmount(selectedInvoice))}</span></div>
+                  <div className="mt-1 flex justify-between gap-3 border-t border-slate-100 pt-2 font-black text-[#07183f]"><span>Remaining Balance</span><span>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</span></div>
                 </div>
               </section>
               <section className="rounded-3xl bg-slate-50 p-5">

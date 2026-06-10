@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import InvoicePaymentButtons from "./InvoicePaymentButtons";
+import OfflinePaymentPanel from "./OfflinePaymentPanel";
 
 type Invoice = {
   id: string;
@@ -24,6 +25,7 @@ type Invoice = {
   paidAt?: string;
   lineItems?: { description: string; quantity: number; unitPrice: number; tax: number }[];
   payments?: { amount: number }[];
+  pendingPayments?: { id: string; amount: number; method: string; submittedAt: string; status: string }[];
 };
 
 function currency(value: number) {
@@ -40,10 +42,12 @@ function calculateTotals(invoice: Invoice) {
   return { subtotal, tax, finalTotal, paid, balance };
 }
 
-type DerivedStatus = "Draft" | "Sent" | "Viewed" | "Paid" | "Overdue";
+type DerivedStatus = "Draft" | "Sent" | "Viewed" | "Paid" | "Overdue" | "Payment Submitted" | "Partially Paid";
 
 function deriveStatus(invoice: Invoice, balance: number, paid: number): DerivedStatus {
   if (balance <= 0 && (paid > 0 || invoice.status === "Paid" || invoice.paidAt)) return "Paid";
+  if (paid > 0 && balance > 0) return "Partially Paid";
+  if (invoice.status === "Payment Submitted" || (invoice.pendingPayments && invoice.pendingPayments.length > 0)) return "Payment Submitted";
   if (invoice.dueDate) {
     const due = new Date(invoice.dueDate);
     if (!Number.isNaN(due.getTime()) && due.getTime() < Date.now()) return "Overdue";
@@ -60,6 +64,8 @@ const statusBadgeClass: Record<DerivedStatus, string> = {
   Viewed: "bg-indigo-100 text-indigo-700",
   Paid: "bg-emerald-100 text-emerald-700",
   Overdue: "bg-red-100 text-red-700",
+  "Payment Submitted": "bg-amber-100 text-amber-700",
+  "Partially Paid": "bg-orange-100 text-orange-700",
 };
 
 const POLL_INTERVAL_MS = 10000;
@@ -67,6 +73,7 @@ const POLL_INTERVAL_MS = 10000;
 export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [paymentMode, setPaymentMode] = useState<"online" | "offline" | null>(null);
   const tracked = useRef(false);
 
   const load = useCallback(async () => {
@@ -198,28 +205,72 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
               </div>
             </section>
 
-            <section id="pay" className="rounded-3xl border border-blue-100 bg-blue-50 p-4 scroll-mt-6 sm:p-5">
+            <section id="pay" className="scroll-mt-6 space-y-4">
               {isPaid ? (
-                <div className="text-center">
-                  <h2 className="text-lg font-black text-emerald-700">Paid in full</h2>
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-center">
+                  <h2 className="text-lg font-black text-emerald-700">✅ Paid in Full</h2>
                   <p className="mt-2 text-sm font-semibold leading-5 text-emerald-800">Thank you — this invoice has been paid. No further action is needed.</p>
                 </div>
+              ) : derived === "Payment Submitted" ? (
+                <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-center">
+                  <h2 className="text-lg font-black text-amber-700">⏳ Payment Submitted</h2>
+                  <p className="mt-2 text-sm font-semibold leading-5 text-amber-800">XRP Roofing has received your payment submission and will verify it shortly. Your balance will update once approved.</p>
+                </div>
               ) : (
-                <>
+                <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4 sm:p-5">
                   <h2 className="text-lg font-black text-[#07183f]">Choose Payment Method</h2>
-                  <InvoicePaymentButtons invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber || invoice.id} amount={totals.balance} customerEmail={invoice.email || ""} />
-                  
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                    <p className="text-xs font-bold text-slate-700">Other Payment Options:</p>
-                    <ul className="mt-1.5 space-y-1 text-[11px] text-slate-600">
-                      <li>• Check payable to: XRP Roofing</li>
-                      <li>• Zelle: +1 (623) 300-8097</li>
-                      <li>• Call to pay by phone: +1 (623) 300-8097</li>
-                    </ul>
-                  </div>
-                  
-                  <p className="mt-3 text-xs font-semibold leading-5 text-blue-800">Having trouble? Contact XRP Roofing directly for assistance with payment.</p>
-                </>
+
+                  {paymentMode === null && (
+                    <div className="mt-4 space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode("online")}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-left text-sm font-black text-[#07183f] shadow-sm transition hover:border-blue-400 hover:bg-blue-50"
+                      >
+                        <span className="text-xl">💳</span>
+                        <div>
+                          <p>Pay Deposit Online</p>
+                          <p className="text-xs font-semibold text-slate-500">Card or bank transfer — instant &amp; secure</p>
+                        </div>
+                        <span className="ml-auto text-blue-400">›</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode("offline")}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        <span className="text-xl">📋</span>
+                        <div>
+                          <p>Pay by Check / Cash / Bank Transfer</p>
+                          <p className="text-xs font-semibold text-slate-500">Submit your offline payment for verification</p>
+                        </div>
+                        <span className="ml-auto text-slate-400">›</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {paymentMode === "online" && (
+                    <div className="mt-3">
+                      <button type="button" onClick={() => setPaymentMode(null)} className="mb-3 text-xs font-bold text-blue-700 hover:underline">← Back</button>
+                      <InvoicePaymentButtons invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber || invoice.id} amount={totals.balance} customerEmail={invoice.email || ""} />
+                    </div>
+                  )}
+
+                  {paymentMode === "offline" && (
+                    <div className="mt-3">
+                      <button type="button" onClick={() => setPaymentMode(null)} className="mb-3 text-xs font-bold text-blue-700 hover:underline">← Back</button>
+                      <OfflinePaymentPanel
+                        invoiceId={invoice.id}
+                        balance={totals.balance}
+                        totalAmount={totals.finalTotal}
+                        totalPaid={totals.paid}
+                        onSuccess={() => void load()}
+                      />
+                    </div>
+                  )}
+
+                  <p className="mt-4 text-xs font-semibold leading-5 text-blue-800">Having trouble? Call XRP Roofing: +1 (623) 300-8097</p>
+                </div>
               )}
             </section>
           </aside>
