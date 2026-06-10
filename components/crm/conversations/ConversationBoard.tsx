@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
@@ -313,10 +313,6 @@ function SchedulerPanel({ onSchedule }: { onSchedule: () => void }) {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return <div className="grid gap-1"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="text-sm leading-5 text-slate-800">{value}</p></div>;
-}
-
 function EditableDetailRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1">
@@ -391,6 +387,7 @@ function createManualConversation(phone: string): ConversationRecord {
     },
     lastMessage: "New phone conversation",
     lastActivityAt: "Now",
+    lastActivityIso: new Date().toISOString(),
     unreadCount: 0,
     isMissedCall: false,
     isNewLead: !contact,
@@ -504,7 +501,7 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
     direction,
     author: direction === "outbound" ? "XRP Roofing" : formatPhoneIdentity(event.from || "Customer"),
     body: event.body || fallbackBody,
-    timestamp: new Date(event.createdAt).toLocaleString(),
+    timestamp: new Date(event.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     status: isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read",
     recordingUrl: event.recordingUrl,
   };
@@ -685,6 +682,7 @@ export default function ConversationBoard() {
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
   const ringtoneRef = useRef<RingtoneController | null>(null);
   const messageBoardRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const initialConversations = useMemo<ConversationRecord[]>(() => [], []);
   const [conversations, setConversations] = useState<ConversationRecord[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState("");
@@ -939,7 +937,7 @@ export default function ConversationBoard() {
     const phone = getEventPhone(event);
     const conversationId = getConversationIdForPhone(phone);
     addTwilioCrmNotification(event);
-    setConversations((current) => upsertConversationFromEvent(current, event));
+    setConversations((current: ConversationRecord[]) => upsertConversationFromEvent(current, event));
     setActiveConversationId(conversationId);
   }
 
@@ -949,11 +947,16 @@ export default function ConversationBoard() {
     Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
       if (!mounted) return;
 
-      const savedConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
+      const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
+      const savedConversations = [...rawConversations].sort((a, b) => {
+        const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
+        const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
+        return tb - ta;
+      });
       const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
       setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
       setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
-      setActiveConversationId((current) => current || savedConversations[0]?.id || "");
+      setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
     }).catch((error) => {
       if (mounted) setTwilioNotice(error instanceof Error ? `Call history sync issue: ${error.message}` : "Call history sync issue");
@@ -969,13 +972,13 @@ export default function ConversationBoard() {
       return subscribeToConversationEvents((event: TwilioConversationEvent) => {
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
         addTwilioCrmNotification(event);
-        setConversations((current) => {
+        setConversations((current: ConversationRecord[]) => {
           const next = upsertConversationFromEvent(current, event);
           if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
           return next;
         });
         if (event.type === "call_recording") {
-          setCallInsights((current) => dedupeCallInsights([event, ...current]).slice(0, 5));
+          setCallInsights((current: TwilioConversationEvent[]) => dedupeCallInsights([event, ...current]).slice(0, 5));
         }
         if (event.type === "incoming_call") {
           notifyIncomingCall(getEventPhone(event));
@@ -992,7 +995,7 @@ export default function ConversationBoard() {
   useEffect(() => {
     try {
       return subscribeToConversationReadStates((conversationId, readAt) => {
-        setConversations((current) => current.map((conversation) => conversation.id === conversationId ? { ...conversation, unreadCount: 0, isMissedCall: false, readAt } : conversation));
+        setConversations((current: ConversationRecord[]) => current.map((conversation: ConversationRecord) => conversation.id === conversationId ? { ...conversation, unreadCount: 0, isMissedCall: false, readAt } : conversation));
       });
     } catch {
       /* realtime read-state sync unavailable; falls back to per-load read state */
@@ -1002,8 +1005,8 @@ export default function ConversationBoard() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setConversations((current) =>
-        current.map((conversation) =>
+      setConversations((current: ConversationRecord[]) =>
+        current.map((conversation: ConversationRecord) =>
           conversation.lastActivityIso
             ? { ...conversation, lastActivityAt: formatActivityTime(conversation.lastActivityIso) }
             : conversation
@@ -1125,11 +1128,14 @@ export default function ConversationBoard() {
       voiceDeviceRef.current = device;
       const call = await device.connect({ params: { To: destination } });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
-      setCallSid(browserCallRef.current.parameters?.CallSid);
       setIsActiveCall(true);
       setIsHeld(false);
       setIsMuted(false);
       setTwilioNotice("Browser call connected. Your microphone is linked to Twilio.");
+      call.on("accept", () => {
+        const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
+        if (sid) setCallSid(sid);
+      });
       call.on("disconnect", () => {
         setIsActiveCall(false);
         setIsHeld(false);
@@ -1279,7 +1285,7 @@ export default function ConversationBoard() {
   }
 
   async function handleSaveCallNotes() {
-    if (!callSid) return;
+    if (!callSid || !active) return;
     if (!callNotes.trim() && !callDisposition) {
       setTwilioNotice("Add notes or choose a disposition first");
       return;
@@ -1396,9 +1402,10 @@ export default function ConversationBoard() {
             </div>
           )}
           <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-3">
-            <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
+            <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} onClick={() => setMessageText((prev: string) => prev ? `${prev} ${template}` : template)} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
             {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
-            <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
+            <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) setMessageText((prev: string) => prev ? `${prev} [${file.name}]` : `[${file.name}]`); event.target.value = ""; }} />
+            <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
         {active && <div className="hidden xl:block xl:min-h-0"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
