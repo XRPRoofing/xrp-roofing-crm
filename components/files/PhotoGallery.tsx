@@ -1,7 +1,12 @@
 "use client";
 
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, ImageDown, Pencil, X, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  Camera, ChevronLeft, ChevronRight, Copy, Download, FileText,
+  ImageDown, Info, Map, MessageCircle, Pencil, Share2,
+  Shield, Smartphone, Star, Tag, X,
+} from "lucide-react";
 
 export type GalleryPhoto = {
   id: string;
@@ -10,6 +15,7 @@ export type GalleryPhoto = {
   photoType?: string;
   uploadedBy?: string;
   uploadedAt?: string;
+  jobAddress?: string;
 };
 
 type PhotoType = "Before" | "Progress" | "After" | "Job Photo";
@@ -25,6 +31,239 @@ function downloadPhoto(photo: GalleryPhoto) {
 
 const TYPE_LABEL: Record<PhotoType, string> = { Before: "BEFORE", Progress: "PROGRESS", After: "AFTER", "Job Photo": "GENERAL" };
 const TYPE_BADGE: Record<PhotoType, string> = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600", "Job Photo": "bg-slate-700" };
+
+const MORE_MENU_ITEMS: { icon: React.ReactNode; label: string }[] = [
+  { icon: <Tag className="h-5 w-5" />, label: "Tag" },
+  { icon: <Share2 className="h-5 w-5" />, label: "Share" },
+  { icon: <Camera className="h-5 w-5" />, label: "Take After Photo" },
+  { icon: <ImageDown className="h-5 w-5" />, label: "Choose After Photo" },
+  { icon: <FileText className="h-5 w-5" />, label: "Print…" },
+  { icon: <Shield className="h-5 w-5" />, label: "Hide in Project Timeline" },
+  { icon: <Copy className="h-5 w-5" />, label: "Duplicate" },
+  { icon: <Smartphone className="h-5 w-5" />, label: "Move to Project" },
+  { icon: <Download className="h-5 w-5" />, label: "Save to Device" },
+  { icon: <Star className="h-5 w-5" />, label: "Set as Cover Photo" },
+  { icon: <FileText className="h-5 w-5" />, label: "Create Report" },
+];
+
+function LightboxViewer({
+  photo,
+  pool,
+  activeIndex,
+  onClose,
+  onNav,
+  onEdit,
+  onDownload,
+}: {
+  photo: GalleryPhoto;
+  pool: GalleryPhoto[];
+  activeIndex: number;
+  onClose: () => void;
+  onNav: (i: number) => void;
+  onEdit?: (photo: GalleryPhoto) => void;
+  onDownload: (photo: GalleryPhoto) => void;
+}) {
+  const [showMore, setShowMore] = useState(false);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { if (showMore) setShowMore(false); else onClose(); }
+      if (e.key === "ArrowRight") onNav(activeIndex + 1);
+      if (e.key === "ArrowLeft") onNav(activeIndex - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeIndex, onClose, onNav, showMore]);
+
+  const type = (photo.photoType || "Job Photo") as PhotoType;
+  const badge = TYPE_BADGE[type] ?? "bg-slate-700";
+  const badgeLabel = TYPE_LABEL[type] ?? type;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
+      {/* ── Top header (CompanyCam style) ── */}
+      <div className="flex shrink-0 items-center justify-between gap-2 bg-black/80 px-4 py-3 backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10 active:scale-95"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="min-w-0 flex-1 text-center">
+          <p className="truncate text-sm font-bold text-white leading-tight">
+            {photo.jobAddress ?? photo.name}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-white hover:bg-white/10 active:scale-95"
+        >
+          <Info className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* ── Full-screen photo ── */}
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+        {pool.length > 1 && (
+          <button
+            type="button"
+            onClick={() => onNav(activeIndex - 1)}
+            className="absolute left-2 z-10 rounded-full bg-black/30 p-2 text-white hover:bg-black/60 active:scale-90"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photo.dataUrl}
+          alt={photo.name}
+          className="max-h-full max-w-full select-none object-contain"
+          draggable={false}
+        />
+
+        {pool.length > 1 && (
+          <button
+            type="button"
+            onClick={() => onNav(activeIndex + 1)}
+            className="absolute right-2 z-10 rounded-full bg-black/30 p-2 text-white hover:bg-black/60 active:scale-90"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        )}
+
+        {/* Photo type badge — top right */}
+        <span className={`absolute right-3 top-3 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white ${badge}`}>
+          {badgeLabel}
+        </span>
+
+        {/* Expand icon — top right corner */}
+        <button
+          type="button"
+          className="absolute right-3 top-10 mt-2 flex h-8 w-8 items-center justify-center rounded-md bg-black/40 text-white hover:bg-black/60"
+          onClick={() => {
+            const win = window.open();
+            if (win) { win.document.write(`<img src="${photo.dataUrl}" style="max-width:100%;max-height:100vh" />`); }
+          }}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" /></svg>
+        </button>
+
+        {/* Photographer + date — bottom left overlay */}
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8">
+          <div className="flex items-end gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-600 text-xs font-black text-white uppercase">
+              {(photo.uploadedBy ?? "U").charAt(0)}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white leading-tight">{photo.uploadedBy ?? "Office"}</p>
+              {photo.uploadedAt && (
+                <p className="text-xs text-slate-300">{photo.uploadedAt}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Thumbnail strip ── */}
+      {pool.length > 1 && (
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto bg-black px-3 py-2">
+          {pool.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onNav(i)}
+              className={`shrink-0 overflow-hidden rounded-lg border-2 transition ${i === activeIndex ? "border-white scale-105" : "border-transparent opacity-50 hover:opacity-90"}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.dataUrl} alt="" className="h-14 w-20 object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Bottom action bar (CompanyCam style) ── */}
+      <div className="flex shrink-0 items-center justify-around border-t border-white/10 bg-black px-2 pb-safe py-3">
+        <button type="button" className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90">
+          <MessageCircle className="h-6 w-6" />
+          <span className="text-[10px] font-bold">Comment</span>
+        </button>
+        <button type="button" className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90">
+          <Tag className="h-6 w-6" />
+          <span className="text-[10px] font-bold">Tag</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onEdit ? (onEdit(photo), onClose()) : undefined}
+          className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90"
+        >
+          <Pencil className="h-6 w-6" />
+          <span className="text-[10px] font-bold">Annotate</span>
+        </button>
+        <button type="button" className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90">
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          <span className="text-[10px] font-bold">Approve</span>
+        </button>
+        <button type="button" className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90">
+          <Map className="h-6 w-6" />
+          <span className="text-[10px] font-bold">Map</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowMore(true)}
+          className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90"
+        >
+          <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+          <span className="text-[10px] font-bold">More</span>
+        </button>
+      </div>
+
+      {/* ── More-menu bottom sheet ── */}
+      {showMore && (
+        <div className="fixed inset-0 z-[70] flex flex-col justify-end" onClick={() => setShowMore(false)}>
+          <div
+            className="w-full rounded-t-3xl bg-white pb-safe"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            {/* drag handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <span className="h-1 w-10 rounded-full bg-slate-300" />
+            </div>
+            <div className="divide-y divide-slate-100">
+              {MORE_MENU_ITEMS.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    if (item.label === "Save to Device") { onDownload(photo); }
+                    setShowMore(false);
+                  }}
+                  className="flex w-full items-center gap-4 px-6 py-3.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMore(false)}
+              className="w-full py-4 text-center text-sm font-black text-slate-500 hover:text-slate-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PhotoGallery({
   photos,
@@ -271,60 +510,15 @@ export default function PhotoGallery({
 
       {/* Fullscreen lightbox */}
       {active && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-black/95" onClick={close}>
-          <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black">{active.name}</p>
-              <p className="text-xs text-slate-400">{(activeIndex ?? 0) + 1} of {lightboxPool.length} · {active.photoType}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setZoomed((v) => !v)} className="rounded-full bg-white/10 p-2 hover:bg-white/20">
-                {zoomed ? <ZoomOut className="h-5 w-5" /> : <ZoomIn className="h-5 w-5" />}
-              </button>
-              {onEditPhoto && active.dataUrl && (
-                <button type="button" onClick={() => { onEditPhoto(active); close(); }} className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-2 text-sm font-black hover:bg-orange-600">
-                  <Pencil className="h-4 w-4" /> Edit
-                </button>
-              )}
-              <button type="button" onClick={() => downloadPhoto(active)} className="rounded-full bg-white/10 p-2 hover:bg-white/20">
-                <Download className="h-5 w-5" />
-              </button>
-              <button type="button" onClick={close} className="rounded-full bg-white/10 p-2 hover:bg-white/20">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-          <div className="relative flex flex-1 items-center justify-center overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            {lightboxPool.length > 1 && (
-              <button type="button" onClick={() => showAt((activeIndex ?? 0) - 1)} className="absolute left-2 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-            )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={active.dataUrl}
-              alt={active.name}
-              onClick={() => setZoomed((v) => !v)}
-              className={`max-h-full select-none object-contain transition-transform ${zoomed ? "scale-150 cursor-zoom-out" : "max-w-full cursor-zoom-in"}`}
-            />
-            {lightboxPool.length > 1 && (
-              <button type="button" onClick={() => showAt((activeIndex ?? 0) + 1)} className="absolute right-2 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
-                <ChevronRight className="h-6 w-6" />
-              </button>
-            )}
-          </div>
-          {/* Thumbnail strip in lightbox */}
-          {lightboxPool.length > 1 && (
-            <div className="flex gap-1.5 overflow-x-auto bg-black/80 px-3 py-2">
-              {lightboxPool.map((p, i) => (
-                <button key={p.id} type="button" onClick={() => showAt(i)} className={`shrink-0 overflow-hidden rounded-lg border-2 transition ${i === activeIndex ? "border-white" : "border-transparent opacity-60 hover:opacity-100"}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.dataUrl} alt="" className="h-14 w-20 object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <LightboxViewer
+          photo={active}
+          pool={lightboxPool}
+          activeIndex={activeIndex ?? 0}
+          onClose={close}
+          onNav={showAt}
+          onEdit={onEditPhoto}
+          onDownload={downloadPhoto}
+        />
       )}
 
       {/* Hidden canvas for comparison export */}
