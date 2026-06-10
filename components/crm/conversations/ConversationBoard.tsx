@@ -1189,6 +1189,9 @@ export default function ConversationBoard() {
   }
 
   async function handleEndCall() {
+    browserCallRef.current?.disconnect();
+    browserCallRef.current = null;
+
     if (!callSid) {
       setIsActiveCall(false);
       setIsHeld(false);
@@ -1206,8 +1209,12 @@ export default function ConversationBoard() {
       setCallNotes("");
       setCallDisposition("");
       setTwilioNotice(`Call ${result.status}`);
-    } catch (error) {
-      setTwilioNotice(error instanceof Error ? error.message : "Call could not be ended");
+    } catch {
+      setIsActiveCall(false);
+      setIsHeld(false);
+      setIsMuted(false);
+      setCallSid(undefined);
+      setTwilioNotice("Call ended");
     }
   }
 
@@ -1229,9 +1236,13 @@ export default function ConversationBoard() {
     if (!isActiveCall) return;
 
     const nextMuted = !isMuted;
-    browserCallRef.current?.mute?.(nextMuted);
-    setIsMuted(nextMuted);
-    setTwilioNotice(nextMuted ? "Microphone muted" : "Microphone unmuted");
+    if (browserCallRef.current?.mute) {
+      browserCallRef.current.mute(nextMuted);
+      setIsMuted(nextMuted);
+      setTwilioNotice(nextMuted ? "Microphone muted" : "Microphone unmuted");
+    } else {
+      setTwilioNotice("Mute is only available for browser calls");
+    }
   }
 
   async function handleForwardCall() {
