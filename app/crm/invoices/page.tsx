@@ -462,7 +462,7 @@ function propagatePaidStatus(invoice: Invoice) {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => readStoredInvoices() ?? initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -529,8 +529,11 @@ export default function InvoicesPage() {
     });
   }, []);
 
+  // Sync to localStorage ONLY as offline cache (secondary to Supabase)
   useEffect(() => {
-    window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
+    if (!hasSupabaseConfig()) {
+      window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
+    }
   }, [invoices]);
 
   // Identify the signed-in CRM user so "Sent By" can be recorded on send.
@@ -658,45 +661,67 @@ export default function InvoicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // No manual refresh: when the user returns to this tab/device (focus,
-  // visibility, or a cross-tab write), re-read invoices saved on this device and
-  // re-pull the Stripe-synced share state so the board is always current.
-  useAutoRefresh(() => {
-    const saved = readStoredInvoices();
-    if (saved) {
-      setInvoices((current) => (JSON.stringify(current) === JSON.stringify(saved) ? current : saved));
+  // Load from Supabase on mount (primary source). Only fall back to localStorage if no Supabase.
+  useEffect(() => {
+    let mounted = true;
+    async function init() {
+      if (hasSupabaseConfig()) {
+        const remoteInvoices = await loadAllInvoices<Invoice>();
+        if (mounted && remoteInvoices.length > 0) {
+          setInvoices(remoteInvoices);
+        }
+      } else {
+        // No Supabase: load from localStorage
+        const saved = readStoredInvoices();
+        if (saved && mounted) setInvoices(saved);
+      }
     }
-    // On focus/tab-switch, pull full invoices so creates/edits from other devices show immediately.
-    void loadAllInvoices<Invoice>()
-      .then((remoteInvoices) => {
-        if (remoteInvoices.length === 0) return;
-        setInvoices((current) => {
-          const byId = new Map(current.map((inv) => [inv.id, inv]));
-          let changed = false;
-          for (const remote of remoteInvoices) {
-            const local = byId.get(remote.id);
-            if (!local) { byId.set(remote.id, remote); changed = true; }
-            else if ((remote.activity?.length ?? 0) > (local.activity?.length ?? 0)) { byId.set(remote.id, remote); changed = true; }
-          }
-          return changed ? Array.from(byId.values()) : current;
-        });
-      })
-      .catch(() => {});
-    void loadInvoiceShares()
-      .then((shares) => {
-        setInvoices((current) => {
-          let changed = false;
-          const next = current.map((invoice) => {
-            const share = shares.find((item) => item.id === invoice.id);
-            if (!share) return invoice;
-            const merged = mergeShareIntoInvoice(invoice, share);
-            if (merged !== invoice) changed = true;
-            return merged;
+    void init();
+    return () => { mounted = false; };
+  }, []);
+
+  // Auto-refresh: when user returns to tab, sync from Supabase (primary source)
+  useAutoRefresh(() => {
+    if (hasSupabaseConfig()) {
+      void loadAllInvoices<Invoice>()
+        .then((remoteInvoices) => {
+          if (remoteInvoices.length === 0) return;
+          setInvoices((current) => {
+            const byId = new Map(current.map((inv) => [inv.id, inv]));
+            let changed = false;
+            for (const remote of remoteInvoices) {
+              const local = byId.get(remote.id);
+              if (!local) { byId.set(remote.id, remote); changed = true; }
+              else if ((remote.activity?.length ?? 0) > (local.activity?.length ?? 0)) {
+                byId.set(remote.id, remote); changed = true;
+              }
+            }
+            return changed ? Array.from(byId.values()) : current;
           });
-          return changed ? next : current;
-        });
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+      void loadInvoiceShares()
+        .then((shares) => {
+          setInvoices((current) => {
+            let changed = false;
+            const next = current.map((invoice) => {
+              const share = shares.find((item) => item.id === invoice.id);
+              if (!share) return invoice;
+              const merged = mergeShareIntoInvoice(invoice, share);
+              if (merged !== invoice) changed = true;
+              return merged;
+            });
+            return changed ? next : current;
+          });
+        })
+        .catch(() => {});
+    } else {
+      // No Supabase: sync from localStorage across tabs
+      const saved = readStoredInvoices();
+      if (saved) {
+        setInvoices((current) => (JSON.stringify(current) === JSON.stringify(saved) ? current : saved));
+      }
+    }
   });
 
   // Cascade Customer/Job status to Paid whenever an invoice newly becomes Paid
