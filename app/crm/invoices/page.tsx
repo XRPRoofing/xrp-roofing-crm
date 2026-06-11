@@ -1043,28 +1043,29 @@ export default function InvoicesPage() {
           <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Invoice Board</h1>
           <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
         </div>
-        <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:grid-cols-6 sm:gap-2">
+        {/* Mobile: horizontal scroll stats / Desktop: 6-column grid */}
+        <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:gap-2 scrollbar-hide">
           {[
-            ["Paid Invoices", String(boardTotals.paidCount), "text-emerald-700"],
-            ["Unpaid Invoices", String(boardTotals.unpaid), "text-slate-950"],
-            ["Overdue Invoices", String(boardTotals.overdue), "text-red-700"],
-            ["Viewed Invoices", String(boardTotals.viewed), "text-blue-700"],
-            ["Outstanding Balance", currency(boardTotals.balance), "text-slate-950"],
-            ["Collection Rate", `${boardTotals.collectionRate}%`, "text-slate-950"],
-          ].map(([label, value, valueClass]) => (
-            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1.5">
-              <p className="text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-500">{label}</p>
-              <p className={`mt-0.5 text-sm font-bold tracking-tight ${valueClass}`}>{value}</p>
+            ["Paid", String(boardTotals.paidCount), "text-emerald-700", "bg-emerald-50/50"],
+            ["Unpaid", String(boardTotals.unpaid), "text-slate-950", ""],
+            ["Overdue", String(boardTotals.overdue), "text-red-700", "bg-red-50/50"],
+            ["Viewed", String(boardTotals.viewed), "text-blue-700", ""],
+            ["Outstanding", currency(boardTotals.balance), "text-slate-950", ""],
+            ["Collection", `${boardTotals.collectionRate}%`, "text-slate-950", ""],
+          ].map(([label, value, valueClass, bgClass]) => (
+            <div key={label} className={`shrink-0 rounded-xl border border-slate-200 px-3 py-2 min-w-[85px] sm:min-w-0 ${bgClass || "bg-slate-50/70"}`}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">{label}</p>
+              <p className={`mt-1 text-base font-black tracking-tight ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
-        <div className="mt-2.5 flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
-          <div className="w-full flex-1">
-            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search by client, invoice #, or property..." />
+        <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <div className="w-full sm:flex-1">
+            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search by client, invoice #, or property..." />
           </div>
-          <div className="inline-flex shrink-0 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-0.5 scrollbar-hide">
+          <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-1 scrollbar-hide">
             {filterOptions.map((option) => (
-              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
+              <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
             ))}
           </div>
         </div>
@@ -1142,11 +1143,12 @@ export default function InvoicesPage() {
                           )}
                         </div>
                       </button>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => openInvoice(invoice)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
+                      {/* Mobile: swipeable action row / Desktop: wrapped buttons */}
+                      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
+                        <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>
                   );
