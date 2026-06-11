@@ -12,6 +12,8 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { Customer } from "@/types/crm";
+import type { OfficeTask } from "@/lib/office-tasks";
+import { upsertTaskToSupabase } from "@/lib/task-sync";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
@@ -453,6 +455,21 @@ function propagatePaidStatus(invoice: Invoice) {
   if (invoice.jobReference) {
     void updateJobRecord(invoice.jobReference, { stage: "paid" }).catch(() => {});
   }
+
+  // Auto-create a "Paid" task for tracking
+  const paidTask: OfficeTask = {
+    id: `task-paid-${invoice.id}-${Date.now()}`,
+    title: `Payment Received - ${invoice.clientName}`,
+    description: `Invoice ${invoice.invoiceNumber} has been paid. Amount: $${getPaidAmount(invoice).toLocaleString()}.`,
+    status: "Done",
+    priority: "High",
+    dueDate: new Date().toISOString().split("T")[0],
+    category: "Invoices",
+    assignedTo: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  void upsertTaskToSupabase(paidTask);
 
   addCrmNotification({
     title: "Payment received",
