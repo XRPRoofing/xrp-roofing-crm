@@ -995,15 +995,19 @@ export default function ProposalsPage() {
   if (activeProposal) {
     return (
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8">
-        <div className="sticky top-16 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm lg:top-20">
-          <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
-          <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700">{activeProposal.status}</span>
-            <button type="button" onClick={handleSaveProposal} className="rounded-full bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">Save</button>
-            <button type="button" onClick={() => handleDeleteProposal(activeProposal)} className="rounded-full bg-red-50 px-4 py-2 text-xs font-black text-red-700">Delete</button>
-            <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">{isPreviewing ? "Edit" : "Preview"}</button>
-            <button type="button" onClick={handleOpenSendModal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white">Send</button>
+        <div className="sticky top-16 z-30 border-b border-slate-200 bg-white shadow-sm lg:top-20">
+          {/* Row 1 — back + address */}
+          <div className="flex h-10 items-center justify-between px-4">
+            <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
+            <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
+          </div>
+          {/* Row 2 — action buttons, scrollable on mobile */}
+          <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">{activeProposal.status}</span>
+            <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700 active:scale-95">Save</button>
+            <button type="button" onClick={() => handleDeleteProposal(activeProposal)} className="shrink-0 rounded-full bg-red-50 px-4 py-1.5 text-xs font-black text-red-700 active:scale-95">Delete</button>
+            <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
+            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
           </div>
         </div>
 
