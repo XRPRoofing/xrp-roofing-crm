@@ -74,6 +74,7 @@ type Proposal = {
   locked?: boolean;
   deletedAt?: string;
   selectedOption?: "good" | "better" | "best";
+  showPackages?: boolean;
   inspectionPhotos?: InspectionPhoto[];
   packages?: {
     good: string | PackageOption;
@@ -415,6 +416,7 @@ export default function ProposalsPage() {
     template: "executive",
     notes: "",
     terms: "",
+    showPackages: true,
     inspectionPhotos: defaultInspectionPhotos,
     packages: defaultPackages,
   });
@@ -729,6 +731,7 @@ export default function ProposalsPage() {
       coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
       notes: "Includes professional roof assessment, materials, labor, cleanup, and customer-ready project documentation.",
       terms: defaultTerms,
+      showPackages: true,
       inspectionPhotos: defaultInspectionPhotos,
       packages: defaultPackages,
     };
@@ -790,6 +793,7 @@ export default function ProposalsPage() {
       template: proposal.template,
       notes: proposal.notes,
       terms: proposal.terms || defaultTerms,
+      showPackages: proposal.showPackages !== false,
       inspectionPhotos: normalizeInspectionPhotos(proposal.inspectionPhotos),
       packages: normalizePackages(proposal.packages),
     });
@@ -823,6 +827,7 @@ export default function ProposalsPage() {
       template: editorForm.template,
       notes: editorForm.notes,
       terms: editorForm.terms,
+      showPackages: editorForm.showPackages,
       inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
       packages: normalizePackages(editorForm.packages),
       ...extraFields,
@@ -1101,9 +1106,23 @@ export default function ProposalsPage() {
               </label>
             </div>
             <div className="mt-5">
+              {/* Good / Better / Best toggle */}
+              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-black text-[#07183f]">Good / Better / Best</p>
+                  <p className="text-xs font-semibold text-slate-500">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditorForm({ ...editorForm, showPackages: !editorForm.showPackages })}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${editorForm.showPackages ? "bg-blue-600" : "bg-slate-300"}`}
+                >
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editorForm.showPackages ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </label>
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Proposal sections</p>
               <div className="space-y-2">
-                {proposalSections.map((section) => (
+                {proposalSections.filter((section) => editorForm.showPackages || !["BEST", "BETTER", "GOOD"].includes(section)).map((section) => (
                   <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-xl px-4 py-3 text-left text-sm font-bold ${section === activeSection ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "bg-slate-50 text-slate-600"}`}>
                     {section}
                   </button>
@@ -1235,7 +1254,7 @@ export default function ProposalsPage() {
                   </div>
                 )}
 
-                {isPreviewing && (
+                {isPreviewing && editorForm.showPackages && (
                   <div className="mt-8">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -1257,7 +1276,7 @@ export default function ProposalsPage() {
                   </div>
                 )}
 
-                {!isPreviewing && (["GOOD", "BETTER", "BEST"].includes(activeSection)) && (
+                {!isPreviewing && editorForm.showPackages && (["GOOD", "BETTER", "BEST"].includes(activeSection)) && (
                   <div className="mt-8">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">{activeSection} proposal option</p>
                     <div className="mt-4 rounded-2xl border border-slate-200 p-5">
@@ -1283,8 +1302,8 @@ export default function ProposalsPage() {
                     <p className="text-xs font-black uppercase tracking-wider text-blue-700">Total Summary</p>
                     <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                       <div>
-                        <p className="text-sm font-bold text-slate-600">Selected Package</p>
-                        <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{activeProposal.selectedOption || "best"}</p>
+                        {editorForm.showPackages && <p className="text-sm font-bold text-slate-600">Selected Package</p>}
+                        {editorForm.showPackages && <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{activeProposal.selectedOption || "best"}</p>}
                         {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{editorForm.notes}</p>}
                       </div>
                       <div className="text-left md:text-right">
