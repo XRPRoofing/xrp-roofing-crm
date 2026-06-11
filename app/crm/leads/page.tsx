@@ -6,7 +6,7 @@ import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Fil
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
-import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
+import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -337,6 +337,7 @@ export default function LeadsPage() {
   }, [jobs]);
 
   useEffect(() => {
+    migrateStaleDueDates();
     let mounted = true;
     async function loadJobs() {
       try {

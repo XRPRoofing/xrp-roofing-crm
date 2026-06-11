@@ -91,6 +91,28 @@ export const crewSyncUpdatedEvent = "crm-crew-sync-updated";
 
 export const supabaseSyncEnabled = hasSupabaseConfig;
 
+export function migrateStaleDueDates() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(jobsStorageKey);
+    if (!raw) return;
+    const jobs = JSON.parse(raw) as { dueDate?: string }[];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let changed = false;
+    const cleaned = jobs.map((job) => {
+      if (!job.dueDate) return job;
+      const due = new Date(`${job.dueDate}T00:00:00`);
+      if (due < today) { changed = true; return { ...job, dueDate: undefined }; }
+      return job;
+    });
+    if (changed) {
+      window.localStorage.setItem(jobsStorageKey, JSON.stringify(cleaned));
+      window.dispatchEvent(new Event(crewSyncUpdatedEvent));
+    }
+  } catch { /* ignore */ }
+}
+
 export function leadToJobRecord(lead: Lead, index = 0): JobRecord {
   const assignment = createDefaultCrewAssignment(lead, index);
   return {
