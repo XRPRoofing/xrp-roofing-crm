@@ -7,6 +7,7 @@ import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
+import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -459,6 +460,16 @@ export default function LeadsPage() {
 
     setJobs((currentJobs) => [newJob, ...currentJobs]);
     void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
+
+    // Auto-create folder in Files Dashboard for this job
+    const folderName = `${form.name} - ${form.address || "Address pending"}`.trim();
+    void createManualFolder({
+      name: folderName,
+      address: form.address || "Address pending",
+      customerName: form.name,
+      workType: form.roofType || "Roofing",
+    }).catch(() => {});
+
     syncCustomerFromJob({
       name: form.name,
       email: form.email,
