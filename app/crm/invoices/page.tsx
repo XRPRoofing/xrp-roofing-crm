@@ -499,6 +499,8 @@ export default function InvoicesPage() {
     activity: ["Invoice created"],
   });
 
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [pendingReviewInvoice, setPendingReviewInvoice] = useState<Invoice | null>(null);
   const paidPropagatedRef = useRef<Set<string>>(new Set());
   const intentHandledRef = useRef(false);
   const [rejectModal, setRejectModal] = useState<{ pending: PendingPayment; invoiceId: string } | null>(null);
@@ -691,10 +693,23 @@ export default function InvoicesPage() {
       status: getComputedStatus(createForm),
       activity: ["Invoice created"],
     };
-    setInvoices((currentInvoices) => [invoice, ...currentInvoices]);
-    setSelectedInvoiceId(invoice.id);
-    setCreateForm(createBlankInvoice(invoices.length + 1));
+    setPendingReviewInvoice(invoice);
+    setShowReviewModal(true);
     setShowCreateModal(false);
+  }
+
+  function handleConfirmInvoice() {
+    if (!pendingReviewInvoice) return;
+    setInvoices((currentInvoices) => [pendingReviewInvoice, ...currentInvoices]);
+    setSelectedInvoiceId(pendingReviewInvoice.id);
+    setCreateForm(createBlankInvoice(invoices.length + 1));
+    setPendingReviewInvoice(null);
+    setShowReviewModal(false);
+  }
+
+  function handleEditFromReview() {
+    setShowReviewModal(false);
+    setShowCreateModal(true);
   }
 
   function handleStartInvoice() {
@@ -1330,6 +1345,190 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
+
+      {showReviewModal && pendingReviewInvoice && (() => {
+        const inv = pendingReviewInvoice;
+        const totals = calculateTotals(inv);
+        const balance = Math.max(totals.finalTotal - getPaidAmount(inv), 0);
+        return (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-6">
+            <div className="mx-auto my-4 max-w-3xl rounded-3xl bg-white shadow-2xl">
+
+              {/* ── Header ── */}
+              <div className="flex items-center justify-between gap-3 rounded-t-3xl bg-[#07183f] px-6 py-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400">Invoice Review</p>
+                  <h2 className="mt-0.5 text-lg font-black text-white sm:text-xl">Verify before finalizing</h2>
+                </div>
+                <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-white">DRAFT PREVIEW</span>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-6">
+
+                {/* ── Customer-facing preview banner ── */}
+                <div className="rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-4 py-3">
+                  <p className="text-xs font-black uppercase tracking-wider text-blue-600">Customer View Preview</p>
+                  <p className="mt-1 text-xs text-blue-700">This is exactly how the invoice will appear to your customer. Review all details carefully before confirming.</p>
+                </div>
+
+                {/* ── Invoice header block ── */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">{inv.invoiceNumber}</p>
+                      <p className="mt-1 text-xl font-black text-[#07183f]">{inv.clientName || <span className="text-slate-400 italic">No client name</span>}</p>
+                      <p className="text-sm font-semibold text-slate-600">{inv.jobName}</p>
+                      <p className="text-xs text-slate-500">{inv.propertyAddress}</p>
+                    </div>
+                    <div className="text-left sm:text-right shrink-0">
+                      <p className="text-xs font-bold text-slate-500">Issue Date</p>
+                      <p className="text-sm font-bold text-slate-800">{inv.issueDate}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Due Date</p>
+                      <p className="text-sm font-bold text-red-600">{inv.dueDate}</p>
+                      {inv.proposalReference && (
+                        <>
+                          <p className="mt-1 text-xs font-bold text-slate-500">Proposal Ref</p>
+                          <p className="text-sm font-bold text-slate-700">{inv.proposalReference}</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Email</p><p className="text-xs font-semibold text-slate-700 break-all">{inv.email || "—"}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Phone</p><p className="text-xs font-semibold text-slate-700">{inv.phone || "—"}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Roof Type</p><p className="text-xs font-semibold text-slate-700">{inv.roofType || "—"}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Completion</p><p className="text-xs font-semibold text-slate-700">{inv.projectCompletionDate || "—"}</p></div>
+                  </div>
+                </div>
+
+                {/* ── Line items ── */}
+                <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5">
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-600">Line Items</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/60">
+                          <th className="px-4 py-2 text-left text-[10px] font-black uppercase text-slate-500">Description</th>
+                          <th className="px-4 py-2 text-right text-[10px] font-black uppercase text-slate-500">Qty</th>
+                          <th className="px-4 py-2 text-right text-[10px] font-black uppercase text-slate-500">Unit Price</th>
+                          <th className="px-4 py-2 text-right text-[10px] font-black uppercase text-slate-500">Tax %</th>
+                          <th className="px-4 py-2 text-right text-[10px] font-black uppercase text-slate-500">Line Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inv.lineItems.length === 0 ? (
+                          <tr><td colSpan={5} className="px-4 py-4 text-center text-sm text-slate-400 italic">No line items added</td></tr>
+                        ) : (
+                          inv.lineItems.map((item, i) => {
+                            const lineTotal = item.quantity * item.unitPrice * (1 + item.tax / 100);
+                            return (
+                              <tr key={i} className="border-b border-slate-100 last:border-0">
+                                <td className="px-4 py-2.5 text-sm text-slate-800">{item.description || <span className="italic text-slate-400">No description</span>}</td>
+                                <td className="px-4 py-2.5 text-right text-sm text-slate-700">{item.quantity}</td>
+                                <td className="px-4 py-2.5 text-right text-sm text-slate-700">{currency(item.unitPrice)}</td>
+                                <td className="px-4 py-2.5 text-right text-sm text-slate-700">{item.tax}%</td>
+                                <td className="px-4 py-2.5 text-right text-sm font-bold text-slate-900">{currency(lineTotal)}</td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* ── Calculation breakdown ── */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-600 mb-3">Amount Breakdown</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Subtotal (before tax)</span>
+                      <span className="font-semibold text-slate-800">{currency(totals.subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Tax</span>
+                      <span className="font-semibold text-slate-800">{currency(totals.tax)}</span>
+                    </div>
+                    {inv.discount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-emerald-700">Discount applied</span>
+                        <span className="font-semibold text-emerald-700">− {currency(inv.discount)}</span>
+                      </div>
+                    )}
+                    {getPaidAmount(inv) > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-700">Payments received</span>
+                        <span className="font-semibold text-blue-700">− {currency(getPaidAmount(inv))}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-slate-300 pt-2 flex items-center justify-between">
+                      <span className="font-black text-[#07183f] text-base">Total Invoice Amount</span>
+                      <span className="font-black text-[#07183f] text-xl">{currency(totals.finalTotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-base text-red-700">Balance Due from Customer</span>
+                      <span className="font-black text-xl text-red-700">{currency(balance)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Payment terms & warranty ── */}
+                {(inv.paymentTerms || inv.warrantyDuration) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {inv.paymentTerms && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Payment Terms</p>
+                        <p className="mt-1 text-xs text-slate-700">{inv.paymentTerms}</p>
+                      </div>
+                    )}
+                    {inv.warrantyDuration && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Warranty</p>
+                        <p className="mt-1 text-xs text-slate-700">{inv.warrantyDuration}</p>
+                        {inv.warrantyNotes && <p className="mt-1 text-xs text-slate-500">{inv.warrantyNotes}</p>}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Transaction fee disclaimer ── */}
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
+                  <span className="shrink-0 text-amber-600 text-lg">ⓘ</span>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-800 mb-1">Transaction Fee Notice</p>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      The balance due shown above is the exact amount owed to XRP Roofing. Please be aware that payment processors, banks, credit card providers, or third-party payment platforms may apply additional transaction fees on the customer&apos;s side when submitting payment. These fees are external to XRP Roofing and are <strong>not included in this invoice total</strong> unless explicitly added by the company.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ── Footer actions ── */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 px-5 sm:px-6 py-4 rounded-b-3xl bg-slate-50">
+                <p className="text-xs text-slate-500 font-semibold order-3 sm:order-1">Review all details above before confirming.</p>
+                <div className="flex gap-3 w-full sm:w-auto order-1 sm:order-2">
+                  <button
+                    onClick={handleEditFromReview}
+                    className="flex-1 sm:flex-none rounded-2xl border-2 border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:border-blue-400 hover:text-blue-700 active:scale-95"
+                  >
+                    ← Edit Invoice
+                  </button>
+                  <button
+                    onClick={handleConfirmInvoice}
+                    className="flex-1 sm:flex-none rounded-2xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+                  >
+                    Confirm & Save →
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {showPaymentModal && selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
