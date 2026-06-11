@@ -11,7 +11,7 @@ const triggerSchema = z.object({
     email: z.string().optional(),
     phone: z.string().optional(),
   }),
-  variables: z.record(z.string()).optional(),
+  variables: z.record(z.string(), z.string()).optional(),
 });
 
 function escapeHtml(v: string) {
