@@ -11,7 +11,7 @@ const triggerSchema = z.object({
     email: z.string().optional(),
     phone: z.string().optional(),
   }),
-  // Fix for Zod v4: z.record() requires both key and value types
+  // Zod v4 compatibility: record requires (keyType, valueType) - both arguments required
   variables: z.record(z.string(), z.string()).optional(),
 });
 
