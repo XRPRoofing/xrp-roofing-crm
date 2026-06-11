@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
@@ -13,30 +14,6 @@ import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
-
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        places?: {
-          Autocomplete: new (
-            input: HTMLInputElement,
-            options: {
-              bounds?: { north: number; south: number; east: number; west: number };
-              componentRestrictions?: { country: string };
-              fields?: string[];
-              strictBounds?: boolean;
-              types?: string[];
-            }
-          ) => {
-            addListener: (eventName: string, callback: () => void) => void;
-            getPlace: () => { formatted_address?: string; address_components?: { long_name: string; types: string[] }[] };
-          };
-        };
-      };
-    };
-  }
-}
 
 const arizonaBounds = {
   north: 37.0043,
@@ -177,7 +154,6 @@ export default function LeadsPage() {
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const router = useRouter();
-  const addressInputRef = useRef<HTMLInputElement>(null);
   const [showCallPaste, setShowCallPaste] = useState(false);
   const [callPasteText, setCallPasteText] = useState("");
   const [form, setForm] = useState({
@@ -367,52 +343,6 @@ export default function LeadsPage() {
     void loadCrewDataset().then((data) => setJobs(data.jobs.map(normalizeJob))).catch(() => {});
   });
 
-  useEffect(() => {
-    if (!showForm || !addressInputRef.current) return;
-
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (!googleMapsApiKey) return;
-
-    function initializeAutocomplete() {
-      if (!addressInputRef.current || !window.google?.maps?.places?.Autocomplete) return;
-
-      const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-        bounds: arizonaBounds,
-        componentRestrictions: { country: "us" },
-        fields: ["formatted_address", "address_components"],
-        strictBounds: true,
-        types: ["address"],
-      });
-
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          setForm((currentForm) => ({ ...currentForm, address: place.formatted_address || currentForm.address }));
-        }
-      });
-    }
-
-    if (window.google?.maps?.places?.Autocomplete) {
-      initializeAutocomplete();
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>("script[data-google-maps-places]");
-
-    if (existingScript) {
-      existingScript.addEventListener("load", initializeAutocomplete, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.googleMapsPlaces = "true";
-    script.addEventListener("load", initializeAutocomplete, { once: true });
-    document.head.appendChild(script);
-  }, [showForm]);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
@@ -633,7 +563,12 @@ export default function LeadsPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1 sm:col-span-2">
                     <span className="text-xs font-bold text-slate-500">Property Address <span className="text-red-400">*</span></span>
-                    <input ref={addressInputRef} required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Street, City, AZ" />
+                    <AddressAutocomplete
+                      value={form.address}
+                      onChange={(address) => setForm({ ...form, address })}
+                      placeholder="Start typing address..."
+                      required
+                    />
                   </label>
                   <label className="grid gap-1">
                     <span className="text-xs font-bold text-slate-500">Roof Type</span>

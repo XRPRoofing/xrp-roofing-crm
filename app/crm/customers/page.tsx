@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -545,7 +546,11 @@ export default function CustomersPage() {
             <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Email" />
             <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Phone" />
             <input value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Status" />
-            <input value={form.propertyAddress} onChange={(event) => setForm({ ...form, propertyAddress: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Property address" />
+            <AddressAutocomplete
+              value={form.propertyAddress}
+              onChange={(address) => setForm({ ...form, propertyAddress: address })}
+              placeholder="Start typing address..."
+            />
             <input value={form.insuranceCarrier} onChange={(event) => setForm({ ...form, insuranceCarrier: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Insurance carrier" />
             <input type="number" value={form.lifetimeValue} onChange={(event) => setForm({ ...form, lifetimeValue: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Lifetime value" />
             <input value={form.roofDetails} onChange={(event) => setForm({ ...form, roofDetails: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Roof details" />
@@ -631,7 +636,11 @@ export default function CustomersPage() {
                       <input type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
                       <input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
                       <input value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Status" />
-                      <input value={editForm.propertyAddress} onChange={(event) => setEditForm({ ...editForm, propertyAddress: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none sm:col-span-2" placeholder="Property address" />
+                      <AddressAutocomplete
+                        value={editForm.propertyAddress}
+                        onChange={(address) => setEditForm({ ...editForm, propertyAddress: address })}
+                        placeholder="Start typing address..."
+                      />
                       <input value={editForm.roofDetails} onChange={(event) => setEditForm({ ...editForm, roofDetails: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Roof details" />
                       <input value={editForm.insuranceCarrier} onChange={(event) => setEditForm({ ...editForm, insuranceCarrier: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Insurance carrier" />
                       <input type="number" value={editForm.lifetimeValue} onChange={(event) => setEditForm({ ...editForm, lifetimeValue: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Lifetime value" />
