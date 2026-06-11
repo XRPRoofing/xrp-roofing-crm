@@ -10,30 +10,6 @@ import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import type { Lead } from "@/types/crm";
 
-declare global {
-  interface Window {
-    google?: {
-      maps?: {
-        places?: {
-          Autocomplete: new (
-            input: HTMLInputElement,
-            options: {
-              bounds?: { north: number; south: number; east: number; west: number };
-              componentRestrictions?: { country: string };
-              fields?: string[];
-              strictBounds?: boolean;
-              types?: string[];
-            }
-          ) => {
-            addListener: (eventName: string, callback: () => void) => void;
-            getPlace: () => { formatted_address?: string; address_components?: { long_name: string; types: string[] }[] };
-          };
-        };
-      };
-    };
-  }
-}
-
 const arizonaBounds = {
   north: 37.0043,
   south: 31.3322,
