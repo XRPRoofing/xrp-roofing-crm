@@ -736,7 +736,10 @@ export default function LeadsPage() {
                           <p className="truncate text-sm font-black leading-tight text-slate-950">{job.name}</p>
                           <p className="mt-0.5 truncate text-xs font-bold text-slate-500">{job.city}, AZ</p>
                         </div>
-                        <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <GripVertical className="h-4 w-4 text-slate-300" />
+                        </div>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="text-base font-black text-[#07183f]">{formatMoney(job.value)}</p>
