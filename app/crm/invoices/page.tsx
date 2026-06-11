@@ -459,17 +459,31 @@ function propagatePaidStatus(invoice: Invoice) {
   }
 
   // Auto-create a "Paid" task for tracking
+  const now = new Date().toISOString();
   const paidTask: OfficeTask = {
     id: `task-paid-${invoice.id}-${Date.now()}`,
+    jobId: invoice.jobReference || invoice.id,
     title: `Payment Received - ${invoice.clientName}`,
-    description: `Invoice ${invoice.invoiceNumber} has been paid. Amount: $${getPaidAmount(invoice).toLocaleString()}.`,
+    customerName: invoice.clientName,
+    jobAddress: invoice.propertyAddress,
+    invoiceAmount: `$${getPaidAmount(invoice).toLocaleString()}`,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceStatus: "Paid",
+    assignedUser: "Office Staff",
+    dueDate: now.split("T")[0],
     status: "Closed",
-    priority: "High",
-    dueDate: new Date().toISOString().split("T")[0],
-    category: "Invoices",
-    assignedTo: "",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    jobLink: invoice.jobReference
+      ? `/crm/crew?job=${encodeURIComponent(invoice.jobReference)}`
+      : "/crm/invoices",
+    createdAt: now,
+    updatedAt: now,
+    timeline: [
+      {
+        id: `${Date.now()}`,
+        event: `Payment received for invoice ${invoice.invoiceNumber}`,
+        at: now,
+      },
+    ],
   };
   void upsertTaskToSupabase(paidTask);
 
