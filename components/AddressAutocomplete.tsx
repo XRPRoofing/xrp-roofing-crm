@@ -49,6 +49,7 @@ declare global {
               componentRestrictions?: { country: string | string[] };
               fields?: string[];
               strictBounds?: boolean;
+              types?: string[];
             }
           ) => GoogleAutocomplete;
         };
@@ -217,6 +218,8 @@ export function AddressAutocomplete({
   // Setup autocomplete when loaded
   useEffect(() => {
     if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
+
+    if (!window.google?.maps) return;
 
     try {
       const GoogleMaps = window.google.maps;
