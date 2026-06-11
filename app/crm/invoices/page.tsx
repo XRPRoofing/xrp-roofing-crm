@@ -102,6 +102,8 @@ type Invoice = {
   emailDeliveredAt?: string;
   emailOpenedAt?: string;
   pendingPayments?: PendingPayment[];
+  isDeleted?: boolean;
+  deletedAt?: string;
 };
 
 const customersStorageKey = "xrp-crm-customers";

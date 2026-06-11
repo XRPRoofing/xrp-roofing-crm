@@ -13,20 +13,15 @@ import {
 } from "lucide-react";
 import DashboardHeroActions from "@/components/crm/dashboard/DashboardHeroActions";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { loadAllInvoices, subscribeToInvoiceShares } from "@/lib/invoice-sync";
+import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
 import type { Lead } from "@/types/crm";
-
-const proposalsKey = "xrp-crm-proposals";
-const invoicesKey  = "xrp-crm-invoices";
 
 type ProposalSnap = { id: string; status: string; sentToEmail?: string; viewedAt?: string; signedAt?: string; deletedAt?: string };
 type InvoiceSnap  = { id: string; status: string; dueDate: string; sentAt?: string; viewedAt?: string; emailOpenedAt?: string; payments?: { amount: number }[]; lineItems?: { unitPrice: number; quantity: number; tax?: number }[] };
 
-function readJson<T>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(window.localStorage.getItem(key) || "[]") as T[]; } catch { return []; }
-}
-
 function invoicePaid(inv: InvoiceSnap): boolean {
+  if (inv.status === "Voided") return false;
   const total = (inv.lineItems || []).reduce((s, li) => s + li.unitPrice * li.quantity * (1 + (li.tax ?? 0) / 100), 0);
   const paid  = (inv.payments  || []).reduce((s, p) => s + p.amount, 0);
   return total > 0 && paid >= total;
@@ -68,29 +63,48 @@ export default function CrmDashboardPage() {
   const [invoices,  setInvoices]  = useState<InvoiceSnap[]>([]);
   const [syncDot,   setSyncDot]   = useState(false);
 
-  function refreshLocal() {
-    setProposals(readJson<ProposalSnap>(proposalsKey).filter((p) => !p.deletedAt));
-    setInvoices(readJson<InvoiceSnap>(invoicesKey));
-  }
-
+  // Load from Supabase on mount (not localStorage)
   useEffect(() => {
-    refreshLocal();
     let mounted = true;
+    
+    // Load jobs
     void loadCrewDataset().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {});
-    const unsub = subscribeToCrewData(() => {
+    
+    // Load invoices from Supabase
+    void loadAllInvoices<InvoiceSnap>().then((data) => { 
+      if (mounted) setInvoices(data); 
+    }).catch(() => {});
+    
+    // Load proposals from Supabase
+    void loadProposalRecords<ProposalSnap>().then((data) => { 
+      if (mounted) setProposals(data.filter((p) => !p.deletedAt)); 
+    }).catch(() => {});
+
+    // Real-time subscriptions
+    const unsubCrew = subscribeToCrewData(() => {
       setSyncDot(true);
       void loadCrewDataset().then((d) => { if (mounted) { setJobs(d.jobs); setSyncDot(false); } }).catch(() => {});
     });
-    const onStorage = () => refreshLocal();
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("crm-invoices-updated", onStorage);
-    window.addEventListener("crm-proposals-updated", onStorage);
+    
+    const unsubInvoices = subscribeToInvoiceShares(() => {
+      setSyncDot(true);
+      void loadAllInvoices<InvoiceSnap>().then((data) => { 
+        if (mounted) { setInvoices(data); setSyncDot(false); }
+      }).catch(() => {});
+    });
+    
+    const unsubProposals = subscribeToProposalRecords(() => {
+      setSyncDot(true);
+      void loadProposalRecords<ProposalSnap>().then((data) => { 
+        if (mounted) { setProposals(data.filter((p) => !p.deletedAt)); setSyncDot(false); }
+      }).catch(() => {});
+    });
+    
     return () => {
       mounted = false;
-      unsub();
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("crm-invoices-updated", onStorage);
-      window.removeEventListener("crm-proposals-updated", onStorage);
+      unsubCrew();
+      unsubInvoices();
+      unsubProposals();
     };
   }, []);
 
