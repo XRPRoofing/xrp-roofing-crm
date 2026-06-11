@@ -341,6 +341,10 @@ export function addTaskTimelineEntry(taskId: string, event: string, note?: strin
 }
 
 export function deleteOfficeTask(taskId: string) {
-  const tasks = readOfficeTasks();
-  saveOfficeTasks(tasks.filter((t) => t.id !== taskId));
+  const tasks = readOfficeTasks().filter((t) => t.id !== taskId);
+  window.localStorage.setItem(officeTaskStorageKey, JSON.stringify(tasks));
+  window.dispatchEvent(new Event("crm-office-tasks-updated"));
+  // Do NOT call saveAllTasksToSupabase here — that would re-upsert the
+  // deleted task. The caller (tasks/page.tsx) calls deleteTaskFromSupabase
+  // directly to remove the row from Supabase.
 }
