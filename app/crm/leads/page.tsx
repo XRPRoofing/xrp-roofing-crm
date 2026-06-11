@@ -95,7 +95,7 @@ function getUrgency(job: Lead) {
   today.setHours(0, 0, 0, 0);
   const due = new Date(`${job.dueDate}T00:00:00`);
   const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86400000);
-  if (diffDays <= 3) return { label: "Due Soon", className: "border-l-yellow-400", dot: "bg-yellow-400", text: "text-yellow-700" };
+  if (diffDays >= 0 && diffDays <= 3) return { label: "Due Soon", className: "border-l-yellow-400", dot: "bg-yellow-400", text: "text-yellow-700" };
   return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
 }
 
