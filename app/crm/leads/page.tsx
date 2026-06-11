@@ -54,7 +54,7 @@ function normalizeJob(job: Lead) {
     ...job,
     stage,
     nextAction: job.nextAction || job.lastActivity || "Review next step",
-    dueDate: job.dueDate || "2026-06-05",
+    dueDate: job.dueDate || undefined,
   };
 }
 

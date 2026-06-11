@@ -96,7 +96,7 @@ export function leadToJobRecord(lead: Lead, index = 0): JobRecord {
   return {
     ...lead,
     nextAction: lead.nextAction || lead.lastActivity || "Review next step",
-    dueDate: lead.dueDate || "2026-06-05",
+    dueDate: lead.dueDate || undefined,
     status: assignment.status,
     assignedCrew: assignment.assignedCrew,
     scheduleDate: assignment.scheduleDate,
