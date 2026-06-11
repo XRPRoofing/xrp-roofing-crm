@@ -1295,13 +1295,13 @@ export default function InvoicesPage() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
-                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal</label>
+                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
                 <select 
                   value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
                   onChange={(event) => handlePrefillFromJob(event.target.value)} 
                   className="mt-2 w-full rounded-2xl border border-blue-100 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none"
                 >
-                  <option value="" disabled>Select a signed proposal...</option>
+                  <option value="">— No proposal (legacy / direct invoice) —</option>
                   {wonProposals.length === 0 ? (
                     <option value="" disabled>No signed proposals available</option>
                   ) : (
@@ -1317,7 +1317,7 @@ export default function InvoicesPage() {
                 </select>
                 {wonProposals.length === 0 && (
                   <p className="mt-2 text-xs text-slate-500">
-                    No signed proposals found. Create and sign a proposal first.
+                    No signed proposals available — you can still create a direct invoice below.
                   </p>
                 )}
               </div>
@@ -1325,7 +1325,7 @@ export default function InvoicesPage() {
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-3 border-t border-slate-200 p-4 sm:p-5">
               <button onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={handleCreateInvoice} disabled={!createForm.proposalReference} className="w-full sm:w-auto rounded-2xl bg-orange-500 px-5 py-2.5 font-bold text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2">Create Invoice</button>
+              <button onClick={handleCreateInvoice} className="w-full sm:w-auto rounded-2xl bg-orange-500 px-5 py-2.5 font-bold text-white active:scale-95 transition order-1 sm:order-2">Create Invoice</button>
             </div>
           </div>
         </div>
