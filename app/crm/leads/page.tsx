@@ -50,11 +50,14 @@ const legacyStageMap: Partial<Record<string, LeadStage>> = {
 
 function normalizeJob(job: Lead) {
   const stage = legacyStageMap[job.stage] || job.stage;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDateValid = job.dueDate && new Date(`${job.dueDate}T00:00:00`) >= today ? job.dueDate : undefined;
   return {
     ...job,
     stage,
     nextAction: job.nextAction || job.lastActivity || "Review next step",
-    dueDate: job.dueDate || undefined,
+    dueDate: dueDateValid,
   };
 }
 
