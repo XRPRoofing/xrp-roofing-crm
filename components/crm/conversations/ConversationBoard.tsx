@@ -36,6 +36,36 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[tone]}`}>{children}</span>;
 }
 
+// Convert URLs in text to clickable links
+function linkifyText(text: string): React.ReactNode {
+  if (!text) return text;
+  const urlRegex = /(https?:\/\/[^\s<]+|www\.[^\s<]+\.[^\s<]+)/gi;
+  const parts = text.split(urlRegex);
+  const matches = text.match(urlRegex) || [];
+
+  const result: React.ReactNode[] = [];
+  parts.forEach((part, index) => {
+    result.push(part);
+    if (matches[index]) {
+      const url = matches[index];
+      const href = url.startsWith("http") ? url : `https://${url}`;
+      result.push(
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:opacity-80"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {url}
+        </a>
+      );
+    }
+  });
+  return result;
+}
+
 function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: () => void }) {
   return (
     <Card className="hidden h-full flex-col items-center gap-2 overflow-hidden p-2 xl:flex">
@@ -143,7 +173,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
               </div>
               <p className="mt-1 truncate text-sm font-medium text-slate-700">{conversation.contact.phone}</p>
               <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{conversation.contact.address}</p>
-              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{conversation.lastMessage}</p>
+              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{linkifyText(conversation.lastMessage)}</p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
               </div>
@@ -190,7 +220,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
       <div className="flex justify-center">
         <div className="max-w-[86%] rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
           <span className="font-semibold">{message.timestamp}</span>
-          <p className="mt-1 whitespace-pre-wrap break-words leading-5">{message.body}</p>
+          <p className="mt-1 whitespace-pre-wrap break-words leading-5">{linkifyText(message.body)}</p>
         </div>
       </div>
     );
@@ -200,7 +230,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-800 shadow-sm"}`}>
         <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-slate-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}</div>
-        <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(message.body)}</p>
         {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
     </div>
