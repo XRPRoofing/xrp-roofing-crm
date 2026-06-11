@@ -12,7 +12,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import type { Customer } from "@/types/crm";
 
-type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Voided";
+type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
 
 type InvoiceLineItem = {
@@ -254,6 +254,7 @@ function getPaidAmount(invoice: Invoice) {
 function getComputedStatus(invoice: Invoice): InvoiceStatus {
   if (invoice.status === "Draft") return "Draft";
   if (invoice.status === "Voided") return "Voided";
+  if (invoice.status === "Paid Mail Check") return "Paid Mail Check";
   const total = calculateTotals(invoice).finalTotal;
   const paid = getPaidAmount(invoice);
   if (paid >= total && total > 0) return "Paid";
@@ -339,6 +340,7 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
 }
 function statusBadgeClass(status: InvoiceStatus) {
   if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  if (status === "Paid Mail Check") return "bg-teal-50 text-teal-700 ring-teal-200";
   if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
   if (status === "Viewed") return "bg-indigo-50 text-indigo-700 ring-indigo-100";
   if (status === "Sent" || status === "Pending") return "bg-blue-50 text-blue-700 ring-blue-100";
@@ -623,8 +625,8 @@ export default function InvoicesPage() {
     const total = invoices.reduce((sum, invoice) => sum + calculateTotals(invoice).finalTotal, 0);
     const paid = invoices.reduce((sum, invoice) => sum + getPaidAmount(invoice), 0);
     const balance = Math.max(total - paid, 0);
-    const paidCount = invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").length;
-    const unpaid = invoices.filter((invoice) => !["Paid", "Voided"].includes(getComputedStatus(invoice))).length;
+    const paidCount = invoices.filter((invoice) => ["Paid", "Paid Mail Check"].includes(getComputedStatus(invoice))).length;
+    const unpaid = invoices.filter((invoice) => !["Paid", "Paid Mail Check", "Voided"].includes(getComputedStatus(invoice))).length;
     const overdue = invoices.filter((invoice) => getComputedStatus(invoice) === "Overdue").length;
     const pending = invoices.filter((invoice) => ["Pending", "Due Soon", "Overdue"].includes(getComputedStatus(invoice))).length;
     const partial = invoices.filter((invoice) => getComputedStatus(invoice) === "Partially Paid").length;
@@ -660,7 +662,7 @@ export default function InvoicesPage() {
     const groups: Record<"Unpaid" | "Partially Paid" | "Paid", Invoice[]> = { Unpaid: [], "Partially Paid": [], Paid: [] };
     filteredInvoices.forEach((invoice) => {
       const status = getComputedStatus(invoice);
-      if (status === "Paid") groups.Paid.push(invoice);
+      if (status === "Paid" || status === "Paid Mail Check") groups.Paid.push(invoice);
       else if (status === "Partially Paid") groups["Partially Paid"].push(invoice);
       else groups.Unpaid.push(invoice);
     });
@@ -1116,6 +1118,7 @@ export default function InvoicesPage() {
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-slate-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">PDF</button>
               <button onClick={() => setShowPaymentModal(true)} className="rounded-xl sm:rounded-2xl bg-emerald-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-emerald-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-xl sm:rounded-2xl bg-slate-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">Mark Paid</button>
+              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-xl sm:rounded-2xl bg-teal-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-teal-700 active:scale-95 transition ring-1 ring-teal-200">Paid Mail Check</button>
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
