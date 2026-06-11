@@ -1010,7 +1010,7 @@ export default function ProposalsPage() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">{activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700 active:scale-95">Save</button>
-            <button type="button" onClick={() => handleDeleteProposal(activeProposal)} className="shrink-0 rounded-full bg-red-50 px-4 py-1.5 text-xs font-black text-red-700 active:scale-95">Delete</button>
+            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
           </div>
@@ -1686,7 +1686,7 @@ export default function ProposalsPage() {
                 <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" ? "bg-emerald-500 text-white" : "bg-yellow-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
-              <button type="button" onClick={() => handleDeleteProposal(proposal)} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-700">Delete</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">Delete</button>
               <span className="text-xl font-black text-slate-500">⋯</span>
             </div>
           </div>

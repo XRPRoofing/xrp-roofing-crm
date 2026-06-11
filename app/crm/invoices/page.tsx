@@ -712,6 +712,12 @@ export default function InvoicesPage() {
     setShowCreateModal(true);
   }
 
+  function handleDeleteInvoice(invoice: Invoice) {
+    if (!window.confirm(`Permanently delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}? This cannot be undone.`)) return;
+    setInvoices((current) => current.filter((item) => item.id !== invoice.id));
+    if (selectedInvoiceId === invoice.id) setSelectedInvoiceId(null);
+  }
+
   function handleStartInvoice() {
     setWonProposals(readWonProposals());
     setCreateForm(createBlankInvoice(invoices.length));
@@ -1096,6 +1102,7 @@ export default function InvoicesPage() {
                         <button type="button" onClick={() => openInvoice(invoice)} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>
                   );
@@ -1135,6 +1142,7 @@ export default function InvoicesPage() {
               <button onClick={handleMarkPaidOffline} className="rounded-xl sm:rounded-2xl bg-slate-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">Mark Paid</button>
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-xl sm:rounded-2xl bg-teal-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-teal-700 active:scale-95 transition ring-1 ring-teal-200">Paid Mail Check</button>
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
+              <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
 
