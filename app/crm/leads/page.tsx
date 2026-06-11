@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, Mic, Phone, Plus, Search, Square, StickyNote, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
@@ -69,13 +69,32 @@ function formatDueDate(value?: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
+
+const SOURCE_COLORS: Record<string, string> = {
+  AZR:           "bg-orange-100 text-orange-700",
+  Google:        "bg-blue-100 text-blue-700",
+  Facebook:      "bg-indigo-100 text-indigo-700",
+  Website:       "bg-sky-100 text-sky-700",
+  Referral:      "bg-emerald-100 text-emerald-700",
+  "Door Knocking": "bg-amber-100 text-amber-700",
+  Yelp:          "bg-red-100 text-red-700",
+  Angi:          "bg-orange-100 text-orange-800",
+  Thumbtack:     "bg-green-100 text-green-700",
+  "Phone Call":  "bg-purple-100 text-purple-700",
+  Other:         "bg-slate-100 text-slate-600",
+};
+
+function getSourceColor(source: string) {
+  return SOURCE_COLORS[source] ?? "bg-slate-100 text-slate-600";
+}
+
 function getUrgency(job: Lead) {
   if (!job.dueDate || job.stage === "completed" || job.stage === "paid") return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(`${job.dueDate}T00:00:00`);
   const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86400000);
-  if (diffDays < 0) return { label: "Overdue", className: "border-l-red-500", dot: "bg-red-500", text: "text-red-700" };
   if (diffDays <= 3) return { label: "Due Soon", className: "border-l-yellow-400", dot: "bg-yellow-400", text: "text-yellow-700" };
   return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
 }
@@ -142,6 +161,7 @@ function syncCustomerFromJob(contact: { name: string; email?: string; phone?: st
 export default function LeadsPage() {
   const [jobs, setJobs] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
@@ -269,13 +289,14 @@ export default function LeadsPage() {
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase().trim();
 
-    if (!query) return jobs;
+    const sourceFiltered = sourceFilter ? jobs.filter((job) => job.source === sourceFilter) : jobs;
+    if (!query) return sourceFiltered;
 
-    return jobs.filter((job) =>
+    return sourceFiltered.filter((job) =>
       [job.name, job.address, job.city, job.roofType, job.source, job.assignedTo, job.lastActivity, job.nextAction || ""]
         .some((value) => value.toLowerCase().includes(query))
     );
-  }, [jobs, search]);
+  }, [jobs, search, sourceFilter]);
 
   const dashboardMetrics = useMemo(() => {
     const now = new Date();
@@ -286,7 +307,7 @@ export default function LeadsPage() {
     const currentYear = now.getFullYear();
 
     return [
-      { label: "Overdue Jobs", value: jobs.filter((job) => getUrgency(job).label === "Overdue").length, tone: "text-red-700 bg-red-50 border-red-100" },
+      { label: "Due Soon", value: jobs.filter((job) => getUrgency(job).label === "Due Soon").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
       { label: "Waiting Approval", value: jobs.filter((job) => job.stage === "waiting_approval").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
       { label: "Scheduled This Week", value: jobs.filter((job) => {
         if (!job.dueDate || job.stage !== "scheduled") return false;
@@ -300,6 +321,16 @@ export default function LeadsPage() {
         return due.getMonth() === currentMonth && due.getFullYear() === currentYear;
       }).length, tone: "text-slate-700 bg-white border-slate-200" },
     ];
+  }, [jobs]);
+
+  const sourceMetrics = useMemo(() => {
+    return LEAD_SOURCES.map((src) => {
+      const srcJobs = jobs.filter((j) => j.source === src);
+      const closed = srcJobs.filter((j) => ["completed", "paid"].includes(j.stage));
+      const revenue = closed.reduce((t, j) => t + j.value, 0);
+      const conversion = srcJobs.length > 0 ? Math.round((closed.length / srcJobs.length) * 100) : 0;
+      return { src, total: srcJobs.length, closed: closed.length, revenue, conversion };
+    }).filter((m) => m.total > 0);
   }, [jobs]);
 
   useEffect(() => {
@@ -441,7 +472,7 @@ export default function LeadsPage() {
       address: "",
       roofType: "",
       source: "Website",
-      assignedTo: "Office Coordinator",
+      assignedTo: "",
       value: "",
       lastActivity: "New job created",
       nextAction: "Schedule inspection",
@@ -465,7 +496,7 @@ export default function LeadsPage() {
             <p className="crm-board-subtitle mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setSearch("")} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
+            <button onClick={() => { setSearch(""); setSourceFilter(null); }} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
             <button onClick={() => setShowForm(true)} className="inline-flex items-center rounded-xl bg-orange-500 px-4 py-2 text-xs font-black text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"><Plus className="mr-2 h-4 w-4" />Add job</button>
           </div>
         </div>
@@ -478,6 +509,29 @@ export default function LeadsPage() {
             </div>
           ))}
         </div>
+
+        {sourceMetrics.length > 0 && (
+          <div className="overflow-x-auto">
+            <div className="flex min-w-max items-stretch gap-2">
+              <div className="flex shrink-0 items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500"><Tag className="h-3 w-3" />By Source</div>
+              {sourceMetrics.map(({ src, total, closed, revenue, conversion }) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setSourceFilter(sourceFilter === src ? null : src)}
+                  className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-[10px] font-black transition hover:opacity-80 ${
+                    sourceFilter === src ? "bg-[#07183f] text-white border-[#07183f]" : `${getSourceColor(src)} border-transparent`
+                  }`}
+                >
+                  <span>{src}</span>
+                  <span className="opacity-70">{total} jobs</span>
+                  <span className="opacity-70">${revenue.toLocaleString()}</span>
+                  <span className="opacity-70">{conversion}% closed</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showForm && (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowForm(false)}>
@@ -581,7 +635,7 @@ export default function LeadsPage() {
                   <label className="grid gap-1">
                     <span className="text-xs font-bold text-slate-500">Lead Source</span>
                     <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white">
-                      {["Website","Phone Call","Referral","Door Knock","Social Media","Google","Flyer","Other"].map((s) => <option key={s}>{s}</option>)}
+                      {LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}
                     </select>
                   </label>
                   <label className="grid gap-1">
@@ -631,7 +685,30 @@ export default function LeadsPage() {
 
         <div className="relative">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search customer, city, rep, roof type, next action..." />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search customer, city, rep, source, next action..." />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500"><Tag className="h-3 w-3" />Source:</span>
+          {LEAD_SOURCES.map((src) => {
+            const count = jobs.filter((j) => j.source === src).length;
+            if (count === 0) return null;
+            const active = sourceFilter === src;
+            return (
+              <button
+                key={src}
+                type="button"
+                onClick={() => setSourceFilter(active ? null : src)}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${active ? "bg-[#07183f] text-white" : getSourceColor(src)} hover:opacity-80`}
+              >
+                {src} <span className="opacity-70">({count})</span>
+              </button>
+            );
+          })}
+          {sourceFilter && (
+            <button type="button" onClick={() => setSourceFilter(null)} className="flex items-center gap-1 rounded-full bg-slate-200 px-2 py-1 text-[10px] font-black text-slate-600 hover:bg-slate-300">
+              <X className="h-3 w-3" /> Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -660,11 +737,25 @@ export default function LeadsPage() {
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="text-base font-black text-[#07183f]">{formatMoney(job.value)}</p>
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-black ${urgency.text}`}><span className={`h-2 w-2 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                        {urgency.label !== "On Track" && (
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-black ${urgency.text}`}><span className={`h-2 w-2 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                        )}
                       </div>
-                      <p className="mt-1 truncate text-xs font-black text-slate-700">{job.assignedTo}</p>
+                      <div className="mt-1.5 flex items-center justify-between gap-1">
+                        <p className="truncate text-xs font-black text-slate-700">{job.assignedTo || "Unassigned"}</p>
+                        {job.source && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSourceFilter(sourceFilter === job.source ? null : job.source); }}
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black transition hover:opacity-80 ${getSourceColor(job.source)}`}
+                          >
+                            {job.source}
+                          </button>
+                        )}
+                      </div>
                       <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5">
                         <p className="truncate text-xs font-bold text-slate-700">Next: {job.nextAction || "Review job"}</p>
+                        {job.inspectionDate && <p className="mt-0.5 truncate text-xs font-semibold text-blue-600">Appt: {job.inspectionDate}</p>}
                         <p className="mt-0.5 text-xs font-black text-slate-500">Due: {formatDueDate(job.dueDate)}</p>
                       </div>
                       <div className="mt-2 flex items-center gap-1.5">
@@ -718,6 +809,7 @@ export default function LeadsPage() {
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. 2008" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Job Value<input type="number" value={selectedJob.value} onChange={(event) => updateJob(selectedJob.id, { value: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Assigned Rep<input value={selectedJob.assignedTo} onChange={(event) => updateJob(selectedJob.id, { assignedTo: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Lead Source<select value={selectedJob.source || ""} onChange={(event) => updateJob(selectedJob.id, { source: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none">{LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Status<select value={selectedJob.stage} onChange={(event) => updateJobStage(selectedJob.id, event.target.value as LeadStage)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none">{leadStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Due Date<input type="date" value={selectedJob.dueDate || ""} onChange={(event) => updateJob(selectedJob.id, { dueDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Next Action<input value={selectedJob.nextAction || ""} onChange={(event) => updateJob(selectedJob.id, { nextAction: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
