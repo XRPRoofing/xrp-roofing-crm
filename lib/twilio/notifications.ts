@@ -28,9 +28,12 @@ export function getTwilioCallOutcomeLabel(event: TwilioConversationEvent) {
   const duration = Number(event.payload.CallDuration || event.payload.DialCallDuration || 0);
   const effectiveStatus = status || payloadStatus;
 
+  const isOutbound = event.direction === "outbound";
   if (event.type === "call_recording") return "Call recorded with summary";
-  if (["no-answer", "busy", "failed", "canceled", "missed"].includes(effectiveStatus)) return "Missed call";
-  if (effectiveStatus === "completed" && duration === 0) return "Missed call";
+  if (!isOutbound && ["no-answer", "busy", "failed", "canceled", "missed"].includes(effectiveStatus)) return "Missed call";
+  if (!isOutbound && effectiveStatus === "completed" && duration === 0) return "Missed call";
+  if (isOutbound && ["no-answer", "busy", "failed", "canceled"].includes(effectiveStatus)) return "No answer";
+  if (isOutbound && effectiveStatus === "completed" && duration === 0) return "No answer";
   if (effectiveStatus === "in-progress" || effectiveStatus === "answered" || answeredBy) return "Answered call";
   if (effectiveStatus === "completed") return "Completed call";
   if (effectiveStatus === "ringing") return "Ringing call";
