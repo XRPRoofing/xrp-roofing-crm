@@ -70,6 +70,8 @@ function invoiceToRow(invoice: Record<string, unknown>) {
     viewed_at: invoice.viewedAt || invoice.viewed_at || null,
     paid_at: invoice.paidAt || invoice.paid_at || null,
     activity: JSON.stringify(invoice.activity || ["Invoice created"]),
+    is_deleted: invoice.isDeleted || false,
+    deleted_at: invoice.deletedAt || null,
   };
 }
 
@@ -120,6 +122,8 @@ function rowToInvoice(row: Record<string, unknown>): Record<string, unknown> {
     viewedAt: row.viewed_at,
     paidAt: row.paid_at,
     activity: safeJsonParse(row.activity, ["Invoice created"]),
+    isDeleted: row.is_deleted,
+    deletedAt: row.deleted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -186,15 +190,17 @@ export async function deleteInvoiceRecord(id: string): Promise<void> {
 
 /**
  * Load ALL invoice records from Supabase.
+ * Filters out deleted invoices (soft delete).
  * Returns [] when Supabase is not configured.
  */
-export async function loadAllInvoices<T extends { id: string }>(): Promise<T[]> {
+export async function loadAllInvoices<T extends { id: string; isDeleted?: boolean }>(): Promise<T[]> {
   if (!hasSupabaseConfig()) return [];
   
   const supabase = createClient();
   const { data, error } = await supabase
     .from(invoicesTable)
     .select("*")
+    .or('is_deleted.is.null,is_deleted.eq.false')
     .order("updated_at", { ascending: false });
     
   if (error) {
@@ -204,7 +210,8 @@ export async function loadAllInvoices<T extends { id: string }>(): Promise<T[]> 
       const response = await fetch("/api/invoices/share", { cache: "no-store" });
       if (!response.ok) return [];
       const result = (await response.json()) as { invoices?: T[] };
-      return result.invoices ?? [];
+      // Filter out deleted invoices from fallback too
+      return (result.invoices ?? []).filter((inv: T) => !inv.isDeleted);
     } catch {
       return [];
     }

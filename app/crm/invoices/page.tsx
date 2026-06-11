@@ -848,10 +848,11 @@ export default function InvoicesPage() {
   }
 
   function handleDeleteInvoice(invoice: Invoice) {
-    if (!window.confirm(`Permanently delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}?`)) return;
+    const deletedInvoice = { ...invoice, isDeleted: true, deletedAt: new Date().toISOString(), activity: [...invoice.activity, "Invoice deleted"] };
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
     if (selectedInvoiceId === invoice.id) setSelectedInvoiceId(null);
-    void deleteInvoiceRecord(invoice.id);
+    void upsertInvoiceRecord(deletedInvoice as unknown as Record<string, unknown> & { id: string });
   }
 
   function handleStartInvoice() {
