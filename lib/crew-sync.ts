@@ -339,7 +339,7 @@ export async function loadCrewDataset(): Promise<CrewDataset> {
 
   const supabase = createClient();
   const [jobsResult, photosResult, notesResult, checklistResult] = await Promise.all([
-    supabase.from(jobsTable).select("*").order("created_at", { ascending: true }),
+    supabase.from(jobsTable).select("*").order("created_at", { ascending: false }),
     // Metadata only — never download every photo's image bytes for the board.
     supabase.from(jobPhotosTable).select(photoMetaColumns).order("created_at", { ascending: true }),
     supabase.from(jobNotesTable).select("*").order("created_at", { ascending: true }),
