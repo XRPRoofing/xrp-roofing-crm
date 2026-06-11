@@ -461,7 +461,7 @@ function propagatePaidStatus(invoice: Invoice) {
     id: `task-paid-${invoice.id}-${Date.now()}`,
     title: `Payment Received - ${invoice.clientName}`,
     description: `Invoice ${invoice.invoiceNumber} has been paid. Amount: $${getPaidAmount(invoice).toLocaleString()}.`,
-    status: "Done",
+    status: "Completed",
     priority: "High",
     dueDate: new Date().toISOString().split("T")[0],
     category: "Invoices",
