@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -24,6 +24,7 @@ const navigation = [
   { href: "/crm/calendar", label: "Calendar", shortLabel: "Calendar", icon: CalendarDays },
   { href: "/crm/pdf-signer-board", label: "PDF Signer Board", shortLabel: "PDF", icon: FileSignature },
   { href: "/crm/files", label: "Files", shortLabel: "Files", icon: UploadCloud },
+  { href: "/crm/automations", label: "Automations", shortLabel: "Auto", icon: Zap },
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 
