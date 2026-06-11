@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckSquare, ChevronDown, ChevronRight, Clock, RefreshCw, Star, ThumbsDown, ThumbsUp, X, Zap } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronRight, Clock, RefreshCw, Star, ThumbsDown, ThumbsUp, Trash2, X, Zap } from "lucide-react";
 import {
   addTaskTimelineEntry,
+  deleteOfficeTask,
   officeTaskStatusColors,
   officeTaskStatuses,
   readOfficeTasks,
@@ -14,7 +15,7 @@ import {
   type OfficeTask,
   type OfficeTaskStatus,
 } from "@/lib/office-tasks";
-import { loadTasksFromSupabase, subscribeToTaskUpdates } from "@/lib/task-sync";
+import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates } from "@/lib/task-sync";
 
 function fmt(iso: string) {
   if (!iso) return "";
@@ -93,6 +94,14 @@ export default function TasksPage() {
     unsatisfied:  tasks.filter((t) => t.satisfactionResult === "no").length,
     closed:       tasks.filter((t) => t.status === "Closed").length,
   }), [tasks]);
+
+  function deleteTask(task: OfficeTask) {
+    if (!window.confirm(`Delete task for "${task.customerName}"? This cannot be undone.`)) return;
+    deleteOfficeTask(task.id);
+    void deleteTaskFromSupabase(task.id);
+    setSelectedTask(null);
+    setTasks((current) => current.filter((t) => t.id !== task.id));
+  }
 
   function moveTask(taskId: string, status: OfficeTaskStatus) {
     updateOfficeTaskStatus(taskId, status);
@@ -395,6 +404,11 @@ export default function TasksPage() {
 
             {/* Open job link */}
             <Link href={selectedTask.jobLink} className="mt-3 block text-center text-xs font-black text-blue-700 underline">Open Job Record</Link>
+
+            {/* Delete task */}
+            <button type="button" onClick={() => deleteTask(selectedTask)} className="mt-3 w-full rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-black text-red-700 transition hover:bg-red-100 flex items-center justify-center gap-2">
+              <Trash2 className="h-4 w-4" />Delete Task
+            </button>
 
             {/* Timeline */}
             <div className="mt-4">

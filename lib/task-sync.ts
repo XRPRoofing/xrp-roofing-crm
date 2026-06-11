@@ -50,6 +50,16 @@ export async function saveAllTasksToSupabase(tasks: OfficeTask[]): Promise<void>
   }
 }
 
+export async function deleteTaskFromSupabase(taskId: string): Promise<void> {
+  if (!hasSupabaseConfig()) return;
+  try {
+    const supabase = createClient();
+    await supabase.from(TABLE).delete().eq("id", taskId);
+  } catch {
+    // silently fall back to localStorage-only
+  }
+}
+
 export function subscribeToTaskUpdates(onUpdate: (tasks: OfficeTask[]) => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
   try {

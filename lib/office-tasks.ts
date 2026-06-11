@@ -339,3 +339,8 @@ export function addTaskTimelineEntry(taskId: string, event: string, note?: strin
   });
   saveOfficeTasks(updated);
 }
+
+export function deleteOfficeTask(taskId: string) {
+  const tasks = readOfficeTasks();
+  saveOfficeTasks(tasks.filter((t) => t.id !== taskId));
+}
