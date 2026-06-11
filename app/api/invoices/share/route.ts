@@ -43,15 +43,23 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json({ error: "Invoice id is required" }, { status: 400 });
-  }
-
   const supabase = getAdminClient();
 
   if (!supabase) {
     return NextResponse.json({ error: "Invoice sharing storage is not configured" }, { status: 503 });
+  }
+
+  // No id = return ALL invoices (used for cross-device sync seed)
+  if (!id) {
+    const { data, error } = await supabase
+      .from("invoice_shares")
+      .select("id, payload")
+      .order("updated_at", { ascending: false });
+    if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+    const invoices = (data ?? [])
+      .map((row: { id: string; payload: unknown }) => (row.payload && typeof row.payload === "object" ? { ...(row.payload as Record<string, unknown>), id: row.id } : null))
+      .filter(Boolean);
+    return NextResponse.json({ invoices });
   }
 
   const { data, error } = await supabase
@@ -65,4 +73,17 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ invoice: data.payload });
+}
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Invoice id is required" }, { status: 400 });
+
+  const supabase = getAdminClient();
+  if (!supabase) return NextResponse.json({ error: "Invoice sharing storage is not configured" }, { status: 503 });
+
+  const { error } = await supabase.from("invoice_shares").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 503 });
+
+  return NextResponse.json({ ok: true });
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
-import { loadInvoiceShares, subscribeToInvoiceShares, type InvoiceSharePayload } from "@/lib/invoice-sync";
+import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, deleteInvoiceRecord, loadAllInvoices, type InvoiceSharePayload } from "@/lib/invoice-sync";
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
@@ -569,6 +569,31 @@ export default function InvoicesPage() {
       });
     }
 
+    // Seed ALL full invoice records from Supabase so devices see invoices
+    // created or edited on other devices (not just Stripe payment updates).
+    void loadAllInvoices<Invoice>()
+      .then((remoteInvoices) => {
+        if (!active || remoteInvoices.length === 0) return;
+        setInvoices((current) => {
+          const localIds = new Set(current.map((inv) => inv.id));
+          const merged = [...current];
+          for (const remote of remoteInvoices) {
+            const idx = merged.findIndex((inv) => inv.id === remote.id);
+            if (idx === -1) {
+              // new invoice from another device
+              if (!localIds.has(remote.id)) merged.unshift(remote);
+            } else {
+              // prefer remote if it was updated more recently (has more activity)
+              if ((remote.activity?.length ?? 0) > (merged[idx].activity?.length ?? 0)) {
+                merged[idx] = remote;
+              }
+            }
+          }
+          return merged;
+        });
+      })
+      .catch(() => {});
+
     void loadInvoiceShares()
       .then((shares) => {
         if (active) shares.forEach(applyShare);
@@ -594,6 +619,22 @@ export default function InvoicesPage() {
     if (saved) {
       setInvoices((current) => (JSON.stringify(current) === JSON.stringify(saved) ? current : saved));
     }
+    // On focus/tab-switch, pull full invoices so creates/edits from other devices show immediately.
+    void loadAllInvoices<Invoice>()
+      .then((remoteInvoices) => {
+        if (remoteInvoices.length === 0) return;
+        setInvoices((current) => {
+          const byId = new Map(current.map((inv) => [inv.id, inv]));
+          let changed = false;
+          for (const remote of remoteInvoices) {
+            const local = byId.get(remote.id);
+            if (!local) { byId.set(remote.id, remote); changed = true; }
+            else if ((remote.activity?.length ?? 0) > (local.activity?.length ?? 0)) { byId.set(remote.id, remote); changed = true; }
+          }
+          return changed ? Array.from(byId.values()) : current;
+        });
+      })
+      .catch(() => {});
     void loadInvoiceShares()
       .then((shares) => {
         setInvoices((current) => {
@@ -676,6 +717,7 @@ export default function InvoicesPage() {
     const statusActivity = status !== nextInvoice.status ? [`Status changed to ${status}`, `Notification: ${status === "Paid" ? "New payment received" : status === "Partially Paid" ? "Partial payment made" : status === "Overdue" ? "Invoice overdue" : `Invoice ${status.toLowerCase()}`}`] : [];
     const updatedInvoice = { ...nextInvoice, status, activity: [...(activity ? [activity] : []), ...statusActivity, ...nextInvoice.activity] };
     setInvoices((currentInvoices) => currentInvoices.map((invoice) => invoice.id === updatedInvoice.id ? updatedInvoice : invoice));
+    void upsertInvoiceRecord(updatedInvoice as unknown as Record<string, unknown> & { id: string });
   }
 
   function openInvoice(invoice: Invoice) {
@@ -702,6 +744,7 @@ export default function InvoicesPage() {
     if (!pendingReviewInvoice) return;
     setInvoices((currentInvoices) => [pendingReviewInvoice, ...currentInvoices]);
     setSelectedInvoiceId(pendingReviewInvoice.id);
+    void upsertInvoiceRecord(pendingReviewInvoice as unknown as Record<string, unknown> & { id: string });
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
     setShowReviewModal(false);
@@ -716,6 +759,7 @@ export default function InvoicesPage() {
     if (!window.confirm(`Permanently delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}? This cannot be undone.`)) return;
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
     if (selectedInvoiceId === invoice.id) setSelectedInvoiceId(null);
+    void deleteInvoiceRecord(invoice.id);
   }
 
   function handleStartInvoice() {
