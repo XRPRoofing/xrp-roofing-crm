@@ -433,6 +433,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <button onClick={logout} className="relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black text-slate-500 transition hover:bg-red-50 hover:text-red-600">
+              <LogOut className="h-5 w-5" />
+              <span>Logout</span>
+            </button>
           </div>
         </nav>
         {showTeamChatFloatingButton && (
