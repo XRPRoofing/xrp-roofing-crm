@@ -143,3 +143,70 @@
 .crm-filter-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* Print styles — only the proposal content should print */
+@media print {
+  /* Hide the CRM shell: sidebar, header, team chat fab, mobile nav */
+  body > div > aside,
+  body > div > header,
+  body > div > nav,
+  body > div > a[href*="team-chat"],
+  [class*="sticky"][class*="top-0"],
+  [class*="fixed"][class*="bottom"] {
+    display: none !important;
+  }
+
+  /* Reset the layout wrapper so proposal fills the page */
+  body > div > main,
+  body > div > div > main {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 0.75in;
+    size: letter;
+  }
+
+  /* Ensure clean white background */
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Allow page breaks in proposal content */
+  #proposal-print-area {
+    break-inside: auto;
+  }
+
+  /* Avoid breaking inside key sections */
+  #proposal-print-area .rounded-3xl,
+  #proposal-print-area .rounded-2xl {
+    break-inside: avoid;
+  }
+
+  /* Terms section: remove max-height scroll constraint for full print */
+  #proposal-print-area [class*="max-h-"] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Remove decorative shadows and unnecessary borders in print */
+  #proposal-print-area [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+
+  /* Package option select buttons — hide interactive elements */
+  #proposal-print-area button[class*="Select This"],
+  #proposal-print-area button[class*="Selected Option"] {
+    display: none !important;
+  }
+
+  /* Signature section checkbox + sign button — hide in print */
+  #proposal-print-area button[class*="Accept"][class*="Sign"] {
+    display: none !important;
+  }
+}
