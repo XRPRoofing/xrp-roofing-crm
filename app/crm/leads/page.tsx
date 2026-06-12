@@ -7,7 +7,8 @@ import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
-import { addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobPhoto } from "@/lib/crew-sync";
+import { addJobNote, addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobNote, type JobPhoto } from "@/lib/crew-sync";
+import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
@@ -148,6 +149,9 @@ export default function LeadsPage() {
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
+  const [jobNotes, setJobNotes] = useState<JobNote[]>([]);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("Office");
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -193,11 +197,23 @@ export default function LeadsPage() {
   const otherPhotos = jobFiles.filter((f) => f.photoType === "Job Photo");
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 
+  // Resolve the current user's display name for note attribution.
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      const meta = data.session.user.user_metadata;
+      const name = (meta?.full_name || meta?.name || data.session.user.email?.split("@")[0] || "Office") as string;
+      setCurrentUserName(name);
+    }).catch(() => {});
+  }, []);
+
   // Load the selected job's saved files (photos + documents) from the shared
   // crew store so they show on the card and stay in sync with the Files board.
   useEffect(() => {
     if (!selectedJobId) {
       setJobFiles([]);
+      setJobNotes([]);
+      setNoteDraft("");
       setActivityOpen(false);
       setChecklistOpen(false);
       setPhotoChecklist({});
@@ -230,6 +246,19 @@ export default function LeadsPage() {
       setFileError(error instanceof Error ? error.message : "Failed to save file.");
     } finally {
       setFileBusy(false);
+    }
+  }
+
+  async function handleAddJobNote() {
+    if (!selectedJob || !noteDraft.trim()) return;
+    const body = noteDraft.trim();
+    setNoteDraft("");
+    try {
+      await addJobNote(selectedJob.id, currentUserName, body);
+      const data = await loadCrewDataset();
+      setJobNotes(data.notes);
+    } catch {
+      setNoteDraft(body);
     }
   }
 
@@ -320,7 +349,10 @@ export default function LeadsPage() {
       try {
         const data = await loadCrewDataset();
         const seededJobs = await ensureSeedJobs(data.jobs);
-        if (mounted) setJobs(seededJobs.map(normalizeJob));
+        if (mounted) {
+          setJobs(seededJobs.map(normalizeJob));
+          setJobNotes(data.notes);
+        }
       } catch {
         /* leave jobs empty when the shared store is unavailable */
       }
@@ -329,7 +361,10 @@ export default function LeadsPage() {
 
     const unsubscribe = subscribeToCrewData(() => {
       void loadCrewDataset().then((data) => {
-        if (mounted) setJobs(data.jobs.map(normalizeJob));
+        if (mounted) {
+          setJobs(data.jobs.map(normalizeJob));
+          setJobNotes(data.notes);
+        }
       }).catch(() => {});
     });
     return () => {
@@ -340,7 +375,10 @@ export default function LeadsPage() {
 
   // No manual refresh: reload jobs when returning to this tab/device.
   useAutoRefresh(() => {
-    void loadCrewDataset().then((data) => setJobs(data.jobs.map(normalizeJob))).catch(() => {});
+    void loadCrewDataset().then((data) => {
+      setJobs(data.jobs.map(normalizeJob));
+      setJobNotes(data.notes);
+    }).catch(() => {});
   });
 
 
@@ -823,7 +861,7 @@ export default function LeadsPage() {
                     return (
                       <div key={type} className={`border-t ${slotIndex === 0 ? "border-slate-700" : border}`}>
                         {/* Photo slot */}
-                        <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+                        <div className="relative w-full" style={{ aspectRatio: "16/7" }}>
                           {latest?.dataUrl ? (
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -946,9 +984,21 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><StickyNote className="h-4 w-4" />Latest note</div>
-                <p className="mt-2 text-sm font-medium text-slate-600">{selectedJob.lastActivity}</p>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><StickyNote className="h-4 w-4" />Notes</div>
+                <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+                  {jobNotes.filter((n) => n.jobId === selectedJobId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((note) => (
+                    <div key={note.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                      <p className="font-semibold text-slate-700">{note.body}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-400">{note.author} • {new Date(note.createdAt).toLocaleString()}</p>
+                    </div>
+                  ))}
+                  {jobNotes.filter((n) => n.jobId === selectedJobId).length === 0 && <p className="text-sm font-semibold text-slate-500">No notes yet.</p>}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddJobNote(); } }} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note..." />
+                  <button type="button" onClick={() => void handleAddJobNote()} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white hover:bg-blue-700">Save</button>
+                </div>
                 <div className="mt-3 flex items-center gap-2 text-xs font-black text-slate-500"><Clock className="h-4 w-4" /><CalendarDays className="h-4 w-4" />Next: {selectedJob.nextAction || "Review job"} • Due {formatDueDate(selectedJob.dueDate)}</div>
               </div>
             </div>

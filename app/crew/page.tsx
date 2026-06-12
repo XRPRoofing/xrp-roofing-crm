@@ -260,28 +260,27 @@ export default function CrewPortalPage() {
                 </div>
               </div>
 
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="text-lg font-black text-[#07183f]">Job Completion Form</h3>
-                <p className="mt-3 text-xs font-bold text-slate-500">Take photos directly from your phone camera or upload from your gallery. Each photo saves automatically to this job&apos;s folder.</p>
-                <div className="mt-3 space-y-3">
+              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-3">
+                <h3 className="text-base font-black text-[#07183f]">Job Completion Form</h3>
+                <div className="mt-2 space-y-2">
                   {(["Before", "Progress", "After"] as const).map((type) => {
                     const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
                     return (
-                      <div key={type} className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div key={type} className="rounded-xl border border-slate-200 bg-white p-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">{type} Photos</p>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{count} photo(s)</span>
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{type}</p>
+                          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">{count}</span>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => setLiveCamera({ jobId: selectedJob.id, type })}
-                            className="flex items-center justify-center gap-2 rounded-2xl bg-[#07183f] px-3 py-3 text-sm font-black text-white transition hover:bg-blue-800 active:scale-95"
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#07183f] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
                           >
-                            <Camera className="h-5 w-5" /> Camera
+                            <Camera className="h-4 w-4" /> Camera
                           </button>
-                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-blue-300 bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100">
-                            <UploadCloud className="h-5 w-5" /> Upload Photo
+                          <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-2 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
+                            <UploadCloud className="h-4 w-4" /> Upload
                             <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
                           </label>
                         </div>
@@ -291,10 +290,10 @@ export default function CrewPortalPage() {
                 </div>
 
                 {photosLoading ? (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-36 w-full animate-pulse rounded-2xl bg-slate-200" />)}</div>
+                  <div className="mt-2 grid gap-2 grid-cols-3">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-20 w-full animate-pulse rounded-lg bg-slate-200" />)}</div>
                 ) : (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Uploaded job completion"} width={400} height={260} loading="lazy" unoptimized className="h-36 w-full rounded-2xl object-cover" />)}
+                  <div className="mt-2 grid gap-2 grid-cols-3">
+                    {selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Uploaded job completion"} width={400} height={260} loading="lazy" unoptimized className="h-20 w-full rounded-lg object-cover" />)}
                   </div>
                 )}
 
