@@ -1283,13 +1283,13 @@ export default function ProposalsPage() {
                   <div className="mt-8">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-3 print:block print:space-y-6">
-                      {(["good", "better", "best"] as const).map((option) => {
+                      {(["good", "better", "best"] as const).map((option, optionIndex) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
                         const selected = (activeProposal.selectedOption || "best") === option;
                         const scopeLines = packageOption.scope.split(/\r?\n|✓|•|·|;/).map((l: string) => l.replace(/^[-*✓\s]+/, "").trim()).filter(Boolean);
                         const isScopeExpanded = previewExpandedScopes[option] ?? false;
                         return (
-                          <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid print:break-after-page ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
+                          <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid ${optionIndex > 0 ? "print:break-before-page" : ""} ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
                             <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
@@ -1376,7 +1376,7 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
                   <div className="mt-8 rounded-3xl border border-slate-200 p-6">
-                    <label className="flex items-start gap-3 text-sm font-bold text-slate-700 print:hidden">
+                    <label className="hidden print:hidden">
                       <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
                       <span>I agree to the Terms and Conditions</span>
                     </label>
@@ -1391,7 +1391,7 @@ export default function ProposalsPage() {
                         <p className="mt-3 font-black text-[#07183f]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none print:hidden">Accept & Sign Proposal</button>
+                    <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
                   </div>
                 )}
 

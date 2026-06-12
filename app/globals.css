@@ -234,5 +234,12 @@
   /* Force page break between package options so each is on its own page */
   #proposal-print-area .rounded-3xl.border.p-5 + .rounded-3xl.border.p-5 {
     break-before: page;
+    page-break-before: always;
+  }
+
+  /* Each package card should not break internally */
+  #proposal-print-area .rounded-3xl.border.p-5 {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
