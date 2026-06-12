@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { leads } from "@/lib/crm-data";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
+import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
@@ -274,24 +274,7 @@ function normalizeInspectionPhotos(photos?: InspectionPhoto[]) {
   }));
 }
 
-const initialProposals: Proposal[] = leads.slice(0, 3).map((job, index) => ({
-  id: `P-${1001 + index}`,
-  job,
-  customerName: job.name,
-  address: `${job.address}, ${job.city}`,
-  scope: `${job.roofType} roofing proposal`,
-  total: job.value,
-  status: index === 0 ? "Draft" : index === 1 ? "Sent" : "Approved",
-  template: index === 0 ? "executive" : index === 1 ? "insurance" : "premium",
-  title: index === 1 ? "INSURANCE ROOFING PROPOSAL" : index === 2 ? "PREMIUM ROOFING PROPOSAL" : "BEST ROOFING PROPOSAL",
-  summary: "A professional roofing proposal prepared for review and approval.",
-  coverPhoto: "/images/logo.jpeg",
-  coverText: "Prepared by XRP Roofing with a professional project overview, proposal options, and customer approval details.",
-  notes: "Includes materials, labor, cleanup, workmanship standards, and customer-ready project documentation.",
-  terms: defaultTerms,
-  inspectionPhotos: defaultInspectionPhotos,
-  packages: defaultPackages,
-}));
+
 
 function formatPastedProposalText(value: string) {
   return value
@@ -340,9 +323,10 @@ const initialProposalTemplates: ProposalTemplate[] = [
 
 export default function ProposalsPage() {
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
-  const [selectedJobId, setSelectedJobId] = useState(leads[0]?.id || "");
-  const [proposals, setProposals] = useState<Proposal[]>(initialProposals);
-  const prevProposalsRef = useRef<Proposal[]>(initialProposals);
+  const [jobs, setJobs] = useState<Lead[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const prevProposalsRef = useRef<Proposal[]>([]);
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
@@ -399,18 +383,18 @@ export default function ProposalsPage() {
   });
   const addressInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedJob = useMemo(() => leads.find((job) => job.id === selectedJobId), [selectedJobId]);
+  const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId), [selectedJobId, jobs]);
   const selectedTemplate = useMemo(() => templates.find((template) => template.id === editorForm.template), [editorForm.template, templates]);
   const filteredJobs = useMemo(() => {
     const query = jobSearch.toLowerCase().trim();
 
-    if (!query) return leads;
+    if (!query) return jobs;
 
-    return leads.filter((job) =>
+    return jobs.filter((job) =>
       [job.name, job.address, job.city, job.roofType, job.email, job.phone]
-        .some((value) => value.toLowerCase().includes(query))
+        .some((value) => value?.toLowerCase().includes(query))
     );
-  }, [jobSearch]);
+  }, [jobSearch, jobs]);
   const filteredProposals = useMemo(() => {
     const query = proposalSearch.toLowerCase().trim();
     const activeProposals = proposals.filter((proposal) => !proposal.deletedAt);
@@ -499,14 +483,21 @@ export default function ProposalsPage() {
 
     void init();
 
+    void loadCrewDataset().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
+
     const unsubscribe = subscribeToProposalRecords(() => void reloadFromServer());
+    const unsubscribeJobs = subscribeToCrewData(() => {
+      void loadCrewDataset().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
+    });
     return () => {
       mounted = false;
       unsubscribe();
+      unsubscribeJobs();
     };
   }, []);
 
   useAutoRefresh(() => {
+    void loadCrewDataset().then((data) => setJobs(data.jobs)).catch(() => {});
     if (!proposalSyncEnabled()) return;
     void loadProposalRecords<Proposal>().then((server) => {
       setProposals((current) => {
@@ -1641,7 +1632,7 @@ export default function ProposalsPage() {
           <button className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white shadow-lg shadow-orange-200">Create proposal</button>
         </div>
         {proposalMode === "job" && (
-          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-4 grid gap-2 pb-20 md:grid-cols-2 lg:pb-0 xl:grid-cols-3">
             {filteredJobs.map((job) => (
               <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`rounded-2xl p-4 text-left text-sm ${selectedJobId === job.id ? "bg-orange-50 ring-2 ring-orange-400" : "bg-slate-50"}`}>
                 <span className="block font-black text-[#07183f]">{job.name}</span>
@@ -1649,6 +1640,9 @@ export default function ProposalsPage() {
                 <span className="mt-2 block font-bold text-orange-700">${job.value.toLocaleString()}</span>
               </button>
             ))}
+            {filteredJobs.length === 0 && (
+              <p className="col-span-full py-6 text-center text-sm font-semibold text-slate-400">No jobs found. Add jobs in the Leads board first.</p>
+            )}
           </div>
         )}
         {proposalMode === "job" && selectedJob && (
@@ -1660,7 +1654,7 @@ export default function ProposalsPage() {
       )}
 
       {activeTab !== "templates" && activeTab !== "settings" && (
-      <div className="max-h-[calc(100vh-18rem)] space-y-3 overflow-y-auto pr-2">
+      <div className="space-y-3 overflow-y-auto pb-20 pr-2 lg:max-h-[calc(100vh-18rem)] lg:pb-0">
         {filteredProposals.map((proposal) => (
           <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-3xl border border-white/70 bg-white/95 p-4 text-left shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
             <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
