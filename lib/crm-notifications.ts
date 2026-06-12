@@ -36,7 +36,15 @@ export function readCrmNotifications() {
 
   try {
     const deletedIds = readDeletedNotificationIds();
-    return (JSON.parse(savedNotifications) as CrmNotification[]).filter((notification) => notification.status !== "deleted" && !deletedIds.includes(notification.id));
+    const filtered = (JSON.parse(savedNotifications) as CrmNotification[]).filter((notification) => notification.status !== "deleted" && !deletedIds.includes(notification.id));
+    // Dedup by title+message (keeps the first = most recent, since ordered newest-first)
+    const seen = new Set<string>();
+    return filtered.filter((n) => {
+      const key = `${n.title}::${n.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   } catch {
     return [] as CrmNotification[];
   }

@@ -46,9 +46,30 @@ export async function loadNotificationsFromSupabase(): Promise<CrmNotification[]
     const remoteIds = new Set(remote.map((n) => n.id));
     const localOnly = readCrmNotifications().filter((n) => !remoteIds.has(n.id));
     const merged = [...remote, ...localOnly].slice(0, 80);
+
+    // Dedup notifications with identical title+message (keeps the most recent).
+    // Old bug created duplicate "Payment received" notifications with unique
+    // timestamp-based IDs for the same invoice on every page load.
+    const seen = new Map<string, number>();
+    const duplicateIds: string[] = [];
+    const deduped = merged.filter((n, i) => {
+      const key = `${n.title}::${n.message}`;
+      if (seen.has(key)) {
+        duplicateIds.push(n.id);
+        return false;
+      }
+      seen.set(key, i);
+      return true;
+    });
+
+    // Fire-and-forget cleanup of duplicate rows from Supabase
+    if (duplicateIds.length > 0) {
+      void supabase.from(TABLE).delete().in("id", duplicateIds).then(() => {});
+    }
+
     // Keep localStorage in sync for offline fallback
-    saveCrmNotifications(merged);
-    return merged;
+    saveCrmNotifications(deduped);
+    return deduped;
   } catch {
     return readCrmNotifications();
   }
