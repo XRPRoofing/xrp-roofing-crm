@@ -21,6 +21,7 @@ import {
   type JobPhoto,
   type JobRecord,
 } from "@/lib/crew-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 export default function CrewPortalPage() {
   const [jobs, setJobs] = useState<JobRecord[]>([]);
@@ -95,6 +96,8 @@ export default function CrewPortalPage() {
       unsubscribe();
     };
   }, [refresh]);
+
+  useAutoRefresh(() => { void refresh().catch(() => {}); });
 
   useEffect(() => {
     const presenceChannel = joinCrewPresence(

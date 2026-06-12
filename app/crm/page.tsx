@@ -15,6 +15,7 @@ import DashboardHeroActions from "@/components/crm/dashboard/DashboardHeroAction
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { loadAllInvoices, subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
 
 type ProposalSnap = { id: string; status: string; sentToEmail?: string; viewedAt?: string; signedAt?: string; deletedAt?: string };
@@ -107,6 +108,12 @@ export default function CrmDashboardPage() {
       unsubProposals();
     };
   }, []);
+
+  useAutoRefresh(() => {
+    void loadCrewDataset().then((d) => setJobs(d.jobs)).catch(() => {});
+    void loadAllInvoices<InvoiceSnap>().then((data) => setInvoices(data)).catch(() => {});
+    void loadProposalRecords<ProposalSnap>().then((data) => setProposals(data.filter((p) => !p.deletedAt))).catch(() => {});
+  });
 
   const metrics: MetricDef[] = useMemo(() => {
     const now = new Date();

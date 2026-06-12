@@ -6,6 +6,7 @@ import { ChevronRight, FolderOpen, FolderPlus, Search, UploadCloud, X } from "lu
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { createManualFolder, loadManualFolders, manualFoldersUpdatedEvent, type ManualFolder } from "@/lib/manual-folders";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 /** Merge manually-created folders with the auto folders derived from crew jobs.
  *  Manual metadata wins for matching ids (manual photos share the folder id). */
@@ -62,6 +63,8 @@ export default function FilesPage() {
       window.removeEventListener(manualFoldersUpdatedEvent, onManual);
     };
   }, [refreshFolders]);
+
+  useAutoRefresh(() => { void refreshFolders().catch(() => {}); });
 
   return (
     <div className="space-y-5">
