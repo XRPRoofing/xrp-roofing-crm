@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import ProposalClientView from "./ProposalClientView";
 
+export const dynamic = "force-dynamic";
+
 type PublicProposal = {
   id: string;
   customerName?: string;
