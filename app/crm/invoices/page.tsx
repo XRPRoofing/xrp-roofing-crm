@@ -501,7 +501,12 @@ function propagatePaidStatus(invoice: Invoice) {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => hasSupabaseConfig() ? [] : initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    // Always start with cached data for instant display, then upgrade from Supabase.
+    const cached = readStoredInvoices();
+    if (cached && cached.length > 0) return cached;
+    return hasSupabaseConfig() ? [] : initialInvoices;
+  });
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -568,9 +573,9 @@ export default function InvoicesPage() {
     });
   }, []);
 
-  // Sync to localStorage ONLY as offline cache (secondary to Supabase)
+  // Always sync to localStorage as offline cache / backup for Supabase failures
   useEffect(() => {
-    if (!hasSupabaseConfig()) {
+    if (invoices.length > 0) {
       window.localStorage.setItem(invoicesStorageKey, JSON.stringify(invoices));
     }
   }, [invoices]);
