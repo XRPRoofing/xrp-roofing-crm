@@ -92,6 +92,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notice, setNotice] = useState("");
   const [termsOpen, setTermsOpen] = useState(false);
+  const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({});
   const isAccepted = proposal.status === "Won";
 
   const packages = useMemo(() => ({
@@ -206,6 +207,10 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                 const selected = selectedOption === option;
                 const popular = option === "best";
                 const features = toFeatures(packageOption.scope);
+                const previewCount = 3;
+                const hasMore = features.length > previewCount;
+                const isExpanded = expandedScopes[option] ?? false;
+                const visibleFeatures = isExpanded ? features : features.slice(0, previewCount);
                 return (
                   <article key={option} className={`relative flex flex-col rounded-2xl border-2 bg-white p-5 transition ${selected ? "border-blue-500 shadow-lg shadow-blue-100" : popular ? "border-blue-200" : "border-slate-200"}`}>
                     {popular && (
@@ -215,7 +220,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                     <p className="mt-1 text-sm font-semibold text-slate-500">{packageMeta[option].tagline}</p>
                     <p className="mt-4 text-3xl font-black text-[#07183f]">{currency(packageOption.price)}</p>
                     <ul className="mt-4 flex-1 space-y-2">
-                      {features.length > 0 ? features.map((feature, index) => (
+                      {visibleFeatures.length > 0 ? visibleFeatures.map((feature, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
                           <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 fill-blue-600" aria-hidden="true"><path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.3 6.8-6.3a1 1 0 0 1 1.9 0z" /></svg>
                           <span>{feature}</span>
@@ -224,6 +229,12 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                         <li className="text-sm leading-6 text-slate-500">Professional roofing option prepared by XRP Roofing.</li>
                       )}
                     </ul>
+                    {hasMore && (
+                      <button type="button" onClick={() => setExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-bold text-blue-600 transition hover:text-blue-800">
+                        <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-current transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
+                        {isExpanded ? "Show less" : `See full scope of work (${features.length - previewCount} more)`}
+                      </button>
+                    )}
                     <button type="button" disabled={isAccepted} onClick={() => handleSelectOption(option)} className={`mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold transition ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"} ${isAccepted && !selected ? "cursor-not-allowed opacity-50" : ""} ${isAccepted ? "cursor-default" : ""}`}>{selected ? (isAccepted ? "✓ Accepted" : "✓ Selected") : "Select this option"}</button>
                   </article>
                 );
