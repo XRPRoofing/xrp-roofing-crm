@@ -382,6 +382,7 @@ export default function ProposalsPage() {
     packages: defaultPackages,
   });
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const [previewExpandedScopes, setPreviewExpandedScopes] = useState<Record<string, boolean>>({});
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId), [selectedJobId, jobs]);
   const selectedTemplate = useMemo(() => templates.find((template) => template.id === editorForm.template), [editorForm.template, templates]);
@@ -1245,12 +1246,30 @@ export default function ProposalsPage() {
                       {(["good", "better", "best"] as const).map((option) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
                         const selected = (activeProposal.selectedOption || "best") === option;
+                        const scopeLines = packageOption.scope.split(/\r?\n|•|·|;/).map((l: string) => l.replace(/^[-*\s]+/, "").trim()).filter(Boolean);
+                        const previewCount = 3;
+                        const hasMoreScope = scopeLines.length > previewCount;
+                        const isScopeExpanded = previewExpandedScopes[option] ?? false;
+                        const visibleLines = isScopeExpanded ? scopeLines : scopeLines.slice(0, previewCount);
                         return (
                           <div key={option} className={`rounded-3xl border p-5 ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
                             <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
-                            <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">{packageOption.scope}</p>
+                            <ul className="mt-5 space-y-2">
+                              {visibleLines.map((line: string, i: number) => (
+                                <li key={i} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                                  <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 fill-blue-600" aria-hidden="true"><path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.3 6.8-6.3a1 1 0 0 1 1.9 0z" /></svg>
+                                  <span>{line}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            {hasMoreScope && (
+                              <button type="button" onClick={() => setPreviewExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-bold text-blue-600 transition hover:text-blue-800">
+                                <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-current transition-transform ${isScopeExpanded ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
+                                {isScopeExpanded ? "Show less" : `See full scope of work (${scopeLines.length - previewCount} more)`}
+                              </button>
+                            )}
                             <p className="mt-5 text-2xl font-black text-blue-700">${packageOption.price.toLocaleString()}</p>
                             <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
                           </div>
