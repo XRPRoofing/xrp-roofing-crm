@@ -60,6 +60,21 @@ canvas.toBlob(function(blob) {
 - "Upload Signed Proposal" button appears only after signing (any sign type)
 - Uploaded images render inline; PDFs show a download link
 
+### Proposal preview testing
+To test proposal preview features:
+
+1. **Edit package scope**: Click GOOD/BETTER/BEST tabs in the sidebar to switch packages. Each has a scope textarea.
+2. **Set scope via console** (faster than typing): React textareas require native setter + event dispatch:
+   ```js
+   const ta = document.querySelector('textarea'); // find the right one
+   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+   setter.call(ta, 'Line 1\nLine 2\nLine 3');
+   ta.dispatchEvent(new Event('input', { bubbles: true }));
+   ta.dispatchEvent(new Event('change', { bubbles: true }));
+   ```
+3. **Preview mode**: Click the "Preview" button in the toolbar to see the rendered proposal.
+4. **Collapsible scope**: Packages with >2 scope items show `max-h-32` CSS clip with fade gradient and "See full scope of work" button. Packages with ≤2 items show no button/gradient. Each package expands/collapses independently.
+
 ## Crew camera / photo upload
 The camera + Before/Progress/After photo sections exist in TWO places (share the same handler logic):
 - **Field Crew Portal** — `/crew` (phone view; pick a team member, tap a job, "Job Completion Form").
@@ -90,6 +105,7 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 - Selecting/deselecting a job toggles the right detail panel; opening DevTools can deselect it — re-click the job row.
 - **Port conflicts**: If port 3000 is in use, Next.js may start on 3001. Delete `.next/dev/lock` and kill old processes if needed.
 - **Address autocomplete**: Requires `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without it, the field shows "Address autocomplete unavailable" — you can still manually type or use console to remove the disabled attribute.
+- **Proposal scope collapse threshold**: The collapse button only appears when `scopeLines.length > 2` (3+ items after splitting by `\n|✓|•|·|;`). For edge case testing, use 1-2 lines for "no button" and 4+ lines for "should collapse".
 
 ## Devin Secrets Needed
 - None for local UI testing (bypass + local mode require no secrets).
