@@ -34,7 +34,7 @@ const navigation = [
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
 ];
 
-const mobilePrimaryNavigation = ["/crm", "/crm/team-chat", "/crm/leads", "/crm/calendar", "/crm/crew", "/crm/files"];
+const mobilePrimaryNavigation = ["/crm", "/crm/team-chat", "/crm/leads", "/crm/calendar", "/crm/crew", "/crm/payments", "/crm/files"];
 
 const quickStats = [
   { label: "Live jobs", value: "24" },
@@ -465,7 +465,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
-          <div className={`mx-auto grid max-w-md gap-1 ${mobileNavigation.length >= 6 ? "grid-cols-6" : "grid-cols-5"}`}>
+          <div className={`mx-auto grid max-w-md gap-1 ${mobileNavigation.length >= 7 ? "grid-cols-7" : mobileNavigation.length >= 6 ? "grid-cols-6" : "grid-cols-5"}`}>
             {mobileNavigation.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
