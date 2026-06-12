@@ -535,7 +535,12 @@ export default function ProposalsPage() {
 
   useEffect(() => {
     if (!dataLoaded) return;
-    window.localStorage.setItem(proposalsLocalKey, JSON.stringify(proposals));
+    try {
+      const slim = proposals.map((p) => ({ ...p, brochures: undefined }));
+      window.localStorage.setItem(proposalsLocalKey, JSON.stringify(slim));
+    } catch {
+      /* localStorage quota exceeded — brochure data URLs on proposals can be very large */
+    }
   }, [dataLoaded, proposals]);
 
   // One-click handoff from a Job / customer profile: open the requested estimate
