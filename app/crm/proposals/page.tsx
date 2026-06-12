@@ -1209,11 +1209,11 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Inspection Photos") && (
-                  <div className="mt-8">
+                  <div className={`mt-8 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Inspection Photos</p>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       {normalizeInspectionPhotos(editorForm.inspectionPhotos).map((photo, index) => (
-                        <div key={photo.label} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                        <div key={photo.label} className={`rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
                           <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-xl bg-white text-sm font-bold text-slate-500">
                             {photo.image ? (
                               <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-52 w-full object-cover" />
