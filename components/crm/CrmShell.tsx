@@ -14,6 +14,7 @@ import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords } from "@/lib/customer-sync";
 import { subscribeToTaskUpdates } from "@/lib/task-sync";
+import { loadNotificationsFromSupabase, subscribeToNotifications } from "@/lib/notification-sync";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -110,10 +111,16 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setNotifications(readCrmNotifications());
     }
 
-    refreshNotifications();
+    // Load from Supabase first for cross-device sync, then fall back to localStorage
+    void loadNotificationsFromSupabase().then((n) => setNotifications(n)).catch(() => refreshNotifications());
+
+    // Subscribe to real-time notification changes from Supabase
+    const unsubRemote = subscribeToNotifications((n) => setNotifications(n));
+
     window.addEventListener("crm-notifications-updated", refreshNotifications);
     window.addEventListener("storage", refreshNotifications);
     return () => {
+      unsubRemote();
       window.removeEventListener("crm-notifications-updated", refreshNotifications);
       window.removeEventListener("storage", refreshNotifications);
     };

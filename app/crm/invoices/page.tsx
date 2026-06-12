@@ -13,6 +13,7 @@ import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
+import { syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
@@ -458,11 +459,15 @@ function propagatePaidStatus(invoice: Invoice) {
     void updateJobRecord(invoice.jobReference, { stage: "paid" }).catch(() => {});
   }
 
-  // Auto-create a "Paid" task for tracking
+  // Move any existing task for this job to "Paid" column
+  const jobId = invoice.jobReference || invoice.id;
+  syncInvoiceStatusToTask(jobId, "Paid", invoice.invoiceNumber, `$${getPaidAmount(invoice).toLocaleString()}`);
+
+  // Also create a dedicated "Paid" task for tracking
   const now = new Date().toISOString();
   const paidTask: OfficeTask = {
     id: `task-paid-${invoice.id}-${Date.now()}`,
-    jobId: invoice.jobReference || invoice.id,
+    jobId,
     title: `Payment Received - ${invoice.clientName}`,
     customerName: invoice.clientName,
     jobAddress: invoice.propertyAddress,
@@ -471,7 +476,7 @@ function propagatePaidStatus(invoice: Invoice) {
     invoiceStatus: "Paid",
     assignedUser: "Office Staff",
     dueDate: now.split("T")[0],
-    status: "Closed",
+    status: "Paid",
     jobLink: invoice.jobReference
       ? `/crm/crew?job=${encodeURIComponent(invoice.jobReference)}`
       : "/crm/invoices",
