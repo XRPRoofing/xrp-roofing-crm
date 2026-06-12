@@ -872,7 +872,7 @@ export default function ProposalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
-      });
+      }).catch(() => null);
 
       const emailPromise = fetch("/api/proposals/send", {
         method: "POST",
@@ -888,27 +888,36 @@ export default function ProposalsPage() {
           coverTitle: sentProposal?.title || editorForm.title,
           coverText: sentProposal?.coverText || editorForm.coverText,
         }),
-      });
+      }).catch(() => null);
+
       const [shareResponse, response] = await Promise.all([sharePromise, emailPromise]);
       let shareWarning = "";
 
-      if (!shareResponse.ok) {
-        const data = await shareResponse.json().catch(() => null) as { error?: string } | null;
+      if (!shareResponse || !shareResponse.ok) {
+        const data = shareResponse ? await shareResponse.json().catch(() => null) as { error?: string } | null : null;
         shareWarning = data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.";
       }
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Unable to send proposal email");
+      if (!response) {
+        setSendNotice(`Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}`);
+        return;
       }
 
-      setSendNotice(`${shareWarning ? `${shareWarning} Email was sent, but the customer link may not open until sharing is configured.` : `Proposal sent to ${sendForm.toEmail}.`} Link: ${proposalLink}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as { error?: string } | null;
+        const serverError = data?.error || "Unable to send proposal email";
+        if (serverError === "Email service is not configured") {
+          setSendNotice(`Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}`);
+        } else {
+          setSendNotice(`${serverError}\n\nProposal link: ${proposalLink}`);
+        }
+        return;
+      }
+
+      setSendNotice(`${shareWarning ? `${shareWarning} Email was sent, but the customer link may not open until sharing is configured.` : `Proposal sent to ${sendForm.toEmail}.`}\n\nProposal link: ${proposalLink}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Email could not be sent.";
-      const supportMessage = message === "Email service is not configured"
-        ? "Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually."
-        : message;
-      setSendNotice(`${supportMessage} Proposal link: ${proposalLink}`);
+      setSendNotice(`${message}\n\nProposal link: ${proposalLink}`);
     }
   }
 
@@ -1416,7 +1425,7 @@ export default function ProposalsPage() {
                       </div>
                     </div>
                   </div>
-                  {sendNotice && <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
+                  {sendNotice && <p className="whitespace-pre-line rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-slate-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
