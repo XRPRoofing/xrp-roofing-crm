@@ -65,7 +65,7 @@ export function subscribeToTaskUpdates(onUpdate: (tasks: OfficeTask[]) => void):
   try {
     const supabase = createClient();
     const channel = supabase
-      .channel("office-tasks-realtime")
+      .channel(`office-tasks-realtime-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
         const tasks = await loadTasksFromSupabase();
         onUpdate(tasks);

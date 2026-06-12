@@ -241,7 +241,7 @@ export function subscribeToInvoiceShares(onChange: (payload: InvoiceSharePayload
   if (!hasSupabaseConfig()) return () => {};
 
   const supabase = createClient();
-  const channel = supabase.channel("invoices-realtime");
+  const channel = supabase.channel(`invoices-realtime-${Math.random().toString(36).slice(2)}`);
   
   channel.on(
     "postgres_changes",

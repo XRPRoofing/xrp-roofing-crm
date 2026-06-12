@@ -646,7 +646,7 @@ export function subscribeToCrewData(onChange: () => void): () => void {
   }
 
   const supabase = createClient();
-  const channel = supabase.channel("crew-workflow-data");
+  const channel = supabase.channel(`crew-workflow-data-${Math.random().toString(36).slice(2)}`);
   [jobsTable, jobPhotosTable, jobNotesTable, jobChecklistTable].forEach((table) => {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, () => onChange());
   });

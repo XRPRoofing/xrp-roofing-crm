@@ -62,7 +62,7 @@ export async function deleteProposalRecord(id: string): Promise<void> {
 export function subscribeToProposalRecords(onChange: () => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
   const supabase = createClient();
-  const channel = supabase.channel("proposal-records-sync");
+  const channel = supabase.channel(`proposal-records-sync-${Math.random().toString(36).slice(2)}`);
   channel.on(
     "postgres_changes",
     { event: "*", schema: "public", table: proposalsTable },
