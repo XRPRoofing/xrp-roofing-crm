@@ -1209,11 +1209,11 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Inspection Photos") && (
-                  <div className="mt-8">
+                  <div className={`mt-8 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Inspection Photos</p>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       {normalizeInspectionPhotos(editorForm.inspectionPhotos).map((photo, index) => (
-                        <div key={photo.label} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                        <div key={photo.label} className={`rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
                           <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-xl bg-white text-sm font-bold text-slate-500">
                             {photo.image ? (
                               <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-52 w-full object-cover" />
@@ -1282,14 +1282,14 @@ export default function ProposalsPage() {
                 {isPreviewing && editorForm.showPackages && (
                   <div className="mt-8">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
-                    <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    <div className="mt-4 grid gap-4 lg:grid-cols-3 print:block print:space-y-6">
                       {(["good", "better", "best"] as const).map((option) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
                         const selected = (activeProposal.selectedOption || "best") === option;
                         const scopeLines = packageOption.scope.split(/\r?\n|✓|•|·|;/).map((l: string) => l.replace(/^[-*✓\s]+/, "").trim()).filter(Boolean);
                         const isScopeExpanded = previewExpandedScopes[option] ?? false;
                         return (
-                          <div key={option} className={`rounded-3xl border p-5 ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
+                          <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid print:break-after-page ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
                             <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
