@@ -474,7 +474,13 @@ export default function ProposalsPage() {
       const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
       if (savedTemplates && mounted) {
         try {
-          setTemplates(JSON.parse(savedTemplates) as ProposalTemplate[]);
+          const parsed = JSON.parse(savedTemplates) as ProposalTemplate[];
+          const migrated = parsed.map((t) => ({
+            ...t,
+            brochureEnabled: t.brochureEnabled ?? false,
+            brochures: Array.isArray(t.brochures) ? t.brochures : [],
+          }));
+          setTemplates(migrated);
         } catch {
           /* keep defaults */
         }
@@ -576,7 +582,12 @@ export default function ProposalsPage() {
 
   useEffect(() => {
     if (!dataLoaded) return;
-    window.localStorage.setItem("xrp-crm-proposal-templates", JSON.stringify(templates));
+    try {
+      const stripped = templates.map((t) => ({ ...t, brochures: (t.brochures || []).map((b) => ({ name: b.name, type: b.type, dataUrl: b.dataUrl })) }));
+      window.localStorage.setItem("xrp-crm-proposal-templates", JSON.stringify(stripped));
+    } catch {
+      /* localStorage quota exceeded — brochure data URLs can be very large */
+    }
   }, [dataLoaded, templates]);
 
   useEffect(() => {
@@ -1639,10 +1650,10 @@ export default function ProposalsPage() {
                 </div>
                 {templateForm.brochureEnabled && (
                   <div className="mt-3 space-y-2">
-                    {templateForm.brochures.map((file, index) => (
+                    {(templateForm.brochures || []).map((file, index) => (
                       <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
                         <span className="truncate">{file.name}</span>
-                        <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: templateForm.brochures.filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
+                        <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: (templateForm.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
                       </div>
                     ))}
                     <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
@@ -1651,9 +1662,10 @@ export default function ProposalsPage() {
                         const files = event.target.files;
                         if (!files) return;
                         Array.from(files).forEach((file) => {
+                          if (file.size > 2 * 1024 * 1024) { alert(`File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max size is 2 MB.`); return; }
                           const reader = new FileReader();
                           reader.onload = () => {
-                            setTemplateForm((prev) => ({ ...prev, brochures: [...prev.brochures, { name: file.name, dataUrl: reader.result as string, type: file.type }] }));
+                            setTemplateForm((prev) => ({ ...prev, brochures: [...(prev.brochures || []), { name: file.name, dataUrl: reader.result as string, type: file.type }] }));
                           };
                           reader.readAsDataURL(file);
                         });
@@ -1726,9 +1738,14 @@ export default function ProposalsPage() {
                         <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(event) => {
                           const files = event.target.files;
                           if (!files) return;
+                          const validFiles = Array.from(files).filter((file) => {
+                            if (file.size > 2 * 1024 * 1024) { alert(`File "${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max size is 2 MB.`); return false; }
+                            return true;
+                          });
+                          if (!validFiles.length) { event.target.value = ""; return; }
                           const newBrochures = [...(template.brochures || [])];
-                          let remaining = files.length;
-                          Array.from(files).forEach((file) => {
+                          let remaining = validFiles.length;
+                          validFiles.forEach((file) => {
                             const reader = new FileReader();
                             reader.onload = () => {
                               newBrochures.push({ name: file.name, dataUrl: reader.result as string, type: file.type });
