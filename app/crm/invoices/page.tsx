@@ -157,7 +157,7 @@ const initialInvoices: Invoice[] = [
     warrantyNotes: "Warranty begins after final payment is received.",
     discount: 500,
     status: "Sent",
-    lineItems: [{ description: "Roofing labor and materials", quantity: 1, unitPrice: 18500, tax: 7.8 }],
+    lineItems: [{ description: "Roofing labor and materials", quantity: 1, unitPrice: 18500, tax: 0 }],
     payments: [],
     activity: ["Invoice created"],
   },
@@ -180,7 +180,7 @@ const initialInvoices: Invoice[] = [
     warrantyNotes: "Includes coating warranty subject to maintenance terms.",
     discount: 0,
     status: "Partially Paid",
-    lineItems: [{ description: "Foam roof repair and coating", quantity: 1, unitPrice: 24200, tax: 7.8 }],
+    lineItems: [{ description: "Foam roof repair and coating", quantity: 1, unitPrice: 24200, tax: 0 }],
     payments: [{ amount: 10000, date: "2026-05-01", method: "Bank Transfer", reference: "ACH-2026", notes: "Deposit received", offline: false }],
     activity: ["Invoice created", "Payment recorded: $10,000"],
   },
@@ -203,7 +203,7 @@ const initialInvoices: Invoice[] = [
     warrantyNotes: "Repair warranty applies to serviced sections only.",
     discount: 0,
     status: "Paid",
-    lineItems: [{ description: "Commercial roof repair", quantity: 1, unitPrice: 32900, tax: 7.8 }],
+    lineItems: [{ description: "Commercial roof repair", quantity: 1, unitPrice: 32900, tax: 0 }],
     payments: [{ amount: 35466.2, date: "2026-04-25", method: "Check", reference: "CHK-8821", notes: "Payment received offline", offline: true }],
     activity: ["Invoice created", "Payment recorded: $35,466.20", "Status changed to Paid"],
   },
@@ -330,7 +330,7 @@ function createInvoiceFromJob(job: Lead, count: number): Invoice {
     roofType: job.roofType,
     dueDate: job.dueDate || today,
     projectCompletionDate: job.dueDate || today,
-    lineItems: [{ description: `${job.roofType} roofing services`, quantity: 1, unitPrice: job.value, tax: 7.8 }],
+    lineItems: [{ description: `${job.roofType} roofing services`, quantity: 1, unitPrice: job.value, tax: 0 }],
   };
 }
 
