@@ -32,7 +32,7 @@ export function isProposalLocked(payload: ProposalPayload | null | undefined): b
   if (payload.locked === true) return true;
   if (typeof payload.signedAt === "string" && payload.signedAt.length > 0) return true;
   const status = typeof payload.status === "string" ? payload.status : "";
-  return status === "Won" || status === "Signed";
+  return status === "Won" || status === "Signed" || status === "Signed Offline";
 }
 
 /**

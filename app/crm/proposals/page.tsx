@@ -21,7 +21,7 @@ type Proposal = {
   address: string;
   scope: string;
   total: number;
-  status: "Draft" | "Sent" | "Viewed" | "Signed" | "Won" | "Approved";
+  status: "Draft" | "Sent" | "Viewed" | "Signed" | "Won" | "Approved" | "Signed Offline";
   template: string;
   title: string;
   summary: string;
@@ -52,6 +52,10 @@ type Proposal = {
     better: string | PackageOption;
     best: string | PackageOption;
   };
+  offlineSignedAt?: string;
+  offlineSignedBy?: string;
+  offlineSignatureFile?: string;
+  offlineSignatureFileName?: string;
 };
 
 type InspectionPhoto = {
@@ -338,6 +342,8 @@ export default function ProposalsPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showOfflineSignModal, setShowOfflineSignModal] = useState(false);
+  const [offlineSignerName, setOfflineSignerName] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [typedSignature, setTypedSignature] = useState("");
   const [sendForm, setSendForm] = useState({
@@ -918,6 +924,56 @@ export default function ProposalsPage() {
     }
   }
 
+  function handleOpenOfflineSignModal() {
+    if (!activeProposal) return;
+    setOfflineSignerName(activeProposal.customerName || "");
+    setShowOfflineSignModal(true);
+  }
+
+  function handleMarkSignedOffline() {
+    if (!activeProposal) return;
+
+    const acceptedOption = activeProposal.selectedOption || "best";
+    const acceptedPrice = Number(editorForm.total) || activeProposal.total || 0;
+    const signedAt = new Date().toISOString();
+    const signedProposal = saveActiveProposal({
+      status: "Signed Offline" as Proposal["status"],
+      offlineSignedAt: signedAt,
+      offlineSignedBy: offlineSignerName.trim() || activeProposal.customerName,
+      signedAt,
+      signedBy: offlineSignerName.trim() || activeProposal.customerName,
+      selectedOption: acceptedOption,
+      acceptedPackage: acceptedOption,
+      acceptedPackageName: acceptedOption.charAt(0).toUpperCase() + acceptedOption.slice(1),
+      acceptedPrice,
+      total: acceptedPrice,
+      proposalVersion: activeProposal.proposalVersion ?? 1,
+      locked: true,
+    });
+
+    if (signedProposal) {
+      setActiveProposal(signedProposal);
+    }
+    setShowOfflineSignModal(false);
+  }
+
+  function handleUploadSignedDocument(file: File | undefined) {
+    if (!file || !activeProposal) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileData = typeof reader.result === "string" ? reader.result : "";
+      const updatedProposal = saveActiveProposal({
+        offlineSignatureFile: fileData,
+        offlineSignatureFileName: file.name,
+      });
+      if (updatedProposal) {
+        setActiveProposal(updatedProposal);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handleInspectionPhotoUpload(index: number, file: File | undefined) {
     if (!file) return;
 
@@ -947,10 +1003,19 @@ export default function ProposalsPage() {
             <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
+            {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
+              <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-amber-50 px-4 py-1.5 text-xs font-black text-amber-700 active:scale-95">Mark as Signed Offline</button>
+            )}
+            {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
+              <label className="shrink-0 cursor-pointer rounded-full bg-violet-50 px-4 py-1.5 text-xs font-black text-violet-700 active:scale-95">
+                Upload Signed Proposal
+                <input type="file" accept="image/*,.pdf" onChange={(event) => handleUploadSignedDocument(event.target.files?.[0])} className="hidden" />
+              </label>
+            )}
           </div>
         </div>
 
-        {(activeProposal.status === "Won" || activeProposal.status === "Signed") && (
+        {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
           <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4">
             <div className="mx-auto max-w-5xl rounded-2xl bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -973,6 +1038,26 @@ export default function ProposalsPage() {
                 </div>
               </div>
               {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
+              {activeProposal.status === "Signed Offline" && (
+                <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Signed In Person</p>
+                  <p className="mt-0.5 text-sm text-slate-700">This proposal was signed offline (in person) by {activeProposal.offlineSignedBy || activeProposal.customerName}.</p>
+                </div>
+              )}
+              {activeProposal.offlineSignatureFile && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Uploaded Signed Document</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    {activeProposal.offlineSignatureFile.startsWith("data:image") ? (
+                      <Image src={activeProposal.offlineSignatureFile} alt="Signed proposal" width={200} height={140} className="max-h-36 w-auto rounded-lg border border-slate-200 object-contain" />
+                    ) : (
+                      <a href={activeProposal.offlineSignatureFile} download={activeProposal.offlineSignatureFileName || "signed-proposal.pdf"} className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100">
+                        📄 {activeProposal.offlineSignatureFileName || "signed-proposal.pdf"}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1320,6 +1405,26 @@ export default function ProposalsPage() {
             </div>
           </main>
         </div>
+        {showOfflineSignModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50">
+            <div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-black text-slate-900">Mark as Signed Offline</h2>
+                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="text-2xl text-slate-400 hover:text-slate-600">&times;</button>
+              </div>
+              <p className="mt-3 text-sm text-slate-600">Record that this proposal was signed in person. The proposal will be locked and marked as accepted.</p>
+              <label className="mt-5 block text-xs font-black uppercase tracking-wider text-slate-500">
+                Signed by (customer name)
+                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#07183f] outline-none focus:border-blue-500" placeholder="Customer full name" />
+              </label>
+              <div className="mt-6 flex items-center gap-3">
+                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-600">Cancel</button>
+                <button type="button" onClick={handleMarkSignedOffline} className="flex-1 rounded-xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-amber-100 hover:bg-amber-600">Confirm Signed Offline</button>
+              </div>
+              <p className="mt-4 text-xs text-slate-500">After confirming, you can upload a photo or PDF of the signed document using the &ldquo;Upload Signed Proposal&rdquo; button.</p>
+            </div>
+          </div>
+        )}
         {showSendModal && (
           <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50">
             <div className="flex h-full w-full max-w-[530px] flex-col bg-white shadow-2xl">
@@ -1643,7 +1748,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-black text-[#07183f]">{proposal.address}</p>
                 <p className="mt-1 text-sm text-slate-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
-                <p className="mt-1 text-xs text-slate-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
+                <p className="mt-1 text-xs text-slate-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
               </div>
             </div>
             </button>
@@ -1652,7 +1757,7 @@ export default function ProposalsPage() {
                 <p className="font-black text-slate-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
                 <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
-              <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" ? "bg-emerald-500 text-white" : "bg-yellow-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
+              <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-emerald-500 text-white" : "bg-yellow-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
               <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">Delete</button>
               <span className="text-xl font-black text-slate-500">⋯</span>
             </div>
