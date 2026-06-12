@@ -23,16 +23,20 @@ export async function loadTasksFromSupabase(): Promise<OfficeTask[]> {
     const tasks = (data as { id: string; payload: OfficeTask }[]).map((row) => ({ ...row.payload, id: row.id }));
 
     // Clean up duplicate paid tasks created by the old Date.now()-based ID bug.
-    // Keep only the first (most recent) task per jobId for "task-paid-*" entries.
+    // Keep only the first (most recent) task per jobId OR invoiceNumber.
     const seenPaidJobs = new Set<string>();
+    const seenPaidInvoices = new Set<string>();
     const duplicateIds: string[] = [];
     const deduped = tasks.filter((t) => {
       if (!t.id.startsWith("task-paid-")) return true;
-      if (seenPaidJobs.has(t.jobId)) {
+      const dupByJob = t.jobId && seenPaidJobs.has(t.jobId);
+      const dupByInvoice = t.invoiceNumber && seenPaidInvoices.has(t.invoiceNumber);
+      if (dupByJob || dupByInvoice) {
         duplicateIds.push(t.id);
         return false;
       }
-      seenPaidJobs.add(t.jobId);
+      if (t.jobId) seenPaidJobs.add(t.jobId);
+      if (t.invoiceNumber) seenPaidInvoices.add(t.invoiceNumber);
       return true;
     });
 
