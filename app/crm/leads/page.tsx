@@ -470,13 +470,13 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-4 py-5 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="sticky top-16 z-30 space-y-3 border-b border-slate-200/80 bg-slate-100/95 pb-3 backdrop-blur sm:space-y-4 sm:pb-4 lg:top-20">
+    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 px-3 py-3 sm:-mx-6 sm:px-6 sm:py-5 lg:-mx-8 lg:px-8">
+      <div className="sticky top-16 z-30 space-y-2 border-b border-slate-200/80 bg-slate-100/95 pb-2 backdrop-blur sm:space-y-4 sm:pb-4 lg:top-20">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Roofing operations</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Jobs board</h1>
-            <p className="crm-board-subtitle mt-1 max-w-3xl text-sm font-medium text-slate-600">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
+            <p className="crm-board-subtitle mt-1 hidden max-w-3xl text-sm font-medium text-slate-600 sm:block">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => { setSearch(""); setSourceFilter(null); }} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
@@ -673,7 +673,7 @@ export default function LeadsPage() {
 
         <div className="relative">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search customer, city, rep, source, next action..." />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-11 pr-4 text-sm font-semibold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50 sm:py-3" placeholder="Search customer, city, rep, source, next action..." />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500"><Tag className="h-3 w-3" />Source:</span>
