@@ -24,11 +24,7 @@ export const leads: Lead[] = [
   { id: "L-1007", name: "Sunset Retail Center", email: "ops@example.com", phone: "(480) 555-0160", address: "7707 E Main St", city: "Mesa", stage: "completed", value: 64500, assignedTo: "Admin User", roofType: "TPO", source: "Repeat Customer", lastActivity: "Warranty packet uploaded", nextAction: "Collect final payment", dueDate: "2026-07-10" },
 ];
 
-export const customers: Customer[] = [
-  { id: "C-501", name: "Priya Shah", email: "priya@example.com", phone: "(480) 555-0108", propertyAddress: "3012 S Dobson Rd, Mesa, AZ", roofDetails: "Concrete tile, 2,900 sq ft, underlayment replacement", insuranceCarrier: "State Farm", status: "Active job", lifetimeValue: 31800 },
-  { id: "C-502", name: "Sunset Retail Center", email: "ops@example.com", phone: "(480) 555-0160", propertyAddress: "7707 E Main St, Mesa, AZ", roofDetails: "60-mil TPO commercial roof", insuranceCarrier: "Travelers", status: "Completed", lifetimeValue: 64500 },
-  { id: "C-503", name: "Carlos Vega", email: "carlos@example.com", phone: "(602) 555-0148", propertyAddress: "4119 N 15th Ave, Phoenix, AZ", roofDetails: "Leak repair and flashing replacement", insuranceCarrier: "USAA", status: "In progress", lifetimeValue: 14200 },
-];
+export const customers: Customer[] = [];
 
 export const tasks: Task[] = [
   { id: "T-1", title: "Upload roof inspection photos", dueDate: "Today", priority: "high", status: "todo", assignedTo: "Johnny Roofer", relatedTo: "Maria Hernandez" },
