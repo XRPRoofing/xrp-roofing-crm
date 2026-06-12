@@ -769,6 +769,19 @@ export default function ProposalsPage() {
     setIsPreviewing(false);
     setActiveSection("Estimate");
     setActiveProposal(proposal);
+
+    if (!proposal.brochures?.length && proposalSyncEnabled()) {
+      fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: { proposal?: Proposal } | null) => {
+          const brochures = data?.proposal?.brochures;
+          if (brochures?.length) {
+            setEditorBrochures(brochures);
+            setProposals((cur) => cur.map((p) => p.id === proposal.id ? { ...p, brochures } : p));
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   function handleSaveProposal() {
@@ -1906,7 +1919,10 @@ export default function ProposalsPage() {
             </div>
           </div>
         ))}
-        {filteredProposals.length === 0 && (
+        {filteredProposals.length === 0 && !dataLoaded && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center font-semibold text-slate-500">Loading proposals…</div>
+        )}
+        {filteredProposals.length === 0 && dataLoaded && (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center font-semibold text-slate-500">No proposals match your search.</div>
         )}
       </div>
