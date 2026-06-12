@@ -223,10 +223,7 @@
     height: 0.75rem !important;
   }
 
-  /* Package options grid: compact spacing between cards */
-  #proposal-print-area .print\\:block.print\\:space-y-4 > * + * {
-    margin-top: 0.75rem !important;
-  }
+
 
   /* Terms section: allow flowing across pages, compact text */
   #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 {
