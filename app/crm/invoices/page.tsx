@@ -7,7 +7,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { addCrmNotification, addUniqueCrmNotification } from "@/lib/crm-notifications";
+import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -505,12 +505,6 @@ function propagatePaidStatus(invoice: Invoice) {
   };
   void upsertTaskToSupabase(paidTask);
 
-  addUniqueCrmNotification(`paid-${invoice.id}`, {
-    title: "Payment received",
-    message: `${invoice.clientName} paid ${invoice.invoiceNumber}`,
-    actor: "Stripe",
-    module: "Invoices",
-  });
 }
 
 export default function InvoicesPage() {

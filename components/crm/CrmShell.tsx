@@ -14,7 +14,7 @@ import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords } from "@/lib/customer-sync";
 import { subscribeToTaskUpdates } from "@/lib/task-sync";
-import { loadNotificationsFromSupabase, subscribeToNotifications } from "@/lib/notification-sync";
+import { deleteNotificationFromSupabase, loadNotificationsFromSupabase, markNotificationsReadInSupabase, subscribeToNotifications } from "@/lib/notification-sync";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -271,12 +271,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   function handleToggleNotifications() {
     setNotificationsOpen((current) => !current);
     markCrmNotificationsRead();
-    setNotifications(readCrmNotifications());
+    const updated = readCrmNotifications();
+    setNotifications(updated);
+    void markNotificationsReadInSupabase(updated);
   }
 
   function handleDeleteNotification(notificationId: string) {
     deleteCrmNotification(notificationId);
     setNotifications(readCrmNotifications());
+    void deleteNotificationFromSupabase(notificationId);
   }
 
   function handleAnswerGlobalIncomingCall() {

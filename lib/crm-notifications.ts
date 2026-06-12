@@ -14,7 +14,7 @@ export type CrmNotification = {
 export const crmNotificationsStorageKey = "xrp-crm-notifications";
 const crmDeletedNotificationsStorageKey = "xrp-crm-deleted-notifications";
 
-function readDeletedNotificationIds() {
+export function readDeletedNotificationIds() {
   if (typeof window === "undefined") return [] as string[];
 
   try {
