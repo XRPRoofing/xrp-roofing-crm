@@ -1,3 +1,5 @@
+import { pushNotificationToSupabase } from "@/lib/notification-sync";
+
 export type CrmNotification = {
   id: string;
   title: string;
@@ -58,6 +60,7 @@ export function addCrmNotification(input: Omit<CrmNotification, "id" | "createdA
 
   if (readDeletedNotificationIds().includes(notification.id)) return;
   saveCrmNotifications([notification, ...readCrmNotifications()].slice(0, 80));
+  void pushNotificationToSupabase(notification);
 }
 
 export function addUniqueCrmNotification(uniqueId: string, input: Omit<CrmNotification, "id" | "createdAt" | "read" | "status">) {
@@ -76,6 +79,7 @@ export function addUniqueCrmNotification(uniqueId: string, input: Omit<CrmNotifi
   };
 
   saveCrmNotifications([notification, ...notifications].slice(0, 80));
+  void pushNotificationToSupabase(notification);
 }
 
 export function markCrmNotificationsRead() {
