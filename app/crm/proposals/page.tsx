@@ -989,8 +989,8 @@ export default function ProposalsPage() {
 
   if (activeProposal) {
     return (
-      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8">
-        <div className="sticky top-16 z-30 border-b border-slate-200 bg-white shadow-sm lg:top-20">
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8 print:m-0 print:min-h-0 print:bg-white">
+        <div className="sticky top-16 z-30 border-b border-slate-200 bg-white shadow-sm lg:top-20 print:hidden">
           {/* Row 1 — back + address */}
           <div className="flex h-10 items-center justify-between px-4">
             <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
@@ -1002,6 +1002,7 @@ export default function ProposalsPage() {
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700 active:scale-95">Save</button>
             <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
+            <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-black text-slate-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
             {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
               <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-amber-50 px-4 py-1.5 text-xs font-black text-amber-700 active:scale-95">Mark as Signed Offline</button>
@@ -1016,7 +1017,7 @@ export default function ProposalsPage() {
         </div>
 
         {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
-          <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4">
+          <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-4 print:hidden">
             <div className="mx-auto max-w-5xl rounded-2xl bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Signed proposal copy</p>
@@ -1062,7 +1063,7 @@ export default function ProposalsPage() {
           </div>
         )}
 
-        <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 ${isPreviewing ? "" : "lg:grid-cols-[280px_1fr]"}`}>
+        <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[280px_1fr]"}`} id="proposal-print-area">
           {!isPreviewing && (
           <aside className="border-r border-slate-200 bg-white p-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1157,10 +1158,10 @@ export default function ProposalsPage() {
           </aside>
           )}
 
-          <main className="p-6">
-            <div className="mx-auto max-w-[760px]">
-              <p className="mb-5 text-center text-sm font-black text-slate-700">{selectedTemplate?.label || "Custom Proposal"}</p>
-              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-slate-200 ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-slate-200"}`}>
+          <main className="p-6 print:p-0">
+            <div className="mx-auto max-w-[760px] print:max-w-none">
+              <p className="mb-5 text-center text-sm font-black text-slate-700 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
+              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-slate-200 print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-slate-200"}`}>
                 <div className="grid gap-6 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:grid-cols-2">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Client Info</p>
@@ -1292,7 +1293,7 @@ export default function ProposalsPage() {
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
                             <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
-                            <div className={`relative mt-5 overflow-hidden ${!isScopeExpanded ? "max-h-32" : ""}`}>
+                            <div className={`relative mt-5 overflow-hidden print:!max-h-none ${!isScopeExpanded ? "max-h-32" : ""}`}>
                               <ul className="space-y-2">
                                 {scopeLines.map((line: string, i: number) => (
                                   <li key={i} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
@@ -1302,17 +1303,17 @@ export default function ProposalsPage() {
                                 ))}
                               </ul>
                               {!isScopeExpanded && scopeLines.length > 2 && (
-                                <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t ${selected ? "from-blue-50" : "from-white"} to-transparent`} />
+                                <div className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t print:hidden ${selected ? "from-blue-50" : "from-white"} to-transparent`} />
                               )}
                             </div>
                             {scopeLines.length > 2 && (
-                              <button type="button" onClick={() => setPreviewExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-bold text-blue-600 transition hover:text-blue-800">
+                              <button type="button" onClick={() => setPreviewExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-bold text-blue-600 transition hover:text-blue-800 print:hidden">
                                 <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-current transition-transform ${isScopeExpanded ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
                                 {isScopeExpanded ? "Show less" : "See full scope of work"}
                               </button>
                             )}
                             <p className="mt-5 text-2xl font-black text-blue-700">${packageOption.price.toLocaleString()}</p>
-                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
+                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black print:hidden ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
                           </div>
                         );
                       })}
@@ -1375,21 +1376,22 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
                   <div className="mt-8 rounded-3xl border border-slate-200 p-6">
-                    <label className="flex items-start gap-3 text-sm font-bold text-slate-700">
+                    <label className="flex items-start gap-3 text-sm font-bold text-slate-700 print:hidden">
                       <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
                       <span>I agree to the Terms and Conditions</span>
                     </label>
+                    <p className="hidden text-sm font-bold text-slate-700 print:block">By signing below, I agree to the Terms and Conditions outlined above.</p>
                     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
                       <label className="block text-xs font-black uppercase tracking-wider text-slate-500">
                         Client Signature
-                        <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none" placeholder="Type full legal name" />
+                        <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none print:rounded-none print:border-0 print:border-b-2 print:border-slate-400 print:py-8" placeholder="Type full legal name" />
                       </label>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">Date Signed</p>
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">Date</p>
                         <p className="mt-3 font-black text-[#07183f]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept & Sign Proposal</button>
+                    <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="mt-5 w-full rounded-2xl bg-blue-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-blue-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none print:hidden">Accept & Sign Proposal</button>
                   </div>
                 )}
 
