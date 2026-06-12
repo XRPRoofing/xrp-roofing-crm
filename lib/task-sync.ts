@@ -21,9 +21,29 @@ export async function loadTasksFromSupabase(): Promise<OfficeTask[]> {
       .order("updated_at", { ascending: false });
     if (error || !data?.length) return readOfficeTasks();
     const tasks = (data as { id: string; payload: OfficeTask }[]).map((row) => ({ ...row.payload, id: row.id }));
+
+    // Clean up duplicate paid tasks created by the old Date.now()-based ID bug.
+    // Keep only the first (most recent) task per jobId for "task-paid-*" entries.
+    const seenPaidJobs = new Set<string>();
+    const duplicateIds: string[] = [];
+    const deduped = tasks.filter((t) => {
+      if (!t.id.startsWith("task-paid-")) return true;
+      if (seenPaidJobs.has(t.jobId)) {
+        duplicateIds.push(t.id);
+        return false;
+      }
+      seenPaidJobs.add(t.jobId);
+      return true;
+    });
+
+    // Fire-and-forget cleanup of duplicate rows from Supabase
+    if (duplicateIds.length > 0) {
+      void supabase.from(TABLE).delete().in("id", duplicateIds).then(() => {});
+    }
+
     // Also keep localStorage in sync for offline fallback
-    saveOfficeTasks(tasks);
-    return tasks;
+    saveOfficeTasks(deduped);
+    return deduped;
   } catch {
     return readOfficeTasks();
   }
