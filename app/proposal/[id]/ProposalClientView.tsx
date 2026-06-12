@@ -34,6 +34,7 @@ type PublicProposal = {
     better?: string | { scope?: string; price?: number };
     best?: string | { scope?: string; price?: number };
   };
+  brochures?: { name: string; dataUrl: string; type: string }[];
 };
 
 type PackageOption = {
@@ -273,6 +274,26 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               </div>
             )}
           </section>
+
+          {proposal.brochures && proposal.brochures.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <p className="text-base font-black text-[#07183f]">Product Brochure</p>
+              <div className="mt-4 space-y-4">
+                {proposal.brochures.map((file, index) => (
+                  <div key={index}>
+                    {file.type.startsWith("image/") ? (
+                      <img src={file.dataUrl} alt={file.name} className="w-full rounded-xl" />
+                    ) : (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-sm font-bold text-slate-700">{file.name}</p>
+                        <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm font-black text-blue-600 hover:underline">Download {file.name}</a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {isAccepted ? (
             <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 text-center shadow-sm sm:p-8">

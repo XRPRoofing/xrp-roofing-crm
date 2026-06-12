@@ -56,6 +56,7 @@ type Proposal = {
   offlineSignedBy?: string;
   offlineSignatureFile?: string;
   offlineSignatureFileName?: string;
+  brochures?: BrochureFile[];
 };
 
 type InspectionPhoto = {
@@ -69,6 +70,12 @@ type PackageOption = {
   price: number;
 };
 
+type BrochureFile = {
+  name: string;
+  dataUrl: string;
+  type: string;
+};
+
 type ProposalTemplate = {
   id: string;
   label: string;
@@ -77,6 +84,8 @@ type ProposalTemplate = {
   summary: string;
   terms: string;
   packages?: Proposal["packages"];
+  brochureEnabled?: boolean;
+  brochures?: BrochureFile[];
 };
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
@@ -298,6 +307,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
     summary: "A professional roofing proposal prepared for review and approval.",
     terms: defaultTerms,
     packages: defaultPackages,
+    brochureEnabled: false,
+    brochures: [],
   },
   {
     id: "insurance",
@@ -307,6 +318,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
     summary: "Prepared for insurance documentation, carrier review, and roofing claim support.",
     terms: defaultTerms,
     packages: defaultPackages,
+    brochureEnabled: false,
+    brochures: [],
   },
   {
     id: "premium",
@@ -316,6 +329,8 @@ const initialProposalTemplates: ProposalTemplate[] = [
     summary: "A premium customer-ready roofing package with clear scope, value, and next steps.",
     terms: defaultTerms,
     packages: defaultPackages,
+    brochureEnabled: false,
+    brochures: [],
   },
 ];
 
@@ -327,6 +342,7 @@ export default function ProposalsPage() {
   const prevProposalsRef = useRef<Proposal[]>([]);
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
+  const [editorBrochures, setEditorBrochures] = useState<BrochureFile[]>([]);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
   const [dataLoaded, setDataLoaded] = useState(false);
   const [jobSearch, setJobSearch] = useState("");
@@ -362,6 +378,8 @@ export default function ProposalsPage() {
     summary: "",
     terms: "",
     packages: defaultPackages,
+    brochureEnabled: false,
+    brochures: [] as BrochureFile[],
   });
   const [editorForm, setEditorForm] = useState({
     customerName: "",
@@ -689,6 +707,7 @@ export default function ProposalsPage() {
       terms: template.terms,
       packages: normalizePackages(template.packages),
     });
+    setEditorBrochures(template.brochureEnabled && template.brochures?.length ? [...template.brochures] : []);
   }
 
   function handleCreateTemplate(event: React.FormEvent<HTMLFormElement>) {
@@ -703,10 +722,12 @@ export default function ProposalsPage() {
       summary: templateForm.summary || "A professional roofing proposal prepared for customer review.",
       terms: templateForm.terms || defaultTerms,
       packages: normalizePackages(templateForm.packages),
+      brochureEnabled: templateForm.brochureEnabled,
+      brochures: templateForm.brochures,
     };
 
     setTemplates((currentTemplates) => [newTemplate, ...currentTemplates]);
-    setTemplateForm({ label: "", description: "", title: "", summary: "", terms: "", packages: defaultPackages });
+    setTemplateForm({ label: "", description: "", title: "", summary: "", terms: "", packages: defaultPackages, brochureEnabled: false, brochures: [] });
   }
 
   function openProposal(proposal: Proposal) {
@@ -728,6 +749,7 @@ export default function ProposalsPage() {
       inspectionPhotos: normalizeInspectionPhotos(proposal.inspectionPhotos),
       packages: normalizePackages(proposal.packages),
     });
+    setEditorBrochures(proposal.brochures || []);
     setIsPreviewing(false);
     setActiveSection("Estimate");
     setActiveProposal(proposal);
@@ -761,6 +783,7 @@ export default function ProposalsPage() {
       showPackages: editorForm.showPackages,
       inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
       packages: normalizePackages(editorForm.packages),
+      brochures: editorBrochures.length > 0 ? editorBrochures : undefined,
       ...extraFields,
     };
 
@@ -1374,6 +1397,26 @@ export default function ProposalsPage() {
                   </div>
                 )}
 
+                {editorBrochures.length > 0 && (isPreviewing || activeSection === "Terms and Conditions") && (
+                  <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    <p className="text-2xl font-black text-[#07183f]">Product Brochure</p>
+                    <div className="mt-4 space-y-4">
+                      {editorBrochures.map((file, index) => (
+                        <div key={index}>
+                          {file.type.startsWith("image/") ? (
+                            <img src={file.dataUrl} alt={file.name} className="w-full rounded-xl" />
+                          ) : (
+                            <div className="rounded-xl border border-slate-200 bg-white p-4">
+                              <p className="text-sm font-bold text-slate-700">{file.name}</p>
+                              <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm font-black text-blue-600 hover:underline">Download {file.name}</a>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
                   <div className="mt-8 rounded-3xl border border-slate-200 p-6">
                     <label className="hidden print:hidden">
@@ -1584,6 +1627,42 @@ export default function ProposalsPage() {
                 ))}
               </div>
               <textarea value={templateForm.terms} onChange={(event) => setTemplateForm({ ...templateForm, terms: event.target.value })} className="min-h-36 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Default terms and conditions" />
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Include Brochure</p>
+                    <p className="mt-1 text-xs text-slate-400">Attach brochure files to this template</p>
+                  </div>
+                  <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochureEnabled: !templateForm.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${templateForm.brochureEnabled ? "bg-blue-600" : "bg-slate-300"}`}>
+                    <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${templateForm.brochureEnabled ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+                {templateForm.brochureEnabled && (
+                  <div className="mt-3 space-y-2">
+                    {templateForm.brochures.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                        <span className="truncate">{file.name}</span>
+                        <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: templateForm.brochures.filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
+                      </div>
+                    ))}
+                    <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
+                      + Add brochure file (PDF, image)
+                      <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(event) => {
+                        const files = event.target.files;
+                        if (!files) return;
+                        Array.from(files).forEach((file) => {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setTemplateForm((prev) => ({ ...prev, brochures: [...prev.brochures, { name: file.name, dataUrl: reader.result as string, type: file.type }] }));
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                        event.target.value = "";
+                      }} />
+                    </label>
+                  </div>
+                )}
+              </div>
               <button className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Save template</button>
             </div>
           </form>
@@ -1623,6 +1702,46 @@ export default function ProposalsPage() {
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-slate-500">Include Brochure</p>
+                      <p className="mt-1 text-xs text-slate-400">Attach brochure files to proposals using this template</p>
+                    </div>
+                    <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochureEnabled: !template.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${template.brochureEnabled ? "bg-blue-600" : "bg-slate-300"}`}>
+                      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${template.brochureEnabled ? "translate-x-6" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+                  {template.brochureEnabled && (
+                    <div className="mt-3 space-y-2">
+                      {(template.brochures || []).map((file, index) => (
+                        <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                          <span className="truncate">{file.name}</span>
+                          <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochures: (template.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
+                        </div>
+                      ))}
+                      <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
+                        + Add brochure file (PDF, image)
+                        <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(event) => {
+                          const files = event.target.files;
+                          if (!files) return;
+                          const newBrochures = [...(template.brochures || [])];
+                          let remaining = files.length;
+                          Array.from(files).forEach((file) => {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              newBrochures.push({ name: file.name, dataUrl: reader.result as string, type: file.type });
+                              remaining--;
+                              if (remaining === 0) handleUpdateTemplate({ ...template, brochures: newBrochures });
+                            };
+                            reader.readAsDataURL(file);
+                          });
+                          event.target.value = "";
+                        }} />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
