@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 type GoogleCalendarEvent = {
   id: string;
@@ -561,7 +562,14 @@ export default function CalendarPage() {
                 <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Appointment title" />
                 <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Customer name" />
                 <input type="tel" inputMode="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Phone number (for click-to-call)" />
-                <input required value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Job address" />
+                <div className="sm:col-span-2">
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(addr) => setForm({ ...form, address: addr })}
+                    placeholder="Start typing job address..."
+                    required
+                  />
+                </div>
                 <select required value={form.jobKind} onChange={(event) => setForm({ ...form, jobKind: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2">
                   <option>Repair</option>
                   <option>Replacement</option>
