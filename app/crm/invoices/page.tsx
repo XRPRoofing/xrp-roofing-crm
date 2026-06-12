@@ -111,6 +111,19 @@ const customersStorageKey = "xrp-crm-customers";
 
 const today = new Date().toISOString().slice(0, 10);
 const invoicesStorageKey = "xrp-crm-invoices";
+const paidPropagatedKey = "xrp-crm-paid-propagated";
+
+function readPaidPropagated(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(paidPropagatedKey);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch { return new Set(); }
+}
+
+function savePaidPropagated(set: Set<string>) {
+  try { window.localStorage.setItem(paidPropagatedKey, JSON.stringify([...set])); } catch {}
+}
 
 /** Read the invoices persisted in this browser (written by any tab on this device). */
 function readStoredInvoices(): Invoice[] | null {
@@ -545,7 +558,7 @@ export default function InvoicesPage() {
 
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [pendingReviewInvoice, setPendingReviewInvoice] = useState<Invoice | null>(null);
-  const paidPropagatedRef = useRef<Set<string>>(new Set());
+  const paidPropagatedRef = useRef<Set<string>>(readPaidPropagated());
   const intentHandledRef = useRef(false);
   const [rejectModal, setRejectModal] = useState<{ pending: PendingPayment; invoiceId: string } | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
@@ -600,9 +613,10 @@ export default function InvoicesPage() {
     let active = true;
 
     // Seed with already-paid invoices so we only cascade NEW payments.
-    paidPropagatedRef.current = new Set(
-      invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").map((invoice) => invoice.id),
-    );
+    // Merge persisted set (survives page reloads) with current paid invoices.
+    const persisted = paidPropagatedRef.current;
+    invoices.filter((invoice) => getComputedStatus(invoice) === "Paid").forEach((invoice) => persisted.add(invoice.id));
+    savePaidPropagated(persisted);
 
     function applyShare(share: InvoiceSharePayload) {
       setInvoices((current) => {
@@ -774,6 +788,7 @@ export default function InvoicesPage() {
     invoices.forEach((invoice) => {
       if (getComputedStatus(invoice) === "Paid" && !paidPropagatedRef.current.has(invoice.id)) {
         paidPropagatedRef.current.add(invoice.id);
+        savePaidPropagated(paidPropagatedRef.current);
         propagatePaidStatus(invoice);
       }
     });
