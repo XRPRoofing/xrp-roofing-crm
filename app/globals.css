@@ -182,38 +182,30 @@
     break-inside: auto;
   }
 
-  /* Avoid breaking inside key sections */
-  #proposal-print-area .rounded-3xl,
-  #proposal-print-area .rounded-2xl {
-    break-inside: avoid;
-  }
-
-  /* Terms section: remove max-height scroll constraint for full print */
+  /* Remove max-height scroll constraints so T&C prints in full */
   #proposal-print-area [class*="max-h-"] {
     max-height: none !important;
     overflow: visible !important;
   }
 
-  /* Remove decorative shadows and unnecessary borders in print */
+  /* Remove decorative shadows in print */
   #proposal-print-area [class*="shadow-"] {
     box-shadow: none !important;
   }
 
-  /* Package option select buttons — hide interactive elements */
+  /* Hide interactive buttons in print */
   #proposal-print-area button[class*="Select This"],
-  #proposal-print-area button[class*="Selected Option"] {
-    display: none !important;
-  }
-
-  /* Signature section checkbox + sign button — hide in print */
+  #proposal-print-area button[class*="Selected Option"],
   #proposal-print-area button[class*="Accept"][class*="Sign"] {
     display: none !important;
   }
 
-  /* Compress package cards so each fits on one page */
+  /* Package cards: compact styling, no internal breaks */
   #proposal-print-area .rounded-3xl.border.p-5 {
     padding: 0.75rem !important;
     font-size: 0.8rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   #proposal-print-area .rounded-3xl.border.p-5 ul {
@@ -231,14 +223,30 @@
     height: 0.75rem !important;
   }
 
-  /* Force page break between package options so each is on its own page */
-  #proposal-print-area .rounded-3xl.border.p-5 + .rounded-3xl.border.p-5 {
-    break-before: page;
-    page-break-before: always;
+  /* Package options grid: compact spacing between cards */
+  #proposal-print-area .print\\:block.print\\:space-y-4 > * + * {
+    margin-top: 0.75rem !important;
   }
 
-  /* Each package card should not break internally */
-  #proposal-print-area .rounded-3xl.border.p-5 {
+  /* Terms section: allow flowing across pages, compact text */
+  #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 {
+    break-inside: auto;
+    page-break-inside: auto;
+    padding: 1rem !important;
+  }
+
+  #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 .rounded-2xl {
+    break-inside: auto;
+    page-break-inside: auto;
+    max-height: none !important;
+    overflow: visible !important;
+    font-size: 0.7rem !important;
+    line-height: 1.5 !important;
+    padding: 0.75rem !important;
+  }
+
+  /* Signature section: keep together on one page */
+  #proposal-print-area .rounded-3xl.border.border-slate-200.p-6:last-of-type {
     break-inside: avoid;
     page-break-inside: avoid;
   }
