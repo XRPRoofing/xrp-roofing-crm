@@ -209,4 +209,30 @@
   #proposal-print-area button[class*="Accept"][class*="Sign"] {
     display: none !important;
   }
+
+  /* Compress package cards so each fits on one page */
+  #proposal-print-area .rounded-3xl.border.p-5 {
+    padding: 0.75rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  #proposal-print-area .rounded-3xl.border.p-5 ul {
+    margin-top: 0.25rem !important;
+  }
+
+  #proposal-print-area .rounded-3xl.border.p-5 li {
+    font-size: 0.75rem !important;
+    line-height: 1.4 !important;
+    gap: 0.25rem !important;
+  }
+
+  #proposal-print-area .rounded-3xl.border.p-5 li svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
+  /* Force page break between package options so each is on its own page */
+  #proposal-print-area .rounded-3xl.border.p-5 + .rounded-3xl.border.p-5 {
+    break-before: page;
+  }
 }

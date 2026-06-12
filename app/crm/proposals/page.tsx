@@ -1282,14 +1282,14 @@ export default function ProposalsPage() {
                 {isPreviewing && editorForm.showPackages && (
                   <div className="mt-8">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
-                    <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    <div className="mt-4 grid gap-4 lg:grid-cols-3 print:block print:space-y-6">
                       {(["good", "better", "best"] as const).map((option) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
                         const selected = (activeProposal.selectedOption || "best") === option;
                         const scopeLines = packageOption.scope.split(/\r?\n|✓|•|·|;/).map((l: string) => l.replace(/^[-*✓\s]+/, "").trim()).filter(Boolean);
                         const isScopeExpanded = previewExpandedScopes[option] ?? false;
                         return (
-                          <div key={option} className={`rounded-3xl border p-5 ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
+                          <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid print:break-after-page ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
                             <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
