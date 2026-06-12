@@ -94,3 +94,4 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 ## Devin Secrets Needed
 - None for local UI testing (bypass + local mode require no secrets).
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — optional, only needed for address autocomplete in proposal creation.
+- For production/Stripe webhook or email flows: `STRIPE_SECRET_KEY` (sk_live_…), `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `INVOICE_NOTIFICATION_EMAIL` (set in Vercel, not needed locally).
