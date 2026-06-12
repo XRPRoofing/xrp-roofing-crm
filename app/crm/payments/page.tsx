@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DollarSign, TrendingUp, Clock, CheckCircle2, Briefcase, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, Clock, CheckCircle2, Briefcase, BarChart3, FileEdit } from "lucide-react";
 import { loadAllInvoices } from "@/lib/invoice-sync";
 import { loadCrewDataset } from "@/lib/crew-sync";
 
@@ -65,15 +65,18 @@ export default function PaymentsPage() {
 
   const stats = useMemo(() => {
     const paidStatuses = new Set(["Paid", "Paid Mail Check"]);
-    const pendingStatuses = new Set(["Draft", "Sent", "Viewed", "Pending", "Due Soon", "Overdue"]);
+    const draftStatuses = new Set(["Draft"]);
+    const pendingStatuses = new Set(["Sent", "Viewed", "Pending", "Due Soon", "Overdue"]);
     const processingStatuses = new Set(["Partially Paid"]);
 
     let totalRevenue = 0;
+    let draftsAmount = 0;
     let pendingAmount = 0;
     let processingAmount = 0;
     let completedAmount = 0;
     let completedCount = 0;
 
+    const drafts: LoadedInvoice[] = [];
     const pending: LoadedInvoice[] = [];
     const processing: LoadedInvoice[] = [];
     const completed: LoadedInvoice[] = [];
@@ -92,6 +95,9 @@ export default function PaymentsPage() {
       } else if (processingStatuses.has(status) || (paid > 0 && !paidStatuses.has(status))) {
         processingAmount += total - paid;
         processing.push(inv);
+      } else if (draftStatuses.has(status)) {
+        draftsAmount += total;
+        drafts.push(inv);
       } else if (pendingStatuses.has(status)) {
         pendingAmount += total;
         pending.push(inv);
@@ -100,11 +106,12 @@ export default function PaymentsPage() {
 
     const avgJobValue = completedCount > 0 ? totalRevenue / completedCount : 0;
 
-    return { totalRevenue, pendingAmount, processingAmount, completedAmount, completedCount, avgJobValue, pending, processing, completed };
+    return { totalRevenue, draftsAmount, pendingAmount, processingAmount, completedAmount, completedCount, avgJobValue, drafts, pending, processing, completed };
   }, [invoices]);
 
   const summaryCards = [
     { label: "Total Revenue", value: formatMoney(stats.totalRevenue), icon: DollarSign, color: "bg-emerald-50 text-emerald-700", iconBg: "bg-emerald-100" },
+    { label: "Drafts", value: formatMoney(stats.draftsAmount), icon: FileEdit, color: "bg-slate-50 text-slate-700", iconBg: "bg-slate-200" },
     { label: "Pending", value: formatMoney(stats.pendingAmount), icon: Clock, color: "bg-amber-50 text-amber-700", iconBg: "bg-amber-100" },
     { label: "Processing", value: formatMoney(stats.processingAmount), icon: TrendingUp, color: "bg-blue-50 text-blue-700", iconBg: "bg-blue-100" },
     { label: "Completed", value: formatMoney(stats.completedAmount), icon: CheckCircle2, color: "bg-emerald-50 text-emerald-700", iconBg: "bg-emerald-100" },
@@ -141,30 +148,31 @@ export default function PaymentsPage() {
 
       {/* Payment columns */}
       {loading ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
+        <div className="grid gap-4 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-60 animate-pulse rounded-2xl bg-slate-100" />
           ))}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <PaymentColumn title="Pending" items={stats.pending} badgeColor="bg-amber-50 text-amber-700" />
-          <PaymentColumn title="Processing" items={stats.processing} badgeColor="bg-blue-50 text-blue-700" />
-          <PaymentColumn title="Completed" items={stats.completed} badgeColor="bg-emerald-50 text-emerald-700" />
+        <div className="grid gap-4 lg:grid-cols-4">
+          <PaymentColumn title="Drafts" subtitle="Unsent invoices" items={stats.drafts} badgeColor="bg-slate-100 text-slate-700" />
+          <PaymentColumn title="Pending" subtitle="Sent & awaiting payment" items={stats.pending} badgeColor="bg-amber-50 text-amber-700" />
+          <PaymentColumn title="Processing" subtitle="Partially paid" items={stats.processing} badgeColor="bg-blue-50 text-blue-700" />
+          <PaymentColumn title="Completed" subtitle="Fully paid" items={stats.completed} badgeColor="bg-emerald-50 text-emerald-700" />
         </div>
       )}
     </div>
   );
 }
 
-function PaymentColumn({ title, items, badgeColor }: { title: string; items: LoadedInvoice[]; badgeColor: string }) {
+function PaymentColumn({ title, subtitle, items, badgeColor }: { title: string; subtitle?: string; items: LoadedInvoice[]; badgeColor: string }) {
   const total = items.reduce((sum, inv) => sum + computeTotal(inv), 0);
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-lg font-black text-[#07183f]">{title}</h2>
-          <p className="text-sm font-semibold text-slate-500">{items.length} payment{items.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm font-semibold text-slate-500">{subtitle || `${items.length} payment${items.length !== 1 ? "s" : ""}`}</p>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-black ${badgeColor}`}>{formatMoney(total)}</span>
       </div>
