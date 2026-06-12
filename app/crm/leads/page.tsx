@@ -37,6 +37,7 @@ function normalizeJob(job: Lead) {
     stage,
     nextAction: job.nextAction || job.lastActivity || "Review next step",
     dueDate: dueDateValid,
+    originalDueDate: job.dueDate,
   };
 }
 
@@ -316,21 +317,23 @@ export default function LeadsPage() {
     const currentYear = now.getFullYear();
 
     return [
-      { label: "Due Soon", value: jobs.filter((job) => getUrgency(job).label === "Due Soon").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
-      { label: "Waiting Approval", value: jobs.filter((job) => job.stage === "waiting_approval").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
-      { label: "Scheduled This Week", value: jobs.filter((job) => {
+      { label: "Due Soon", value: filteredJobs.filter((job) => getUrgency(job).label === "Due Soon").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
+      { label: "Waiting Approval", value: filteredJobs.filter((job) => job.stage === "waiting_approval").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
+      { label: "Scheduled This Week", value: filteredJobs.filter((job) => {
         if (!job.dueDate || job.stage !== "scheduled") return false;
         const due = new Date(`${job.dueDate}T00:00:00`);
         return due >= now && due <= weekEnd;
       }).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
-      { label: "Active Jobs", value: jobs.filter((job) => ["scheduled", "in_progress", "final_inspection"].includes(job.stage)).length, tone: "text-emerald-700 bg-emerald-50 border-emerald-100" },
-      { label: "Completed This Month", value: jobs.filter((job) => {
-        if (!["completed", "paid"].includes(job.stage) || !job.dueDate) return false;
-        const due = new Date(`${job.dueDate}T00:00:00`);
+      { label: "Active Jobs", value: filteredJobs.filter((job) => !["completed", "paid"].includes(job.stage)).length, tone: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+      { label: "Completed This Month", value: filteredJobs.filter((job) => {
+        if (!["completed", "paid"].includes(job.stage)) return false;
+        const dateStr = (job as Lead & { originalDueDate?: string }).originalDueDate;
+        if (!dateStr) return false;
+        const due = new Date(`${dateStr}T00:00:00`);
         return due.getMonth() === currentMonth && due.getFullYear() === currentYear;
       }).length, tone: "text-slate-700 bg-white border-slate-200" },
     ];
-  }, [jobs]);
+  }, [filteredJobs]);
 
   const sourceMetrics = useMemo(() => {
     return LEAD_SOURCES.map((src) => {
