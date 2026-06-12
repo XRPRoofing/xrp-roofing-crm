@@ -16,6 +16,50 @@ NEXT_PUBLIC_TEST_FORCE_LOCAL=1
 
 Start with `npm run dev` (serves on http://localhost:3000). Maximize the browser before recording.
 
+## Proposals
+The proposal system is at `/crm/proposals`. In local mode, proposals are stored in localStorage.
+
+### Creating a test proposal
+1. Click "⊕ Proposal" → select "New Customer"
+2. Fill customer name, address (address autocomplete may be disabled without `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — if the address field is disabled, use browser console to remove the `disabled` attribute or just use the address as-is)
+3. Click "Create Proposal" → the editor opens
+
+### Proposal modal overlays
+Modals in the proposal editor use `fixed inset-0 z-50` positioning but may render outside the visible viewport due to the parent layout nesting. If a modal doesn't appear visually but IS in the DOM, use browser console to click the confirm button programmatically (`document.querySelectorAll('button')` → find by textContent → `.click()`). The functional behavior works correctly.
+
+### File upload testing
+The "Upload Signed Proposal" button is a `<label>` wrapping a hidden `<input type="file">`. To programmatically upload in tests:
+```js
+const labels = document.querySelectorAll('label');
+let fileInput = null;
+for (const label of labels) {
+  if (label.textContent.includes('Upload Signed Proposal')) {
+    fileInput = label.querySelector('input[type="file"]');
+    break;
+  }
+}
+// Create a test image via canvas
+const canvas = document.createElement('canvas');
+canvas.width = 400; canvas.height = 300;
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = '#f5f5f5'; ctx.fillRect(0, 0, 400, 300);
+ctx.font = 'bold 20px Arial'; ctx.fillText('SIGNED PROPOSAL', 100, 50);
+canvas.toBlob(function(blob) {
+  const file = new File([blob], 'signed-proposal.png', { type: 'image/png' });
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fileInput.files = dt.files;
+  fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+}, 'image/png');
+```
+
+### Proposal statuses and locking
+- Statuses: Draft, Sent, Viewed, Signed, Won, Approved, Signed Offline
+- "Signed", "Won", and "Signed Offline" lock the proposal (🔒 badge, fields disabled)
+- "Mark as Signed Offline" button only appears for non-signed statuses
+- "Upload Signed Proposal" button appears only after signing (any sign type)
+- Uploaded images render inline; PDFs show a download link
+
 ## Crew camera / photo upload
 The camera + Before/Progress/After photo sections exist in TWO places (share the same handler logic):
 - **Field Crew Portal** — `/crew` (phone view; pick a team member, tap a job, "Job Completion Form").
@@ -44,7 +88,10 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 - **Optimistic "instant display" can't be proven in localStorage mode** — local saves are already instant, so optimistic vs normal render look identical. Its real payoff is over slow Supabase sync in production. State this honestly; don't claim the production speed-up was proven locally.
 - **Real-time cross-device sync** needs a live Supabase DB — only the no-F5 auto-reload-on-focus path is testable locally.
 - Selecting/deselecting a job toggles the right detail panel; opening DevTools can deselect it — re-click the job row.
+- **Port conflicts**: If port 3000 is in use, Next.js may start on 3001. Delete `.next/dev/lock` and kill old processes if needed.
+- **Address autocomplete**: Requires `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without it, the field shows "Address autocomplete unavailable" — you can still manually type or use console to remove the disabled attribute.
 
 ## Devin Secrets Needed
 - None for local UI testing (bypass + local mode require no secrets).
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — optional, only needed for address autocomplete in proposal creation.
 - For production/Stripe webhook or email flows: `STRIPE_SECRET_KEY` (sk_live_…), `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `INVOICE_NOTIFICATION_EMAIL` (set in Vercel, not needed locally).
