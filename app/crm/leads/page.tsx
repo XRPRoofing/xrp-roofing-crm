@@ -836,93 +836,45 @@ export default function LeadsPage() {
                   )}
                 </div>
 
-                {/* CompanyCam-style Before / Progress / After */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a] shadow-xl">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Camera className="h-4 w-4 text-orange-400" />
-                      <span className="text-sm font-black text-white">Job Photos</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-black text-blue-300">{beforePhotos.length} Before</span>
-                      <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-black text-orange-300">{progressPhotos.length} Progress</span>
-                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-300">{afterPhotos.length} After</span>
-                    </div>
-                  </div>
-
-                  {/* Stacked photo slots */}
-                  {([
-                    { type: "Before" as const, photos: beforePhotos, label: "BEFORE", labelBg: "bg-black/70", labelText: "text-white", addBg: "bg-slate-800 hover:bg-slate-700", camBg: "bg-blue-600 hover:bg-blue-700", border: "border-blue-900/40" },
-                    { type: "Progress" as const, photos: progressPhotos, label: "PROGRESS", labelBg: "bg-black/70", labelText: "text-orange-300", addBg: "bg-slate-800 hover:bg-slate-700", camBg: "bg-orange-500 hover:bg-orange-600", border: "border-orange-900/40" },
-                    { type: "After" as const, photos: afterPhotos, label: "AFTER", labelBg: "bg-black/70", labelText: "text-emerald-300", addBg: "bg-slate-800 hover:bg-slate-700", camBg: "bg-emerald-600 hover:bg-emerald-700", border: "border-emerald-900/40" },
-                  ]).map(({ type, photos, label, labelBg, labelText, addBg, camBg, border }, slotIndex) => {
-                    const latest = photos[photos.length - 1];
-                    return (
-                      <div key={type} className={`border-t ${slotIndex === 0 ? "border-slate-700" : border}`}>
-                        {/* Photo slot */}
-                        <div className="relative w-full" style={{ aspectRatio: "16/7" }}>
-                          {latest?.dataUrl ? (
-                            <>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={latest.dataUrl} alt={label} className="h-full w-full object-cover" />
-                              {/* Replace overlay on tap */}
-                                  <button
-                                type="button"
-                                disabled={fileBusy}
-                                onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type })}
-                                className={`absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition hover:bg-black/40 hover:opacity-100 ${fileBusy ? "pointer-events-none" : ""}`}
-                              >
-                                <span className="rounded-2xl bg-white/90 px-4 py-2 text-xs font-black text-slate-900">Tap to open camera</span>
-                              </button>
-                            </>
-                          ) : (
-                              <button
-                              type="button"
-                              disabled={fileBusy}
-                              onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type })}
-                              className={`flex h-full w-full flex-col items-center justify-center gap-3 ${addBg} transition ${fileBusy ? "opacity-60 pointer-events-none" : ""}`}
-                            >
-                              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
-                                <Camera className="h-7 w-7 text-slate-400" />
-                              </div>
-                              <span className="text-sm font-black text-slate-400">Tap to open camera</span>
-                            </button>
-                          )}
-                          {/* Label badge */}
-                          <span className={`absolute bottom-3 right-3 rounded-lg ${labelBg} px-2.5 py-1 text-[11px] font-black uppercase tracking-widest ${labelText} backdrop-blur-sm`}>{label}</span>
-                          {/* Photo count badge */}
-                          {photos.length > 1 && (
-                            <span className="absolute left-3 top-3 rounded-lg bg-black/60 px-2 py-0.5 text-[10px] font-black text-white backdrop-blur-sm">{photos.length} photos</span>
-                          )}
+                {/* Compact Before / Progress / After */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Camera className="h-4 w-4" />Job Photos</div>
+                  <div className="mt-2 space-y-2">
+                    {([
+                      { type: "Before" as const, photos: beforePhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
+                      { type: "Progress" as const, photos: progressPhotos, color: "bg-orange-500 hover:bg-orange-600", badge: "bg-orange-100 text-orange-700" },
+                      { type: "After" as const, photos: afterPhotos, color: "bg-emerald-600 hover:bg-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+                    ]).map(({ type, photos, color, badge }) => (
+                      <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{type}</p>
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${badge}`}>{photos.length}</span>
                         </div>
-                        {/* Action row */}
-                        <div className="grid grid-cols-2 gap-px bg-slate-700">
+                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             disabled={fileBusy}
                             onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type })}
-                            className={`flex items-center justify-center gap-2 py-3 text-xs font-black text-white transition ${camBg} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-black text-white transition active:scale-95 ${color} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
                           >
-                            <Camera className="h-4 w-4" /> Camera
+                            <Camera className="h-3.5 w-3.5" /> Camera
                           </button>
-                          <label className="flex cursor-pointer items-center justify-center gap-2 bg-slate-800 py-3 text-xs font-black text-slate-300 transition hover:bg-slate-700">
-                            <UploadCloud className="h-4 w-4" /> Upload
+                          <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                            <UploadCloud className="h-3.5 w-3.5" /> Upload
                             <input type="file" accept="image/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(type, input.files).finally(() => { input.value = ""; }); }} />
                           </label>
                         </div>
-                        {/* Thumbnails strip if multiple */}
-                        {photos.length > 1 && (
-                          <div className="flex gap-1.5 overflow-x-auto bg-slate-900 p-2">
+                        {photos.length > 0 && (
+                          <div className="mt-1.5 flex gap-1 overflow-x-auto">
                             {photos.map((photo) => (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-14 w-20 shrink-0 rounded-lg object-cover opacity-80 hover:opacity-100" />
+                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 rounded-md object-cover" />
                             ))}
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
 
                 {/* General job photos */}
