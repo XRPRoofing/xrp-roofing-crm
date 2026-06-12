@@ -76,6 +76,13 @@ type BrochureFile = {
   type: string;
 };
 
+type ProposalEmailTemplate = {
+  id: string;
+  label: string;
+  subject: string;
+  message: string;
+};
+
 type ProposalTemplate = {
   id: string;
   label: string;
@@ -89,6 +96,28 @@ type ProposalTemplate = {
 };
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
+const emailTemplatesLocalKey = "xrp-crm-proposal-email-templates";
+
+const defaultEmailTemplates: ProposalEmailTemplate[] = [
+  {
+    id: "personalized",
+    label: "Personalized Proposal Email",
+    subject: "Proposal for {{customer_name}}",
+    message: "Dear {{customer_name}},\n\nPlease follow the link to review and accept your customized proposal.\nThank you for your time and consideration.\n\nJonathan Gonzalez",
+  },
+  {
+    id: "formal",
+    label: "Formal Proposal",
+    subject: "XRP Roofing — Proposal for {{customer_name}}",
+    message: "Dear {{customer_name}},\n\nThank you for the opportunity to provide a roofing proposal for your property. Please use the link below to review the detailed scope of work, pricing options, and terms.\n\nIf you have any questions, please do not hesitate to reach out.\n\nBest regards,\nXRP Roofing Team",
+  },
+  {
+    id: "follow-up",
+    label: "Follow-Up",
+    subject: "Following up — Proposal for {{customer_name}}",
+    message: "Hi {{customer_name}},\n\nI wanted to follow up on the proposal we sent earlier. Please review it at your convenience using the link below.\n\nWe are happy to answer any questions or make adjustments.\n\nThank you,\nJonathan Gonzalez",
+  },
+];
 const trashRetentionDays = 30;
 const trashRetentionMs = trashRetentionDays * 24 * 60 * 60 * 1000;
 const proposalsLocalKey = "xrp-crm-proposals";
@@ -342,6 +371,7 @@ export default function ProposalsPage() {
   const prevProposalsRef = useRef<Proposal[]>([]);
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
+  const [emailTemplates, setEmailTemplates] = useState<ProposalEmailTemplate[]>(defaultEmailTemplates);
   const [editorBrochures, setEditorBrochures] = useState<BrochureFile[]>([]);
   const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -366,7 +396,7 @@ export default function ProposalsPage() {
     toName: "",
     toEmail: "info@xrproofing.com",
     ccRecipients: "",
-    templateName: "Personalized Proposal Email",
+    emailTemplateId: "personalized",
     subject: "",
     message: "",
   });
@@ -486,6 +516,16 @@ export default function ProposalsPage() {
         }
       }
 
+      const savedEmailTemplates = window.localStorage.getItem(emailTemplatesLocalKey);
+      if (savedEmailTemplates && mounted) {
+        try {
+          const parsed = JSON.parse(savedEmailTemplates) as ProposalEmailTemplate[];
+          if (parsed.length) setEmailTemplates(parsed);
+        } catch {
+          /* keep defaults */
+        }
+      }
+
       const local = retain(readLocalProposals());
       if (local.length && mounted) setProposals(local);
 
@@ -594,6 +634,15 @@ export default function ProposalsPage() {
       /* localStorage quota exceeded — brochure data URLs can be very large */
     }
   }, [dataLoaded, templates]);
+
+  useEffect(() => {
+    if (!dataLoaded) return;
+    try {
+      window.localStorage.setItem(emailTemplatesLocalKey, JSON.stringify(emailTemplates));
+    } catch {
+      /* localStorage quota exceeded */
+    }
+  }, [dataLoaded, emailTemplates]);
 
   useEffect(() => {
     if (!dataLoaded || !activeProposal) return;
@@ -829,19 +878,39 @@ export default function ProposalsPage() {
     );
   }
 
+  function applyEmailTemplateVars(text: string, customerName: string) {
+    return text.replaceAll("{{customer_name}}", customerName);
+  }
+
+  function handleSelectEmailTemplate(templateId: string, customerName: string) {
+    const selected = emailTemplates.find((t) => t.id === templateId);
+    if (!selected) return;
+    setSendForm((prev) => ({
+      ...prev,
+      emailTemplateId: templateId,
+      subject: applyEmailTemplateVars(selected.subject, customerName),
+      message: applyEmailTemplateVars(selected.message, customerName),
+    }));
+  }
+
   function handleOpenSendModal() {
     if (!activeProposal) return;
 
     const savedProposal = saveActiveProposal() || activeProposal;
     setActiveProposal(savedProposal);
     setSendNotice("");
+
+    const name = savedProposal.customerName;
+    const savedTemplateId = savedProposal.sendSubject ? (emailTemplates.find((t) => applyEmailTemplateVars(t.subject, name) === savedProposal.sendSubject)?.id || "personalized") : "personalized";
+    const selected = emailTemplates.find((t) => t.id === savedTemplateId) || emailTemplates[0];
+
     setSendForm({
-      toName: savedProposal.customerName,
+      toName: name,
       toEmail: savedProposal.customerEmail || savedProposal.job?.email || "info@xrproofing.com",
       ccRecipients: savedProposal.ccRecipients || "",
-      templateName: "Personalized Proposal Email",
-      subject: savedProposal.sendSubject || `Proposal for ${savedProposal.customerName}`,
-      message: savedProposal.sendMessage || `Dear ${savedProposal.customerName},\n\nPlease follow the link to review and accept your customized proposal.\nThank you for your time and consideration.\n\nJonathan Gonzalez`,
+      emailTemplateId: savedTemplateId,
+      subject: savedProposal.sendSubject || applyEmailTemplateVars(selected.subject, name),
+      message: savedProposal.sendMessage || applyEmailTemplateVars(selected.message, name),
     });
     setShowSendModal(true);
   }
@@ -1511,10 +1580,12 @@ export default function ProposalsPage() {
                 <div className="space-y-5 px-7 py-6">
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-black text-slate-900">Template</p>
-                      <button type="button" onClick={() => setActiveTab("templates")} className="text-xs font-black text-blue-600">⊞ Select template</button>
+                      <p className="text-sm font-black text-slate-900">Email Template</p>
+                      <button type="button" onClick={() => { setShowSendModal(false); setActiveTab("templates"); }} className="text-xs font-black text-blue-600">⊞ Manage templates</button>
                     </div>
-                    <input value={sendForm.templateName} onChange={(event) => setSendForm({ ...sendForm, templateName: event.target.value })} className="w-full rounded border border-slate-200 px-4 py-3 text-sm font-bold outline-none" />
+                    <select value={sendForm.emailTemplateId} onChange={(event) => handleSelectEmailTemplate(event.target.value, sendForm.toName)} className="w-full rounded border border-slate-200 px-4 py-3 text-sm font-bold outline-none">
+                      {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
                   </div>
                   <label className="block text-sm font-black text-slate-900">
                     Subject*
@@ -1758,6 +1829,43 @@ export default function ProposalsPage() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Email Templates</p>
+                <h2 className="mt-1 text-xl font-black text-[#07183f]">Proposal email templates</h2>
+                <p className="mt-1 text-sm text-slate-500">Saved email templates used when sending proposals. Use <code className="rounded bg-slate-100 px-1 text-xs">{"{{customer_name}}"}</code> for dynamic customer name.</p>
+              </div>
+              <button type="button" onClick={() => {
+                const newId = `email-${Date.now()}`;
+                setEmailTemplates((prev) => [...prev, { id: newId, label: "New Email Template", subject: "Proposal for {{customer_name}}", message: "Dear {{customer_name}},\n\n\n\nThank you,\nXRP Roofing" }]);
+              }} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-blue-700">+ New email template</button>
+            </div>
+            <div className="grid gap-3">
+              {emailTemplates.map((et) => (
+                <div key={et.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <label className="flex-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                      Template name
+                      <input value={et.label} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, label: event.target.value } : t))} className="mt-2 w-full border-none bg-transparent text-lg font-black normal-case tracking-normal text-[#07183f] outline-none" />
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Saved</span>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete email template "${et.label}"?`)) setEmailTemplates((prev) => prev.filter((t) => t.id !== et.id)); }} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
+                    </div>
+                  </div>
+                  <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                    Subject line
+                    <input value={et.subject} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, subject: event.target.value } : t))} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case tracking-normal text-slate-800 outline-none" />
+                  </label>
+                  <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                    Email body
+                    <textarea value={et.message} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, message: event.target.value } : t))} className="mt-2 min-h-32 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-slate-600 outline-none" />
+                  </label>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
