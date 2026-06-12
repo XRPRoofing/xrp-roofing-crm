@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { DollarSign, TrendingUp, Clock, CheckCircle2, Briefcase, BarChart3, FileEdit } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { DollarSign, TrendingUp, Clock, CheckCircle2, Briefcase, BarChart3, FileEdit, Pencil } from "lucide-react";
 import { loadAllInvoices } from "@/lib/invoice-sync";
 import { loadCrewDataset } from "@/lib/crew-sync";
+import { requestOpenInvoice } from "@/lib/crm-board-nav";
 
 type PaymentRecord = {
   amount: number;
@@ -41,9 +43,15 @@ function computePaid(inv: LoadedInvoice): number {
 }
 
 export default function PaymentsPage() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<LoadedInvoice[]>([]);
   const [jobCount, setJobCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  function openInvoice(id: string) {
+    requestOpenInvoice(id);
+    router.push("/crm/invoices");
+  }
 
   useEffect(() => {
     async function load() {
@@ -155,7 +163,7 @@ export default function PaymentsPage() {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-4">
-          <PaymentColumn title="Drafts" subtitle="Unsent invoices" items={stats.drafts} badgeColor="bg-slate-100 text-slate-700" />
+          <PaymentColumn title="Drafts" subtitle="Unsent invoices" items={stats.drafts} badgeColor="bg-slate-100 text-slate-700" onClickItem={openInvoice} />
           <PaymentColumn title="Pending" subtitle="Sent & awaiting payment" items={stats.pending} badgeColor="bg-amber-50 text-amber-700" />
           <PaymentColumn title="Processing" subtitle="Partially paid" items={stats.processing} badgeColor="bg-blue-50 text-blue-700" />
           <PaymentColumn title="Completed" subtitle="Fully paid" items={stats.completed} badgeColor="bg-emerald-50 text-emerald-700" />
@@ -165,7 +173,7 @@ export default function PaymentsPage() {
   );
 }
 
-function PaymentColumn({ title, subtitle, items, badgeColor }: { title: string; subtitle?: string; items: LoadedInvoice[]; badgeColor: string }) {
+function PaymentColumn({ title, subtitle, items, badgeColor, onClickItem }: { title: string; subtitle?: string; items: LoadedInvoice[]; badgeColor: string; onClickItem?: (id: string) => void }) {
   const total = items.reduce((sum, inv) => sum + computeTotal(inv), 0);
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
@@ -183,14 +191,17 @@ function PaymentColumn({ title, subtitle, items, badgeColor }: { title: string; 
           const paid = computePaid(inv);
           const balance = invTotal - paid;
           return (
-            <article key={inv.id} className="rounded-2xl bg-slate-50 p-4">
+            <article key={inv.id} className={`rounded-2xl bg-slate-50 p-4${onClickItem ? " cursor-pointer transition hover:bg-slate-100 hover:ring-1 hover:ring-blue-200" : ""}`} onClick={onClickItem ? () => onClickItem(inv.id) : undefined}>
               <div className="flex items-center justify-between">
                 <p className="font-black text-slate-900">{inv.clientName || "Unnamed"}</p>
                 <span className="text-sm font-black text-slate-700">{formatMoney(invTotal)}</span>
               </div>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
-                {inv.invoiceNumber ? `#${inv.invoiceNumber}` : "No invoice #"}{inv.propertyAddress ? ` • ${inv.propertyAddress}` : ""}
-              </p>
+              <div className="mt-1 flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-500">
+                  {inv.invoiceNumber ? `#${inv.invoiceNumber}` : "No invoice #"}{inv.propertyAddress ? ` • ${inv.propertyAddress}` : ""}
+                </p>
+                {onClickItem && <Pencil className="h-3.5 w-3.5 text-blue-500" />}
+              </div>
               {paid > 0 && balance > 0 && (
                 <div className="mt-2">
                   <div className="flex justify-between text-[11px] font-bold text-slate-500">
