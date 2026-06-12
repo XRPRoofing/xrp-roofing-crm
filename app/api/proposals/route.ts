@@ -40,7 +40,11 @@ export async function GET() {
     );
   }
   const proposals = (data as ProposalRow[])
-    .map((row) => (row.payload ? { ...row.payload, id: row.id } : null))
+    .map((row) => {
+      if (!row.payload) return null;
+      const { brochures: _b, ...rest } = row.payload as Proposal & { brochures?: unknown };
+      return { ...rest, id: row.id };
+    })
     .filter((proposal): proposal is Proposal => Boolean(proposal));
   return NextResponse.json({ proposals });
 }
