@@ -1,4 +1,4 @@
-const CACHE_NAME = "xrp-crm-pwa-v5"; // Bumped version to clear old caches
+const CACHE_NAME = "xrp-crm-pwa-v6"; // Bumped version to clear old caches
 const APP_SHELL = ["/", "/crm", "/crew", "/login", "/manifest.webmanifest"];
 
 // API routes that should NEVER be cached - always fetch fresh
