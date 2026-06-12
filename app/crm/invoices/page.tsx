@@ -7,7 +7,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { addCrmNotification } from "@/lib/crm-notifications";
+import { addCrmNotification, addUniqueCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -463,10 +463,10 @@ function propagatePaidStatus(invoice: Invoice) {
   const jobId = invoice.jobReference || invoice.id;
   syncInvoiceStatusToTask(jobId, "Paid", invoice.invoiceNumber, `$${getPaidAmount(invoice).toLocaleString()}`);
 
-  // Also create a dedicated "Paid" task for tracking
+  // Also create a dedicated "Paid" task for tracking (deterministic ID to prevent duplicates)
   const now = new Date().toISOString();
   const paidTask: OfficeTask = {
-    id: `task-paid-${invoice.id}-${Date.now()}`,
+    id: `task-paid-${invoice.id}`,
     jobId,
     title: `Payment Received - ${invoice.clientName}`,
     customerName: invoice.clientName,
@@ -492,7 +492,7 @@ function propagatePaidStatus(invoice: Invoice) {
   };
   void upsertTaskToSupabase(paidTask);
 
-  addCrmNotification({
+  addUniqueCrmNotification(`paid-${invoice.id}`, {
     title: "Payment received",
     message: `${invoice.clientName} paid ${invoice.invoiceNumber}`,
     actor: "Stripe",
@@ -501,7 +501,7 @@ function propagatePaidStatus(invoice: Invoice) {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => hasSupabaseConfig() ? [] : initialInvoices);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
