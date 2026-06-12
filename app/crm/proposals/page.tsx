@@ -875,58 +875,45 @@ export default function ProposalsPage() {
       setActiveProposal(sentProposal);
     }
 
-    setSendNotice("Sending proposal email...");
+    // Save the proposal to Supabase immediately so the customer link works
+    // before the email arrives.
+    fetch("/api/proposals/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposalForLink),
+    }).catch(() => {});
 
-    try {
-      const shareResponse = await fetch("/api/proposals/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(proposalForLink),
-      }).catch(() => null);
+    // Show success immediately — the email fires in the background; we only
+    // update the notice if it fails.
+    setSendNotice(`Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}`);
 
-      const response = await fetch("/api/proposals/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          toName: sendForm.toName,
-          toEmail: sendForm.toEmail,
-          ccRecipients: sendForm.ccRecipients,
-          subject: sendForm.subject,
-          message: sendForm.message,
-          proposalLink,
-          coverPhoto: sentProposal?.coverPhoto || editorForm.coverPhoto,
-          coverTitle: sentProposal?.title || editorForm.title,
-          coverText: sentProposal?.coverText || editorForm.coverText,
-        }),
-      }).catch(() => null);
-      let shareWarning = "";
-
-      if (!shareResponse || !shareResponse.ok) {
-        const data = shareResponse ? await shareResponse.json().catch(() => null) as { error?: string } | null : null;
-        shareWarning = data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.";
-      }
-
-      if (!response) {
-        setSendNotice(`Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}`);
-        return;
-      }
-
+    fetch("/api/proposals/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        toName: sendForm.toName,
+        toEmail: sendForm.toEmail,
+        ccRecipients: sendForm.ccRecipients,
+        subject: sendForm.subject,
+        message: sendForm.message,
+        proposalLink,
+        coverPhoto: sentProposal?.coverPhoto || editorForm.coverPhoto,
+        coverTitle: sentProposal?.title || editorForm.title,
+        coverText: sentProposal?.coverText || editorForm.coverText,
+      }),
+    }).then(async (response) => {
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null;
-        const serverError = data?.error || "Unable to send proposal email";
+        const serverError = typeof data?.error === "string" ? data.error : "Unable to send proposal email";
         if (serverError === "Email service is not configured") {
           setSendNotice(`Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}`);
         } else {
           setSendNotice(`${serverError}\n\nProposal link: ${proposalLink}`);
         }
-        return;
       }
-
-      setSendNotice(`${shareWarning ? `${shareWarning} Email was sent, but the customer link may not open until sharing is configured.` : `Proposal sent to ${sendForm.toEmail}.`}\n\nProposal link: ${proposalLink}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Email could not be sent.";
-      setSendNotice(`${message}\n\nProposal link: ${proposalLink}`);
-    }
+    }).catch(() => {
+      setSendNotice(`Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}`);
+    });
   }
 
   function handleDeleteProposal(proposal: Proposal) {
