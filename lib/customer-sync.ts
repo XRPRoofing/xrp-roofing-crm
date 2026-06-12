@@ -193,7 +193,7 @@ export async function findOrCreateCustomer(input: CustomerLeadInput): Promise<Cu
 export function subscribeToCustomerRecords(onChange: () => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
   const supabase = createClient();
-  const channel = supabase.channel("customer-records-sync");
+  const channel = supabase.channel(`customer-records-sync-${Math.random().toString(36).slice(2)}`);
   channel.on(
     "postgres_changes",
     { event: "*", schema: "public", table: customersTable },
