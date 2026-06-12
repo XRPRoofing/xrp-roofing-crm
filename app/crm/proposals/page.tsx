@@ -819,6 +819,14 @@ export default function ProposalsPage() {
       ...extraFields,
     };
 
+    // If all package prices are 0 but total > 0, populate Best with the total
+    // so the customer view shows real pricing instead of $0.
+    const pkgs = normalizePackages(updatedProposal.packages);
+    const totalVal = updatedProposal.total;
+    if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
+      updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
+    }
+
     setProposals((currentProposals) =>
       currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
     );

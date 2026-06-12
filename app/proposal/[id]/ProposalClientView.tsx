@@ -96,11 +96,17 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({});
   const isAccepted = proposal.status === "Won";
 
-  const packages = useMemo(() => ({
-    good: normalizePackage(proposal.packages?.good),
-    better: normalizePackage(proposal.packages?.better),
-    best: normalizePackage(proposal.packages?.best),
-  }), [proposal.packages]);
+  const packages = useMemo(() => {
+    const good = normalizePackage(proposal.packages?.good);
+    const better = normalizePackage(proposal.packages?.better);
+    const best = normalizePackage(proposal.packages?.best);
+    // If all package prices are 0 but total > 0, use total as Best price
+    // so the customer sees the actual quoted amount.
+    if (!good.price && !better.price && !best.price && proposal.total && proposal.total > 0) {
+      return { good, better, best: { ...best, price: proposal.total } };
+    }
+    return { good, better, best };
+  }, [proposal.packages, proposal.total]);
   const selectedPackage = packages[selectedOption];
 
   useEffect(() => {
