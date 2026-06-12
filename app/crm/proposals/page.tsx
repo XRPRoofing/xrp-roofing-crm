@@ -866,14 +866,16 @@ export default function ProposalsPage() {
 
     setSendNotice("Sending proposal email...");
 
-    try {
-      const sharePromise = fetch("/api/proposals/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(proposalForLink),
-      }).catch(() => null);
+    // Fire the share request in the background — the payload can be large
+    // (base64 inspection photos / brochures) so don't block the email flow on it.
+    const sharePromise = fetch("/api/proposals/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposalForLink),
+    }).catch(() => null);
 
-      const emailPromise = fetch("/api/proposals/send", {
+    try {
+      const response = await fetch("/api/proposals/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -887,20 +889,7 @@ export default function ProposalsPage() {
           coverTitle: sentProposal?.title || editorForm.title,
           coverText: sentProposal?.coverText || editorForm.coverText,
         }),
-      }).catch(() => null);
-
-      const [shareResponse, response] = await Promise.all([sharePromise, emailPromise]);
-      let shareWarning = "";
-
-      if (!shareResponse || !shareResponse.ok) {
-        const data = shareResponse ? await shareResponse.json().catch(() => null) as { error?: string } | null : null;
-        shareWarning = data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.";
-      }
-
-      if (!response) {
-        setSendNotice(`Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}`);
-        return;
-      }
+      });
 
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null;
@@ -913,7 +902,18 @@ export default function ProposalsPage() {
         return;
       }
 
-      setSendNotice(`${shareWarning ? `${shareWarning} Email was sent, but the customer link may not open until sharing is configured.` : `Proposal sent to ${sendForm.toEmail}.`}\n\nProposal link: ${proposalLink}`);
+      setSendNotice(`Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}`);
+
+      // Check share result in background — warn if it failed but don't delay the success message.
+      sharePromise.then(async (shareResponse) => {
+        if (!shareResponse || !shareResponse.ok) {
+          const data = shareResponse ? await shareResponse.json().catch(() => null) as { error?: string } | null : null;
+          const shareWarning = data?.error || "Proposal could not be saved for the customer link. Please configure proposal sharing before sending.";
+          setSendNotice((prev) => `${prev}\n\n⚠ ${shareWarning}`);
+        }
+      }).catch(() => {
+        // Share failed silently — proposal link may not work until sharing is configured.
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Email could not be sent.";
       setSendNotice(`${message}\n\nProposal link: ${proposalLink}`);
