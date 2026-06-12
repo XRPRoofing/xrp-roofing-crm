@@ -8,7 +8,7 @@
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import type { CrmNotification } from "@/lib/crm-notifications";
-import { readCrmNotifications, saveCrmNotifications } from "@/lib/crm-notifications";
+import { readCrmNotifications, readDeletedNotificationIds, saveCrmNotifications } from "@/lib/crm-notifications";
 
 const TABLE = "crm_notifications";
 
@@ -24,6 +24,36 @@ export async function pushNotificationToSupabase(notification: CrmNotification):
     });
   } catch {
     // silently fall back to localStorage-only
+  }
+}
+
+/** Mark all notifications as read in Supabase so other devices see the read state. */
+export async function markNotificationsReadInSupabase(notifications: CrmNotification[]): Promise<void> {
+  if (!hasSupabaseConfig() || notifications.length === 0) return;
+  try {
+    const supabase = createClient();
+    await Promise.all(
+      notifications.map((n) =>
+        supabase.from(TABLE).upsert({
+          id: n.id,
+          payload: { ...n, read: true, status: "read" },
+          created_at: n.createdAt,
+        })
+      )
+    );
+  } catch {
+    // best-effort
+  }
+}
+
+/** Delete a notification from Supabase so it doesn't reappear on other devices. */
+export async function deleteNotificationFromSupabase(notificationId: string): Promise<void> {
+  if (!hasSupabaseConfig()) return;
+  try {
+    const supabase = createClient();
+    await supabase.from(TABLE).delete().eq("id", notificationId);
+  } catch {
+    // best-effort
   }
 }
 
@@ -67,9 +97,13 @@ export async function loadNotificationsFromSupabase(): Promise<CrmNotification[]
       void supabase.from(TABLE).delete().in("id", duplicateIds).then(() => {});
     }
 
+    // Filter out notifications the user has locally deleted (prevents reappearance)
+    const deletedIds = readDeletedNotificationIds();
+    const filtered = deduped.filter((n) => !deletedIds.includes(n.id));
+
     // Keep localStorage in sync for offline fallback
-    saveCrmNotifications(deduped);
-    return deduped;
+    saveCrmNotifications(filtered);
+    return filtered;
   } catch {
     return readCrmNotifications();
   }
