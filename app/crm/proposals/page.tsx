@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
@@ -10,13 +11,6 @@ import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
-
-const arizonaBounds = {
-  north: 37.0043,
-  south: 31.3322,
-  east: -109.0452,
-  west: -114.8184,
-};
 
 type Proposal = {
   id: string;
@@ -381,7 +375,7 @@ export default function ProposalsPage() {
     inspectionPhotos: defaultInspectionPhotos,
     packages: defaultPackages,
   });
-  const addressInputRef = useRef<HTMLInputElement>(null);
+
   const [previewExpandedScopes, setPreviewExpandedScopes] = useState<Record<string, boolean>>({});
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId), [selectedJobId, jobs]);
@@ -593,52 +587,7 @@ export default function ProposalsPage() {
     return () => window.clearTimeout(timeout);
   }, [activeProposal, dataLoaded, editorForm]);
 
-  useEffect(() => {
-    if (proposalMode !== "new" || !addressInputRef.current) return;
 
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (!googleMapsApiKey) return;
-
-    function initializeAutocomplete() {
-      if (!addressInputRef.current || !window.google?.maps?.places?.Autocomplete) return;
-
-      const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-        bounds: arizonaBounds,
-        componentRestrictions: { country: "us" },
-        fields: ["formatted_address"],
-        strictBounds: true,
-        types: ["address"],
-      });
-
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          setAddress(place.formatted_address);
-        }
-      });
-    }
-
-    if (window.google?.maps?.places?.Autocomplete) {
-      initializeAutocomplete();
-      return;
-    }
-
-    const existingScript = document.querySelector<HTMLScriptElement>("script[data-google-maps-places]");
-
-    if (existingScript) {
-      existingScript.addEventListener("load", initializeAutocomplete, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.dataset.googleMapsPlaces = "true";
-    script.addEventListener("load", initializeAutocomplete, { once: true });
-    document.head.appendChild(script);
-  }, [proposalMode]);
 
   function handleCreateProposal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1036,7 +985,12 @@ export default function ProposalsPage() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer</p>
                   <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-[#07183f] outline-none" />
-                  <input value={editorForm.address} onChange={(event) => setEditorForm({ ...editorForm, address: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 outline-none" />
+                  <AddressAutocomplete
+                    value={editorForm.address}
+                    onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
+                    placeholder="Start typing address..."
+                    className="mt-2 !rounded-lg !py-2 !text-xs text-slate-600"
+                  />
                   <input value={editorForm.customerPhone} onChange={(event) => setEditorForm({ ...editorForm, customerPhone: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 outline-none" placeholder="Customer phone" />
                   <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
                 </div>
@@ -1634,7 +1588,12 @@ export default function ProposalsPage() {
               </label>
               <label className="grid gap-2 text-sm font-bold text-slate-700">
                 Searchable address
-                <input ref={addressInputRef} required value={address} onChange={(event) => setAddress(event.target.value)} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Enter address" />
+                <AddressAutocomplete
+                  value={address}
+                  onChange={(addr) => setAddress(addr)}
+                  placeholder="Start typing address..."
+                  required
+                />
               </label>
             </>
           )}
