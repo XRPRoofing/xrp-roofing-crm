@@ -10,6 +10,7 @@ import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCustomerRecordsResult, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { ConversationChannel, ConversationMessage } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
@@ -379,11 +380,9 @@ export default function CustomersPage() {
     refreshFromStore();
 
     const unsubscribe = subscribeToCrewData(refreshFromStore);
-    window.addEventListener("focus", refreshFromStore);
     return () => {
       mounted = false;
       unsubscribe();
-      window.removeEventListener("focus", refreshFromStore);
     };
   }, []);
 
@@ -429,13 +428,20 @@ export default function CustomersPage() {
     void init();
 
     const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
-    window.addEventListener("focus", refreshCustomers);
     return () => {
       mounted = false;
       unsubscribe();
-      window.removeEventListener("focus", refreshCustomers);
     };
   }, []);
+
+  useAutoRefresh(() => {
+    void loadCrewDataset().then((data) => setJobList(data.jobs)).catch(() => {});
+    void loadCustomerRecordsResult().then((result) => {
+      setSavedCustomers(result.customers);
+      setCustomersError(result.error ?? null);
+    }).catch(() => {});
+    void listConversationEvents().then((events) => setConversationEvents(events)).catch(() => {});
+  });
 
   // After every create/update/delete we await persistence then re-fetch the
   // authoritative list from Supabase so the board never shows stale data. The

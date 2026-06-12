@@ -16,6 +16,7 @@ import {
   type OfficeTaskStatus,
 } from "@/lib/office-tasks";
 import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates } from "@/lib/task-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 function fmt(iso: string) {
   if (!iso) return "";
@@ -74,6 +75,8 @@ export default function TasksPage() {
       window.removeEventListener("storage", onLocal);
     };
   }, []);
+
+  useAutoRefresh(() => { void refresh(); });
 
   const groupedTasks = useMemo(() =>
     officeTaskStatuses.map((status) => ({

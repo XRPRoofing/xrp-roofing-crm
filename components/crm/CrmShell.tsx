@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, Sparkles, UploadCloud, UsersRound, X, Zap } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
 import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
+import { subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
+import { subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { subscribeToCustomerRecords } from "@/lib/customer-sync";
+import { subscribeToTaskUpdates } from "@/lib/task-sync";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -286,6 +291,30 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setGlobalIncomingCall(null);
   }
 
+  const [syncActive, setSyncActive] = useState(false);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Global real-time sync indicator — flashes when any Supabase table changes
+  useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+    function flash() {
+      setSyncActive(true);
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(() => setSyncActive(false), 2000);
+    }
+    const unsubs = [
+      subscribeToCrewData(flash),
+      subscribeToInvoiceShares(() => flash()),
+      subscribeToProposalRecords(flash),
+      subscribeToCustomerRecords(flash),
+      subscribeToTaskUpdates(() => flash()),
+    ];
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, []);
+
   const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
   const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";
 
@@ -363,7 +392,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-16 items-center gap-3 px-3 sm:px-5 lg:h-20 lg:px-8">
             <button onClick={() => setOpen(true)} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
             <div className="min-w-0 flex-1 lg:hidden">
-              <p className="truncate text-xs font-black uppercase tracking-[0.18em] text-orange-600">XRP CRM App</p>
+              <div className="flex items-center gap-2">
+                <p className="truncate text-xs font-black uppercase tracking-[0.18em] text-orange-600">XRP CRM App</p>
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncActive ? "bg-emerald-500 animate-pulse" : "bg-emerald-400/60"}`} title={syncActive ? "Syncing" : "Live"} />
+              </div>
               <p className="truncate text-sm font-black text-[#07183f]">{activeModule?.label || "Dashboard"}</p>
             </div>
             <div className="hidden min-w-0 lg:block">
@@ -406,9 +438,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             )}
-            <button className="hidden items-center gap-2 rounded-2xl border border-orange-300/40 bg-orange-400/15 px-4 py-3 text-sm font-black text-orange-100 xl:flex">
-              <Sparkles className="h-4 w-4" /> Pro
-            </button>
+            <div className="hidden items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-3 py-2 text-xs font-black text-emerald-100 xl:flex" title="Real-time sync active across all devices">
+              <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-emerald-400 animate-pulse" : "bg-emerald-400/60"}`} />
+              <span>{syncActive ? "Syncing" : "Live"}</span>
+            </div>
             <button onClick={logout} className="hidden items-center gap-2 rounded-2xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-600 sm:flex">
               <LogOut className="h-4 w-4" /> Logout
             </button>

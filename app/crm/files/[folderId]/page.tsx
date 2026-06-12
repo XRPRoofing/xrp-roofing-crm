@@ -8,6 +8,7 @@ import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
 import { addJobPhotos, loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
 import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
 import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
@@ -86,6 +87,8 @@ export default function FolderGalleryPage() {
       window.removeEventListener(manualFoldersUpdatedEvent, onManual);
     };
   }, [refresh]);
+
+  useAutoRefresh(() => { void refresh().catch(() => {}); });
 
   // Manual folders need their backing job row to exist before photos can be
   // saved (foreign key). Idempotent + heals folders made before this existed.

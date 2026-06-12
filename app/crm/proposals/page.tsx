@@ -8,6 +8,7 @@ import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscri
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
 
 const arizonaBounds = {
@@ -499,15 +500,22 @@ export default function ProposalsPage() {
     void init();
 
     const unsubscribe = subscribeToProposalRecords(() => void reloadFromServer());
-    window.addEventListener("focus", reloadFromServer);
-    window.addEventListener("storage", reloadFromServer);
     return () => {
       mounted = false;
       unsubscribe();
-      window.removeEventListener("focus", reloadFromServer);
-      window.removeEventListener("storage", reloadFromServer);
     };
   }, []);
+
+  useAutoRefresh(() => {
+    if (!proposalSyncEnabled()) return;
+    void loadProposalRecords<Proposal>().then((server) => {
+      setProposals((current) => {
+        const serverIds = new Set(server.map((p) => p.id));
+        const localOnly = current.filter((p) => !serverIds.has(p.id));
+        return [...server, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
+      });
+    }).catch(() => {});
+  });
 
   useEffect(() => {
     if (!dataLoaded) return;

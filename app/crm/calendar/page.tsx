@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 
 type GoogleCalendarEvent = {
@@ -286,6 +287,8 @@ export default function CalendarPage() {
     void loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthCursor]);
+
+  useAutoRefresh(() => { void loadEvents(); });
 
   useEffect(() => {
     if (!selectedEvent) return;

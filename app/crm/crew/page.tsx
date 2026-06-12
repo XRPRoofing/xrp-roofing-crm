@@ -30,6 +30,7 @@ import {
   type JobPhoto,
   type JobRecord,
 } from "@/lib/crew-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
   { label: "All Jobs", value: "all" },
@@ -125,6 +126,8 @@ export default function CrewWorkflowPage() {
       unsubscribe();
     };
   }, [refresh]);
+
+  useAutoRefresh(() => { void refresh().catch(() => {}); });
 
   useEffect(() => {
     const presenceChannel = joinCrewPresence(
