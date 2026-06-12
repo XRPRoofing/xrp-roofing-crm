@@ -388,7 +388,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="relative mx-4 mb-6 mt-4 rounded-3xl bg-white/10 p-4 text-sm text-blue-100 ring-1 ring-white/10 backdrop-blur">
+        <button onClick={() => { logout(); setOpen(false); }} className="relative mx-4 mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-red-300 transition hover:bg-white/10 hover:text-red-200">
+          <span className="rounded-xl bg-white/10 p-2 text-red-300"><LogOut className="h-4 w-4" /></span>
+          Logout
+        </button>
+        <div className="relative mx-4 mb-6 mt-2 rounded-3xl bg-white/10 p-4 text-sm text-blue-100 ring-1 ring-white/10 backdrop-blur">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-orange-300" />
             <p className="font-bold text-white">Secure team workspace</p>
@@ -476,10 +480,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
-            <button onClick={logout} className="relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black text-slate-500 transition hover:bg-red-50 hover:text-red-600">
-              <LogOut className="h-5 w-5" />
-              <span>Logout</span>
-            </button>
+
           </div>
         </nav>
         {showTeamChatFloatingButton && (
