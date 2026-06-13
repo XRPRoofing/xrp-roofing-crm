@@ -605,6 +605,8 @@ export default function ProposalsPage() {
       const updatedProposal: Proposal = {
         ...activeProposal,
         customerName: editorForm.customerName,
+        customerEmail: editorForm.customerEmail,
+        customerPhone: editorForm.customerPhone,
         address: editorForm.address,
         title: editorForm.title,
         summary: editorForm.summary,
@@ -615,6 +617,7 @@ export default function ProposalsPage() {
         template: editorForm.template,
         notes: editorForm.notes,
         terms: editorForm.terms,
+        showPackages: editorForm.showPackages,
         inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
         packages: normalizePackages(editorForm.packages),
       };
@@ -816,6 +819,14 @@ export default function ProposalsPage() {
       ...extraFields,
     };
 
+    // If all package prices are 0 but total > 0, populate Best with the total
+    // so the customer view shows real pricing instead of $0.
+    const pkgs = normalizePackages(updatedProposal.packages);
+    const totalVal = updatedProposal.total;
+    if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
+      updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
+    }
+
     setProposals((currentProposals) =>
       currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
     );
@@ -864,9 +875,16 @@ export default function ProposalsPage() {
       setActiveProposal(sentProposal);
     }
 
-    // Show success immediately — the proposal is saved (localStorage + Supabase
-    // sync via useEffect) so the customer link already works. The email fires in
-    // the background; we only update the notice if it fails.
+    // Save the proposal to Supabase immediately so the customer link works
+    // before the email arrives.
+    fetch("/api/proposals/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposalForLink),
+    }).catch(() => {});
+
+    // Show success immediately — the email fires in the background; we only
+    // update the notice if it fails.
     setSendNotice(`Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}`);
 
     fetch("/api/proposals/send", {
@@ -1360,7 +1378,7 @@ export default function ProposalsPage() {
                         {isPreviewing ? (
                           <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
                         ) : (
-                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; setEditorForm({ ...editorForm, packages: { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: Number(event.target.value) || 0 } } }); }} className="w-32 rounded-full bg-blue-50 px-4 py-2 text-right text-sm font-black text-blue-700 outline-none" />
+                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; const newPrice = Number(event.target.value) || 0; const newPackages = { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: newPrice } }; setEditorForm({ ...editorForm, packages: newPackages, total: option === "best" ? String(newPrice) : editorForm.total }); }} className="w-32 rounded-full bg-blue-50 px-4 py-2 text-right text-sm font-black text-blue-700 outline-none" />
                         )}
                       </div>
                       {isPreviewing ? (

@@ -31,7 +31,15 @@ export async function POST(req: NextRequest) {
       .select("payload")
       .eq("id", proposal.id)
       .single();
-    const payload = applyProposalLock(existing?.payload ?? null, proposal);
+
+    // Preserve brochures from the existing record when the incoming data
+    // doesn't include them (background sync strips brochures for performance).
+    const existingPayload = existing?.payload as Record<string, unknown> | null;
+    const proposalWithBrochures = (existingPayload?.brochures && !proposal.brochures)
+      ? { ...proposal, brochures: existingPayload.brochures }
+      : proposal;
+
+    const payload = applyProposalLock(existingPayload ?? null, proposalWithBrochures);
 
     const { error } = await supabase
       .from("proposal_shares")
