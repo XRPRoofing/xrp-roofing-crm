@@ -22,6 +22,7 @@ type PublicProposal = {
   signedAt?: string;
   signedBy?: string;
   signatureDataUrl?: string;
+  showPackages?: boolean;
   packages?: {
     good?: string | { scope?: string; price?: number };
     better?: string | { scope?: string; price?: number };
