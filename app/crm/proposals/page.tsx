@@ -474,7 +474,7 @@ export default function ProposalsPage() {
 
     const visibleProposals = proposalFilter === "drafts"
       ? activeProposals.filter((proposal) => proposal.status === "Draft")
-      : activeProposals.filter((proposal) => proposal.status !== "Draft");
+      : activeProposals;
 
     if (!query) return visibleProposals;
 
@@ -2028,7 +2028,7 @@ export default function ProposalsPage() {
       )}
 
       {activeTab !== "templates" && activeTab !== "settings" && (
-      <div className="space-y-3 overflow-y-auto pb-20 pr-2 lg:max-h-[calc(100vh-18rem)] lg:pb-0">
+      <div className="space-y-3 pb-20 pr-2 lg:pb-0">
         {filteredProposals.map((proposal) => (
           <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-3xl border border-white/70 bg-white/95 p-4 text-left shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
             <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
