@@ -361,6 +361,30 @@ const initialProposalTemplates: ProposalTemplate[] = [
     brochureEnabled: false,
     brochures: [],
   },
+  {
+    id: "gaf-timberline",
+    label: "GAF Timberline",
+    description: "GAF Timberline shingle options from Natural Shadow to UHDZ.",
+    title: "GAF TIMBERLINE ROOFING PROPOSAL",
+    summary: "A professional roofing proposal featuring GAF Timberline shingle systems — America's #1 selling shingle brand.",
+    terms: defaultTerms,
+    packages: {
+      good: {
+        scope: "GOOD option: Essential roofing repair package with necessary labor, standard materials, clean GAF TIMBERLINE® NATURAL SHADOW® ROOFING SYSTEM",
+        price: 0,
+      },
+      better: {
+        scope: "BETTER OPTION – GAF TIMBERLINE® HDZ® ROOFING SYSTEM\n\nProject Description\n\nA premium architectural roofing system featuring GAF's LayerLock® Technology for superior wind resistance, enhanced curb appeal, and long-lasting performance. This system offers a strong balance of beauty, durability, and value — backed by one of the best warranties in the industry.",
+        price: 0,
+      },
+      best: {
+        scope: "GAF TIMBERLINE® UHDZ® ROOFING SYSTEM\n\nProject Description\n\nGAF's premium architectural shingle system designed for homeowners who want the ultimate combination of beauty, strength, and protection. Features the thickest, most dimensional Timberline profile with advanced LayerLock® Technology and industry-leading wind warranty coverage.",
+        price: 0,
+      },
+    },
+    brochureEnabled: true,
+    brochures: [],
+  },
 ];
 
 export default function ProposalsPage() {
@@ -510,7 +534,10 @@ export default function ProposalsPage() {
             brochureEnabled: t.brochureEnabled ?? false,
             brochures: Array.isArray(t.brochures) ? t.brochures : [],
           }));
-          setTemplates(migrated);
+          // Merge in any new built-in templates that aren't in the saved set
+          const savedIds = new Set(migrated.map((t) => t.id));
+          const missing = initialProposalTemplates.filter((t) => !savedIds.has(t.id));
+          setTemplates([...migrated, ...missing]);
         } catch {
           /* keep defaults */
         }
