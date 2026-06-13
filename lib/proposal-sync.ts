@@ -55,6 +55,35 @@ export async function deleteProposalRecord(id: string): Promise<void> {
   }
 }
 
+const TEMPLATES_ROW_ID = "_proposal_templates";
+
+/** Load saved proposal templates from the shared store. */
+export async function loadTemplateRecords<T>(): Promise<T[]> {
+  if (!hasSupabaseConfig()) return [];
+  try {
+    const response = await fetch(`/api/proposals/share?id=${encodeURIComponent(TEMPLATES_ROW_ID)}`, { cache: "no-store" });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { proposal?: { templates?: T[] } };
+    return data.proposal?.templates || [];
+  } catch {
+    return [];
+  }
+}
+
+/** Save proposal templates to the shared store. */
+export async function saveTemplateRecords(templates: Record<string, unknown>[]): Promise<void> {
+  if (!hasSupabaseConfig()) return;
+  try {
+    await fetch("/api/proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: TEMPLATES_ROW_ID, templates }),
+    });
+  } catch {
+    /* retry on next change */
+  }
+}
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on `proposal_shares`. The callback
  * fires whenever any device changes a proposal. Returns an unsubscribe fn.
