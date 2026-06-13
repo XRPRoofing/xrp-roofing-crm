@@ -1,4 +1,5 @@
-import { headers } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
+import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import ProposalClientView from "./ProposalClientView";
 
 export const dynamic = "force-dynamic";
@@ -32,18 +33,19 @@ type PublicProposal = {
 };
 
 async function getProposal(id: string) {
-  const headerStore = await headers();
-  const host = headerStore.get("x-forwarded-host") || headerStore.get("host");
-  const protocol = headerStore.get("x-forwarded-proto") || "https";
+  const url = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return null;
 
-  if (!host) return null;
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const { data, error } = await supabase
+    .from("proposal_shares")
+    .select("payload")
+    .eq("id", id)
+    .single();
 
-  const response = await fetch(`${protocol}://${host}/api/proposals/share?id=${encodeURIComponent(id)}`, { cache: "no-store" }).catch(() => null);
-
-  if (!response?.ok) return null;
-
-  const data = await response.json().catch(() => null) as { proposal?: PublicProposal } | null;
-  return data?.proposal || null;
+  if (error || !data?.payload) return null;
+  return data.payload as PublicProposal;
 }
 
 export default async function PublicProposalPage({ params }: { params: Promise<{ id: string }> }) {
