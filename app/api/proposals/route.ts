@@ -31,7 +31,7 @@ function missingTable(message: string | undefined) {
 export async function GET() {
   const admin = getAdminClient();
   if (!admin) return NextResponse.json({ proposals: [] });
-  const { data, error } = await admin.from(proposalsTable).select("id, payload");
+  const { data, error } = await admin.from(proposalsTable).select("id, payload").order("updated_at", { ascending: false }).limit(10000);
   if (error) {
     return NextResponse.json(
       missingTable(error.message)
@@ -46,7 +46,7 @@ export async function GET() {
       return { ...rest, id: row.id };
     })
     .filter((proposal): proposal is Proposal => Boolean(proposal));
-  return NextResponse.json({ proposals });
+  return NextResponse.json({ proposals }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache" } });
 }
 
 export async function POST(req: NextRequest) {

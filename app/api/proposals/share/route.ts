@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ proposal: data.payload });
+  return NextResponse.json({ proposal: data.payload }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache" } });
 }
 
 export async function PATCH(req: NextRequest) {

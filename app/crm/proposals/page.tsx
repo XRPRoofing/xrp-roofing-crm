@@ -714,7 +714,7 @@ export default function ProposalsPage() {
     if (proposalMode === "new" && (!customerName || !address)) return;
 
     const newProposal: Proposal = {
-      id: `P-${1001 + proposals.length}`,
+      id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       job: proposalMode === "job" ? selectedJob : undefined,
       customerName: proposalMode === "job" && selectedJob ? selectedJob.name : customerName,
       customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : "",
@@ -759,7 +759,7 @@ export default function ProposalsPage() {
   // future clicks open this same estimate instead of creating another.
   function createEstimateFromLead(job: Lead) {
     const newProposal: Proposal = {
-      id: `P-${1001 + proposals.length}`,
+      id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       job,
       customerName: job.name,
       customerEmail: job.email,

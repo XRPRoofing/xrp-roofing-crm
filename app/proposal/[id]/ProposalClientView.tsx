@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type PublicProposal = {
   id: string;
@@ -111,6 +111,39 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     if (proposal.status === "Won") return;
     void updateSharedProposal(proposal.id, { status: "Viewed", viewedAt: new Date().toISOString() });
   }, [proposal.id, proposal.status]);
+
+  const refreshProposal = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json() as { proposal?: PublicProposal };
+      if (!data.proposal) return;
+      setProposal((current) => {
+        if (current.status === "Won") return current;
+        return { ...current, ...data.proposal };
+      });
+      if (data.proposal.selectedOption && data.proposal.status !== "Won") {
+        setSelectedOption(data.proposal.selectedOption);
+      }
+    } catch { /* network error — retry on next interval */ }
+  }, [proposal.id]);
+
+  useEffect(() => {
+    const POLL_INTERVAL = 10_000;
+    const timer = window.setInterval(refreshProposal, POLL_INTERVAL);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshProposal();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refreshProposal);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refreshProposal);
+    };
+  }, [refreshProposal]);
 
   async function handleSelectOption(option: "good" | "better" | "best") {
     if (isAccepted) return; // a signed proposal is locked; selection can't change
