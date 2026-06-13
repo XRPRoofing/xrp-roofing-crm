@@ -40,6 +40,7 @@ export async function GET() {
     );
   }
   const proposals = (data as ProposalRow[])
+    .filter((row) => !row.id.startsWith("_"))
     .map((row) => {
       if (!row.payload) return null;
       const { brochures: _b, ...rest } = row.payload as Proposal & { brochures?: unknown };

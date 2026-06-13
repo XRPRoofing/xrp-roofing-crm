@@ -5,7 +5,7 @@ import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
-import { deleteProposalRecord, loadProposalRecords, proposalSyncEnabled, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
+import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
@@ -528,22 +528,36 @@ export default function ProposalsPage() {
       });
     }
 
+    function mergeTemplates(saved: ProposalTemplate[]) {
+      const migrated = saved.map((t) => ({
+        ...t,
+        brochureEnabled: t.brochureEnabled ?? false,
+        brochures: Array.isArray(t.brochures) ? t.brochures : [],
+      }));
+      const savedIds = new Set(migrated.map((t) => t.id));
+      const missing = initialProposalTemplates.filter((t) => !savedIds.has(t.id));
+      return [...migrated, ...missing];
+    }
+
     async function init() {
-      const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
-      if (savedTemplates && mounted) {
-        try {
-          const parsed = JSON.parse(savedTemplates) as ProposalTemplate[];
-          const migrated = parsed.map((t) => ({
-            ...t,
-            brochureEnabled: t.brochureEnabled ?? false,
-            brochures: Array.isArray(t.brochures) ? t.brochures : [],
-          }));
-          // Merge in any new built-in templates that aren't in the saved set
-          const savedIds = new Set(migrated.map((t) => t.id));
-          const missing = initialProposalTemplates.filter((t) => !savedIds.has(t.id));
-          setTemplates([...migrated, ...missing]);
-        } catch {
-          /* keep defaults */
+      // Load templates: prefer server, fall back to localStorage
+      let templatesLoaded = false;
+      if (proposalSyncEnabled()) {
+        const serverTemplates = await loadTemplateRecords<ProposalTemplate>();
+        if (serverTemplates.length && mounted) {
+          setTemplates(mergeTemplates(serverTemplates));
+          templatesLoaded = true;
+        }
+      }
+      if (!templatesLoaded) {
+        const savedTemplates = window.localStorage.getItem("xrp-crm-proposal-templates");
+        if (savedTemplates && mounted) {
+          try {
+            const parsed = JSON.parse(savedTemplates) as ProposalTemplate[];
+            setTemplates(mergeTemplates(parsed));
+          } catch {
+            /* keep defaults */
+          }
         }
       }
 
@@ -661,11 +675,12 @@ export default function ProposalsPage() {
   useEffect(() => {
     if (!dataLoaded) return;
     try {
-      const stripped = templates.map((t) => ({ ...t, brochures: (t.brochures || []).map((b) => ({ name: b.name, type: b.type, dataUrl: b.dataUrl })) }));
+      const stripped = templates.map((t) => ({ ...t, brochures: (t.brochures || []).map((b) => ({ name: b.name, type: b.type })) }));
       window.localStorage.setItem("xrp-crm-proposal-templates", JSON.stringify(stripped));
     } catch {
-      /* localStorage quota exceeded — brochure data URLs can be very large */
+      /* localStorage quota exceeded */
     }
+    void saveTemplateRecords(templates as unknown as Record<string, unknown>[]);
   }, [dataLoaded, templates]);
 
   useEffect(() => {
@@ -816,7 +831,7 @@ export default function ProposalsPage() {
     if (!templateForm.label || !templateForm.title) return;
 
     const newTemplate: ProposalTemplate = {
-      id: `template-${templates.length + 1}`,
+      id: `template-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       label: templateForm.label,
       description: templateForm.description || "Custom professional proposal template.",
       title: templateForm.title,
