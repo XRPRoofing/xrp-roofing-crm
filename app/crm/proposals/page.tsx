@@ -393,6 +393,7 @@ export default function ProposalsPage() {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const prevProposalsRef = useRef<Proposal[]>([]);
+  const permanentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [emailTemplates, setEmailTemplates] = useState<ProposalEmailTemplate[]>(defaultEmailTemplates);
@@ -508,10 +509,12 @@ export default function ProposalsPage() {
       if (!proposalSyncEnabled()) return;
       const server = await loadProposalRecords<Proposal>();
       if (!mounted) return;
+      const deletedIds = permanentlyDeletedIdsRef.current;
+      const filtered = server.filter((proposal) => !deletedIds.has(proposal.id));
       setProposals((current) => {
-        const serverIds = new Set(server.map((proposal) => proposal.id));
-        const localOnly = current.filter((proposal) => !serverIds.has(proposal.id));
-        const merged = retain([...server, ...localOnly]);
+        const serverIds = new Set(filtered.map((proposal) => proposal.id));
+        const localOnly = current.filter((proposal) => !serverIds.has(proposal.id) && !deletedIds.has(proposal.id));
+        const merged = retain([...filtered, ...localOnly]);
         // Treat server data as already-synced so the diff effect doesn't echo it
         // back (jsonb reorders keys, which would otherwise look like a change).
         prevProposalsRef.current = merged;
@@ -519,7 +522,8 @@ export default function ProposalsPage() {
       });
       setActiveProposal((currentProposal) => {
         if (!currentProposal) return currentProposal;
-        const updated = server.find((proposal) => proposal.id === currentProposal.id);
+        if (deletedIds.has(currentProposal.id)) return null;
+        const updated = filtered.find((proposal) => proposal.id === currentProposal.id);
         return updated ? { ...currentProposal, ...updated } : currentProposal;
       });
     }
@@ -592,10 +596,12 @@ export default function ProposalsPage() {
     void loadCrewDataset().then((data) => setJobs(data.jobs)).catch(() => {});
     if (!proposalSyncEnabled()) return;
     void loadProposalRecords<Proposal>().then((server) => {
+      const deletedIds = permanentlyDeletedIdsRef.current;
+      const filtered = server.filter((p) => !deletedIds.has(p.id));
       setProposals((current) => {
-        const serverIds = new Set(server.map((p) => p.id));
-        const localOnly = current.filter((p) => !serverIds.has(p.id));
-        return [...server, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
+        const serverIds = new Set(filtered.map((p) => p.id));
+        const localOnly = current.filter((p) => !serverIds.has(p.id) && !deletedIds.has(p.id));
+        return [...filtered, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
       });
     }).catch(() => {});
   });
@@ -1035,14 +1041,23 @@ export default function ProposalsPage() {
   }
 
   function handlePermanentDeleteProposal(proposal: Proposal) {
+    permanentlyDeletedIdsRef.current.add(proposal.id);
     setProposals((currentProposals) => currentProposals.filter((currentProposal) => currentProposal.id !== proposal.id));
     if (deletedProposal?.id === proposal.id) {
       setDeletedProposal(null);
     }
+    void deleteProposalRecord(proposal.id);
   }
 
   function handleEmptyExpiredTrash() {
-    setProposals((currentProposals) => currentProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs));
+    setProposals((currentProposals) => {
+      const toDelete = currentProposals.filter((proposal) => proposal.deletedAt && Date.now() - new Date(proposal.deletedAt).getTime() >= trashRetentionMs);
+      for (const proposal of toDelete) {
+        permanentlyDeletedIdsRef.current.add(proposal.id);
+        void deleteProposalRecord(proposal.id);
+      }
+      return currentProposals.filter((proposal) => !proposal.deletedAt || Date.now() - new Date(proposal.deletedAt).getTime() < trashRetentionMs);
+    });
   }
 
   function handleAcceptProposal() {
