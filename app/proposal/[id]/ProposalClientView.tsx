@@ -29,6 +29,7 @@ type PublicProposal = {
   acceptedAt?: string;
   proposalVersion?: number;
   locked?: boolean;
+  showPackages?: boolean;
   packages?: {
     good?: string | { scope?: string; price?: number };
     better?: string | { scope?: string; price?: number };
@@ -96,17 +97,14 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({});
   const isAccepted = proposal.status === "Won";
 
+  const showPackages = proposal.showPackages !== false;
+
   const packages = useMemo(() => {
     const good = normalizePackage(proposal.packages?.good);
     const better = normalizePackage(proposal.packages?.better);
     const best = normalizePackage(proposal.packages?.best);
-    // If all package prices are 0 but total > 0, use total as Best price
-    // so the customer sees the actual quoted amount.
-    if (!good.price && !better.price && !best.price && proposal.total && proposal.total > 0) {
-      return { good, better, best: { ...best, price: proposal.total } };
-    }
     return { good, better, best };
-  }, [proposal.packages, proposal.total]);
+  }, [proposal.packages]);
   const selectedPackage = packages[selectedOption];
 
   useEffect(() => {
@@ -126,14 +124,15 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     if (!agreementAccepted || !signatureDataUrl) return;
 
     const signedAt = new Date().toISOString();
+    const finalPrice = showPackages ? selectedPackage.price : (proposal.total || 0);
     // Lock the accepted record: package, name, price and signature become the
     // immutable source of truth. These are never recalculated from templates.
     const updates = {
-      selectedOption,
-      acceptedPackage: selectedOption,
-      acceptedPackageName: packageMeta[selectedOption].label,
-      acceptedPrice: selectedPackage.price,
-      total: selectedPackage.price,
+      selectedOption: showPackages ? selectedOption : undefined,
+      acceptedPackage: showPackages ? selectedOption : undefined,
+      acceptedPackageName: showPackages ? packageMeta[selectedOption].label : undefined,
+      acceptedPrice: finalPrice,
+      total: finalPrice,
       status: "Won",
       signedAt,
       acceptedAt: signedAt,
@@ -201,6 +200,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.scope || "Scope details are included in the proposal prepared by XRP Roofing."}</p>
           </section>
 
+          {showPackages && (
           <section>
             <div className="flex items-end justify-between gap-2">
               <div>
@@ -250,16 +250,17 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               })}
             </div>
           </section>
+          )}
 
           <section className="flex flex-col justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-5 md:flex-row md:items-center">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Your selection</p>
-              <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{packageMeta[selectedOption].label} Package</p>
+              {showPackages && <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Your selection</p>}
+              {showPackages && <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{packageMeta[selectedOption].label} Package</p>}
               {proposal.notes && <p className="mt-2 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.notes}</p>}
             </div>
             <div className="md:text-right">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Total price</p>
-              <p className="mt-1 text-4xl font-black text-blue-700">{currency(selectedPackage.price || proposal.total)}</p>
+              <p className="mt-1 text-4xl font-black text-blue-700">{currency(proposal.total)}</p>
             </div>
           </section>
 
