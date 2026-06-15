@@ -22,22 +22,42 @@ export async function loadTasksFromSupabase(): Promise<OfficeTask[]> {
     if (error || !data?.length) return readOfficeTasks();
     const tasks = (data as { id: string; payload: OfficeTask }[]).map((row) => ({ ...row.payload, id: row.id }));
 
-    // Global dedup: keep only ONE task per jobId (most advanced in workflow).
+    // Dedup helper: pick the task that is more advanced in the workflow.
+    function isBetter(candidate: OfficeTask, incumbent: OfficeTask): boolean {
+      const cIdx = officeTaskStatuses.indexOf(candidate.status);
+      const iIdx = officeTaskStatuses.indexOf(incumbent.status);
+      return cIdx > iIdx || (cIdx === iIdx && candidate.updatedAt > incumbent.updatedAt);
+    }
+
+    // Pass 1: dedup by jobId
     const bestPerJob = new Map<string, OfficeTask>();
     for (const t of tasks) {
       if (!t.jobId) continue;
       const existing = bestPerJob.get(t.jobId);
       if (!existing) { bestPerJob.set(t.jobId, t); continue; }
-      const existIdx = officeTaskStatuses.indexOf(existing.status);
-      const thisIdx = officeTaskStatuses.indexOf(t.status);
-      if (thisIdx > existIdx || (thisIdx === existIdx && t.updatedAt > existing.updatedAt)) {
-        bestPerJob.set(t.jobId, t);
-      }
+      if (isBetter(t, existing)) bestPerJob.set(t.jobId, t);
     }
     const duplicateIds: string[] = [];
-    const deduped = tasks.filter((t) => {
+    const afterJobDedup = tasks.filter((t) => {
       if (!t.jobId) return true;
       const best = bestPerJob.get(t.jobId);
+      if (best && best.id !== t.id) { duplicateIds.push(t.id); return false; }
+      return true;
+    });
+
+    // Pass 2: dedup by customerName + jobAddress (catches cross-jobId duplicates)
+    const bestPerCustomer = new Map<string, OfficeTask>();
+    for (const t of afterJobDedup) {
+      const key = t.customerName && t.jobAddress ? `${t.customerName}|||${t.jobAddress}` : "";
+      if (!key) continue;
+      const existing = bestPerCustomer.get(key);
+      if (!existing) { bestPerCustomer.set(key, t); continue; }
+      if (isBetter(t, existing)) bestPerCustomer.set(key, t);
+    }
+    const deduped = afterJobDedup.filter((t) => {
+      const key = t.customerName && t.jobAddress ? `${t.customerName}|||${t.jobAddress}` : "";
+      if (!key) return true;
+      const best = bestPerCustomer.get(key);
       if (best && best.id !== t.id) { duplicateIds.push(t.id); return false; }
       return true;
     });
