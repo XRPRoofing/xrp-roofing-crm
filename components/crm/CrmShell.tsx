@@ -283,17 +283,21 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const runSearch = useCallback((query: string) => {
     if (!query.trim()) { setSearchResults([]); setSearchOpen(false); return; }
     const q = query.toLowerCase();
-    // Stripped variant for flexible phone matching (keeps + for country codes)
-    const qPhone = query.replace(/[\s\-\(\)\.]/g, "").toLowerCase();
+    // Normalize a phone string to digits, stripping US country code "1" from 11-digit numbers
+    function normPhone(raw: string): string {
+      const digits = raw.replace(/\D/g, "");
+      return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+    }
+    const qPhone = normPhone(query);
     const results: SearchResult[] = [];
     const MAX = 20;
 
-    // Build a haystack that includes a digits-only phone variant for flexible matching
+    // Match against standard haystack OR normalized phone digits
     function hit(fields: (string | undefined)[], phones: (string | undefined)[]): boolean {
       const haystack = fields.filter(Boolean).join(" ").toLowerCase();
       if (haystack.includes(q)) return true;
       if (qPhone.length >= 2) {
-        const phonesNorm = phones.filter(Boolean).map((p) => p!.replace(/[\s\-\(\)\.]/g, "").toLowerCase()).join(" ");
+        const phonesNorm = phones.filter(Boolean).map((p) => normPhone(p!)).join(" ");
         if (phonesNorm.includes(qPhone)) return true;
       }
       return false;
