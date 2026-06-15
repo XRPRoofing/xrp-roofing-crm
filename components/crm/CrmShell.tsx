@@ -442,14 +442,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   if (checkingAuth) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#dbeafe,transparent_32%),#f8fafc] text-sm font-semibold text-slate-600">
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#D4E2F5,transparent_32%),#f8fafc] text-sm font-semibold text-slate-600">
         <div className="rounded-3xl border border-white/70 bg-white/80 px-6 py-5 shadow-xl shadow-slate-200 backdrop-blur">Opening CRM app...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_32%),linear-gradient(135deg,#07183f_0%,#0f2156_42%,#1d4ed8_100%)]">
+    <div className="min-h-screen overflow-x-clip bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(10,61,145,0.28),transparent_32%),linear-gradient(135deg,#072C6B_0%,#0A3D91_42%,#2B6BC4_100%)]">
       {globalIncomingCall && !isCrewUser && (
         <div className="fixed right-4 top-24 z-[80] w-[min(92vw,380px)] rounded-3xl border border-orange-200 bg-white p-5 text-slate-950 shadow-2xl shadow-slate-950/25">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Incoming Call</p>
@@ -461,11 +461,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#07183f] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.35),transparent_35%)]" />
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#0A3D91] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(10,61,145,0.35),transparent_35%)]" />
         <div className="relative flex h-24 items-center justify-between px-6">
           <Link href={isCrewUser ? "/crm/crew" : "/crm"} className="group flex items-center gap-3" onClick={() => setOpen(false)}>
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#07183f] shadow-lg shadow-slate-950/25">XR</span>
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#0A3D91] shadow-lg shadow-slate-950/25">XR</span>
             <span>
               <span className="block text-xl font-black tracking-tight">XRP CRM</span>
               <span className="mt-0.5 block text-xs font-bold uppercase tracking-[0.2em] text-orange-200">Roofing OS</span>
@@ -487,11 +487,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
             const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
             return (
-              <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-white text-[#07183f] shadow-lg shadow-slate-950/20" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
+              <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-white text-[#0A3D91] shadow-lg shadow-slate-950/20" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
                 <span className="flex items-center gap-3">
                   <span className={`relative rounded-xl p-2 ${active ? "bg-orange-100 text-orange-600" : "bg-white/10 text-blue-100 group-hover:text-white"}`}>
                     <Icon className="h-4 w-4" />
-                    {showChatBadge && <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-[#07183f]">{unreadTeamChatCount}</span>}
+                    {showChatBadge && <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-[#0A3D91]">{unreadTeamChatCount}</span>}
                   </span>
                   {item.label}
                 </span>
@@ -514,17 +514,17 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       </aside>
       {open && <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden" />}
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur-xl lg:border-white/10 lg:bg-[#07183f]/95 lg:text-white lg:shadow-xl lg:shadow-slate-950/20">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur-xl lg:border-white/10 lg:bg-[#0A3D91]/95 lg:text-white lg:shadow-xl lg:shadow-slate-950/20">
           <div className="flex h-16 items-center gap-3 px-3 sm:px-5 lg:h-20 lg:px-8">
-            <button onClick={() => setOpen(true)} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
+            <button onClick={() => setOpen(true)} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
             <div className="min-w-0 flex-1 lg:hidden">
               <div className="flex items-center gap-2">
                 <p className="truncate text-xs font-black uppercase tracking-[0.18em] text-orange-600">XRP CRM App</p>
                 <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncActive ? "bg-emerald-500 animate-pulse" : "bg-emerald-400/60"}`} title={syncActive ? "Syncing" : "Live"} />
               </div>
-              <p className="truncate text-sm font-black text-[#07183f]">{activeModule?.label || "Dashboard"}</p>
+              <p className="truncate text-sm font-black text-[#0A3D91]">{activeModule?.label || "Dashboard"}</p>
             </div>
-            <button type="button" onClick={() => { setMobileSearchOpen((v) => !v); setTimeout(() => mobileSearchInputRef.current?.focus(), 100); }} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm hover:bg-white lg:hidden"><Search className="h-5 w-5" /></button>
+            <button type="button" onClick={() => { setMobileSearchOpen((v) => !v); setTimeout(() => mobileSearchInputRef.current?.focus(), 100); }} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm hover:bg-white lg:hidden"><Search className="h-5 w-5" /></button>
             <div className="hidden min-w-0 lg:block">
               <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">{isCrewUser ? "Crew Workspace" : "Command Center"}</p>
               <p className="mt-1 text-sm font-semibold text-blue-100">{isCrewUser ? "Assigned jobs and completion workflow" : "Roofing operations dashboard"}</p>
@@ -565,14 +565,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </div>
             {!isCrewUser && (
               <div className="relative">
-                <button onClick={handleToggleNotifications} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm hover:bg-white lg:border-white/15 lg:bg-white/10 lg:p-3 lg:text-white lg:hover:bg-white/15">
+                <button onClick={handleToggleNotifications} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm hover:bg-white lg:border-white/15 lg:bg-white/10 lg:p-3 lg:text-white lg:hover:bg-white/15">
                   <Bell className="h-5 w-5" />
                   {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-black text-white ring-2 ring-white">{unreadNotifications}</span>}
                 </button>
                 {notificationsOpen && (
                   <div className="absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-900 shadow-2xl shadow-slate-950/20">
                     <div className="border-b border-slate-200 p-4">
-                      <p className="text-sm font-black text-[#07183f]">Notifications</p>
+                      <p className="text-sm font-black text-[#0A3D91]">Notifications</p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">Recent CRM changes and movements</p>
                     </div>
                     <div className="max-h-96 overflow-y-auto p-2">
@@ -650,7 +650,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
               const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
               return (
-                <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${active ? "bg-[#07183f] text-white" : "text-slate-500 hover:bg-slate-100 hover:text-[#07183f]"}`}>
+                <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${active ? "bg-[#0A3D91] text-white" : "text-slate-500 hover:bg-slate-100 hover:text-[#0A3D91]"}`}>
                   <span className="relative">
                     <Icon className="h-5 w-5" />
                     {showChatBadge && <span className="absolute -right-3 -top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
@@ -663,7 +663,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
         {showTeamChatFloatingButton && (
-          <Link href="/crm/team-chat" className="fixed bottom-24 right-5 z-40 flex items-center gap-3 rounded-full bg-[#07183f] px-4 py-3 text-sm font-black text-white shadow-2xl shadow-blue-950/30 ring-4 ring-white/80 transition hover:-translate-y-0.5 hover:bg-blue-800 lg:bottom-8">
+          <Link href="/crm/team-chat" className="fixed bottom-24 right-5 z-40 flex items-center gap-3 rounded-full bg-[#0A3D91] px-4 py-3 text-sm font-black text-white shadow-2xl shadow-blue-950/30 ring-4 ring-white/80 transition hover:-translate-y-0.5 hover:bg-blue-800 lg:bottom-8">
             <span className="relative rounded-full bg-orange-500 p-2">
               <MessageCircle className="h-5 w-5" />
               {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}

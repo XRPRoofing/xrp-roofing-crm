@@ -73,7 +73,7 @@ export default function ShareGalleryClient({ shareId }: { shareId: string }) {
 
         {status === "error" && (
           <div className="rounded-[2rem] bg-white p-12 text-center">
-            <p className="text-lg font-black text-[#07183f]">Gallery unavailable</p>
+            <p className="text-lg font-black text-[#0A3D91]">Gallery unavailable</p>
             <p className="mt-2 text-sm font-semibold text-slate-500">{message}</p>
           </div>
         )}
@@ -81,7 +81,7 @@ export default function ShareGalleryClient({ shareId }: { shareId: string }) {
         {status === "password" && (
           <form onSubmit={submitPassword} className="mx-auto max-w-sm rounded-[2rem] bg-white p-8 text-center shadow-sm">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><Lock className="h-6 w-6" /></span>
-            <h1 className="mt-4 text-xl font-black text-[#07183f]">Password required</h1>
+            <h1 className="mt-4 text-xl font-black text-[#0A3D91]">Password required</h1>
             <p className="mt-1 text-sm font-semibold text-slate-500">Enter the password to view this gallery.</p>
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" className="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
             {message && <p className="mt-2 text-sm font-bold text-red-600">{message}</p>}
@@ -92,7 +92,7 @@ export default function ShareGalleryClient({ shareId }: { shareId: string }) {
         {status === "ready" && folder && (
           <>
             <section className="rounded-[2rem] bg-white p-6 shadow-sm">
-              <h1 className="text-2xl font-black text-[#07183f]">{folder.address}</h1>
+              <h1 className="text-2xl font-black text-[#0A3D91]">{folder.address}</h1>
               <p className="mt-1 font-bold text-slate-600">{folder.customerName}</p>
               <p className="text-sm font-semibold text-slate-500">{folder.workType} · {photos.length} photos</p>
             </section>

@@ -147,7 +147,7 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
   return (
     <main className="min-h-screen overflow-x-hidden bg-slate-100 px-3 py-6 text-slate-950 sm:px-4 sm:py-8">
       <section className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm sm:rounded-[2rem]">
-        <div className="bg-[#07183f] p-5 text-white sm:p-8">
+        <div className="bg-[#0A3D91] p-5 text-white sm:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">XRP Roofing Invoice</p>
             <span className={`rounded-full px-3 py-1 text-xs font-black ${statusBadgeClass[derived]}`}>{derived}</span>
@@ -168,7 +168,7 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
         <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 p-4 sm:p-5">
-              <h2 className="text-lg font-black text-[#07183f] sm:text-xl">Scope of Work</h2>
+              <h2 className="text-lg font-black text-[#0A3D91] sm:text-xl">Scope of Work</h2>
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                 {(invoice.lineItems || []).map((item, index) => (
                   <div key={index} className="grid gap-1 border-b border-slate-100 p-4 last:border-b-0 sm:grid-cols-[1fr_120px] sm:gap-3">
@@ -183,7 +183,7 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
             </section>
 
             <section className="rounded-3xl border border-slate-200 p-4 sm:p-5">
-              <h2 className="text-lg font-black text-[#07183f] sm:text-xl">Project Details</h2>
+              <h2 className="text-lg font-black text-[#0A3D91] sm:text-xl">Project Details</h2>
               <div className="mt-4 grid gap-3 text-sm font-semibold text-slate-600 sm:grid-cols-2">
                 <p className="break-words"><span className="font-black text-slate-900">Job:</span> {invoice.jobName}</p>
                 <p className="break-words"><span className="font-black text-slate-900">Roof Type:</span> {invoice.roofType}</p>
@@ -195,13 +195,13 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
 
           <aside className="space-y-4">
             <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-              <h2 className="text-lg font-black text-[#07183f]">Payment Summary</h2>
+              <h2 className="text-lg font-black text-[#0A3D91]">Payment Summary</h2>
               <div className="mt-4 space-y-2 text-sm font-bold text-slate-700">
                 <div className="flex justify-between gap-3"><span>Subtotal</span><span>{currency(totals.subtotal)}</span></div>
                 <div className="flex justify-between gap-3"><span>Tax</span><span>{currency(totals.tax)}</span></div>
                 <div className="flex justify-between gap-3"><span>Discount</span><span>{currency(invoice.discount || 0)}</span></div>
                 <div className="flex justify-between gap-3"><span>Paid</span><span>{currency(totals.paid)}</span></div>
-                <div className="border-t border-slate-200 pt-3 text-lg font-black text-[#07183f]"><div className="flex justify-between gap-3"><span>Total Due</span><span>{currency(totals.balance)}</span></div></div>
+                <div className="border-t border-slate-200 pt-3 text-lg font-black text-[#0A3D91]"><div className="flex justify-between gap-3"><span>Total Due</span><span>{currency(totals.balance)}</span></div></div>
               </div>
             </section>
 
@@ -218,14 +218,14 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                 </div>
               ) : (
                 <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4 sm:p-5">
-                  <h2 className="text-lg font-black text-[#07183f]">Choose Payment Method</h2>
+                  <h2 className="text-lg font-black text-[#0A3D91]">Choose Payment Method</h2>
 
                   {paymentMode === null && (
                     <div className="mt-4 space-y-3">
                       <button
                         type="button"
                         onClick={() => setPaymentMode("online")}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-left text-sm font-black text-[#07183f] shadow-sm transition hover:border-blue-400 hover:bg-blue-50"
+                        className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-left text-sm font-black text-[#0A3D91] shadow-sm transition hover:border-blue-400 hover:bg-blue-50"
                       >
                         <span className="text-xl">💳</span>
                         <div>

@@ -149,7 +149,7 @@ export default function PaymentsPage() {
       <div className="flex items-center justify-between pt-2">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
-          <h1 className="mt-1 text-2xl font-black text-[#07183f]">Payments</h1>
+          <h1 className="mt-1 text-2xl font-black text-[#0A3D91]">Payments</h1>
         </div>
         <button
           onClick={() => setShowSearch((v) => !v)}
@@ -178,7 +178,7 @@ export default function PaymentsPage() {
           onClick={() => setTab("unpaid")}
           className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-black uppercase tracking-wide transition ${
             tab === "unpaid"
-              ? "border-[#07183f] bg-[#07183f] text-white"
+              ? "border-[#0A3D91] bg-[#0A3D91] text-white"
               : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
           }`}
         >
@@ -188,7 +188,7 @@ export default function PaymentsPage() {
           onClick={() => setTab("paid")}
           className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-black uppercase tracking-wide transition ${
             tab === "paid"
-              ? "border-[#07183f] bg-[#07183f] text-white"
+              ? "border-[#0A3D91] bg-[#0A3D91] text-white"
               : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
           }`}
         >

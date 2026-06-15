@@ -26,7 +26,7 @@ function fmt(iso: string) {
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
   return (
     <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-2xl border p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-slate-200 bg-white"}`}>
-      <span className="text-2xl font-black text-[#07183f]">{value}</span>
+      <span className="text-2xl font-black text-[#0A3D91]">{value}</span>
       <span className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</span>
     </button>
   );
@@ -149,7 +149,7 @@ export default function TasksPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
-          <h1 className="mt-1 text-2xl font-black text-[#07183f] sm:text-3xl">Task Board</h1>
+          <h1 className="mt-1 text-2xl font-black text-[#0A3D91] sm:text-3xl">Task Board</h1>
           <div className="mt-1 flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : "bg-emerald-500"}`} />
             <p className="text-xs font-semibold text-slate-500">
@@ -332,7 +332,7 @@ export default function TasksPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className={`text-[10px] font-black uppercase tracking-widest ${officeTaskStatusColors[selectedTask.status].text}`}>{selectedTask.status}</p>
-                <h2 className="mt-1 text-lg font-black text-[#07183f]">{selectedTask.customerName}</h2>
+                <h2 className="mt-1 text-lg font-black text-[#0A3D91]">{selectedTask.customerName}</h2>
                 <p className="text-sm font-semibold text-slate-500">{selectedTask.jobAddress}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -459,7 +459,7 @@ export default function TasksPage() {
           <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <p className="text-[10px] font-black uppercase tracking-widest text-teal-600">Customer Satisfaction Check</p>
-            <h2 className="mt-2 text-lg font-black text-[#07183f]">Was the customer satisfied?</h2>
+            <h2 className="mt-2 text-lg font-black text-[#0A3D91]">Was the customer satisfied?</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">{satModal.customerName} — {satModal.jobAddress}</p>
 
             <div className="mt-5 grid grid-cols-2 gap-3">

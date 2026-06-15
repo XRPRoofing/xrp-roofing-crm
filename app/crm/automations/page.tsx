@@ -211,7 +211,7 @@ export default function AutomationsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
@@ -246,7 +246,7 @@ export default function AutomationsPage() {
       {showLog && (
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-black text-[#07183f]">Automation History</h2>
+            <h2 className="text-lg font-black text-[#0A3D91]">Automation History</h2>
             <button type="button" onClick={() => setShowLog(false)} className="rounded-xl p-1.5 hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
           </div>
           {log.length === 0 ? (
@@ -306,7 +306,7 @@ export default function AutomationsPage() {
                   <GroupIcon className="h-5 w-5" />
                 </span>
                 <div>
-                  <p className="text-sm font-black text-[#07183f]">{group}</p>
+                  <p className="text-sm font-black text-[#0A3D91]">{group}</p>
                   <p className="text-xs font-semibold text-slate-500">{enabledInGroup}/{ids.length} enabled</p>
                 </div>
                 {isExpanded ? <ChevronUp className="ml-2 h-4 w-4 text-slate-400" /> : <ChevronDown className="ml-2 h-4 w-4 text-slate-400" />}
@@ -332,7 +332,7 @@ export default function AutomationsPage() {
                         <div className="flex items-start gap-3">
                           <span className="mt-0.5 text-lg">{meta.icon}</span>
                           <div className="min-w-0">
-                            <p className="text-sm font-black text-[#07183f]">{meta.label}</p>
+                            <p className="text-sm font-black text-[#0A3D91]">{meta.label}</p>
                             <p className="mt-0.5 text-xs font-semibold text-slate-500">{meta.description}</p>
                             {rec.lastTriggered && (
                               <p className="mt-1 text-[10px] text-slate-400">Last triggered: {fmt(rec.lastTriggered)}</p>

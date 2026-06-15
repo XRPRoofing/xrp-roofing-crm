@@ -237,14 +237,14 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
           <button
             type="button"
             onClick={() => setZoom(0.5)}
-            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 0.5 ? "bg-[#3b82f6] text-white" : "text-white/60 hover:text-white"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 0.5 ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"}`}
           >
             .5×
           </button>
           <button
             type="button"
             onClick={() => setZoom(1)}
-            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 1 ? "bg-[#3b82f6] text-white" : "text-white/60 hover:text-white"}`}
+            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 1 ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"}`}
           >
             1×
           </button>
@@ -270,7 +270,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
               onClick={() => setViewMode(mode)}
               className={`flex-1 py-2 text-[11px] font-black uppercase tracking-widest transition ${
                 viewMode === mode
-                  ? "rounded-full bg-[#3b82f6] text-white"
+                  ? "rounded-full bg-[#0A3D91] text-white"
                   : "text-white/50 hover:text-white"
               }`}
             >

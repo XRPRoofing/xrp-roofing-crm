@@ -72,7 +72,7 @@ export default function FilesPage() {
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
-            <h1 className="mt-2 text-3xl font-black text-[#07183f]">Files & Photo Uploads</h1>
+            <h1 className="mt-2 text-3xl font-black text-[#0A3D91]">Files & Photo Uploads</h1>
             <p className="crm-board-subtitle mt-2 text-slate-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-center">
@@ -95,7 +95,7 @@ export default function FilesPage() {
       {filteredFolders.length === 0 ? (
         <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
           <UploadCloud className="mx-auto h-12 w-12 text-orange-500" />
-          <p className="mt-4 font-black text-[#07183f]">No folders yet</p>
+          <p className="mt-4 font-black text-[#0A3D91]">No folders yet</p>
           <p className="mt-1 text-sm text-slate-500">Crew photos sync here into folders automatically — or tap <span className="font-black text-blue-700">New Folder</span> to create one and add photos yourself.</p>
         </section>
       ) : (
@@ -110,7 +110,7 @@ export default function FilesPage() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><FolderOpen className="h-6 w-6" /></span>
                 <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700">{folder.files.length} {folder.files.length === 1 ? "photo" : "photos"}</span>
               </div>
-              <h2 className="mt-4 text-lg font-black leading-snug text-[#07183f]">{folder.address}</h2>
+              <h2 className="mt-4 text-lg font-black leading-snug text-[#0A3D91]">{folder.address}</h2>
               <p className="mt-1 text-sm font-bold text-slate-600">{folder.customerName}</p>
               <p className="mt-0.5 text-sm font-semibold text-slate-500">{folder.workType}</p>
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
@@ -160,7 +160,7 @@ function NewFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
-            <h2 className="mt-1 text-xl font-black text-[#07183f]">New Folder</h2>
+            <h2 className="mt-1 text-xl font-black text-[#0A3D91]">New Folder</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-600"><X className="h-4 w-4" /></button>
         </div>

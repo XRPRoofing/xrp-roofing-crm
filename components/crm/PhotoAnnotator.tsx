@@ -16,7 +16,7 @@ type TextShape  = ShapeBase & { kind: "text";  x: number; y: number; text: strin
 type Shape = ArrowShape | BoxShape | CircleShape | TextShape;
 type Tool = "pen" | "arrow" | "box" | "circle" | "text";
 
-const PALETTE = ["#eab308", "#ef4444", "#22c55e", "#3b82f6", "#ffffff", "#0f172a"];
+const PALETTE = ["#eab308", "#ef4444", "#22c55e", "#0A3D91", "#ffffff", "#0f172a"];
 const uid = () => Math.random().toString(36).slice(2);
 
 function hitArrow(s: ArrowShape, p: Pt, tol: number) {
@@ -408,7 +408,7 @@ export default function PhotoAnnotator({
     ctx.drawImage(canvas, 0, 0);
     if (trimmed) {
       const fs = Math.max(18, Math.round(canvas.width * 0.028));
-      ctx.fillStyle = "#07183f";
+      ctx.fillStyle = "#0A3D91";
       ctx.fillRect(0, canvas.height, out.width, capH);
       ctx.fillStyle = "#ffffff"; ctx.font = `600 ${fs}px system-ui, sans-serif`; ctx.textBaseline = "top";
       const pad = Math.round(fs * 0.6);
@@ -529,7 +529,7 @@ export default function PhotoAnnotator({
             <div className="mb-3 flex gap-2">
               {(["Abc", "ft. in.", "m. cm."] as const).map((mode) => (
                 <button key={mode} type="button"
-                  className={`rounded-xl px-3 py-1.5 text-xs font-black ${mode === "Abc" ? "bg-[#07183f] text-white" : "border border-slate-300 text-slate-600"}`}>
+                  className={`rounded-xl px-3 py-1.5 text-xs font-black ${mode === "Abc" ? "bg-[#0A3D91] text-white" : "border border-slate-300 text-slate-600"}`}>
                   {mode}
                 </button>
               ))}

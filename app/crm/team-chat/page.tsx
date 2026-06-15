@@ -211,7 +211,7 @@ export default function TeamChatPage() {
         <div className="flex items-center justify-between gap-3 lg:gap-4">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Team Chat</p>
-            <h1 className="mt-1 text-xl font-black text-[#07183f] sm:mt-2 sm:text-3xl">General Chat</h1>
+            <h1 className="mt-1 text-xl font-black text-[#0A3D91] sm:mt-2 sm:text-3xl">General Chat</h1>
             <p className="crm-board-subtitle mt-2 hidden text-slate-600 sm:block">One shared room for authenticated CRM users. No private messages, channels, or team setup.</p>
           </div>
           <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 sm:px-4 sm:py-3 sm:text-sm">
@@ -225,7 +225,7 @@ export default function TeamChatPage() {
           <div className="flex items-center gap-3">
             <span className="rounded-2xl bg-orange-100 p-3 text-orange-600"><MessageCircle className="h-5 w-5" /></span>
             <div>
-              <h2 className="font-black text-[#07183f]">General Chat</h2>
+              <h2 className="font-black text-[#0A3D91]">General Chat</h2>
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{messages.length} messages</p>
             </div>
           </div>
@@ -247,7 +247,7 @@ export default function TeamChatPage() {
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageCircle className="h-12 w-12 text-orange-500" />
-              <p className="mt-4 font-black text-[#07183f]">No messages yet</p>
+              <p className="mt-4 font-black text-[#0A3D91]">No messages yet</p>
               <p className="mt-1 text-sm text-slate-500">Start the General Chat with the first team update.</p>
             </div>
           ) : (
@@ -258,7 +258,7 @@ export default function TeamChatPage() {
                   {chatMessage.user_avatar_url ? (
                     <Image src={chatMessage.user_avatar_url} alt={chatMessage.user_name} width={44} height={44} unoptimized className="h-11 w-11 rounded-2xl object-cover" />
                   ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#07183f] text-sm font-black text-white">{getInitials(chatMessage.user_name)}</div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0A3D91] text-sm font-black text-white">{getInitials(chatMessage.user_name)}</div>
                   )}
                   <div className={`max-w-3xl rounded-3xl border px-4 py-3 shadow-sm ${isMine ? "border-blue-100 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-900"}`}>
                     <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black ${isMine ? "text-blue-100" : "text-slate-500"}`}>
@@ -313,9 +313,9 @@ export default function TeamChatPage() {
             </div>
           )}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <button type="button" onClick={insertMention} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] hover:bg-white sm:p-3"><AtSign className="h-5 w-5" /></button>
-            <button type="button" onClick={() => setShowEmojis((current) => !current)} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] hover:bg-white sm:p-3"><SmilePlus className="h-5 w-5" /></button>
-            <label className="shrink-0 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] hover:bg-white sm:p-3">
+            <button type="button" onClick={insertMention} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3"><AtSign className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setShowEmojis((current) => !current)} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3"><SmilePlus className="h-5 w-5" /></button>
+            <label className="shrink-0 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3">
               <ImagePlus className="h-5 w-5" />
               <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => handlePhotoUpload(event.target.files)} />
             </label>

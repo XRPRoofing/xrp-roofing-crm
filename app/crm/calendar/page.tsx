@@ -381,12 +381,12 @@ export default function CalendarPage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Scheduling</p>
               <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">Arizona MT</span>
             </div>
-            <h1 className="mt-0.5 text-lg font-black text-[#07183f] sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
+            <h1 className="mt-0.5 text-lg font-black text-[#0A3D91] sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
             <p className="crm-board-subtitle mt-1 hidden text-slate-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments. All times shown in Arizona Mountain Time.</p>
             <p className="mt-1 text-xs text-slate-500 sm:hidden">All times in Arizona MT</p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-xl bg-[#07183f] px-3 py-2 text-sm font-bold text-white sm:rounded-2xl sm:px-4 sm:py-3">
+            <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-xl bg-[#0A3D91] px-3 py-2 text-sm font-bold text-white sm:rounded-2xl sm:px-4 sm:py-3">
               <Plus className="mr-1.5 inline h-4 w-4" />New appointment
             </button>
             <button onClick={loadEvents} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 sm:rounded-2xl sm:px-4 sm:py-3">
@@ -415,7 +415,7 @@ export default function CalendarPage() {
 
       <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-black text-[#07183f] sm:text-2xl">{monthLabel}</h2>
+          <h2 className="text-xl font-black text-[#0A3D91] sm:text-2xl">{monthLabel}</h2>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
               <ChevronLeft className="h-5 w-5" />
@@ -514,7 +514,7 @@ export default function CalendarPage() {
                         <span className="mt-0.5 text-[11px] font-black leading-tight">{formatEventTime(event)}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-[#07183f]">{event.summary || "Untitled event"}</p>
+                        <p className="truncate text-sm font-black text-[#0A3D91]">{event.summary || "Untitled event"}</p>
                         {details.name !== "Not provided" && (
                           <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
                         )}
@@ -550,7 +550,7 @@ export default function CalendarPage() {
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New schedule</p>
-                <h2 className="mt-0.5 text-lg font-black text-[#07183f] sm:text-2xl">Create appointment</h2>
+                <h2 className="mt-0.5 text-lg font-black text-[#0A3D91] sm:text-2xl">Create appointment</h2>
               </div>
               <button type="button" onClick={() => setNewScheduleOpen(false)} aria-label="Close" className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                 <X className="h-5 w-5" />
@@ -598,7 +598,7 @@ export default function CalendarPage() {
       )}
 
       <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-black text-[#07183f]">Upcoming Google Calendar events</h2>
+        <h2 className="text-2xl font-black text-[#0A3D91]">Upcoming Google Calendar events</h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {events.map((event) => {
             const phone = getEventDetails(event).phone;
@@ -607,7 +607,7 @@ export default function CalendarPage() {
             <article key={event.id} onClick={() => setSelectedEvent(event)} className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-black text-[#07183f]">{event.summary || "Untitled event"}</p>
+                  <p className="font-black text-[#0A3D91]">{event.summary || "Untitled event"}</p>
                   <p className="mt-1 text-sm font-semibold text-orange-600">{formatEventDate(event)}</p>
                 </div>
                 {event.htmlLink && (
@@ -635,7 +635,7 @@ export default function CalendarPage() {
           <form onSubmit={handleUpdateEvent} className="mx-auto my-6 grid max-w-6xl gap-6 lg:grid-cols-[1fr_260px]">
             <div className="rounded-[2rem] bg-white p-6 shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <input required value={eventForm.title} onChange={(event) => setEventForm({ ...eventForm, title: event.target.value })} className="w-full border-0 text-3xl font-normal text-[#07183f] outline-none" placeholder="Add title" />
+                <input required value={eventForm.title} onChange={(event) => setEventForm({ ...eventForm, title: event.target.value })} className="w-full border-0 text-3xl font-normal text-[#0A3D91] outline-none" placeholder="Add title" />
                 <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100">
                   <X className="h-5 w-5" />
                 </button>
@@ -728,7 +728,7 @@ export default function CalendarPage() {
             <aside className="rounded-[2rem] bg-white p-5 shadow-2xl">
               <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
                 <Clock className="h-5 w-5 text-slate-500" />
-                <h3 className="font-black text-[#07183f]">Guests</h3>
+                <h3 className="font-black text-[#0A3D91]">Guests</h3>
               </div>
               <textarea value={eventForm.guestEmails} onChange={(event) => setEventForm({ ...eventForm, guestEmails: event.target.value })} className="mt-5 min-h-24 w-full rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Add guest emails, separated by commas" />
               <p className="mt-2 text-xs font-semibold text-slate-500">Saving changes will send the Google Calendar invite/update to each guest.</p>

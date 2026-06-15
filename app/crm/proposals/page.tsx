@@ -1252,15 +1252,15 @@ export default function ProposalsPage() {
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted package</p>
-                  <p className="mt-0.5 text-sm font-black text-[#07183f]">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
+                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted price</p>
-                  <p className="mt-0.5 text-sm font-black text-[#07183f]">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
+                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Version</p>
-                  <p className="mt-0.5 text-sm font-black text-[#07183f]">v{activeProposal.proposalVersion ?? 1}</p>
+                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">v{activeProposal.proposalVersion ?? 1}</p>
                 </div>
               </div>
               {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
@@ -1295,7 +1295,7 @@ export default function ProposalsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer</p>
-                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-[#07183f] outline-none" />
+                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-[#0A3D91] outline-none" />
                   <AddressAutocomplete
                     value={editorForm.address}
                     onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
@@ -1314,7 +1314,7 @@ export default function ProposalsPage() {
               <div className="space-y-2">
                 {templates.map((template) => (
                   <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-xl p-3 text-left ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-300" : "bg-slate-50"}`}>
-                    <span className="block text-sm font-black text-[#07183f]">{template.label}</span>
+                    <span className="block text-sm font-black text-[#0A3D91]">{template.label}</span>
                     <span className="mt-1 block text-xs font-semibold text-slate-500">{template.description}</span>
                   </button>
                 ))}
@@ -1359,7 +1359,7 @@ export default function ProposalsPage() {
               {/* Good / Better / Best toggle */}
               <label className="mb-4 flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-black text-[#07183f]">Good / Better / Best</p>
+                  <p className="text-sm font-black text-[#0A3D91]">Good / Better / Best</p>
                   <p className="text-xs font-semibold text-slate-500">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
                 </div>
                 <button
@@ -1390,14 +1390,14 @@ export default function ProposalsPage() {
                 <div className="grid gap-6 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:grid-cols-2">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Client Info</p>
-                    <p className="mt-3 text-xl font-black text-[#07183f]">{editorForm.customerName}</p>
+                    <p className="mt-3 text-xl font-black text-[#0A3D91]">{editorForm.customerName}</p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{editorForm.address}</p>
                     {editorForm.customerPhone && <p className="mt-2 text-sm font-bold text-slate-700">{editorForm.customerPhone}</p>}
                     {editorForm.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{editorForm.customerEmail}</p>}
                   </div>
                   <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Prepared By</p>
-                    <p className="mt-3 text-xl font-black text-[#07183f]">XRP Roofing</p>
+                    <p className="mt-3 text-xl font-black text-[#0A3D91]">XRP Roofing</p>
                     <p className="mt-2 text-sm font-bold text-slate-700">Jonathan Gonzalez</p>
                     <p className="mt-2 text-sm text-slate-600">(623) 300-8097</p>
                     <p className="mt-1 text-sm text-blue-700">info@xrproofing.com</p>
@@ -1407,9 +1407,9 @@ export default function ProposalsPage() {
 
                 <div className="my-8 text-center">
                   {isPreviewing ? (
-                    <h1 className={`text-3xl font-black tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`}>ROOFING PROPOSAL</h1>
+                    <h1 className={`text-3xl font-black tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-[#0A3D91]"}`}>ROOFING PROPOSAL</h1>
                   ) : (
-                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-black tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-[#07183f]"}`} />
+                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-black tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-[#0A3D91]"}`} />
                   )}
                   <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-black uppercase tracking-wider">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">ID {activeProposal.id}</span>
@@ -1422,7 +1422,7 @@ export default function ProposalsPage() {
                   <div className="mt-8 rounded-3xl bg-slate-50 p-8 text-center">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">Cover page</p>
                     <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
-                    <p className="mt-5 text-3xl font-black text-[#07183f]">{editorForm.title}</p>
+                    <p className="mt-5 text-3xl font-black text-[#0A3D91]">{editorForm.title}</p>
                     <p className="mt-4 text-lg font-bold text-slate-700">{editorForm.customerName}</p>
                     <p className="mt-2 text-sm text-slate-500">{editorForm.address}</p>
                     {isPreviewing ? (
@@ -1467,7 +1467,7 @@ export default function ProposalsPage() {
                   <div className="mt-8 grid gap-6 md:grid-cols-2">
                     <div className="rounded-2xl bg-slate-50 p-5">
                       <p className="text-xs font-black uppercase tracking-wider text-slate-500">Prepared for</p>
-                      <p className="mt-2 text-lg font-black text-[#07183f]">{editorForm.customerName}</p>
+                      <p className="mt-2 text-lg font-black text-[#0A3D91]">{editorForm.customerName}</p>
                       <p className="mt-1 text-sm leading-6 text-slate-600">{editorForm.address}</p>
                     </div>
                     <div className="rounded-2xl bg-slate-50 p-5">
@@ -1499,7 +1499,7 @@ export default function ProposalsPage() {
                     </div>
                     <div className="mt-4 flex justify-between text-sm">
                       <span className="font-bold text-slate-700">Proposal total</span>
-                      <span className="font-black text-[#07183f]">${(Number(editorForm.total) || 0).toLocaleString()}</span>
+                      <span className="font-black text-[#0A3D91]">${(Number(editorForm.total) || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -1516,7 +1516,7 @@ export default function ProposalsPage() {
                         return (
                           <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
                             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
-                            <p className="mt-2 text-xl font-black uppercase text-[#07183f]">{option} Package</p>
+                            <p className="mt-2 text-xl font-black uppercase text-[#0A3D91]">{option} Package</p>
                             <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
                             <div className={`relative mt-5 overflow-hidden print:!max-h-none ${!isScopeExpanded ? "max-h-32" : ""}`}>
                               <ul className="space-y-2">
@@ -1551,7 +1551,7 @@ export default function ProposalsPage() {
                     <p className="text-xs font-black uppercase tracking-wider text-slate-500">{activeSection} proposal option</p>
                     <div className="mt-4 rounded-2xl border border-slate-200 p-5">
                       <div className="flex items-center justify-between">
-                        <p className="text-2xl font-black text-[#07183f]">{activeSection} Roofing Package</p>
+                        <p className="text-2xl font-black text-[#0A3D91]">{activeSection} Roofing Package</p>
                         {isPreviewing ? (
                           <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
                         ) : (
@@ -1573,7 +1573,7 @@ export default function ProposalsPage() {
                     <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                       <div>
                         {editorForm.showPackages && <p className="text-sm font-bold text-slate-600">Selected Package</p>}
-                        {editorForm.showPackages && <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{activeProposal.selectedOption || "best"}</p>}
+                        {editorForm.showPackages && <p className="mt-1 text-xl font-black uppercase text-[#0A3D91]">{activeProposal.selectedOption || "best"}</p>}
                         {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{editorForm.notes}</p>}
                       </div>
                       <div className="text-left md:text-right">
@@ -1586,7 +1586,7 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Terms and Conditions") && (
                   <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                    <p className="text-2xl font-black text-[#07183f]">Terms and Conditions</p>
+                    <p className="text-2xl font-black text-[#0A3D91]">Terms and Conditions</p>
                     {isPreviewing ? (
                       <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700">
                         {editorForm.terms.split("\n\n").map((section, index) => (
@@ -1601,7 +1601,7 @@ export default function ProposalsPage() {
 
                 {editorBrochures.length > 0 && (isPreviewing || activeSection === "Terms and Conditions") && (
                   <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                    <p className="text-2xl font-black text-[#07183f]">Product Brochure</p>
+                    <p className="text-2xl font-black text-[#0A3D91]">Product Brochure</p>
                     <div className="mt-4 space-y-4">
                       {editorBrochures.map((file, index) => (
                         <div key={index}>
@@ -1633,7 +1633,7 @@ export default function ProposalsPage() {
                       </label>
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <p className="text-xs font-black uppercase tracking-wider text-slate-500">Date</p>
-                        <p className="mt-3 font-black text-[#07183f]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                        <p className="mt-3 font-black text-[#0A3D91]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                       </div>
                     </div>
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
@@ -1646,7 +1646,7 @@ export default function ProposalsPage() {
                     <p>ROC #350898</p>
                     <p>info@xrproofing.com</p>
                   </div>
-                  <div className="text-right text-xl font-black text-[#07183f]">XRP<br /><span className="text-xs tracking-[0.25em]">ROOFING</span></div>
+                  <div className="text-right text-xl font-black text-[#0A3D91]">XRP<br /><span className="text-xs tracking-[0.25em]">ROOFING</span></div>
                 </div>
               </div>
             </div>
@@ -1662,7 +1662,7 @@ export default function ProposalsPage() {
               <p className="mt-3 text-sm text-slate-600">Record that this proposal was signed in person. The proposal will be locked and marked as accepted.</p>
               <label className="mt-5 block text-xs font-black uppercase tracking-wider text-slate-500">
                 Signed by (customer name)
-                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#07183f] outline-none focus:border-blue-500" placeholder="Customer full name" />
+                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#0A3D91] outline-none focus:border-blue-500" placeholder="Customer full name" />
               </label>
               <div className="mt-6 flex items-center gap-3">
                 <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-600">Cancel</button>
@@ -1737,7 +1737,7 @@ export default function ProposalsPage() {
                       <p className="whitespace-pre-line">{sendForm.message}</p>
                       <div className="mt-5 rounded-xl border border-slate-200 p-4 text-center">
                         <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
-                        <p className="mt-3 font-black text-[#07183f]">{editorForm.title}</p>
+                        <p className="mt-3 font-black text-[#0A3D91]">{editorForm.title}</p>
                         <p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{editorForm.coverText}</p>
                       </div>
                       <div className="mt-5 text-center">
@@ -1765,7 +1765,7 @@ export default function ProposalsPage() {
   return (
     <div className="space-y-5 font-sans">
       <BackToJobsLink />
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20">
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
@@ -1812,7 +1812,7 @@ export default function ProposalsPage() {
       {activeTab === "templates" && (
         <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
           <form onSubmit={handleCreateTemplate} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-black text-[#07183f]">Create proposal template</h2>
+            <h2 className="text-xl font-black text-[#0A3D91]">Create proposal template</h2>
             <div className="mt-4 space-y-3">
               <input required value={templateForm.label} onChange={(event) => setTemplateForm({ ...templateForm, label: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Template name" />
               <input value={templateForm.description} onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Short description" />
@@ -1823,7 +1823,7 @@ export default function ProposalsPage() {
                 {(["good", "better", "best"] as const).map((option) => (
                   <div key={option} className="rounded-xl bg-white p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase text-[#07183f]">{option}</p>
+                      <p className="text-xs font-black uppercase text-[#0A3D91]">{option}</p>
                       <input type="number" value={normalizePackages(templateForm.packages)[option].price} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], price: Number(event.target.value) || 0 } } })} className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-right text-xs font-black text-blue-700 outline-none" placeholder="Price" />
                     </div>
                     <textarea value={normalizePackages(templateForm.packages)[option].scope} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], scope: event.target.value } } })} className="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs leading-5 text-slate-600 outline-none" placeholder={`${option.toUpperCase()} included services`} />
@@ -1876,7 +1876,7 @@ export default function ProposalsPage() {
               <div key={template.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <input value={template.label} onChange={(event) => handleUpdateTemplate({ ...template, label: event.target.value })} className="w-full border-none bg-transparent text-lg font-black text-[#07183f] outline-none" />
+                    <input value={template.label} onChange={(event) => handleUpdateTemplate({ ...template, label: event.target.value })} className="w-full border-none bg-transparent text-lg font-black text-[#0A3D91] outline-none" />
                     <input value={template.description} onChange={(event) => handleUpdateTemplate({ ...template, description: event.target.value })} className="mt-1 w-full border-none bg-transparent text-sm text-slate-500 outline-none" />
                   </div>
                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Saved</span>
@@ -1900,7 +1900,7 @@ export default function ProposalsPage() {
                     return (
                       <div key={option} className="rounded-xl bg-white p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-black uppercase text-[#07183f]">{option}</p>
+                          <p className="text-sm font-black uppercase text-[#0A3D91]">{option}</p>
                           <input type="number" value={templatePackages[option].price} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], price: Number(event.target.value) || 0 } } })} className="w-32 rounded-xl border border-slate-200 px-3 py-2 text-right text-sm font-black text-blue-700 outline-none" />
                         </div>
                         <textarea value={templatePackages[option].scope} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], scope: event.target.value } } })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-600 outline-none" />
@@ -1960,7 +1960,7 @@ export default function ProposalsPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Email Templates</p>
-                <h2 className="mt-1 text-xl font-black text-[#07183f]">Proposal email templates</h2>
+                <h2 className="mt-1 text-xl font-black text-[#0A3D91]">Proposal email templates</h2>
                 <p className="mt-1 text-sm text-slate-500">Saved email templates used when sending proposals. Use <code className="rounded bg-slate-100 px-1 text-xs">{"{{customer_name}}"}</code> for dynamic customer name.</p>
               </div>
               <button type="button" onClick={() => {
@@ -1974,7 +1974,7 @@ export default function ProposalsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <label className="flex-1 text-xs font-black uppercase tracking-wider text-slate-500">
                       Template name
-                      <input value={et.label} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, label: event.target.value } : t))} className="mt-2 w-full border-none bg-transparent text-lg font-black normal-case tracking-normal text-[#07183f] outline-none" />
+                      <input value={et.label} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, label: event.target.value } : t))} className="mt-2 w-full border-none bg-transparent text-lg font-black normal-case tracking-normal text-[#0A3D91] outline-none" />
                     </label>
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">Saved</span>
@@ -2002,7 +2002,7 @@ export default function ProposalsPage() {
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Settings</p>
-                <h2 className="mt-2 text-2xl font-black text-[#07183f]">Proposal trash bin</h2>
+                <h2 className="mt-2 text-2xl font-black text-[#0A3D91]">Proposal trash bin</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Deleted proposals are hidden from the proposal board and drafts. They stay here for {trashRetentionDays} days before they are removed completely.</p>
               </div>
               <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-700 hover:bg-white">Clear expired trash</button>
@@ -2012,7 +2012,7 @@ export default function ProposalsPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             {trashedProposals.length === 0 ? (
               <div className="rounded-2xl bg-slate-50 p-8 text-center">
-                <p className="text-lg font-black text-[#07183f]">Trash bin is empty</p>
+                <p className="text-lg font-black text-[#0A3D91]">Trash bin is empty</p>
                 <p className="mt-2 text-sm text-slate-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
               </div>
             ) : (
@@ -2025,7 +2025,7 @@ export default function ProposalsPage() {
                   return (
                     <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center">
                       <div>
-                        <p className="text-base font-black text-[#07183f]">{proposal.customerName}</p>
+                        <p className="text-base font-black text-[#0A3D91]">{proposal.customerName}</p>
                         <p className="mt-1 text-sm text-slate-600">{proposal.address}</p>
                         <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Deleted {deletedAt.toLocaleDateString()} · Permanently deletes in {daysLeft} days</p>
                       </div>
@@ -2045,8 +2045,8 @@ export default function ProposalsPage() {
       {activeTab !== "templates" && activeTab !== "settings" && showCreateForm && (
       <form onSubmit={handleCreateProposal} className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setProposalMode("job")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "job" ? "bg-[#07183f] text-white" : "bg-slate-100 text-slate-700"}`}>From selected job</button>
-          <button type="button" onClick={() => setProposalMode("new")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "new" ? "bg-[#07183f] text-white" : "bg-slate-100 text-slate-700"}`}>New proposal</button>
+          <button type="button" onClick={() => setProposalMode("job")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "job" ? "bg-[#0A3D91] text-white" : "bg-slate-100 text-slate-700"}`}>From selected job</button>
+          <button type="button" onClick={() => setProposalMode("new")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "new" ? "bg-[#0A3D91] text-white" : "bg-slate-100 text-slate-700"}`}>New proposal</button>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-end">
@@ -2088,7 +2088,7 @@ export default function ProposalsPage() {
           <div className="mt-4 grid gap-2 pb-20 md:grid-cols-2 lg:pb-0 xl:grid-cols-3">
             {filteredJobs.map((job) => (
               <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`rounded-2xl p-4 text-left text-sm ${selectedJobId === job.id ? "bg-orange-50 ring-2 ring-orange-400" : "bg-slate-50"}`}>
-                <span className="block font-black text-[#07183f]">{job.name}</span>
+                <span className="block font-black text-[#0A3D91]">{job.name}</span>
                 <span className="mt-1 block text-slate-500">{job.address}, {job.city}</span>
                 <span className="mt-2 block font-bold text-orange-700">${job.value.toLocaleString()}</span>
               </button>
@@ -2100,7 +2100,7 @@ export default function ProposalsPage() {
         )}
         {proposalMode === "job" && selectedJob && (
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            <span className="font-black text-[#07183f]">{selectedJob.name}</span> · {selectedJob.address}, {selectedJob.city} · {selectedJob.assignedTo}
+            <span className="font-black text-[#0A3D91]">{selectedJob.name}</span> · {selectedJob.address}, {selectedJob.city} · {selectedJob.assignedTo}
           </div>
         )}
       </form>
@@ -2112,9 +2112,9 @@ export default function ProposalsPage() {
           <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-3xl border border-white/70 bg-white/95 p-4 text-left shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
             <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-black leading-4 text-[#07183f] shadow-sm">XRP<br />ROOF</div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-black leading-4 text-[#0A3D91] shadow-sm">XRP<br />ROOF</div>
               <div>
-                <p className="font-black text-[#07183f]">{proposal.address}</p>
+                <p className="font-black text-[#0A3D91]">{proposal.address}</p>
                 <p className="mt-1 text-sm text-slate-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
                 <p className="mt-1 text-xs text-slate-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
               </div>

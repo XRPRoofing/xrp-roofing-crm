@@ -81,13 +81,13 @@ export async function POST(req: NextRequest) {
                       <tr>
                         <td style="padding:18px;">
                           <div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.12em;">Invoice</div>
-                          <div style="font-weight:900;color:#07183f;font-size:22px;margin-top:4px;">${escapeHtml(data.invoiceNumber)}</div>
+                          <div style="font-weight:900;color:#0A3D91;font-size:22px;margin-top:4px;">${escapeHtml(data.invoiceNumber)}</div>
                           <div style="font-weight:900;color:#ea580c;font-size:28px;margin-top:12px;">${escapeHtml(data.balance)}</div>
                           <div style="font-size:13px;color:#475569;margin-top:4px;">Remaining balance due</div>
                         </td>
                       </tr>
                     </table>
-                    <div style="margin-top:30px;">${button(data.invoiceLink, "View Invoice", "#07183f")}</div>
+                    <div style="margin-top:30px;">${button(data.invoiceLink, "View Invoice", "#0A3D91")}</div>
                     <div style="margin-top:14px;">${button(payLink, "Pay Invoice", "#1768c9")}</div>
                     <p style="font-size:12px;color:#64748b;margin-top:26px;text-align:center;">Payment options include ACH bank transfer and credit card.</p>
                   </td>

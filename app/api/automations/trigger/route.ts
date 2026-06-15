@@ -39,7 +39,7 @@ async function sendEmail(to: string, subject: string, body: string): Promise<{ o
         <div style="background:#e9eef3;padding:18px 28px;text-align:center;">
           <img src="${logoUrl}" alt="XRP Roofing" width="140" style="width:140px;max-width:55%;height:auto;display:inline-block;" />
         </div>
-        <div style="background:#07183f;padding:20px 28px;color:#fff;">
+        <div style="background:#0A3D91;padding:20px 28px;color:#fff;">
           <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.16em;opacity:.85;">XRP Roofing CRM</div>
           <div style="font-size:20px;font-weight:900;margin-top:4px;">${escapeHtml(subject)}</div>
         </div>

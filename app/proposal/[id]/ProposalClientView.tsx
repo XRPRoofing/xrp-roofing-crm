@@ -185,7 +185,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     <main className="min-h-screen bg-slate-100 px-3 py-5 text-slate-950 sm:px-4 sm:py-8">
       <section className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {/* Compact header: small logo + title on one row, meta badges aligned right */}
-        <header className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-[#07183f] to-[#13316b] p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <header className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-[#0A3D91] to-[#072C6B] p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5 shadow-sm">
               <Image src="/images/logo.jpeg" alt="XRP Roofing logo" width={44} height={44} className="h-full w-auto object-contain" priority />
@@ -227,7 +227,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
         <div className="space-y-6 p-4 sm:p-6">
           {/* Summary + scope combined into one tidy card */}
           <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="text-base font-black text-[#07183f]">Project Summary</h2>
+            <h2 className="text-base font-black text-[#0A3D91]">Project Summary</h2>
             <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.summary || proposal.coverText || "Your customized XRP Roofing proposal is ready for review."}</p>
             <h3 className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Scope of Work</h3>
             <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.scope || "Scope details are included in the proposal prepared by XRP Roofing."}</p>
@@ -237,7 +237,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           <section>
             <div className="flex items-end justify-between gap-2">
               <div>
-                <p className="text-base font-black text-[#07183f]">Choose your package</p>
+                <p className="text-base font-black text-[#0A3D91]">Choose your package</p>
                 <p className="text-sm text-slate-500">Pick the option that best fits your home.</p>
               </div>
             </div>
@@ -255,7 +255,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                     )}
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">{packageMeta[option].label}</p>
                     <p className="mt-1 text-sm font-semibold text-slate-500">{packageMeta[option].tagline}</p>
-                    <p className="mt-4 text-3xl font-black text-[#07183f]">{currency(packageOption.price)}</p>
+                    <p className="mt-4 text-3xl font-black text-[#0A3D91]">{currency(packageOption.price)}</p>
                     <div className={`relative mt-4 flex-1 overflow-hidden ${!isExpanded ? "max-h-32" : ""}`}>
                       <ul className="space-y-2">
                         {features.length > 0 ? features.map((feature, index) => (
@@ -288,7 +288,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           <section className="flex flex-col justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-5 md:flex-row md:items-center">
             <div>
               {showPackages && <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Your selection</p>}
-              {showPackages && <p className="mt-1 text-xl font-black uppercase text-[#07183f]">{packageMeta[selectedOption].label} Package</p>}
+              {showPackages && <p className="mt-1 text-xl font-black uppercase text-[#0A3D91]">{packageMeta[selectedOption].label} Package</p>}
               {proposal.notes && <p className="mt-2 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.notes}</p>}
             </div>
             <div className="md:text-right">
@@ -300,7 +300,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           {/* Collapsible terms to keep the page clean */}
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <button type="button" onClick={() => setTermsOpen((open) => !open)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
-              <span className="text-base font-black text-[#07183f]">Terms &amp; Conditions</span>
+              <span className="text-base font-black text-[#0A3D91]">Terms &amp; Conditions</span>
               <span className="flex items-center gap-2 text-sm font-bold text-blue-700">
                 {termsOpen ? "Hide" : "View"}
                 <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-blue-700 transition-transform ${termsOpen ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
@@ -317,7 +317,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
 
           {proposal.brochures && proposal.brochures.length > 0 && (
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <p className="text-base font-black text-[#07183f]">Product Brochure</p>
+              <p className="text-base font-black text-[#0A3D91]">Product Brochure</p>
               <div className="mt-4 space-y-4">
                 {proposal.brochures.map((file, index) => (
                   <div key={index}>
@@ -353,7 +353,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             <section className="rounded-2xl border-2 border-blue-200 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
                 <svg viewBox="0 0 20 20" className="h-5 w-5 fill-blue-600" aria-hidden="true"><path d="M13.6 2.4a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L8.2 16.8l-4.6 1 1-4.6 9-9z" /></svg>
-                <h2 className="text-base font-black text-[#07183f]">Accept &amp; sign your proposal</h2>
+                <h2 className="text-base font-black text-[#0A3D91]">Accept &amp; sign your proposal</h2>
               </div>
               <label className="mt-4 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">
                 <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300" />

@@ -179,7 +179,7 @@ export default function FolderGalleryPage() {
       ) : !folder ? (
         <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
           <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
-          <p className="mt-4 font-black text-[#07183f]">Folder not found</p>
+          <p className="mt-4 font-black text-[#0A3D91]">Folder not found</p>
           <p className="mt-1 text-sm text-slate-500">This job folder may have no photos yet.</p>
         </section>
       ) : (
@@ -202,7 +202,7 @@ export default function FolderGalleryPage() {
 
             {/* Address + meta */}
             <div className="px-5 pt-4 pb-3">
-              <h1 className="text-xl font-black text-[#07183f]">{folder.address}</h1>
+              <h1 className="text-xl font-black text-[#0A3D91]">{folder.address}</h1>
               <p className="mt-0.5 text-sm font-bold text-slate-500">{folder.customerName}{folder.workType ? ` · ${folder.workType}` : ""}</p>
               <p className="mt-1 text-xs font-semibold text-slate-400">Last updated {formatDate(folder.updatedAt)}</p>
             </div>
@@ -215,7 +215,7 @@ export default function FolderGalleryPage() {
                   <button key={t} type="button" onClick={() => setActivePhotoType(t as typeof activePhotoType)}
                     className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-black transition ${
                       activePhotoType === t
-                        ? t === "Before" ? "bg-blue-600 text-white" : t === "Progress" ? "bg-orange-500 text-white" : t === "After" ? "bg-emerald-600 text-white" : "bg-[#07183f] text-white"
+                        ? t === "Before" ? "bg-blue-600 text-white" : t === "Progress" ? "bg-orange-500 text-white" : t === "After" ? "bg-emerald-600 text-white" : "bg-[#0A3D91] text-white"
                         : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                     }`}>
                     {t} {count > 0 && <span className="opacity-70">({count})</span>}
@@ -227,7 +227,7 @@ export default function FolderGalleryPage() {
             {/* Action row */}
             <div className="flex items-center gap-2 border-t border-slate-100 px-5 py-3 overflow-x-auto">
               <button type="button" disabled={uploading} onClick={() => setLiveCameraOpen(true)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#07183f] px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-900 active:scale-95 ${uploading ? "opacity-60" : ""}`}>
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#0A3D91] px-4 py-2.5 text-sm font-black text-white transition hover:bg-blue-900 active:scale-95 ${uploading ? "opacity-60" : ""}`}>
                 <Camera className="h-4 w-4" /> Camera
               </button>
               <label className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
@@ -260,12 +260,12 @@ export default function FolderGalleryPage() {
       <PhotoAnnotator key={annotatorKey} images={annotatorImages} onComplete={handleAnnotated} onCancel={() => { editTargetRef.current = null; setAnnotatorImages(null); }} />
 
       {liveCameraOpen && folder && (() => {
-        const accentMap: Record<string, string> = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600", "Job Photo": "bg-[#07183f]" };
+        const accentMap: Record<string, string> = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600", "Job Photo": "bg-[#0A3D91]" };
         const existingCount = (folder.files ?? []).filter((f) => f.photoType === activePhotoType).length;
         return (
           <LiveCameraCapture
             label={activePhotoType === "Job Photo" ? "General" : activePhotoType}
-            accentColor={accentMap[activePhotoType] ?? "bg-[#07183f]"}
+            accentColor={accentMap[activePhotoType] ?? "bg-[#0A3D91]"}
             existingCount={existingCount}
             onCapture={async (photo) => {
               // Save directly — no blocking setUploading so shutter stays instant
@@ -293,14 +293,14 @@ export default function FolderGalleryPage() {
               <FileText className="h-5 w-5 text-orange-600" />
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-orange-600">Job Report</p>
-                <p className="text-sm font-black text-[#07183f]">{folder.address}</p>
+                <p className="text-sm font-black text-[#0A3D91]">{folder.address}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-2xl bg-[#07183f] px-4 py-2.5 text-sm font-black text-white hover:bg-blue-900"
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-[#0A3D91] px-4 py-2.5 text-sm font-black text-white hover:bg-blue-900"
               >
                 <FileText className="h-4 w-4" /> Print / Save PDF
               </button>
@@ -314,7 +314,7 @@ export default function FolderGalleryPage() {
           <div className="mx-auto w-full max-w-2xl space-y-8 px-5 py-8">
             {/* Cover info */}
             <div className="text-center">
-              <p className="text-2xl font-black text-[#07183f]">{folder.address}</p>
+              <p className="text-2xl font-black text-[#0A3D91]">{folder.address}</p>
               <p className="mt-1 font-bold text-slate-600">{folder.customerName}</p>
               {folder.workType && <p className="text-sm font-semibold text-slate-500">{folder.workType}</p>}
               <p className="mt-1 text-xs font-semibold text-slate-400">Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
@@ -326,7 +326,7 @@ export default function FolderGalleryPage() {
                 const cnt = t === "General" ? photos.length : photos.filter((p) => p.photoType === t).length;
                 return (
                   <div key={t} className="text-center">
-                    <p className="text-2xl font-black text-[#07183f]">{cnt}</p>
+                    <p className="text-2xl font-black text-[#0A3D91]">{cnt}</p>
                     <p className="text-xs font-bold text-slate-500">{t}</p>
                   </div>
                 );
@@ -423,7 +423,7 @@ function ShareFolderModal({ folder, onClose }: { folder: CrmFileFolder; onClose:
       <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-black text-[#07183f]">Share Folder</h2>
+            <h2 className="text-xl font-black text-[#0A3D91]">Share Folder</h2>
             <p className="mt-1 text-sm text-slate-500">{folder.address}</p>
           </div>
           <button onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-600"><X className="h-4 w-4" /></button>
