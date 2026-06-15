@@ -7,7 +7,7 @@
  */
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { readOfficeTasks, saveOfficeTasks, type OfficeTask } from "@/lib/office-tasks";
+import { officeTaskStatuses, readOfficeTasks, saveOfficeTasks, type OfficeTask } from "@/lib/office-tasks";
 
 const TABLE = "office_tasks";
 
@@ -22,21 +22,23 @@ export async function loadTasksFromSupabase(): Promise<OfficeTask[]> {
     if (error || !data?.length) return readOfficeTasks();
     const tasks = (data as { id: string; payload: OfficeTask }[]).map((row) => ({ ...row.payload, id: row.id }));
 
-    // Clean up duplicate paid tasks created by the old Date.now()-based ID bug.
-    // Keep only the first (most recent) task per jobId OR invoiceNumber.
-    const seenPaidJobs = new Set<string>();
-    const seenPaidInvoices = new Set<string>();
+    // Global dedup: keep only ONE task per jobId (most advanced in workflow).
+    const bestPerJob = new Map<string, OfficeTask>();
+    for (const t of tasks) {
+      if (!t.jobId) continue;
+      const existing = bestPerJob.get(t.jobId);
+      if (!existing) { bestPerJob.set(t.jobId, t); continue; }
+      const existIdx = officeTaskStatuses.indexOf(existing.status);
+      const thisIdx = officeTaskStatuses.indexOf(t.status);
+      if (thisIdx > existIdx || (thisIdx === existIdx && t.updatedAt > existing.updatedAt)) {
+        bestPerJob.set(t.jobId, t);
+      }
+    }
     const duplicateIds: string[] = [];
     const deduped = tasks.filter((t) => {
-      if (!t.id.startsWith("task-paid-")) return true;
-      const dupByJob = t.jobId && seenPaidJobs.has(t.jobId);
-      const dupByInvoice = t.invoiceNumber && seenPaidInvoices.has(t.invoiceNumber);
-      if (dupByJob || dupByInvoice) {
-        duplicateIds.push(t.id);
-        return false;
-      }
-      if (t.jobId) seenPaidJobs.add(t.jobId);
-      if (t.invoiceNumber) seenPaidInvoices.add(t.invoiceNumber);
+      if (!t.jobId) return true;
+      const best = bestPerJob.get(t.jobId);
+      if (best && best.id !== t.id) { duplicateIds.push(t.id); return false; }
       return true;
     });
 

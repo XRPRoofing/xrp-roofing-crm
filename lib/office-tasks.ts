@@ -191,14 +191,7 @@ export function updateOfficeTaskStatus(taskId: string, status: OfficeTaskStatus,
     return addTimelineEntry(next, `Moved to ${status}`, undefined, by || "Office");
   });
 
-  // Auto-create Customer Satisfaction card when moved to Paid
-  const paidTask = updated.find((t) => t.id === taskId && t.status === "Paid");
-  const satId = paidTask ? `sat-${paidTask.jobId}` : "";
-  const withSat = paidTask && !updated.some((t) => t.id === satId)
-    ? [{ ...paidTask, id: satId, status: "Customer Satisfaction" as OfficeTaskStatus, satisfactionChecked: false, dueDate: "Immediately", createdAt: now, updatedAt: now, timeline: [{ id: `${Date.now()}`, event: "Payment Received — Satisfaction Check Required", at: now }] }, ...updated]
-    : updated;
-
-  saveOfficeTasks(withSat);
+  saveOfficeTasks(updated);
 }
 
 export function recordCustomerSatisfaction(taskId: string, satisfied: boolean, notes?: string) {
@@ -321,14 +314,7 @@ export function syncCrewJobToTaskBoard(input: CrewJobSyncInput, eventLabel?: str
     return addTimelineEntry(withUpdate, event, undefined, "Crew");
   });
 
-  // Auto-create For Invoice task when Completed
-  const justCompleted = nextStatus === "Job Completed" && existing.status !== "Job Completed";
-  const forInvoiceId = `forinvoice-${input.id}`;
-  const withInvoice = justCompleted && !updated.some((t) => t.id === forInvoiceId)
-    ? [{ ...updated.find((t) => t.jobId === input.id)!, id: forInvoiceId, status: "For Invoice" as OfficeTaskStatus, dueDate: "Immediately", createdAt: now, updatedAt: now, timeline: [{ id: `${Date.now()}`, event: "Job Completed — Invoice Task Created", at: now }] }, ...updated]
-    : updated;
-
-  saveOfficeTasks(withInvoice);
+  saveOfficeTasks(updated);
 }
 
 export function addTaskTimelineEntry(taskId: string, event: string, note?: string, by?: string) {
