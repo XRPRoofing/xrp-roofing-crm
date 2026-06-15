@@ -12,7 +12,7 @@ import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { EmailLink, AddressLink } from "@/components/ContactLinks";
+import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
@@ -1409,6 +1409,7 @@ export default function InvoicesPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#07183f]">{selectedInvoice.clientName || "—"}</p></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Phone</p><p className="mt-1 text-sm font-bold text-[#07183f]"><PhoneLink value={selectedInvoice.phone} fallback="—" /></p></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#07183f]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.sentBy || "—"}</p></div>
               </div>
@@ -1643,8 +1644,8 @@ export default function InvoicesPage() {
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Email</p><p className="text-xs font-semibold text-slate-700 break-all">{inv.email || "—"}</p></div>
-                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Phone</p><p className="text-xs font-semibold text-slate-700">{inv.phone || "—"}</p></div>
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Email</p><p className="text-xs font-semibold text-slate-700 break-all"><EmailLink value={inv.email} fallback="—" /></p></div>
+                    <div><p className="text-[10px] font-bold uppercase text-slate-400">Phone</p><p className="text-xs font-semibold text-slate-700"><PhoneLink value={inv.phone} fallback="—" /></p></div>
                     <div><p className="text-[10px] font-bold uppercase text-slate-400">Roof Type</p><p className="text-xs font-semibold text-slate-700">{inv.roofType || "—"}</p></div>
                     <div><p className="text-[10px] font-bold uppercase text-slate-400">Completion</p><p className="text-xs font-semibold text-slate-700">{inv.projectCompletionDate || "—"}</p></div>
                   </div>
