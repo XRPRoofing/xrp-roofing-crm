@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
@@ -331,13 +331,37 @@ export default function CustomersPage() {
     router.push("/crm/invoices");
   }
 
+  const cardHistoryPushedRef = useRef(false);
+
+  const closeCustomerCard = useCallback(() => {
+    if (cardHistoryPushedRef.current) {
+      cardHistoryPushedRef.current = false;
+      window.history.back();
+    } else {
+      setSelectedCustomerId(null);
+    }
+  }, []);
+
   function openCustomer(customer: Customer) {
     setSelectedCustomerId(customer.id);
     setActiveTab("Contact Info");
     setEditingCustomerId(null);
     setEditForm(null);
     setNoteDraft(readCustomerNotes()[customer.id] || "");
+    window.history.pushState({ customerCardOpen: true }, "");
+    cardHistoryPushedRef.current = true;
   }
+
+  useEffect(() => {
+    function handlePopState() {
+      if (cardHistoryPushedRef.current) {
+        cardHistoryPushedRef.current = false;
+        setSelectedCustomerId(null);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const filteredCustomers = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -364,6 +388,8 @@ export default function CustomersPage() {
       if (match) {
         setSelectedCustomerId(match.id);
         setActiveTab("Contact Info");
+        window.history.pushState({ customerCardOpen: true }, "");
+        cardHistoryPushedRef.current = true;
       }
     }
   }, [searchParams, customerList, selectedCustomerId]);
@@ -528,6 +554,7 @@ export default function CustomersPage() {
   async function handleDeleteCustomer(id: string) {
     if (typeof window !== "undefined" && !window.confirm("Delete this customer? This cannot be undone.")) return;
     setSavedCustomers((current) => current.filter((customer) => customer.id !== id));
+    if (cardHistoryPushedRef.current) { cardHistoryPushedRef.current = false; window.history.back(); }
     setSelectedCustomerId(null);
     await deleteCustomerRecord(id);
     await syncFromServer();
@@ -610,7 +637,7 @@ export default function CustomersPage() {
       </div>
 
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={() => setSelectedCustomerId(null)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
               <div className="flex items-start justify-between gap-4 p-5 pb-3">
@@ -627,7 +654,7 @@ export default function CustomersPage() {
                   {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
                     <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-5 w-5" /></button>
                   )}
-                  <button type="button" onClick={() => setSelectedCustomerId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                  <button type="button" onClick={closeCustomerCard} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>
               <div className="flex gap-1 overflow-x-auto px-3">

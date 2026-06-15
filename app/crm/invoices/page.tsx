@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
@@ -517,6 +517,7 @@ export default function InvoicesPage() {
     return hasSupabaseConfig() ? [] : initialInvoices;
   });
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const invoiceCardHistoryRef = useRef(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -562,12 +563,40 @@ export default function InvoicesPage() {
 
   const searchParams = useSearchParams();
 
+  const closeInvoiceCard = useCallback(() => {
+    if (invoiceCardHistoryRef.current) {
+      invoiceCardHistoryRef.current = false;
+      window.history.back();
+    } else {
+      setSelectedInvoiceId(null);
+    }
+  }, []);
+
+  function pushInvoiceHistory() {
+    window.history.pushState({ invoiceCardOpen: true }, "");
+    invoiceCardHistoryRef.current = true;
+  }
+
+  useEffect(() => {
+    function handlePopState() {
+      if (invoiceCardHistoryRef.current) {
+        invoiceCardHistoryRef.current = false;
+        setSelectedInvoiceId(null);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Auto-select an invoice when navigated from global search with ?invoice=<id>
   useEffect(() => {
     const invoiceId = searchParams.get("invoice");
     if (invoiceId && invoices.length > 0 && !selectedInvoiceId) {
       const match = invoices.find((inv) => inv.id === invoiceId);
-      if (match) setSelectedInvoiceId(match.id);
+      if (match) {
+        setSelectedInvoiceId(match.id);
+        pushInvoiceHistory();
+      }
     }
   }, [searchParams, invoices, selectedInvoiceId]);
 
@@ -581,6 +610,7 @@ export default function InvoicesPage() {
     intentHandledRef.current = true;
     if (intent.kind === "open") {
       setSelectedInvoiceId(intent.id);
+      pushInvoiceHistory();
       return;
     }
     setInvoices((current) => {
@@ -860,6 +890,7 @@ export default function InvoicesPage() {
 
   function openInvoice(invoice: Invoice) {
     setSelectedInvoiceId(invoice.id);
+    pushInvoiceHistory();
     if (!invoice.activity.includes("Viewed")) {
       updateInvoice(invoice, "Viewed");
     }
@@ -882,6 +913,7 @@ export default function InvoicesPage() {
     if (!pendingReviewInvoice) return;
     setInvoices((currentInvoices) => [pendingReviewInvoice, ...currentInvoices]);
     setSelectedInvoiceId(pendingReviewInvoice.id);
+    pushInvoiceHistory();
     void upsertInvoiceRecord(pendingReviewInvoice as unknown as Record<string, unknown> & { id: string });
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
@@ -897,7 +929,10 @@ export default function InvoicesPage() {
     if (!window.confirm(`Delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}?`)) return;
     const deletedInvoice = { ...invoice, isDeleted: true, deletedAt: new Date().toISOString(), activity: [...invoice.activity, "Invoice deleted"] };
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
-    if (selectedInvoiceId === invoice.id) setSelectedInvoiceId(null);
+    if (selectedInvoiceId === invoice.id) {
+      if (invoiceCardHistoryRef.current) { invoiceCardHistoryRef.current = false; window.history.back(); }
+      setSelectedInvoiceId(null);
+    }
     void upsertInvoiceRecord(deletedInvoice as unknown as Record<string, unknown> & { id: string });
   }
 
@@ -1292,8 +1327,8 @@ export default function InvoicesPage() {
                       {/* Mobile: swipeable action row / Desktop: wrapped buttons */}
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHistory(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHistory(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>
@@ -1311,7 +1346,7 @@ export default function InvoicesPage() {
           <div className="mx-auto my-2 sm:my-6 max-w-6xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-5 lg:flex-row lg:items-start">
               <div>
-                <button onClick={() => setSelectedInvoiceId(null)} className="mb-3 sm:mb-4 text-sm font-black text-blue-700 flex items-center gap-1">
+                <button onClick={closeInvoiceCard} className="mb-3 sm:mb-4 text-sm font-black text-blue-700 flex items-center gap-1">
                   <span>←</span> Back to board
                 </button>
                 <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">{selectedInvoice.invoiceNumber}</p>
