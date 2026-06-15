@@ -508,10 +508,20 @@ export default function ProposalsPage() {
 
     if (!query) return visibleProposals;
 
-    return visibleProposals.filter((proposal) =>
-      [proposal.customerName, proposal.address, proposal.scope, proposal.status]
-        .some((value) => value.toLowerCase().includes(query))
-    );
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
+
+    return visibleProposals.filter((proposal) => {
+      const textMatch = [proposal.customerName, proposal.customerPhone, proposal.address, proposal.scope, proposal.status]
+        .some((value) => (value || "").toLowerCase().includes(query));
+      if (textMatch) return true;
+      if (queryPhone.length >= 2 && proposal.customerPhone) {
+        const pDigits = proposal.customerPhone.replace(/\D/g, "");
+        const pPhone = pDigits.length === 11 && pDigits.startsWith("1") ? pDigits.slice(1) : pDigits;
+        if (pPhone.includes(queryPhone)) return true;
+      }
+      return false;
+    });
   }, [proposalFilter, proposalSearch, proposals]);
   const trashedProposals = useMemo(() => proposals.filter((proposal) => Boolean(proposal.deletedAt)), [proposals]);
 

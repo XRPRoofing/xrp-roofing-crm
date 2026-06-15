@@ -374,15 +374,25 @@ export default function CustomersPage() {
 
     if (!query) return customerList;
 
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
+
     return customerList.filter((customer) => {
       const relatedJobs = getCustomerJobs(customer, jobList);
-      return [
+      const textMatch = [
         customer.name,
         customer.phone,
         customer.email,
         customer.propertyAddress,
         ...relatedJobs.map((job) => `${job.name} ${job.city} ${job.stage} ${job.roofType} ${job.address}`),
       ].some((value) => normalizeText(value).includes(query));
+      if (textMatch) return true;
+      if (queryPhone.length >= 2 && customer.phone) {
+        const custDigits = digitsOnly(customer.phone);
+        const custPhone = custDigits.length === 11 && custDigits.startsWith("1") ? custDigits.slice(1) : custDigits;
+        if (custPhone.includes(queryPhone)) return true;
+      }
+      return false;
     });
   }, [customerList, jobList, search]);
 

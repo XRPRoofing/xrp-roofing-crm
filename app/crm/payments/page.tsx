@@ -16,6 +16,7 @@ type LoadedInvoice = {
   id: string;
   invoiceNumber?: string;
   clientName?: string;
+  phone?: string;
   propertyAddress?: string;
   status?: string;
   total?: number;
@@ -121,11 +122,20 @@ export default function PaymentsPage() {
     const filtered = search.trim()
       ? list.filter((inv) => {
           const q = search.toLowerCase();
-          return (
+          const textMatch =
             (inv.clientName || "").toLowerCase().includes(q) ||
             (inv.invoiceNumber || "").toLowerCase().includes(q) ||
-            (inv.propertyAddress || "").toLowerCase().includes(q)
-          );
+            (inv.propertyAddress || "").toLowerCase().includes(q) ||
+            (inv.phone || "").toLowerCase().includes(q);
+          if (textMatch) return true;
+          const qDigits = q.replace(/\D/g, "");
+          const qPhone = qDigits.length === 11 && qDigits.startsWith("1") ? qDigits.slice(1) : qDigits;
+          if (qPhone.length >= 2 && inv.phone) {
+            const invDigits = inv.phone.replace(/\D/g, "");
+            const invPhone = invDigits.length === 11 && invDigits.startsWith("1") ? invDigits.slice(1) : invDigits;
+            if (invPhone.includes(qPhone)) return true;
+          }
+          return false;
         })
       : list;
 
