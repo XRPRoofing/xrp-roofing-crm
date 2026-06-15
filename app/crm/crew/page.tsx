@@ -83,10 +83,19 @@ export default function CrewWorkflowPage() {
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
   const filteredJobs = useMemo(() => {
     const query = search.toLowerCase().trim();
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
     return crewJobs.filter((job) => {
       const matchesStatus = activeFilter === "all" || job.status === activeFilter;
-      const matchesSearch = !query || [job.name, formatAddress(job), job.assignedCrew.join(" "), job.jobScope, job.status].some((value) => value.toLowerCase().includes(query));
-      return matchesStatus && matchesSearch;
+      if (!query) return matchesStatus;
+      const textMatch = [job.name, job.phone, formatAddress(job), job.assignedCrew.join(" "), job.jobScope, job.status].some((value) => value.toLowerCase().includes(query));
+      if (textMatch) return matchesStatus;
+      if (queryPhone.length >= 2 && job.phone) {
+        const jobDigits = job.phone.replace(/\D/g, "");
+        const jobPhone = jobDigits.length === 11 && jobDigits.startsWith("1") ? jobDigits.slice(1) : jobDigits;
+        if (jobPhone.includes(queryPhone)) return matchesStatus;
+      }
+      return false;
     });
   }, [activeFilter, crewJobs, search]);
   const selectedJob = crewJobs.find((job) => job.id === selectedJobId) || null;

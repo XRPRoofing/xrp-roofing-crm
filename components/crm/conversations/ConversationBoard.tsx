@@ -89,11 +89,20 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
 
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
     return conversations.filter((conversation) => {
       if (!conversationMatchesFilter(conversation, filter)) return false;
       if (!query) return true;
-      return [conversation.contact.name, conversation.contact.phone, conversation.contact.address, conversation.lastMessage]
+      const textMatch = [conversation.contact.name, conversation.contact.phone, conversation.contact.address, conversation.lastMessage]
         .some((value) => value?.toLowerCase().includes(query));
+      if (textMatch) return true;
+      if (queryPhone.length >= 2 && conversation.contact.phone) {
+        const cDigits = conversation.contact.phone.replace(/\D/g, "");
+        const cPhone = cDigits.length === 11 && cDigits.startsWith("1") ? cDigits.slice(1) : cDigits;
+        if (cPhone.includes(queryPhone)) return true;
+      }
+      return false;
     });
   }, [conversations, filter, search]);
 

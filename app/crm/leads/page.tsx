@@ -352,10 +352,20 @@ export default function LeadsPage() {
     const sourceFiltered = sourceFilter ? jobs.filter((job) => job.source === sourceFilter) : jobs;
     if (!query) return sourceFiltered;
 
-    return sourceFiltered.filter((job) =>
-      [job.name, job.address, job.city, job.roofType, job.source, job.assignedTo, job.lastActivity, job.nextAction || ""]
-        .some((value) => value.toLowerCase().includes(query))
-    );
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
+
+    return sourceFiltered.filter((job) => {
+      const textMatch = [job.name, job.email, job.phone, job.address, job.city, job.roofType, job.source, job.assignedTo, job.lastActivity, job.nextAction || ""]
+        .some((value) => value.toLowerCase().includes(query));
+      if (textMatch) return true;
+      if (queryPhone.length >= 2 && job.phone) {
+        const jobDigits = job.phone.replace(/\D/g, "");
+        const jobPhone = jobDigits.length === 11 && jobDigits.startsWith("1") ? jobDigits.slice(1) : jobDigits;
+        if (jobPhone.includes(queryPhone)) return true;
+      }
+      return false;
+    });
   }, [jobs, search, sourceFilter]);
 
   const dashboardMetrics = useMemo(() => {

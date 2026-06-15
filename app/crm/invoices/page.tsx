@@ -857,6 +857,8 @@ export default function InvoicesPage() {
   }, [invoices]);
   const filteredInvoices = useMemo(() => {
     const query = invoiceSearch.toLowerCase().trim();
+    const queryDigits = query.replace(/\D/g, "");
+    const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
     return invoices.filter((invoice) => {
       const status = getComputedStatus(invoice);
       const matchesFilter =
@@ -864,9 +866,17 @@ export default function InvoicesPage() {
         (invoiceFilter === "Paid clients" && status === "Paid") ||
         (invoiceFilter === "Unpaid clients" && status !== "Paid" && status !== "Voided") ||
         (invoiceFilter === "Overdue accounts" && status === "Overdue");
-      const matchesSearch = !query || [invoice.clientName, invoice.invoiceNumber, invoice.propertyAddress]
-        .some((value) => value.toLowerCase().includes(query));
-      return matchesFilter && matchesSearch;
+      if (!matchesFilter) return false;
+      if (!query) return true;
+      const textMatch = [invoice.clientName, invoice.invoiceNumber, invoice.propertyAddress, invoice.phone]
+        .some((value) => (value || "").toLowerCase().includes(query));
+      if (textMatch) return true;
+      if (queryPhone.length >= 2 && invoice.phone) {
+        const invDigits = invoice.phone.replace(/\D/g, "");
+        const invPhone = invDigits.length === 11 && invDigits.startsWith("1") ? invDigits.slice(1) : invDigits;
+        if (invPhone.includes(queryPhone)) return true;
+      }
+      return false;
     });
   }, [invoiceFilter, invoiceSearch, invoices]);
   const clientHistory = useMemo(() => {
