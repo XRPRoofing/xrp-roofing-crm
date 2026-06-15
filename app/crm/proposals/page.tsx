@@ -410,31 +410,31 @@ export default function ProposalsPage() {
   const [proposalFilter, setProposalFilter] = useState<"all" | "drafts">("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeProposal, setActiveProposal] = useState<Proposal | null>(null);
-  const proposalCardHistoryRef = useRef(false);
+  const proposalCardHashRef = useRef(false);
   const proposalSearchParams = useSearchParams();
 
   const closeProposalCard = useCallback(() => {
-    if (proposalCardHistoryRef.current) {
-      proposalCardHistoryRef.current = false;
-      window.history.back();
-    }
     setActiveProposal(null);
+    if (proposalCardHashRef.current) {
+      proposalCardHashRef.current = false;
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    }
   }, []);
 
   useEffect(() => {
-    function handlePopState() {
-      if (proposalCardHistoryRef.current) {
-        proposalCardHistoryRef.current = false;
+    function handleHashChange() {
+      if (proposalCardHashRef.current && !window.location.hash.includes("card")) {
+        proposalCardHashRef.current = false;
         setActiveProposal(null);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") closeProposalCard();
     }
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeProposalCard]);
@@ -656,8 +656,8 @@ export default function ProposalsPage() {
       const match = proposals.find((p) => p.id === proposalId && !p.deletedAt);
       if (match) {
         setActiveProposal(match);
-        window.history.pushState({ proposalCardOpen: true }, "");
-        proposalCardHistoryRef.current = true;
+        window.location.hash = "#card";
+        proposalCardHashRef.current = true;
       }
     }
   }, [proposalSearchParams, proposals, activeProposal]);
@@ -911,8 +911,8 @@ export default function ProposalsPage() {
     setIsPreviewing(false);
     setActiveSection("Estimate");
     setActiveProposal(proposal);
-    window.history.pushState({ proposalCardOpen: true }, "");
-    proposalCardHistoryRef.current = true;
+    window.location.hash = "#card";
+    proposalCardHashRef.current = true;
 
     if (!proposal.brochures?.length && proposalSyncEnabled()) {
       fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`)
@@ -1084,8 +1084,11 @@ export default function ProposalsPage() {
     setDeletedProposal(trashedProposal);
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
     if (activeProposal?.id === proposal.id) {
-      if (proposalCardHistoryRef.current) { proposalCardHistoryRef.current = false; window.history.back(); }
       setActiveProposal(null);
+      if (proposalCardHashRef.current) {
+        proposalCardHashRef.current = false;
+        history.replaceState(history.state, "", window.location.pathname + window.location.search);
+      }
     }
   }
 
