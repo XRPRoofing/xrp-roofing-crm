@@ -11,6 +11,7 @@ import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { EmailLink } from "@/components/ContactLinks";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { syncInvoiceStatusToTask } from "@/lib/office-tasks";
@@ -1012,7 +1013,7 @@ export default function InvoicesPage() {
           ${isPaid ? `<div class="stamp">PAID${isOffline ? "<small>Received Offline</small>" : ""}</div>` : ""}
           <button class="print-btn" onclick="window.print()">Download / Save PDF</button>
           <div class="header"><div><img class="logo" src="${logoUrl}" alt="XRP Roofing" /><p class="roc">ROC #350898</p></div><div class="doc-title"><h1>Invoice</h1><p>${invoice.invoiceNumber}</p>${isOffline ? "<strong>Payment Received Offline</strong>" : ""}</div></div>
-          <div class="grid"><div class="box"><h3>Client Details</h3><p>${invoice.clientName}</p><p>${invoice.email}</p><p>${invoice.phone}</p><p>${invoice.propertyAddress}</p></div><div class="box"><h3>Job Details</h3><p>${invoice.jobName}</p><p>Roof Type: ${invoice.roofType}</p><p>Proposal: ${invoice.proposalReference}</p><p>Completion: ${invoice.projectCompletionDate}</p></div></div>
+          <div class="grid"><div class="box"><h3>Client Details</h3><p>${invoice.clientName}</p><p><a href="mailto:${invoice.email}" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">${invoice.email}</a></p><p><a href="tel:${invoice.phone.replace(/[^\d+]/g, "")}" style="color:inherit;text-decoration:underline dotted;text-underline-offset:2px">${invoice.phone}</a></p><p>${invoice.propertyAddress}</p></div><div class="box"><h3>Job Details</h3><p>${invoice.jobName}</p><p>Roof Type: ${invoice.roofType}</p><p>Proposal: ${invoice.proposalReference}</p><p>Completion: ${invoice.projectCompletionDate}</p></div></div>
           <table><thead><tr><th>Description</th><th>Qty</th><th>Unit</th><th>Tax</th><th>Total</th></tr></thead><tbody>${invoice.lineItems.map((item) => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${currency(item.unitPrice)}</td><td>${item.tax}%</td><td>${currency(item.quantity * item.unitPrice * (1 + item.tax / 100))}</td></tr>`).join("")}</tbody></table>
           <p class="total">Total: ${currency(totals.finalTotal)}<br/>Paid: ${currency(paid)}<br/>Balance: ${currency(Math.max(totals.finalTotal - paid, 0))}</p>
           <div class="grid"><div class="box"><h3>Payment Terms</h3><p>${invoice.paymentTerms}</p></div><div class="box"><h3>Warranty Notes</h3><p>${invoice.warrantyNotes}</p><p>${invoice.warrantyDuration}</p></div></div>
@@ -1346,7 +1347,7 @@ export default function InvoicesPage() {
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#07183f]">{selectedInvoice.clientName || "—"}</p></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.email || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#07183f]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
                 <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.sentBy || "—"}</p></div>
               </div>
@@ -1801,7 +1802,7 @@ export default function InvoicesPage() {
             </div>
             <div className="mt-4 sm:mt-6 rounded-2xl bg-slate-50 p-3 sm:p-4 text-xs sm:text-sm leading-5 sm:leading-6 text-slate-600">
               <p className="font-black text-[#07183f]">{selectedInvoice.invoiceNumber}</p>
-              <p>To: {selectedInvoice.clientName} · {selectedInvoice.email}</p>
+              <p>To: {selectedInvoice.clientName} · <EmailLink value={selectedInvoice.email} /></p>
               <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
               <p className="mt-1">{sendForm.message}</p>
             </div>

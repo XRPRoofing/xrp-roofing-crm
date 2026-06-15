@@ -797,7 +797,12 @@ export default function LeadsPage() {
                     {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white hover:bg-emerald-600"><Phone className="h-4 w-4" /></a>}
                   </div>
                 </label>
-                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Email<input type="email" value={selectedJob.email} onChange={(event) => updateJob(selectedJob.id, { email: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Email
+                  <div className="flex items-center gap-1">
+                    <input type="email" value={selectedJob.email} onChange={(event) => updateJob(selectedJob.id, { email: event.target.value })} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" />
+                    {selectedJob.email && <a href={`mailto:${selectedJob.email}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-4 w-4" /></a>}
+                  </div>
+                </label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Address<input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Inspection Date<input value={selectedJob.inspectionDate || ""} onChange={(event) => updateJob(selectedJob.id, { inspectionDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. June 12" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. 2008" /></label>

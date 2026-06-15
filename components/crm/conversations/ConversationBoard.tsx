@@ -12,6 +12,7 @@ import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
+import { PhoneLink, linkifyContactInfo } from "@/components/ContactLinks";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -36,35 +37,8 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${styles[tone]}`}>{children}</span>;
 }
 
-// Convert URLs in text to clickable links
-function linkifyText(text: string): React.ReactNode {
-  if (!text) return text;
-  const urlRegex = /(https?:\/\/[^\s<]+|www\.[^\s<]+\.[^\s<]+)/gi;
-  const parts = text.split(urlRegex);
-  const matches = text.match(urlRegex) || [];
-
-  const result: React.ReactNode[] = [];
-  parts.forEach((part, index) => {
-    result.push(part);
-    if (matches[index]) {
-      const url = matches[index];
-      const href = url.startsWith("http") ? url : `https://${url}`;
-      result.push(
-        <a
-          key={index}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:opacity-80"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {url}
-        </a>
-      );
-    }
-  });
-  return result;
-}
+// Convert URLs, phone numbers, and emails in text to clickable links
+const linkifyText = linkifyContactInfo;
 
 function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: () => void }) {
   return (
@@ -171,7 +145,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
                   <span className="text-xs text-slate-500">{conversation.lastActivityAt}</span>
                 </div>
               </div>
-              <p className="mt-1 truncate text-sm font-medium text-slate-700">{conversation.contact.phone}</p>
+              <p className="mt-1 truncate text-sm font-medium text-slate-700"><PhoneLink value={conversation.contact.phone} /></p>
               <p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{conversation.contact.address}</p>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{linkifyText(conversation.lastMessage)}</p>
               <div className="mt-2 flex items-center justify-between gap-2">

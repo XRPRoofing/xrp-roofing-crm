@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
+import { PhoneLink, EmailLink } from "@/components/ContactLinks";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
@@ -545,7 +546,7 @@ export default function CrewWorkflowPage() {
 
             <div className="space-y-5 p-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Information</p><p className="mt-2 font-black text-slate-900">{selectedJob.name}</p><p className="text-sm font-semibold text-slate-600">{selectedJob.phone}</p><p className="text-sm font-semibold text-slate-600">{selectedJob.email}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Information</p><p className="mt-2 font-black text-slate-900">{selectedJob.name}</p><p className="text-sm font-semibold text-slate-600"><PhoneLink value={selectedJob.phone} /></p><p className="text-sm font-semibold text-slate-600"><EmailLink value={selectedJob.email} /></p></div>
                 <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => updateAssignment(selectedJob.id, { scheduleDate: event.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case text-slate-800 outline-none" /></label>
                 <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case text-slate-800 outline-none" /></label>
                 <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} rows={3} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-slate-800 outline-none" /></label>

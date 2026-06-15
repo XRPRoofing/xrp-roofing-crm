@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { PhoneLink, EmailLink } from "@/components/ContactLinks";
 import { leadStages } from "@/lib/crm-data";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -584,7 +585,7 @@ export default function CustomersPage() {
               </div>
               <div className="mt-3 space-y-2 text-sm">
                 <p className="flex items-start gap-2 text-slate-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold">{customer.propertyAddress || "Address pending"}</span></p>
-                <p className="flex items-center gap-2 text-slate-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold">{customer.phone || "No phone on file"}</span></p>
+                <p className="flex items-center gap-2 text-slate-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><PhoneLink value={customer.phone} fallback="No phone on file" /></span></p>
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
                 <BriefcaseBusiness className="h-4 w-4 text-blue-700" />
@@ -658,8 +659,8 @@ export default function CustomersPage() {
                   ) : (
                     <>
                       <section className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Phone Number</p><p className="font-bold text-slate-900">{selectedCustomer.phone || "Not provided"}</p></div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Email Address</p><p className="font-bold text-slate-900">{selectedCustomer.email || "Not provided"}</p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Phone Number</p><p className="font-bold text-slate-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" /></p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Email Address</p><p className="font-bold text-slate-900"><EmailLink value={selectedCustomer.email} fallback="Not provided" /></p></div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Full Property Address</p><p className="font-bold text-slate-900">{selectedCustomer.propertyAddress || "Not provided"}</p></div>
                       </section>
                       <section className="grid gap-3 sm:grid-cols-2">
