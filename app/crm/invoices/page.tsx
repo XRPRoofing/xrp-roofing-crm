@@ -12,6 +12,7 @@ import { addCrmNotification } from "@/lib/crm-notifications";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { Phone, Mail, MapPin } from "lucide-react";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
@@ -1190,15 +1191,28 @@ export default function InvoicesPage() {
     return (
       <div className="grid gap-3 lg:grid-cols-2">
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client name<input disabled={!editable} value={invoice.clientName} onChange={(event) => onChange({ ...invoice, clientName: event.target.value })} className={inputClass} placeholder="Client name" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500">Email<input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className={inputClass} placeholder="Email" /></label>
-        <label className="text-xs font-black uppercase tracking-wider text-slate-500">Phone<input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className={inputClass} placeholder="Phone" /></label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500">Email
+          <div className="flex items-center gap-1 mt-1.5">
+            <input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50" placeholder="Email" />
+            {invoice.email && <a href={`mailto:${invoice.email}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-4 w-4" /></a>}
+          </div>
+        </label>
+        <label className="text-xs font-black uppercase tracking-wider text-slate-500">Phone
+          <div className="flex items-center gap-1 mt-1.5">
+            <input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-slate-50" placeholder="Phone" />
+            {invoice.phone && <a href={`tel:${invoice.phone.replace(/[^\d+]/g, "")}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></a>}
+          </div>
+        </label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Property address
-          <AddressAutocomplete
-            value={invoice.propertyAddress}
-            onChange={(address) => onChange({ ...invoice, propertyAddress: address })}
-            placeholder="Property address"
-            disabled={!editable}
-          />
+          <div className="flex items-center gap-1 mt-1.5">
+            <AddressAutocomplete
+              value={invoice.propertyAddress}
+              onChange={(address) => onChange({ ...invoice, propertyAddress: address })}
+              placeholder="Property address"
+              disabled={!editable}
+            />
+            {invoice.propertyAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(invoice.propertyAddress)}`} target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-500 text-white hover:bg-blue-600"><MapPin className="h-4 w-4" /></a>}
+          </div>
         </label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Job name<input disabled={!editable} value={invoice.jobName} onChange={(event) => onChange({ ...invoice, jobName: event.target.value })} className={inputClass} placeholder="Job reference/name" /></label>
         <label className="text-xs font-black uppercase tracking-wider text-slate-500">Job reference<input disabled={!editable} value={invoice.jobReference} onChange={(event) => onChange({ ...invoice, jobReference: event.target.value })} className={inputClass} placeholder="Job reference" /></label>
