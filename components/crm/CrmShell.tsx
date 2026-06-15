@@ -13,7 +13,7 @@ import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { subscribeToCustomerRecords } from "@/lib/customer-sync";
+import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
 import { subscribeToTaskUpdates } from "@/lib/task-sync";
 import { deleteNotificationFromSupabase, loadNotificationsFromSupabase, markNotificationsReadInSupabase, subscribeToNotifications } from "@/lib/notification-sync";
 
@@ -428,7 +428,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       subscribeToCrewData(flash),
       subscribeToInvoiceShares(() => flash()),
       subscribeToProposalRecords(flash),
-      subscribeToCustomerRecords(flash),
+      subscribeToCustomerRecords(() => { flash(); void loadCustomerRecords(); }),
       subscribeToTaskUpdates(() => flash()),
     ];
     return () => {
@@ -436,6 +436,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => { void loadCustomerRecords(); }, []);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
   const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";

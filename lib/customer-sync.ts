@@ -50,7 +50,9 @@ export async function loadCustomerRecordsResult(): Promise<CustomerLoadResult> {
     const response = await fetch("/api/customers", { cache: "no-store" });
     const data = (await response.json().catch(() => ({}))) as { customers?: Customer[]; error?: string };
     if (!response.ok) return { customers: readLocal(), error: data.error || "Unable to load customers." };
-    return { customers: data.customers || [], error: data.error };
+    const customers = data.customers || [];
+    writeLocal(customers);
+    return { customers, error: data.error };
   } catch {
     return { customers: readLocal(), error: "Network error loading customers." };
   }
