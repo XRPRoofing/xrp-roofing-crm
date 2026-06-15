@@ -415,17 +415,17 @@ export default function ProposalsPage() {
 
   const closeProposalCard = useCallback(() => {
     setActiveProposal(null);
-    if (proposalCardHashRef.current) {
-      proposalCardHashRef.current = false;
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
+    proposalCardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("proposal");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
   }, []);
 
   useEffect(() => {
     function handleHashChange() {
       if (proposalCardHashRef.current && !window.location.hash.includes("card")) {
-        proposalCardHashRef.current = false;
-        setActiveProposal(null);
+        closeProposalCard();
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
@@ -1085,10 +1085,11 @@ export default function ProposalsPage() {
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
     if (activeProposal?.id === proposal.id) {
       setActiveProposal(null);
-      if (proposalCardHashRef.current) {
-        proposalCardHashRef.current = false;
-        history.replaceState(history.state, "", window.location.pathname + window.location.search);
-      }
+      proposalCardHashRef.current = false;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("proposal");
+      url.hash = "";
+      history.replaceState(history.state, "", url.pathname + url.search);
     }
   }
 

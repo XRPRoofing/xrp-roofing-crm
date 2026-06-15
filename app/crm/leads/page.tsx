@@ -205,10 +205,11 @@ export default function LeadsPage() {
 
   const closeJobCard = useCallback(() => {
     setSelectedJobId(null);
-    if (jobCardHashRef.current) {
-      jobCardHashRef.current = false;
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
+    jobCardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("job");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
   }, []);
 
   function openJobCard(jobId: string) {
@@ -220,8 +221,7 @@ export default function LeadsPage() {
   useEffect(() => {
     function handleHashChange() {
       if (jobCardHashRef.current && !window.location.hash.includes("card")) {
-        jobCardHashRef.current = false;
-        setSelectedJobId(null);
+        closeJobCard();
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
@@ -451,11 +451,12 @@ export default function LeadsPage() {
   function deleteJob(job: Lead) {
     if (typeof window !== "undefined" && !window.confirm(`Delete "${job.name}"? This permanently removes the job and its photos, notes, and checklist for everyone. This cannot be undone.`)) return;
     const previousJobs = jobs;
-    if (jobCardHashRef.current) {
-      jobCardHashRef.current = false;
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
     setSelectedJobId(null);
+    jobCardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("job");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
     setJobs((currentJobs) => currentJobs.filter((item) => item.id !== job.id));
     void deleteJobRecord(job.id).catch(() => setJobs(previousJobs));
   }
