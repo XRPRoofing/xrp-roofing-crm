@@ -15,7 +15,7 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { EmailLink, AddressLink } from "@/components/ContactLinks";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
-import { syncInvoiceStatusToTask } from "@/lib/office-tasks";
+import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
@@ -478,34 +478,37 @@ function propagatePaidStatus(invoice: Invoice) {
   const jobId = invoice.jobReference || invoice.id;
   syncInvoiceStatusToTask(jobId, "Paid", invoice.invoiceNumber, `$${getPaidAmount(invoice).toLocaleString()}`);
 
-  // Also create a dedicated "Paid" task for tracking (deterministic ID to prevent duplicates)
-  const now = new Date().toISOString();
-  const paidTask: OfficeTask = {
-    id: `task-paid-${invoice.id}`,
-    jobId,
-    title: `Payment Received - ${invoice.clientName}`,
-    customerName: invoice.clientName,
-    jobAddress: invoice.propertyAddress,
-    invoiceAmount: `$${getPaidAmount(invoice).toLocaleString()}`,
-    invoiceNumber: invoice.invoiceNumber,
-    invoiceStatus: "Paid",
-    assignedUser: "Office Staff",
-    dueDate: now.split("T")[0],
-    status: "Paid",
-    jobLink: invoice.jobReference
-      ? `/crm/crew?job=${encodeURIComponent(invoice.jobReference)}`
-      : "/crm/invoices",
-    createdAt: now,
-    updatedAt: now,
-    timeline: [
-      {
-        id: `${Date.now()}`,
-        event: `Payment received for invoice ${invoice.invoiceNumber}`,
-        at: now,
-      },
-    ],
-  };
-  void upsertTaskToSupabase(paidTask);
+  // Only create a "Paid" task card when no existing task covers this job
+  const currentTasks = readOfficeTasks();
+  if (!currentTasks.some((t) => t.jobId === jobId)) {
+    const now = new Date().toISOString();
+    const paidTask: OfficeTask = {
+      id: `task-paid-${invoice.id}`,
+      jobId,
+      title: `Payment Received - ${invoice.clientName}`,
+      customerName: invoice.clientName,
+      jobAddress: invoice.propertyAddress,
+      invoiceAmount: `$${getPaidAmount(invoice).toLocaleString()}`,
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceStatus: "Paid",
+      assignedUser: "Office Staff",
+      dueDate: now.split("T")[0],
+      status: "Paid",
+      jobLink: invoice.jobReference
+        ? `/crm/crew?job=${encodeURIComponent(invoice.jobReference)}`
+        : "/crm/invoices",
+      createdAt: now,
+      updatedAt: now,
+      timeline: [
+        {
+          id: `${Date.now()}`,
+          event: `Payment received for invoice ${invoice.invoiceNumber}`,
+          at: now,
+        },
+      ],
+    };
+    void upsertTaskToSupabase(paidTask);
+  }
 
 }
 
