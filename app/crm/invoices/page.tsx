@@ -1352,7 +1352,7 @@ export default function InvoicesPage() {
       </div>
 
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-2 sm:p-4">
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/40 p-2 sm:p-4">
           <div className="mx-auto my-2 sm:my-6 max-w-6xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-5 lg:flex-row lg:items-start">
               <div>
@@ -1776,7 +1776,7 @@ export default function InvoicesPage() {
       })()}
 
       {showPaymentModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
           <div className="w-full max-w-xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Record Payment</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
@@ -1798,7 +1798,7 @@ export default function InvoicesPage() {
 
       {/* ── Reject payment modal ── */}
       {rejectModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => { (e as { stopPropagation(): void }).stopPropagation(); }}>
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-lg">✗</span>
@@ -1847,7 +1847,7 @@ export default function InvoicesPage() {
       )}
 
       {showSendModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
           <div className="w-full max-w-2xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Send Invoice</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
