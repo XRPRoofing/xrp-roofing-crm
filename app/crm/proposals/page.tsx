@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -409,6 +410,7 @@ export default function ProposalsPage() {
   const [proposalFilter, setProposalFilter] = useState<"all" | "drafts">("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeProposal, setActiveProposal] = useState<Proposal | null>(null);
+  const proposalSearchParams = useSearchParams();
   const [deletedProposal, setDeletedProposal] = useState<Proposal | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
@@ -619,6 +621,15 @@ export default function ProposalsPage() {
       });
     }).catch(() => {});
   });
+
+  // Auto-select a proposal when navigated from global search with ?proposal=<id>
+  useEffect(() => {
+    const proposalId = proposalSearchParams.get("proposal");
+    if (proposalId && proposals.length > 0 && !activeProposal) {
+      const match = proposals.find((p) => p.id === proposalId && !p.deletedAt);
+      if (match) setActiveProposal(match);
+    }
+  }, [proposalSearchParams, proposals, activeProposal]);
 
   useEffect(() => {
     if (!dataLoaded) return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, deleteInvoiceRecord, loadAllInvoices, type InvoiceSharePayload } from "@/lib/invoice-sync";
@@ -558,6 +559,17 @@ export default function InvoicesPage() {
   const [rejectModal, setRejectModal] = useState<{ pending: PendingPayment; invoiceId: string } | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  const searchParams = useSearchParams();
+
+  // Auto-select an invoice when navigated from global search with ?invoice=<id>
+  useEffect(() => {
+    const invoiceId = searchParams.get("invoice");
+    if (invoiceId && invoices.length > 0 && !selectedInvoiceId) {
+      const match = invoices.find((inv) => inv.id === invoiceId);
+      if (match) setSelectedInvoiceId(match.id);
+    }
+  }, [searchParams, invoices, selectedInvoiceId]);
 
   // One-click handoff from a Job / customer profile: open the requested invoice
   // editor directly, or create one from the job and open it (linked by

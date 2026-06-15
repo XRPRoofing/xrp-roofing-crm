@@ -288,7 +288,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       for (const job of jobs) {
         if (results.length >= MAX) break;
         const haystack = [job.name, job.email, job.phone, job.address, job.city, job.stage, job.roofType, job.assignedTo, job.source].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Jobs", label: job.name || job.id, sub: [job.address, job.city].filter(Boolean).join(", "), href: "/crm/leads", icon: "job" });
+        if (haystack.includes(q)) results.push({ category: "Jobs", label: job.name || job.id, sub: [job.address, job.city].filter(Boolean).join(", "), href: `/crm/leads?job=${encodeURIComponent(job.id)}`, icon: "job" });
       }
     } catch {}
 
@@ -297,7 +297,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       for (const c of customers) {
         if (results.length >= MAX) break;
         const haystack = [c.name, c.email, c.phone, c.propertyAddress, c.roofDetails, c.insuranceCarrier, c.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Customers", label: c.name || c.id, sub: c.email || c.phone || c.propertyAddress || "", href: "/crm/customers", icon: "customer" });
+        if (haystack.includes(q)) results.push({ category: "Customers", label: c.name || c.id, sub: c.email || c.phone || c.propertyAddress || "", href: `/crm/customers?customer=${encodeURIComponent(c.id)}`, icon: "customer" });
       }
     } catch {}
 
@@ -307,7 +307,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         if (results.length >= MAX) break;
         if (p.deletedAt) continue;
         const haystack = [p.customerName, p.customerEmail, p.address, p.scope, p.title, p.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Proposals", label: p.title || p.customerName || p.id, sub: p.address || p.customerEmail || "", href: "/crm/proposals", icon: "proposal" });
+        if (haystack.includes(q)) results.push({ category: "Proposals", label: p.title || p.customerName || p.id, sub: p.address || p.customerEmail || "", href: `/crm/proposals?proposal=${encodeURIComponent(p.id)}`, icon: "proposal" });
       }
     } catch {}
 
@@ -317,7 +317,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         if (results.length >= MAX) break;
         if (inv.isDeleted) continue;
         const haystack = [inv.invoiceNumber, inv.clientName, inv.email, inv.phone, inv.propertyAddress, inv.jobName, inv.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Invoices", label: inv.invoiceNumber || inv.id, sub: [inv.clientName, inv.propertyAddress].filter(Boolean).join(" — "), href: "/crm/invoices", icon: "invoice" });
+        if (haystack.includes(q)) results.push({ category: "Invoices", label: inv.invoiceNumber || inv.id, sub: [inv.clientName, inv.propertyAddress].filter(Boolean).join(" — "), href: `/crm/invoices?invoice=${encodeURIComponent(inv.id)}`, icon: "invoice" });
       }
     } catch {}
 
