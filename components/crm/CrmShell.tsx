@@ -283,15 +283,28 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const runSearch = useCallback((query: string) => {
     if (!query.trim()) { setSearchResults([]); setSearchOpen(false); return; }
     const q = query.toLowerCase();
+    // Stripped variant for flexible phone matching (keeps + for country codes)
+    const qPhone = query.replace(/[\s\-\(\)\.]/g, "").toLowerCase();
     const results: SearchResult[] = [];
     const MAX = 20;
+
+    // Build a haystack that includes a digits-only phone variant for flexible matching
+    function hit(fields: (string | undefined)[], phones: (string | undefined)[]): boolean {
+      const haystack = fields.filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(q)) return true;
+      if (qPhone.length >= 2) {
+        const phonesNorm = phones.filter(Boolean).map((p) => p!.replace(/[\s\-\(\)\.]/g, "").toLowerCase()).join(" ");
+        if (phonesNorm.includes(qPhone)) return true;
+      }
+      return false;
+    }
 
     try {
       const jobs = JSON.parse(window.localStorage.getItem("xrp-crm-jobs-board") || "[]") as { id: string; name?: string; email?: string; phone?: string; address?: string; city?: string; stage?: string; roofType?: string; assignedTo?: string; source?: string }[];
       for (const job of jobs) {
         if (results.length >= MAX) break;
-        const haystack = [job.name, job.email, job.phone, job.address, job.city, job.stage, job.roofType, job.assignedTo, job.source].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Jobs", label: job.name || job.id, sub: [job.address, job.city].filter(Boolean).join(", "), href: `/crm/leads?job=${encodeURIComponent(job.id)}`, icon: "job" });
+        if (hit([job.name, job.email, job.phone, job.address, job.city, job.stage, job.roofType, job.assignedTo, job.source], [job.phone]))
+          results.push({ category: "Jobs", label: job.name || job.id, sub: [job.address, job.city].filter(Boolean).join(", "), href: `/crm/leads?job=${encodeURIComponent(job.id)}`, icon: "job" });
       }
     } catch {}
 
@@ -299,18 +312,18 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       const customers = JSON.parse(window.localStorage.getItem("xrp-crm-customers") || "[]") as { id: string; name?: string; email?: string; phone?: string; propertyAddress?: string; roofDetails?: string; insuranceCarrier?: string; status?: string }[];
       for (const c of customers) {
         if (results.length >= MAX) break;
-        const haystack = [c.name, c.email, c.phone, c.propertyAddress, c.roofDetails, c.insuranceCarrier, c.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Customers", label: c.name || c.id, sub: c.email || c.phone || c.propertyAddress || "", href: `/crm/customers?customer=${encodeURIComponent(c.id)}`, icon: "customer" });
+        if (hit([c.name, c.email, c.phone, c.propertyAddress, c.roofDetails, c.insuranceCarrier, c.status], [c.phone]))
+          results.push({ category: "Customers", label: c.name || c.id, sub: c.email || c.phone || c.propertyAddress || "", href: `/crm/customers?customer=${encodeURIComponent(c.id)}`, icon: "customer" });
       }
     } catch {}
 
     try {
-      const proposals = JSON.parse(window.localStorage.getItem("xrp-crm-proposals") || "[]") as { id: string; customerName?: string; customerEmail?: string; address?: string; scope?: string; title?: string; total?: number; status?: string; deletedAt?: string }[];
+      const proposals = JSON.parse(window.localStorage.getItem("xrp-crm-proposals") || "[]") as { id: string; customerName?: string; customerEmail?: string; customerPhone?: string; address?: string; scope?: string; title?: string; total?: number; status?: string; deletedAt?: string }[];
       for (const p of proposals) {
         if (results.length >= MAX) break;
         if (p.deletedAt) continue;
-        const haystack = [p.customerName, p.customerEmail, p.address, p.scope, p.title, p.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Proposals", label: p.title || p.customerName || p.id, sub: p.address || p.customerEmail || "", href: `/crm/proposals?proposal=${encodeURIComponent(p.id)}`, icon: "proposal" });
+        if (hit([p.customerName, p.customerEmail, p.customerPhone, p.address, p.scope, p.title, p.status], [p.customerPhone]))
+          results.push({ category: "Proposals", label: p.title || p.customerName || p.id, sub: p.address || p.customerEmail || "", href: `/crm/proposals?proposal=${encodeURIComponent(p.id)}`, icon: "proposal" });
       }
     } catch {}
 
@@ -319,8 +332,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       for (const inv of invoices) {
         if (results.length >= MAX) break;
         if (inv.isDeleted) continue;
-        const haystack = [inv.invoiceNumber, inv.clientName, inv.email, inv.phone, inv.propertyAddress, inv.jobName, inv.status].filter(Boolean).join(" ").toLowerCase();
-        if (haystack.includes(q)) results.push({ category: "Invoices", label: inv.invoiceNumber || inv.id, sub: [inv.clientName, inv.propertyAddress].filter(Boolean).join(" — "), href: `/crm/invoices?invoice=${encodeURIComponent(inv.id)}`, icon: "invoice" });
+        if (hit([inv.invoiceNumber, inv.clientName, inv.email, inv.phone, inv.propertyAddress, inv.jobName, inv.status], [inv.phone]))
+          results.push({ category: "Invoices", label: inv.invoiceNumber || inv.id, sub: [inv.clientName, inv.propertyAddress].filter(Boolean).join(" — "), href: `/crm/invoices?invoice=${encodeURIComponent(inv.id)}`, icon: "invoice" });
       }
     } catch {}
 
