@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, UploadCloud, UsersRound, X, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
@@ -43,6 +43,14 @@ const quickStats = [
   { label: "Tasks", value: "18" },
 ];
 
+type SearchResult = {
+  category: "Jobs" | "Customers" | "Proposals" | "Invoices";
+  label: string;
+  sub: string;
+  href: string;
+  icon: "job" | "customer" | "proposal" | "invoice";
+};
+
 function getUserRole(metadata: Record<string, unknown> | undefined) {
   return typeof metadata?.role === "string" ? metadata.role : "admin";
 }
@@ -60,6 +68,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const voiceDeviceRef = useRef<BrowserVoiceDevice | null>(null);
   const incomingCallRef = useRef<BrowserVoiceCall | null>(null);
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchIndex, setSearchIndex] = useState(-1);
+  const searchRef = useRef<HTMLDivElement>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
   const mobileNavigation = isCrewUser
@@ -264,6 +277,81 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const runSearch = useCallback((query: string) => {
+    if (!query.trim()) { setSearchResults([]); setSearchOpen(false); return; }
+    const q = query.toLowerCase();
+    const results: SearchResult[] = [];
+    const MAX = 20;
+
+    try {
+      const jobs = JSON.parse(window.localStorage.getItem("xrp-crm-jobs-board") || "[]") as { id: string; name?: string; email?: string; phone?: string; address?: string; city?: string; stage?: string; roofType?: string; assignedTo?: string; source?: string }[];
+      for (const job of jobs) {
+        if (results.length >= MAX) break;
+        const haystack = [job.name, job.email, job.phone, job.address, job.city, job.stage, job.roofType, job.assignedTo, job.source].filter(Boolean).join(" ").toLowerCase();
+        if (haystack.includes(q)) results.push({ category: "Jobs", label: job.name || job.id, sub: [job.address, job.city].filter(Boolean).join(", "), href: "/crm/leads", icon: "job" });
+      }
+    } catch {}
+
+    try {
+      const customers = JSON.parse(window.localStorage.getItem("xrp-crm-customers") || "[]") as { id: string; name?: string; email?: string; phone?: string; propertyAddress?: string; roofDetails?: string; insuranceCarrier?: string; status?: string }[];
+      for (const c of customers) {
+        if (results.length >= MAX) break;
+        const haystack = [c.name, c.email, c.phone, c.propertyAddress, c.roofDetails, c.insuranceCarrier, c.status].filter(Boolean).join(" ").toLowerCase();
+        if (haystack.includes(q)) results.push({ category: "Customers", label: c.name || c.id, sub: c.email || c.phone || c.propertyAddress || "", href: "/crm/customers", icon: "customer" });
+      }
+    } catch {}
+
+    try {
+      const proposals = JSON.parse(window.localStorage.getItem("xrp-crm-proposals") || "[]") as { id: string; customerName?: string; customerEmail?: string; address?: string; scope?: string; title?: string; total?: number; status?: string; deletedAt?: string }[];
+      for (const p of proposals) {
+        if (results.length >= MAX) break;
+        if (p.deletedAt) continue;
+        const haystack = [p.customerName, p.customerEmail, p.address, p.scope, p.title, p.status].filter(Boolean).join(" ").toLowerCase();
+        if (haystack.includes(q)) results.push({ category: "Proposals", label: p.title || p.customerName || p.id, sub: p.address || p.customerEmail || "", href: "/crm/proposals", icon: "proposal" });
+      }
+    } catch {}
+
+    try {
+      const invoices = JSON.parse(window.localStorage.getItem("xrp-crm-invoices") || "[]") as { id: string; invoiceNumber?: string; clientName?: string; email?: string; phone?: string; propertyAddress?: string; jobName?: string; status?: string; isDeleted?: boolean }[];
+      for (const inv of invoices) {
+        if (results.length >= MAX) break;
+        if (inv.isDeleted) continue;
+        const haystack = [inv.invoiceNumber, inv.clientName, inv.email, inv.phone, inv.propertyAddress, inv.jobName, inv.status].filter(Boolean).join(" ").toLowerCase();
+        if (haystack.includes(q)) results.push({ category: "Invoices", label: inv.invoiceNumber || inv.id, sub: [inv.clientName, inv.propertyAddress].filter(Boolean).join(" — "), href: "/crm/invoices", icon: "invoice" });
+      }
+    } catch {}
+
+    setSearchResults(results);
+    setSearchOpen(results.length > 0);
+    setSearchIndex(-1);
+  }, []);
+
+  function handleSearchKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { setSearchOpen(false); return; }
+    if (!searchOpen || searchResults.length === 0) {
+      if (e.key === "Enter") { runSearch(searchQuery); }
+      return;
+    }
+    if (e.key === "ArrowDown") { e.preventDefault(); setSearchIndex((i) => Math.min(i + 1, searchResults.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSearchIndex((i) => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter" && searchIndex >= 0) { e.preventDefault(); navigateToResult(searchResults[searchIndex]); }
+  }
+
+  function navigateToResult(result: SearchResult) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    router.push(result.href);
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   async function logout() {
     await createClient().auth.signOut();
     router.push("/login");
@@ -417,9 +505,39 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">{isCrewUser ? "Crew Workspace" : "Command Center"}</p>
               <p className="mt-1 text-sm font-semibold text-blue-100">{isCrewUser ? "Assigned jobs and completion workflow" : "Roofing operations dashboard"}</p>
             </div>
-            <div className="relative hidden max-w-2xl flex-1 lg:ml-6 lg:block">
+            <div ref={searchRef} className="relative hidden max-w-2xl flex-1 lg:ml-6 lg:block">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-100" />
-              <input className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder={isCrewUser ? "Search assigned crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
+              <input value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }} onKeyDown={handleSearchKeyDown} onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }} className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder={isCrewUser ? "Search assigned crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
+              {searchOpen && searchResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  {(["Jobs", "Customers", "Proposals", "Invoices"] as const).map((cat) => {
+                    const items = searchResults.filter((r) => r.category === cat);
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={cat}>
+                        <p className="sticky top-0 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{cat}</p>
+                        {items.map((result, i) => {
+                          const globalIdx = searchResults.indexOf(result);
+                          return (
+                            <button key={`${result.category}-${i}`} type="button" onClick={() => navigateToResult(result)} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                                {result.icon === "job" && <BriefcaseBusiness className="h-4 w-4" />}
+                                {result.icon === "customer" && <UsersRound className="h-4 w-4" />}
+                                {result.icon === "proposal" && <FileText className="h-4 w-4" />}
+                                {result.icon === "invoice" && <ClipboardList className="h-4 w-4" />}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-bold text-slate-900">{result.label}</span>
+                                {result.sub && <span className="block truncate text-xs text-slate-500">{result.sub}</span>}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             {!isCrewUser && (
               <div className="relative">
