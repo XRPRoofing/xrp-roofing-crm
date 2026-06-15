@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
           <div>${safeMessage}</div>
           <div style="border:1px solid #e2e8f0;border-radius:16px;padding:18px;text-align:center;margin-top:28px;">
             <img src="${coverPhotoUrl}" alt="Proposal cover" style="max-width:180px;max-height:110px;width:auto;height:auto;display:inline-block;" />
-            <div style="font-weight:800;color:#07183f;margin-top:12px;">${safeCoverTitle}</div>
+            <div style="font-weight:800;color:#0A3D91;margin-top:12px;">${safeCoverTitle}</div>
             ${safeCoverText ? `<div style="font-size:13px;color:#475569;margin-top:8px;">${safeCoverText}</div>` : ""}
           </div>
           <div style="text-align:center;margin-top:30px;">

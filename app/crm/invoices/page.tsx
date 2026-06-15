@@ -1046,20 +1046,20 @@ export default function InvoicesPage() {
           <style>
             * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             body { font-family: Georgia, serif; color: #0f172a; padding: 40px; position: relative; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 4px solid #07183f; padding-bottom: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 4px solid #0A3D91; padding-bottom: 20px; }
             .logo { height: 84px; width: auto; display: block; }
             .roc { margin-top: 8px; font-weight: 700; color: #475569; }
             .doc-title { text-align: right; }
-            .doc-title h1 { margin: 0; color: #07183f; }
+            .doc-title h1 { margin: 0; color: #0A3D91; }
             .stamp { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%) rotate(-22deg); color: #16a34a; border: 10px solid #16a34a; border-radius: 18px; padding: 6px 56px; font-size: 120px; font-weight: 900; letter-spacing: 10px; opacity: .20; text-transform: uppercase; pointer-events: none; z-index: 999; }
             .stamp small { display: block; text-align: center; font-size: 22px; letter-spacing: 3px; margin-top: 6px; }
             table { width: 100%; border-collapse: collapse; margin-top: 28px; }
             th, td { border-bottom: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-            th { background: #f8fafc; color: #07183f; }
+            th { background: #f8fafc; color: #0A3D91; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
             .box { background: #f8fafc; border-radius: 18px; padding: 18px; }
-            .total { text-align: right; font-size: 22px; font-weight: 900; color: #07183f; }
-            .print-btn { margin-bottom: 20px; padding: 12px 20px; font-size: 16px; font-weight: 700; background: #07183f; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+            .total { text-align: right; font-size: 22px; font-weight: 900; color: #0A3D91; }
+            .print-btn { margin-bottom: 20px; padding: 12px 20px; font-size: 16px; font-weight: 700; background: #0A3D91; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
             @media print { .print-btn { display: none; } body { padding: 24px; } }
             @media (max-width: 640px) {
               body { padding: 20px; }
@@ -1202,7 +1202,7 @@ export default function InvoicesPage() {
         <label className="text-xs font-black uppercase tracking-wider text-slate-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></label>
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-black text-[#07183f]">Line Items</h3>
+            <h3 className="font-black text-[#0A3D91]">Line Items</h3>
             {editable && <button type="button" onClick={() => onChange({ ...invoice, lineItems: [...invoice.lineItems, emptyLineItem] })} className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">+ Add line</button>}
           </div>
           <div className="space-y-3">
@@ -1223,7 +1223,7 @@ export default function InvoicesPage() {
           <div className="mt-2 flex justify-between"><span>Discount</span><span>{currency(invoice.discount)}</span></div>
           <div className="mt-3 border-t border-slate-200 pt-3">
             <p className="text-xs font-black uppercase tracking-wider text-slate-500">Final Total</p>
-            <p className="mt-1 text-2xl font-black text-[#07183f]">{currency(totals.finalTotal)}</p>
+            <p className="mt-1 text-2xl font-black text-[#0A3D91]">{currency(totals.finalTotal)}</p>
           </div>
         </div>
       </div>
@@ -1364,14 +1364,14 @@ export default function InvoicesPage() {
                   <span>←</span> Back to board
                 </button>
                 <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">{selectedInvoice.invoiceNumber}</p>
-                <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-black text-[#07183f]">{selectedInvoice.clientName}</h2>
+                <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-black text-[#0A3D91]">{selectedInvoice.clientName}</h2>
                 <p className="mt-1 font-semibold text-sm sm:text-base text-slate-600">{selectedInvoice.jobName}</p>
                 <p className="text-xs sm:text-sm text-slate-500"><AddressLink value={selectedInvoice.propertyAddress} /></p>
               </div>
               <div className="text-left lg:text-right">
                 <span className={`inline-block rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-black ring-1 ${statusBadgeClass(getComputedStatus(selectedInvoice))}`}>{getComputedStatus(selectedInvoice)}</span>
                 <p className="mt-3 sm:mt-4 text-xs sm:text-sm font-bold text-slate-500">Total amount</p>
-                <p className="text-2xl sm:text-3xl font-black text-[#07183f]">{currency(calculateTotals(selectedInvoice).finalTotal)}</p>
+                <p className="text-2xl sm:text-3xl font-black text-[#0A3D91]">{currency(calculateTotals(selectedInvoice).finalTotal)}</p>
                 <p className="mt-1 sm:mt-2 text-xs sm:text-sm font-bold text-slate-600">Balance {currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
               </div>
             </div>
@@ -1389,7 +1389,7 @@ export default function InvoicesPage() {
 
             <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-black text-[#07183f]">Sent To</h3>
+                <h3 className="font-black text-[#0A3D91]">Sent To</h3>
                 <div className="flex flex-wrap gap-2">
                   {([
                     { label: "Email Delivered", at: selectedInvoice.emailDeliveredAt, fallbackDone: Boolean(selectedInvoice.sentAt) },
@@ -1407,11 +1407,11 @@ export default function InvoicesPage() {
                 </div>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#07183f]">{selectedInvoice.clientName || "—"}</p></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Phone</p><p className="mt-1 text-sm font-bold text-[#07183f]"><PhoneLink value={selectedInvoice.phone} fallback="—" /></p></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#07183f]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#07183f] break-all">{selectedInvoice.sentBy || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Name</p><p className="mt-1 text-sm font-bold text-[#0A3D91]">{selectedInvoice.clientName || "—"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Email</p><p className="mt-1 text-sm font-bold text-[#0A3D91] break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Phone</p><p className="mt-1 text-sm font-bold text-[#0A3D91]"><PhoneLink value={selectedInvoice.phone} fallback="—" /></p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Date Sent</p><p className="mt-1 text-sm font-bold text-[#0A3D91]">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
+                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Sent By User</p><p className="mt-1 text-sm font-bold text-[#0A3D91] break-all">{selectedInvoice.sentBy || "—"}</p></div>
               </div>
             </section>
 
@@ -1471,7 +1471,7 @@ export default function InvoicesPage() {
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <section className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="font-black text-[#07183f]">Payments</h3>
+                <h3 className="font-black text-[#0A3D91]">Payments</h3>
                 <div className="mt-3 space-y-2">
                   {selectedInvoice.payments.map((payment, index) => <p key={index} className="rounded-2xl bg-white p-3 text-sm font-semibold text-slate-600">{currency(payment.amount)} · {payment.method} · {payment.date}{payment.offline ? " · Offline" : ""}{payment.reference ? ` · ${payment.reference}` : ""}</p>)}
                   {selectedInvoice.payments.length === 0 && <p className="text-sm font-semibold text-slate-500">No payments recorded yet.</p>}
@@ -1479,11 +1479,11 @@ export default function InvoicesPage() {
                 <div className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold">
                   <div className="flex justify-between gap-3 text-slate-600"><span>Total Invoice</span><span>{currency(calculateTotals(selectedInvoice).finalTotal)}</span></div>
                   <div className="flex justify-between gap-3 text-emerald-700"><span>Total Deposits Paid</span><span>{currency(getPaidAmount(selectedInvoice))}</span></div>
-                  <div className="mt-1 flex justify-between gap-3 border-t border-slate-100 pt-2 font-black text-[#07183f]"><span>Remaining Balance</span><span>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</span></div>
+                  <div className="mt-1 flex justify-between gap-3 border-t border-slate-100 pt-2 font-black text-[#0A3D91]"><span>Remaining Balance</span><span>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</span></div>
                 </div>
               </section>
               <section className="rounded-3xl bg-slate-50 p-5">
-                <h3 className="font-black text-[#07183f]">Activity Timeline</h3>
+                <h3 className="font-black text-[#0A3D91]">Activity Timeline</h3>
                 <ol className="mt-4 space-y-4">
                   {buildInvoiceTimeline(selectedInvoice).map((step, index, steps) => (
                     <li key={step.label} className="flex gap-3">
@@ -1492,7 +1492,7 @@ export default function InvoicesPage() {
                         {index < steps.length - 1 && <span className={`mt-1 w-0.5 flex-1 ${step.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
                       </div>
                       <div className="pb-1">
-                        <p className={`text-sm font-black ${step.done ? "text-[#07183f]" : "text-slate-400"}`}>{step.label}</p>
+                        <p className={`text-sm font-black ${step.done ? "text-[#0A3D91]" : "text-slate-400"}`}>{step.label}</p>
                         <p className="text-xs font-semibold text-slate-500">{step.done ? (formatDateTime(step.at) || "Completed") : "Pending"}</p>
                       </div>
                     </li>
@@ -1508,13 +1508,13 @@ export default function InvoicesPage() {
             </div>
             {clientHistory && (
               <section className="mt-6 rounded-3xl bg-slate-50 p-5">
-                <h3 className="font-black text-[#07183f]">Client Payment History</h3>
+                <h3 className="font-black text-[#0A3D91]">Client Payment History</h3>
                 <div className="mt-4 grid gap-3 md:grid-cols-5">
-                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Invoices sent</p><p className="mt-2 text-xl font-black text-[#07183f]">{clientHistory.clientInvoices.length}</p></div>
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Invoices sent</p><p className="mt-2 text-xl font-black text-[#0A3D91]">{clientHistory.clientInvoices.length}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Total paid</p><p className="mt-2 text-xl font-black text-emerald-700">{currency(clientHistory.totalPaid)}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Outstanding</p><p className="mt-2 text-xl font-black text-orange-700">{currency(clientHistory.outstandingBalance)}</p></div>
-                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Last payment</p><p className="mt-2 text-sm font-black text-[#07183f]">{clientHistory.lastPaymentDate}</p></div>
-                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Methods used</p><p className="mt-2 text-sm font-black text-[#07183f]">{clientHistory.methods.join(", ") || "None"}</p></div>
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Last payment</p><p className="mt-2 text-sm font-black text-[#0A3D91]">{clientHistory.lastPaymentDate}</p></div>
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Methods used</p><p className="mt-2 text-sm font-black text-[#0A3D91]">{clientHistory.methods.join(", ") || "None"}</p></div>
                 </div>
                 <div className="mt-4 space-y-2">
                   {clientHistory.payments.map((payment, index) => (
@@ -1527,10 +1527,10 @@ export default function InvoicesPage() {
             <section className="mt-6 rounded-3xl bg-slate-50 p-5">
               <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                 <div>
-                  <h3 className="font-black text-[#07183f]">Integrations</h3>
+                  <h3 className="font-black text-[#0A3D91]">Integrations</h3>
                   <p className="mt-1 text-sm font-semibold text-slate-500">Connect payment, accounting, communication, automation, and storage platforms.</p>
                 </div>
-                <button type="button" onClick={() => setIntegrationNotice("Stripe is ready to connect. Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to enable live payment links, successful payment sync, failed payment alerts, and auto-paid invoice updates.")} className="rounded-2xl bg-[#07183f] px-4 py-3 text-sm font-black text-white">Connect Stripe</button>
+                <button type="button" onClick={() => setIntegrationNotice("Stripe is ready to connect. Add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to enable live payment links, successful payment sync, failed payment alerts, and auto-paid invoice updates.")} className="rounded-2xl bg-[#0A3D91] px-4 py-3 text-sm font-black text-white">Connect Stripe</button>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {integrations.map((integration) => (
@@ -1554,7 +1554,7 @@ export default function InvoicesPage() {
             <div className="flex items-center justify-between border-b border-slate-200 p-4 sm:p-5">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
-                <h2 className="mt-0.5 text-xl font-black text-[#07183f] sm:text-2xl">{createForm.invoiceNumber}</h2>
+                <h2 className="mt-0.5 text-xl font-black text-[#0A3D91] sm:text-2xl">{createForm.invoiceNumber}</h2>
               </div>
               <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100">×</button>
             </div>
@@ -1605,7 +1605,7 @@ export default function InvoicesPage() {
             <div className="mx-auto my-4 max-w-3xl rounded-3xl bg-white shadow-2xl">
 
               {/* ── Header ── */}
-              <div className="flex items-center justify-between gap-3 rounded-t-3xl bg-[#07183f] px-6 py-4">
+              <div className="flex items-center justify-between gap-3 rounded-t-3xl bg-[#0A3D91] px-6 py-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-400">Invoice Review</p>
                   <h2 className="mt-0.5 text-lg font-black text-white sm:text-xl">Verify before finalizing</h2>
@@ -1626,7 +1626,7 @@ export default function InvoicesPage() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">{inv.invoiceNumber}</p>
-                      <p className="mt-1 text-xl font-black text-[#07183f]">{inv.clientName || <span className="text-slate-400 italic">No client name</span>}</p>
+                      <p className="mt-1 text-xl font-black text-[#0A3D91]">{inv.clientName || <span className="text-slate-400 italic">No client name</span>}</p>
                       <p className="text-sm font-semibold text-slate-600">{inv.jobName}</p>
                       <p className="text-xs text-slate-500"><AddressLink value={inv.propertyAddress} /></p>
                     </div>
@@ -1714,8 +1714,8 @@ export default function InvoicesPage() {
                       </div>
                     )}
                     <div className="border-t border-slate-300 pt-2 flex items-center justify-between">
-                      <span className="font-black text-[#07183f] text-base">Total Invoice Amount</span>
-                      <span className="font-black text-[#07183f] text-xl">{currency(totals.finalTotal)}</span>
+                      <span className="font-black text-[#0A3D91] text-base">Total Invoice Amount</span>
+                      <span className="font-black text-[#0A3D91] text-xl">{currency(totals.finalTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-black text-base text-red-700">Balance Due from Customer</span>
@@ -1783,7 +1783,7 @@ export default function InvoicesPage() {
       {showPaymentModal && selectedInvoice && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
           <div className="w-full max-w-xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
-            <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Record Payment</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-[#0A3D91]">Record Payment</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
               <input type="number" value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" placeholder="Payment amount" />
               <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm({ ...paymentForm, date: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" />
@@ -1854,7 +1854,7 @@ export default function InvoicesPage() {
       {showSendModal && selectedInvoice && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-3 sm:p-4">
           <div className="w-full max-w-2xl rounded-2xl sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
-            <h2 className="text-xl sm:text-2xl font-black text-[#07183f]">Send Invoice</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-[#0A3D91]">Send Invoice</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
               <select value={sendForm.template} onChange={(event) => setSendForm({ ...sendForm, template: event.target.value, message: emailTemplates[event.target.value as keyof typeof emailTemplates] })} className="rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base">
                 {Object.keys(emailTemplates).map((template) => <option key={template}>{template}</option>)}
@@ -1863,7 +1863,7 @@ export default function InvoicesPage() {
               <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-32 rounded-2xl border border-slate-200 px-4 py-3.5 outline-none text-base" />
             </div>
             <div className="mt-4 sm:mt-6 rounded-2xl bg-slate-50 p-3 sm:p-4 text-xs sm:text-sm leading-5 sm:leading-6 text-slate-600">
-              <p className="font-black text-[#07183f]">{selectedInvoice.invoiceNumber}</p>
+              <p className="font-black text-[#0A3D91]">{selectedInvoice.invoiceNumber}</p>
               <p>To: {selectedInvoice.clientName} · <EmailLink value={selectedInvoice.email} /></p>
               <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
               <p className="mt-1">{sendForm.message}</p>

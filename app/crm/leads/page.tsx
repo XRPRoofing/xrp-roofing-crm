@@ -533,7 +533,7 @@ export default function LeadsPage() {
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Roofing operations</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-[#07183f]">Jobs board</h1>
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-[#0A3D91]">Jobs board</h1>
             <p className="crm-board-subtitle mt-1 hidden max-w-3xl text-sm font-medium text-slate-600 sm:block">Compact production tracking for owners and office staff: see urgency, value, rep, next action, and due date at a glance.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -561,7 +561,7 @@ export default function LeadsPage() {
                   type="button"
                   onClick={() => setSourceFilter(sourceFilter === src ? null : src)}
                   className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-1.5 text-[10px] font-black transition hover:opacity-80 ${
-                    sourceFilter === src ? "bg-[#07183f] text-white border-[#07183f]" : `${getSourceColor(src)} border-transparent`
+                    sourceFilter === src ? "bg-[#0A3D91] text-white border-[#0A3D91]" : `${getSourceColor(src)} border-transparent`
                   }`}
                 >
                   <span>{src}</span>
@@ -578,7 +578,7 @@ export default function LeadsPage() {
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowForm(false)}>
           <form onSubmit={handleAddJob} className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-200 p-4">
-              <h2 className="text-lg font-black text-[#07183f]">Add new job</h2>
+              <h2 className="text-lg font-black text-[#0A3D91]">Add new job</h2>
               <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -744,7 +744,7 @@ export default function LeadsPage() {
                 key={src}
                 type="button"
                 onClick={() => setSourceFilter(active ? null : src)}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${active ? "bg-[#07183f] text-white" : getSourceColor(src)} hover:opacity-80`}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${active ? "bg-[#0A3D91] text-white" : getSourceColor(src)} hover:opacity-80`}
               >
                 {src} <span className="opacity-70">({count})</span>
               </button>
@@ -765,7 +765,7 @@ export default function LeadsPage() {
           return (
             <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-19rem)] min-h-[30rem] w-[18rem] shrink-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/90 p-2 shadow-sm">
               <div className="sticky top-0 z-10 mb-2 shrink-0 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-                <h2 className="truncate text-xs font-black uppercase tracking-wide text-[#07183f]">{stage.label}</h2>
+                <h2 className="truncate text-xs font-black uppercase tracking-wide text-[#0A3D91]">{stage.label}</h2>
                 <p className="mt-1 text-xs font-bold text-slate-500">{stageJobs.length} Jobs • {formatMoney(stageValue)}</p>
               </div>
 
@@ -785,7 +785,7 @@ export default function LeadsPage() {
                         </div>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <p className="text-base font-black text-[#07183f]">{formatMoney(job.value)}</p>
+                        <p className="text-base font-black text-[#0A3D91]">{formatMoney(job.value)}</p>
                         {urgency.label !== "On Track" && (
                           <span className={`inline-flex items-center gap-1 text-[11px] font-black ${urgency.text}`}><span className={`h-2 w-2 rounded-full ${urgency.dot}`} />{urgency.label}</span>
                         )}
@@ -832,7 +832,7 @@ export default function LeadsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Job details</p>
-                  <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
+                  <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">{selectedJob.name}</h2>
                   <p className="text-sm font-bold text-slate-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -884,7 +884,7 @@ export default function LeadsPage() {
                 {/* Photo Checklist */}
                 <div className="rounded-2xl border border-slate-200 bg-white">
                   <button type="button" onClick={() => setChecklistOpen((v) => !v)} className="flex w-full items-center justify-between p-4">
-                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><ListChecks className="h-4 w-4 text-orange-500" />Photo Checklist</div>
+                    <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><ListChecks className="h-4 w-4 text-orange-500" />Photo Checklist</div>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-black ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
                   </button>
                   {checklistOpen && (
@@ -906,7 +906,7 @@ export default function LeadsPage() {
 
                 {/* Compact Before / Progress / After */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Camera className="h-4 w-4" />Job Photos</div>
+                  <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><Camera className="h-4 w-4" />Job Photos</div>
                   <div className="mt-2 space-y-2">
                     {([
                       { type: "Before" as const, photos: beforePhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
@@ -948,7 +948,7 @@ export default function LeadsPage() {
                 {/* General job photos */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><Image className="h-4 w-4" />General Photos</div>
+                    <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><Image className="h-4 w-4" />General Photos</div>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">{otherPhotos.length}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -956,7 +956,7 @@ export default function LeadsPage() {
                       type="button"
                       disabled={fileBusy}
                       onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
-                      className={`flex items-center justify-center gap-2 rounded-xl bg-[#07183f] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-900 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                      className={`flex items-center justify-center gap-2 rounded-xl bg-[#0A3D91] px-3 py-2.5 text-xs font-black text-white transition hover:bg-blue-900 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
                     >
                       <Camera className="h-4 w-4" /> Camera
                     </button>
@@ -1005,7 +1005,7 @@ export default function LeadsPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><StickyNote className="h-4 w-4" />Notes</div>
+                <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><StickyNote className="h-4 w-4" />Notes</div>
                 <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
                   {jobNotes.filter((n) => n.jobId === selectedJobId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((note) => (
                     <div key={note.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm">

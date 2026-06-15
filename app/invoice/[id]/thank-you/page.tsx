@@ -4,7 +4,7 @@ export default function InvoiceThankYouPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-12 text-slate-950">
       <section className="mx-auto w-full max-w-xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-        <div className="bg-[#07183f] p-8 text-center text-white">
+        <div className="bg-[#0A3D91] p-8 text-center text-white">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">XRP Roofing</p>
           <div className="mx-auto mt-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 ring-1 ring-emerald-300/40">
             <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8 text-emerald-300" aria-hidden="true">

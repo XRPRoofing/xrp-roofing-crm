@@ -415,7 +415,7 @@ export default function CrewWorkflowPage() {
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-600">Production Workflow</p>
-            <h1 className="mt-0.5 text-xl font-black tracking-tight text-[#07183f] sm:text-3xl">Roofing Crew Workflow</h1>
+            <h1 className="mt-0.5 text-xl font-black tracking-tight text-[#0A3D91] sm:text-3xl">Roofing Crew Workflow</h1>
             <p className="crm-board-subtitle mt-1 hidden text-sm font-semibold text-slate-600 sm:block">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${supabaseSyncEnabled() ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
@@ -441,7 +441,7 @@ export default function CrewWorkflowPage() {
           {filters.map((filter) => {
             const count = filter.value === "all" ? crewJobs.length : crewJobs.filter((job) => job.status === filter.value).length;
             return (
-              <button key={filter.value} type="button" onClick={() => setActiveFilter(filter.value)} className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-black transition ${activeFilter === filter.value ? "bg-[#07183f] text-white shadow-lg shadow-blue-950/10" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>
+              <button key={filter.value} type="button" onClick={() => setActiveFilter(filter.value)} className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-black transition ${activeFilter === filter.value ? "bg-[#0A3D91] text-white shadow-lg shadow-blue-950/10" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>
                 {filter.label} <span className="ml-1 opacity-70">{count}</span>
               </button>
             );
@@ -467,7 +467,7 @@ export default function CrewWorkflowPage() {
                 const jobViewers = presence.filter((entry) => entry.jobId === job.id);
                 return (
                   <tr key={job.id} onClick={() => setSelectedJobId(job.id)} className="cursor-pointer bg-white transition hover:bg-blue-50/60">
-                    <td className="px-4 py-3 font-black text-[#07183f]">
+                    <td className="px-4 py-3 font-black text-[#0A3D91]">
                       <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 font-semibold text-slate-600"><AddressLink value={formatAddress(job)} /></td>
@@ -491,7 +491,7 @@ export default function CrewWorkflowPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-700">Crew Created Job</p>
-              <h2 className="mt-1 text-2xl font-black text-[#07183f]">Create New Job</h2>
+              <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">Create New Job</h2>
             </div>
             <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-xl p-2 text-slate-500 hover:bg-white"><X className="h-5 w-5" /></button>
           </div>
@@ -525,7 +525,7 @@ export default function CrewWorkflowPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Job Details</p>
-                  <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
+                  <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">{selectedJob.name}</h2>
                   <p className="mt-1 text-sm font-bold text-slate-500"><AddressLink value={formatAddress(selectedJob)} /></p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -554,12 +554,12 @@ export default function CrewWorkflowPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-black text-[#07183f]"><UsersRound className="h-4 w-4" />Assigned Team</div>
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-[#0A3D91]"><UsersRound className="h-4 w-4" />Assigned Team</div>
                 <div className="flex flex-wrap gap-2">{crewMembers.map((member) => <button key={member} type="button" onClick={() => toggleCrew(selectedJob, member)} className={`rounded-full px-4 py-2 text-sm font-black transition ${selectedJob.assignedCrew.includes(member) ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50"}`}>{member}</button>)}</div>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                <p className="text-sm font-black text-[#07183f]">Uploaded Photos</p>
+                <p className="text-sm font-black text-[#0A3D91]">Uploaded Photos</p>
                 <div className="mt-2 space-y-2">
                   {(["Before", "Progress", "After"] as const).map((type) => {
                     const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
@@ -573,7 +573,7 @@ export default function CrewWorkflowPage() {
                           <button
                             type="button"
                             onClick={() => setLiveCamera({ jobId: selectedJob.id, type })}
-                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#07183f] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#0A3D91] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
                           >
                             <Camera className="h-4 w-4" /> Camera
                           </button>
@@ -595,7 +595,7 @@ export default function CrewWorkflowPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#07183f]">Checklist</p>
+                <p className="text-sm font-black text-[#0A3D91]">Checklist</p>
                 <div className="mt-3 space-y-2">
                   {selectedChecklist.map((item) => (
                     <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
@@ -612,7 +612,7 @@ export default function CrewWorkflowPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#07183f]">Notes</p>
+                <p className="text-sm font-black text-[#0A3D91]">Notes</p>
                 <div className="mt-3 space-y-2">
                   {selectedNotes.map((note) => (
                     <div key={note.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
@@ -629,14 +629,14 @@ export default function CrewWorkflowPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-black text-[#07183f]">Completion Notes</p>
+                <p className="text-sm font-black text-[#0A3D91]">Completion Notes</p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{selectedJob.completion.notes || "No completion notes submitted yet."}</p>
-                <p className="mt-3 text-sm font-black text-[#07183f]">Materials Used</p>
+                <p className="mt-3 text-sm font-black text-[#0A3D91]">Materials Used</p>
                 <p className="mt-1 text-sm font-semibold text-slate-700">{selectedJob.completion.materialsUsed || "No materials recorded."}</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#07183f]">Status History</p>
+                <p className="text-sm font-black text-[#0A3D91]">Status History</p>
                 <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
                   <p>Current status: <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${statusStyles[selectedJob.status]}`}>{selectedJob.status}</span></p>
                   {selectedJob.completion.submittedAt && <p>Marked done: {new Date(selectedJob.completion.submittedAt).toLocaleString()}</p>}

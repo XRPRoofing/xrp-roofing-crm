@@ -210,7 +210,7 @@ export default function CrmDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="absolute bottom-0 right-10 h-40 w-40 rounded-full bg-blue-300/20 blur-2xl" />
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
@@ -236,7 +236,7 @@ export default function CrmDashboardPage() {
       {/* 7 Actionable Metric Cards */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-[#07183f]">Action Items</h2>
+          <h2 className="text-lg font-black text-[#0A3D91]">Action Items</h2>
           <p className="text-xs font-semibold text-slate-400">Click a card to open the filtered list</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -272,17 +272,17 @@ export default function CrmDashboardPage() {
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Jobs in CRM</p>
-          <p className="mt-2 text-4xl font-black text-[#07183f]">{jobs.length}</p>
+          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{jobs.length}</p>
           <p className="mt-1 text-xs text-slate-400">All stages including completed</p>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Proposals</p>
-          <p className="mt-2 text-4xl font-black text-[#07183f]">{proposals.length}</p>
+          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{proposals.length}</p>
           <p className="mt-1 text-xs text-slate-400">{proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length} signed / approved</p>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Invoices</p>
-          <p className="mt-2 text-4xl font-black text-[#07183f]">{invoices.length}</p>
+          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{invoices.length}</p>
           <p className="mt-1 text-xs text-slate-400">{invoices.filter(invoicePaid).length} paid</p>
         </div>
       </section>

@@ -112,9 +112,9 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#07183f] px-4 py-10 text-slate-900">
+    <div className="min-h-screen bg-[#0A3D91] px-4 py-10 text-slate-900">
       <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl overflow-hidden rounded-[2rem] bg-white shadow-2xl lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="hidden bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#163783] p-10 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="hidden bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div>
             <div className="inline-flex rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/15">XRP Roofing CRM</div>
             <h1 className="mt-10 text-5xl font-bold tracking-tight">Manage leads, jobs, estimates, and crews from one roof-ready workspace.</h1>
@@ -129,8 +129,8 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
         <div className="flex items-center justify-center p-6 sm:p-10">
           <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5">
             <div>
-              <Link href="/" className="text-sm font-semibold text-[#0f2156]">← Back to website</Link>
-              <h2 className="mt-8 text-3xl font-bold tracking-tight text-[#07183f]">{copy[mode].title}</h2>
+              <Link href="/" className="text-sm font-semibold text-[#0A3D91]">← Back to website</Link>
+              <h2 className="mt-8 text-3xl font-bold tracking-tight text-[#0A3D91]">{copy[mode].title}</h2>
               <p className="mt-2 text-slate-600">{copy[mode].subtitle}</p>
             </div>
             {mode === "signup" && (
@@ -167,8 +167,8 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
               {copy[mode].cta}
             </button>
             <div className="flex justify-between text-sm text-slate-600">
-              {mode !== "login" ? <Link href="/login" className="font-semibold text-[#0f2156]">Log in</Link> : <Link href="/signup" className="font-semibold text-[#0f2156]">Create account</Link>}
-              {mode === "login" && <Link href="/forgot-password" className="font-semibold text-[#0f2156]">Forgot password?</Link>}
+              {mode !== "login" ? <Link href="/login" className="font-semibold text-[#0A3D91]">Log in</Link> : <Link href="/signup" className="font-semibold text-[#0A3D91]">Create account</Link>}
+              {mode === "login" && <Link href="/forgot-password" className="font-semibold text-[#0A3D91]">Forgot password?</Link>}
             </div>
           </form>
         </div>

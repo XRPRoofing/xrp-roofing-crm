@@ -54,7 +54,7 @@ const stripeEnvVars = [
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
-      <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#07183f] via-[#0f2156] to-[#1d4ed8] p-6 text-white shadow-2xl shadow-blue-950/20">
+      <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Admin Center</p>
@@ -93,12 +93,12 @@ export default function SettingsPage() {
                   <span className="rounded-2xl bg-blue-50 p-3 text-blue-700"><CreditCard className="h-6 w-6" /></span>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Payments Settings</p>
-                    <h2 className="text-2xl font-black text-[#07183f]">Stripe Setup</h2>
+                    <h2 className="text-2xl font-black text-[#0A3D91]">Stripe Setup</h2>
                   </div>
                 </div>
                 <p className="mt-4 max-w-3xl text-sm font-semibold leading-6 text-slate-600">For security, the owner should add Stripe keys directly in the hosting environment settings. Secret keys should not be typed into the CRM page or saved in the browser.</p>
               </div>
-              <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 rounded-2xl bg-[#07183f] px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-950/10">
+              <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 rounded-2xl bg-[#0A3D91] px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-950/10">
                 Open Stripe Keys <ExternalLink className="h-4 w-4" />
               </a>
             </div>
@@ -106,7 +106,7 @@ export default function SettingsPage() {
             <div className="mt-6 grid gap-4 lg:grid-cols-3">
               {stripeEnvVars.map((item) => (
                 <div key={item.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center gap-2 text-sm font-black text-[#07183f]"><KeyRound className="h-4 w-4 text-blue-600" />{item.type}</div>
+                  <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><KeyRound className="h-4 w-4 text-blue-600" />{item.type}</div>
                   <p className="mt-3 break-all rounded-xl bg-white px-3 py-2 font-mono text-xs font-bold text-slate-700 ring-1 ring-slate-200">{item.name}</p>
                   <p className="mt-2 font-mono text-xs font-bold text-slate-400">{item.value}</p>
                 </div>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
                     <span className="rounded-2xl bg-blue-50 p-3 text-blue-700"><Icon className="h-6 w-6" /></span>
                     <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700">{section.status}</span>
                   </div>
-                  <h2 className="mt-5 text-xl font-black text-[#07183f]">{section.title}</h2>
+                  <h2 className="mt-5 text-xl font-black text-[#0A3D91]">{section.title}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{section.description}</p>
                   <div className="mt-5 space-y-2">
                     {section.items.map((item) => (

@@ -1476,7 +1476,7 @@ export default function ConversationBoard() {
 
       {!isDialerOpen && (
         <div className={`fixed bottom-6 right-6 z-40 flex-col items-end gap-3 ${showMobileThread ? "hidden xl:flex" : "flex"}`}>
-          <Link href="/crm/team-chat" className="inline-flex items-center rounded-full bg-[#07183f] px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-900">
+          <Link href="/crm/team-chat" className="inline-flex items-center rounded-full bg-[#0A3D91] px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-900">
             <MessageCircle className="mr-2 h-5 w-5" />Team Chat
           </Link>
           <button onClick={() => setIsDialerOpen(true)} className="inline-flex items-center rounded-full bg-blue-600 px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700">

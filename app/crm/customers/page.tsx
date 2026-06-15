@@ -580,7 +580,7 @@ export default function CustomersPage() {
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
-          <h1 className="mt-2 text-3xl font-black text-[#07183f]">Customers ({customerList.length})</h1>
+          <h1 className="mt-2 text-3xl font-black text-[#0A3D91]">Customers ({customerList.length})</h1>
           <p className="crm-board-subtitle mt-2 text-slate-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
         </div>
         <button onClick={() => setShowForm(true)} className="w-fit rounded-2xl bg-orange-500 px-4 py-3 font-bold text-white shadow-lg shadow-orange-200"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
@@ -595,7 +595,7 @@ export default function CustomersPage() {
       {showForm && (
         <form onSubmit={handleAddCustomer} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-[#07183f]">Add new customer</h2>
+            <h2 className="text-xl font-black text-[#0A3D91]">Add new customer</h2>
             <button type="button" onClick={() => setShowForm(false)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -613,7 +613,7 @@ export default function CustomersPage() {
             <input value={form.roofDetails} onChange={(event) => setForm({ ...form, roofDetails: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none md:col-span-2" placeholder="Roof details" />
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button value="save" className="rounded-2xl bg-[#07183f] px-5 py-3 font-bold text-white">Save customer</button>
+            <button value="save" className="rounded-2xl bg-[#0A3D91] px-5 py-3 font-bold text-white">Save customer</button>
             <button value="add-another" className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white">Save + add another</button>
           </div>
         </form>
@@ -630,7 +630,7 @@ export default function CustomersPage() {
           return (
             <button key={customer.id} type="button" onClick={() => openCustomer(customer)} className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
               <div className="flex items-start justify-between gap-2">
-                <h2 className="text-lg font-black leading-tight text-[#07183f]">{customer.name}</h2>
+                <h2 className="text-lg font-black leading-tight text-[#0A3D91]">{customer.name}</h2>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(customer.status)}`}>{customer.status || "New customer"}</span>
               </div>
               <div className="mt-3 space-y-2 text-sm">
@@ -653,7 +653,7 @@ export default function CustomersPage() {
               <div className="flex items-start justify-between gap-4 p-5 pb-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Customer profile</p>
-                  <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedCustomer.name}</h2>
+                  <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">{selectedCustomer.name}</h2>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusTone(selectedCustomer.status)}`}>{selectedCustomer.status || "New customer"}</span>
                     <span className="text-sm font-bold text-slate-500">{getActiveJobCount(selectedCustomer, jobList)} active • {selectedCustomerJobs.length} total job{selectedCustomerJobs.length === 1 ? "" : "s"}</span>
@@ -702,7 +702,7 @@ export default function CustomersPage() {
                       <input value={editForm.insuranceCarrier} onChange={(event) => setEditForm({ ...editForm, insuranceCarrier: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Insurance carrier" />
                       <input type="number" value={editForm.lifetimeValue} onChange={(event) => setEditForm({ ...editForm, lifetimeValue: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none" placeholder="Lifetime value" />
                       <div className="flex gap-2 sm:col-span-2">
-                        <button className="rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save changes</button>
+                        <button className="rounded-xl bg-[#0A3D91] px-4 py-2 text-sm font-bold text-white">Save changes</button>
                         <button type="button" onClick={() => { setEditingCustomerId(null); setEditForm(null); }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Cancel</button>
                       </div>
                     </form>
@@ -724,7 +724,7 @@ export default function CustomersPage() {
 
               {activeTab === "Jobs" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Jobs</h3></div>
+                  <div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#0A3D91]">Jobs</h3></div>
                   <div className="mt-4 space-y-3">
                     {selectedCustomerJobs.length > 0 ? selectedCustomerJobs.map((job) => (
                       <div key={job.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -733,7 +733,7 @@ export default function CustomersPage() {
                             <p className="font-black text-slate-900">{job.roofType}</p>
                             <p className="text-sm font-bold text-slate-500">{getStageLabel(job)} • {job.city}, AZ</p>
                           </div>
-                          <p className="font-black text-[#07183f]">${job.value.toLocaleString()}</p>
+                          <p className="font-black text-[#0A3D91]">${job.value.toLocaleString()}</p>
                         </div>
                         <div className="mt-3 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3">
                           <p className="flex items-center gap-1"><CalendarCheck2 className="h-3.5 w-3.5 text-slate-400" />Added: {getJobAddedDate(job)}</p>
@@ -749,7 +749,7 @@ export default function CustomersPage() {
               {activeTab === "Estimates" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2"><FileSignature className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Estimates &amp; Proposals</h3></div>
+                    <div className="flex items-center gap-2"><FileSignature className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#0A3D91]">Estimates &amp; Proposals</h3></div>
                     <button type="button" onClick={() => createEstimate(selectedCustomer)} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-black text-white transition hover:bg-blue-700"><Plus className="h-4 w-4" />Create estimate</button>
                   </div>
                   <div className="mt-4 space-y-3">
@@ -760,7 +760,7 @@ export default function CustomersPage() {
                           <p className="truncate text-sm font-bold text-slate-500"><AddressLink value={proposal.address || selectedCustomer.propertyAddress} /></p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="font-black text-[#07183f]">${(proposal.total || 0).toLocaleString()}</p>
+                          <p className="font-black text-[#0A3D91]">${(proposal.total || 0).toLocaleString()}</p>
                           <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(proposal.status)}`}>{proposal.status || "Draft"}</span>
                         </div>
                       </button>
@@ -772,7 +772,7 @@ export default function CustomersPage() {
               {activeTab === "Invoices" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2"><Receipt className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Invoices</h3></div>
+                    <div className="flex items-center gap-2"><Receipt className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#0A3D91]">Invoices</h3></div>
                     <button type="button" onClick={() => createInvoice(selectedCustomer)} className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-black text-white transition hover:bg-blue-700"><Plus className="h-4 w-4" />Create invoice</button>
                   </div>
                   <div className="mt-4 space-y-3">
@@ -783,7 +783,7 @@ export default function CustomersPage() {
                           <p className="truncate text-sm font-bold text-slate-500"><AddressLink value={invoice.propertyAddress || selectedCustomer.propertyAddress} /></p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="font-black text-[#07183f]">${invoiceTotal(invoice).toLocaleString()}</p>
+                          <p className="font-black text-[#0A3D91]">${invoiceTotal(invoice).toLocaleString()}</p>
                           <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold ${statusTone(invoice.status)}`}>{invoice.status || "Draft"}</span>
                         </div>
                       </button>
@@ -802,10 +802,10 @@ export default function CustomersPage() {
 
               {activeTab === "Notes" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Notes</h3></div>
+                  <div className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#0A3D91]">Notes</h3></div>
                   <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows={6} className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none" placeholder="Add internal notes about this customer..." />
                   <div className="mt-3 flex items-center gap-2">
-                    <button type="button" onClick={() => handleSaveNote(selectedCustomer.id)} className="rounded-xl bg-[#07183f] px-4 py-2 text-sm font-bold text-white">Save note</button>
+                    <button type="button" onClick={() => handleSaveNote(selectedCustomer.id)} className="rounded-xl bg-[#0A3D91] px-4 py-2 text-sm font-bold text-white">Save note</button>
                     {customerNotes[selectedCustomer.id] && noteDraft === customerNotes[selectedCustomer.id] && <span className="text-xs font-bold text-emerald-600">Saved</span>}
                   </div>
                 </section>
@@ -813,7 +813,7 @@ export default function CustomersPage() {
 
               {activeTab === "Communication History" && (
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#07183f]">Calls, Messages &amp; Recordings</h3></div>
+                  <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-black text-[#0A3D91]">Calls, Messages &amp; Recordings</h3></div>
                   <div className="mt-4 space-y-3">
                     {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: CommunicationEntry) => {
                       const Icon = getCommunicationIcon(message);

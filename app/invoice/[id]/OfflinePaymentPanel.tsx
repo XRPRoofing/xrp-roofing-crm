@@ -107,7 +107,7 @@ export default function OfflinePaymentPanel({ invoiceId, balance, totalAmount, t
         <div className="space-y-1.5 text-sm font-bold text-slate-700">
           <div className="flex justify-between gap-3"><span>Total Invoice</span><span>{currency(totalAmount)}</span></div>
           <div className="flex justify-between gap-3"><span>Deposits Paid</span><span className="text-emerald-700">{currency(totalPaid)}</span></div>
-          <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 text-base font-black text-[#07183f]">
+          <div className="flex justify-between gap-3 border-t border-slate-200 pt-2 text-base font-black text-[#0A3D91]">
             <span>Remaining Balance</span><span className="text-orange-600">{currency(balance)}</span>
           </div>
         </div>
@@ -231,7 +231,7 @@ export default function OfflinePaymentPanel({ invoiceId, balance, totalAmount, t
           type="button"
           onClick={() => void handleSubmit()}
           disabled={submitting}
-          className="block w-full rounded-2xl bg-[#07183f] px-4 py-3.5 text-center text-sm font-black text-white shadow-sm transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="block w-full rounded-2xl bg-[#0A3D91] px-4 py-3.5 text-center text-sm font-black text-white shadow-sm transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Submitting..." : `Submit ${selectedMethod} Payment`}
         </button>

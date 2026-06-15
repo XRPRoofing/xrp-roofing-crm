@@ -196,13 +196,13 @@ export default function CrewPortalPage() {
             <button type="button" onClick={() => setError("")} className="rounded-lg p-1 hover:bg-red-100"><X className="h-4 w-4" /></button>
           </div>
         )}
-        <div className="rounded-[2rem] bg-gradient-to-br from-[#07183f] to-[#1d4ed8] p-5 text-white shadow-xl shadow-blue-950/20">
+        <div className="rounded-[2rem] bg-gradient-to-br from-[#0A3D91] to-[#2B6BC4] p-5 text-white shadow-xl shadow-blue-950/20">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Crew Portal</p>
           <h1 className="mt-2 text-3xl font-black">My Assigned Jobs</h1>
           <p className="mt-2 text-sm font-semibold leading-6 text-blue-100">Field-only job view for roofing teams. No proposals, invoices, payments, reports, settings, or other customer records.</p>
           <label className="mt-5 grid gap-2 text-xs font-black uppercase tracking-wide text-blue-100">
             Team Member
-            <select value={selectedCrew} onChange={(event) => { setSelectedCrew(event.target.value); setSelectedJobId(""); }} className="rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black normal-case tracking-normal text-[#07183f] outline-none">
+            <select value={selectedCrew} onChange={(event) => { setSelectedCrew(event.target.value); setSelectedJobId(""); }} className="rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-black normal-case tracking-normal text-[#0A3D91] outline-none">
               {crewMembers.map((member) => <option key={member}>{member}</option>)}
             </select>
           </label>
@@ -213,12 +213,12 @@ export default function CrewPortalPage() {
             {crewJobs.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
                 <Hammer className="mx-auto h-8 w-8 text-slate-400" />
-                <p className="mt-3 font-black text-[#07183f]">No assigned jobs</p>
+                <p className="mt-3 font-black text-[#0A3D91]">No assigned jobs</p>
                 <p className="mt-1 text-sm text-slate-500">Ask an admin to assign jobs to this Team Member.</p>
               </div>
             ) : crewJobs.map((job) => (
               <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`w-full rounded-3xl border p-4 text-left shadow-sm transition ${selectedJob?.id === job.id ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white"}`}>
-                <p className="font-black text-[#07183f]">{job.name}</p>
+                <p className="font-black text-[#0A3D91]">{job.name}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-600">{job.address}, {job.city}, AZ</p>
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100">{job.status}</span>
@@ -232,7 +232,7 @@ export default function CrewPortalPage() {
             <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="border-b border-slate-200 pb-5">
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Job Details</p>
-                <h2 className="mt-2 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
+                <h2 className="mt-2 text-2xl font-black text-[#0A3D91]">{selectedJob.name}</h2>
                 <p className="mt-2 text-sm font-bold text-slate-600">{selectedJob.address}, {selectedJob.city}, AZ</p>
                 {otherViewers.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -261,7 +261,7 @@ export default function CrewPortalPage() {
               </div>
 
               <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-3">
-                <h3 className="text-base font-black text-[#07183f]">Job Completion Form</h3>
+                <h3 className="text-base font-black text-[#0A3D91]">Job Completion Form</h3>
                 <div className="mt-2 space-y-2">
                   {(["Before", "Progress", "After"] as const).map((type) => {
                     const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
@@ -275,7 +275,7 @@ export default function CrewPortalPage() {
                           <button
                             type="button"
                             onClick={() => setLiveCamera({ jobId: selectedJob.id, type })}
-                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#07183f] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
+                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#0A3D91] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
                           >
                             <Camera className="h-4 w-4" /> Camera
                           </button>
