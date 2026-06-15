@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { AddressLink } from "@/components/ContactLinks";
 
 type GoogleCalendarEvent = {
   id: string;
@@ -518,7 +519,7 @@ export default function CalendarPage() {
                           <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
                         )}
                         {details.address !== "Not provided" && (
-                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-slate-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />{details.address}</p>
+                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-slate-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" /><AddressLink value={details.address} /></p>
                         )}
                       </div>
                     </button>
@@ -677,10 +678,17 @@ export default function CalendarPage() {
                       )}
                     </div>
                   </div>
-                  <label className="grid grid-cols-[28px_1fr] items-center gap-4">
+                  <div className="grid grid-cols-[28px_1fr] items-center gap-4">
                     <MapPin className="h-5 w-5 text-slate-500" />
-                    <input required value={eventForm.address} onChange={(event) => setEventForm({ ...eventForm, address: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Job address" />
-                  </label>
+                    <div className="flex items-center gap-2">
+                      <input required value={eventForm.address} onChange={(event) => setEventForm({ ...eventForm, address: event.target.value })} className="flex-1 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Job address" />
+                      {eventForm.address && (
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eventForm.address)}`} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-bold text-white hover:bg-blue-600">
+                          <MapPin className="h-4 w-4" />Map
+                        </a>
+                      )}
+                    </div>
+                  </div>
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
                     <Briefcase className="h-5 w-5 text-slate-500" />
                     <select required value={eventForm.jobKind} onChange={(event) => setEventForm({ ...eventForm, jobKind: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none">

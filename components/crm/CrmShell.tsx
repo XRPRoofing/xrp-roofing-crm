@@ -10,6 +10,7 @@ import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount
 import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { subscribeToCrewData } from "@/lib/crew-sync";
+import { PhoneLink } from "@/components/ContactLinks";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords } from "@/lib/customer-sync";
@@ -342,7 +343,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         <div className="fixed right-4 top-24 z-[80] w-[min(92vw,380px)] rounded-3xl border border-orange-200 bg-white p-5 text-slate-950 shadow-2xl shadow-slate-950/25">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Incoming Call</p>
           <p className="mt-2 text-xl font-black">{globalIncomingCall.name}</p>
-          <p className="mt-1 text-sm font-bold text-slate-600">{globalIncomingCall.phone}</p>
+          <p className="mt-1 text-sm font-bold text-slate-600"><PhoneLink value={globalIncomingCall.phone} /></p>
           <div className="mt-4 flex gap-2">
             <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700">Answer</button>
             <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
