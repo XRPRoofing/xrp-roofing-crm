@@ -566,10 +566,11 @@ export default function InvoicesPage() {
 
   const closeInvoiceCard = useCallback(() => {
     setSelectedInvoiceId(null);
-    if (invoiceCardHashRef.current) {
-      invoiceCardHashRef.current = false;
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
+    invoiceCardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invoice");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
   }, []);
 
   function pushInvoiceHash() {
@@ -580,8 +581,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     function handleHashChange() {
       if (invoiceCardHashRef.current && !window.location.hash.includes("card")) {
-        invoiceCardHashRef.current = false;
-        setSelectedInvoiceId(null);
+        closeInvoiceCard();
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
@@ -938,10 +938,11 @@ export default function InvoicesPage() {
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
     if (selectedInvoiceId === invoice.id) {
       setSelectedInvoiceId(null);
-      if (invoiceCardHashRef.current) {
-        invoiceCardHashRef.current = false;
-        history.replaceState(history.state, "", window.location.pathname + window.location.search);
-      }
+      invoiceCardHashRef.current = false;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("invoice");
+      url.hash = "";
+      history.replaceState(history.state, "", url.pathname + url.search);
     }
     void upsertInvoiceRecord(deletedInvoice as unknown as Record<string, unknown> & { id: string });
   }

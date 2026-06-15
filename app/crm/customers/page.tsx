@@ -335,11 +335,11 @@ export default function CustomersPage() {
 
   const closeCustomerCard = useCallback(() => {
     setSelectedCustomerId(null);
-    if (cardHashRef.current) {
-      cardHashRef.current = false;
-      // Remove the hash silently without triggering hashchange
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
+    cardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("customer");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
   }, []);
 
   function openCustomer(customer: Customer) {
@@ -355,8 +355,7 @@ export default function CustomersPage() {
   useEffect(() => {
     function handleHashChange() {
       if (cardHashRef.current && !window.location.hash.includes("card")) {
-        cardHashRef.current = false;
-        setSelectedCustomerId(null);
+        closeCustomerCard();
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
@@ -562,10 +561,11 @@ export default function CustomersPage() {
     if (typeof window !== "undefined" && !window.confirm("Delete this customer? This cannot be undone.")) return;
     setSavedCustomers((current) => current.filter((customer) => customer.id !== id));
     setSelectedCustomerId(null);
-    if (cardHashRef.current) {
-      cardHashRef.current = false;
-      history.replaceState(history.state, "", window.location.pathname + window.location.search);
-    }
+    cardHashRef.current = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("customer");
+    url.hash = "";
+    history.replaceState(history.state, "", url.pathname + url.search);
     await deleteCustomerRecord(id);
     await syncFromServer();
   }
