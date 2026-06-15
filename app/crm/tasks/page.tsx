@@ -15,7 +15,7 @@ import {
   type OfficeTask,
   type OfficeTaskStatus,
 } from "@/lib/office-tasks";
-import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates } from "@/lib/task-sync";
+import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates, upsertTaskToSupabase } from "@/lib/task-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 function fmt(iso: string) {
@@ -108,8 +108,14 @@ export default function TasksPage() {
 
   function moveTask(taskId: string, status: OfficeTaskStatus) {
     updateOfficeTaskStatus(taskId, status);
-    refresh();
+    // Read from localStorage (updated synchronously) for immediate UI — avoids
+    // race with fire-and-forget Supabase save that refresh() would hit.
+    const fresh = readOfficeTasks();
+    setTasks(fresh);
     if (selectedTask?.id === taskId) setSelectedTask((prev) => prev ? { ...prev, status } : null);
+    // Persist the moved task directly to Supabase
+    const moved = fresh.find((t) => t.id === taskId);
+    if (moved) void upsertTaskToSupabase(moved);
   }
 
   function handleDrop(status: OfficeTaskStatus) {
