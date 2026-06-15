@@ -72,7 +72,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchIndex, setSearchIndex] = useState(-1);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
   const mobileNavigation = isCrewUser
@@ -341,12 +344,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setSearchOpen(false);
     setSearchQuery("");
     setSearchResults([]);
+    setMobileSearchOpen(false);
     router.push(result.href);
   }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
+      const inDesktop = searchRef.current?.contains(e.target as Node);
+      const inMobile = mobileSearchRef.current?.contains(e.target as Node);
+      if (!inDesktop && !inMobile) setSearchOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -501,6 +507,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               </div>
               <p className="truncate text-sm font-black text-[#07183f]">{activeModule?.label || "Dashboard"}</p>
             </div>
+            <button type="button" onClick={() => { setMobileSearchOpen((v) => !v); setTimeout(() => mobileSearchInputRef.current?.focus(), 100); }} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#07183f] shadow-sm hover:bg-white lg:hidden"><Search className="h-5 w-5" /></button>
             <div className="hidden min-w-0 lg:block">
               <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">{isCrewUser ? "Crew Workspace" : "Command Center"}</p>
               <p className="mt-1 text-sm font-semibold text-blue-100">{isCrewUser ? "Assigned jobs and completion workflow" : "Roofing operations dashboard"}</p>
@@ -579,6 +586,42 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               <LogOut className="h-4 w-4" /> Logout
             </button>
           </div>
+          {mobileSearchOpen && (
+            <div ref={mobileSearchRef} className="relative border-t border-slate-200 px-3 py-2 lg:hidden">
+              <Search className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input ref={mobileSearchInputRef} value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }} onKeyDown={handleSearchKeyDown} onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/20" placeholder={isCrewUser ? "Search crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
+              {searchOpen && searchResults.length > 0 && (
+                <div className="absolute left-3 right-3 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  {(["Jobs", "Customers", "Proposals", "Invoices"] as const).map((cat) => {
+                    const items = searchResults.filter((r) => r.category === cat);
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={cat}>
+                        <p className="sticky top-0 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{cat}</p>
+                        {items.map((result, i) => {
+                          const globalIdx = searchResults.indexOf(result);
+                          return (
+                            <button key={`${result.category}-${i}`} type="button" onClick={() => { navigateToResult(result); setMobileSearchOpen(false); }} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                                {result.icon === "job" && <BriefcaseBusiness className="h-4 w-4" />}
+                                {result.icon === "customer" && <UsersRound className="h-4 w-4" />}
+                                {result.icon === "proposal" && <FileText className="h-4 w-4" />}
+                                {result.icon === "invoice" && <ClipboardList className="h-4 w-4" />}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-bold text-slate-900">{result.label}</span>
+                                {result.sub && <span className="block truncate text-xs text-slate-500">{result.sub}</span>}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </header>
         <main className="crm-main px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
           <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
