@@ -337,9 +337,8 @@ export default function CustomersPage() {
     if (cardHistoryPushedRef.current) {
       cardHistoryPushedRef.current = false;
       window.history.back();
-    } else {
-      setSelectedCustomerId(null);
     }
+    setSelectedCustomerId(null);
   }, []);
 
   function openCustomer(customer: Customer) {
