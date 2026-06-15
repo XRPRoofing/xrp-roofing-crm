@@ -241,7 +241,7 @@ function statusTone(status?: string) {
   if (!value) return "bg-slate-100 text-slate-600";
   if (["paid", "won", "complete", "completed"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
   if (["progress", "active", "scheduled"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
-  if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-orange-100 text-orange-700";
+  if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-red-100 text-red-700";
   if (value.includes("new")) return "bg-orange-100 text-orange-700";
   return "bg-slate-100 text-slate-600";
 }
@@ -662,7 +662,7 @@ export default function CustomersPage() {
                 <div className="flex gap-2">
                   <button type="button" onClick={() => handleEditCustomer(selectedCustomer)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100"><Edit3 className="h-5 w-5" /></button>
                   {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
-                    <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-orange-200 p-2 text-orange-500 hover:bg-orange-50"><Trash2 className="h-5 w-5" /></button>
+                    <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-red-200 p-2 text-red-500 hover:bg-red-50"><Trash2 className="h-5 w-5" /></button>
                   )}
                   <button type="button" onClick={closeCustomerCard} className="pointer-events-auto relative rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>

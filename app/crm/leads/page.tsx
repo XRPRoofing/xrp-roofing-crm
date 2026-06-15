@@ -780,7 +780,7 @@ export default function LeadsPage() {
                           <p className="mt-0.5 truncate text-xs font-bold text-slate-500">{job.city}, AZ</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-orange-50 hover:text-orange-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
                           <GripVertical className="h-4 w-4 text-slate-300" />
                         </div>
                       </div>
@@ -836,7 +836,7 @@ export default function LeadsPage() {
                   <p className="text-sm font-bold text-slate-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
                   <button type="button" onClick={closeJobCard} className="pointer-events-auto relative rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>

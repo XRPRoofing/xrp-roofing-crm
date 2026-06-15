@@ -1225,7 +1225,7 @@ export default function ProposalsPage() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">{activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">Save</button>
-            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-orange-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
+            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-black text-slate-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
@@ -1846,7 +1846,7 @@ export default function ProposalsPage() {
                     {(templateForm.brochures || []).map((file, index) => (
                       <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
                         <span className="truncate">{file.name}</span>
-                        <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: (templateForm.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-orange-500 hover:text-orange-700">Remove</button>
+                        <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: (templateForm.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
                       </div>
                     ))}
                     <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
@@ -1923,7 +1923,7 @@ export default function ProposalsPage() {
                       {(template.brochures || []).map((file, index) => (
                         <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
                           <span className="truncate">{file.name}</span>
-                          <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochures: (template.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-orange-500 hover:text-orange-700">Remove</button>
+                          <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochures: (template.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
                         </div>
                       ))}
                       <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
@@ -1978,7 +1978,7 @@ export default function ProposalsPage() {
                     </label>
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">Saved</span>
-                      <button type="button" onClick={() => { if (window.confirm(`Delete email template "${et.label}"?`)) setEmailTemplates((prev) => prev.filter((t) => t.id !== et.id)); }} className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-600 hover:bg-orange-100">Delete</button>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete email template "${et.label}"?`)) setEmailTemplates((prev) => prev.filter((t) => t.id !== et.id)); }} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
                     </div>
                   </div>
                   <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
@@ -2031,7 +2031,7 @@ export default function ProposalsPage() {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white">Restore</button>
-                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-orange-50 px-4 py-2 text-sm font-black text-orange-700">Delete forever</button>
+                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-black text-red-700">Delete forever</button>
                       </div>
                     </div>
                   );
@@ -2126,7 +2126,7 @@ export default function ProposalsPage() {
                 <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
-              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-orange-600 px-3 py-1 text-xs font-black text-white">Delete</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">Delete</button>
               <span className="text-xl font-black text-slate-500">⋯</span>
             </div>
           </div>

@@ -529,7 +529,7 @@ export default function CrewWorkflowPage() {
                   <p className="mt-1 text-sm font-bold text-slate-500"><AddressLink value={formatAddress(selectedJob)} /></p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
                   <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>

@@ -585,7 +585,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{notification.message}</p>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
-                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-orange-600 hover:bg-orange-50">Delete</button>
+                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-red-600 hover:bg-red-50">Delete</button>
                           </div>
                         </div>
                       ))}

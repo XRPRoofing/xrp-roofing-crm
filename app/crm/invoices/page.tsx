@@ -1343,7 +1343,7 @@ export default function InvoicesPage() {
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 active:scale-95">Reminder</button>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 active:scale-95">Delete</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>
                   );
@@ -1382,8 +1382,8 @@ export default function InvoicesPage() {
               <button onClick={() => setShowPaymentModal(true)} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-xl sm:rounded-2xl bg-slate-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">Mark Paid</button>
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
-              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-orange-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-orange-700 active:scale-95 transition">Void</button>
-              <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-orange-300 bg-orange-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-orange-700">Delete Invoice</button>
+              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
+              <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
 
@@ -1458,7 +1458,7 @@ export default function InvoicesPage() {
                         <button
                           type="button"
                           onClick={() => { setRejectModal({ pending, invoiceId: selectedInvoice.id }); setRejectNotes(""); }}
-                          className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100 active:scale-95"
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 active:scale-95"
                         >
                           ✗ Reject
                         </button>
@@ -1806,7 +1806,7 @@ export default function InvoicesPage() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => { (e as { stopPropagation(): void }).stopPropagation(); }}>
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-lg">✗</span>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-lg">✗</span>
               <div>
                 <h2 className="text-lg font-black text-slate-900">Reject Payment</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -1823,11 +1823,11 @@ export default function InvoicesPage() {
                 value={rejectNotes}
                 onChange={(e) => setRejectNotes(e.target.value)}
                 rows={3}
-                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-orange-300 focus:ring-4 focus:ring-orange-50"
+                className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
                 placeholder="e.g. Check number not found, amount does not match invoice, please resubmit…"
               />
             </div>
-            <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs font-semibold text-orange-800">
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800">
               ⚠️ The customer will be notified by email that their payment submission was rejected. The invoice will remain unpaid.
             </div>
             <div className="mt-5 flex gap-3">
@@ -1842,7 +1842,7 @@ export default function InvoicesPage() {
                 type="button"
                 disabled={rejectSubmitting}
                 onClick={() => void handleRejectPendingPayment(rejectModal.pending, rejectNotes)}
-                className="flex-1 rounded-2xl bg-orange-600 py-3 text-sm font-black text-white transition hover:bg-orange-700 active:scale-95 disabled:opacity-60"
+                className="flex-1 rounded-2xl bg-red-600 py-3 text-sm font-black text-white transition hover:bg-red-700 active:scale-95 disabled:opacity-60"
               >
                 {rejectSubmitting ? "Rejecting…" : "Confirm Reject"}
               </button>

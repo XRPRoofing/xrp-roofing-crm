@@ -515,7 +515,7 @@ export default function PhotoAnnotator({
             <button type="button" title="Duplicate" onClick={duplicateSelected} className="flex h-9 w-9 items-center justify-center rounded-xl text-white hover:bg-white/10">
               <Copy className="h-4 w-4" />
             </button>
-            <button type="button" title="Delete" onClick={deleteSelected} className="flex h-9 w-9 items-center justify-center rounded-xl text-orange-400 hover:bg-white/10">
+            <button type="button" title="Delete" onClick={deleteSelected} className="flex h-9 w-9 items-center justify-center rounded-xl text-red-400 hover:bg-white/10">
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
