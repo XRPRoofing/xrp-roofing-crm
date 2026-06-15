@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
-import { PhoneLink, EmailLink } from "@/components/ContactLinks";
+import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
@@ -470,7 +470,7 @@ export default function CrewWorkflowPage() {
                     <td className="px-4 py-3 font-black text-[#07183f]">
                       <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
                     </td>
-                    <td className="max-w-xs truncate px-4 py-3 font-semibold text-slate-600">{formatAddress(job)}</td>
+                    <td className="max-w-xs truncate px-4 py-3 font-semibold text-slate-600"><AddressLink value={formatAddress(job)} /></td>
                     <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700">{member}</span>)}</div></td>
                     <td className="px-4 py-3 font-bold text-slate-700">{job.scheduleDate}</td>
                     <td className="max-w-[180px] truncate px-4 py-3 font-semibold text-slate-600">{job.jobScope}</td>
@@ -526,7 +526,7 @@ export default function CrewWorkflowPage() {
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Job Details</p>
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
-                  <p className="mt-1 text-sm font-bold text-slate-500">{formatAddress(selectedJob)}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-500"><AddressLink value={formatAddress(selectedJob)} /></p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>

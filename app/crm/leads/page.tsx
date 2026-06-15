@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
+import { AddressLink } from "@/components/ContactLinks";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
@@ -778,7 +779,7 @@ export default function LeadsPage() {
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Job details</p>
                   <h2 className="mt-1 text-2xl font-black text-[#07183f]">{selectedJob.name}</h2>
-                  <p className="text-sm font-bold text-slate-500">{selectedJob.address}, {selectedJob.city}, AZ</p>
+                  <p className="text-sm font-bold text-slate-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
@@ -803,7 +804,12 @@ export default function LeadsPage() {
                     {selectedJob.email && <a href={`mailto:${selectedJob.email}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-4 w-4" /></a>}
                   </div>
                 </label>
-                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Address<input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500 sm:col-span-2">Address
+                  <div className="flex items-center gap-1">
+                    <input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" />
+                    {selectedJob.address && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedJob.address}, ${selectedJob.city}, AZ`)}`} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600"><MapPin className="h-4 w-4" /></a>}
+                  </div>
+                </label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Inspection Date<input value={selectedJob.inspectionDate || ""} onChange={(event) => updateJob(selectedJob.id, { inspectionDate: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. June 12" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="e.g. 2008" /></label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Job Value<input type="number" value={selectedJob.value} onChange={(event) => updateJob(selectedJob.id, { value: Number(event.target.value) || 0 })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" /></label>

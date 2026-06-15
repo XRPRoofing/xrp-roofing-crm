@@ -60,6 +60,36 @@ export function EmailLink({
   );
 }
 
+function toMapsHref(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+export function AddressLink({
+  value,
+  fallback,
+  className,
+}: {
+  value?: string;
+  fallback?: string;
+  className?: string;
+}) {
+  const display = value || fallback || "";
+  if (!value) return <>{display}</>;
+
+  return (
+    <a
+      href={toMapsHref(value)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      style={linkStyle}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {display}
+    </a>
+  );
+}
+
 const URL_PATTERN = "https?://[^\\s<]+|www\\.[^\\s<]+\\.[^\\s<]+";
 const EMAIL_PATTERN = "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}";
 const PHONE_PATTERN = "\\+?\\d[\\d\\s().\\-]{6,}\\d";

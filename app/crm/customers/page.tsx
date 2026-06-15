@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { PhoneLink, EmailLink } from "@/components/ContactLinks";
+import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import { leadStages } from "@/lib/crm-data";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -584,7 +584,7 @@ export default function CustomersPage() {
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(customer.status)}`}>{customer.status || "New customer"}</span>
               </div>
               <div className="mt-3 space-y-2 text-sm">
-                <p className="flex items-start gap-2 text-slate-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold">{customer.propertyAddress || "Address pending"}</span></p>
+                <p className="flex items-start gap-2 text-slate-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><AddressLink value={customer.propertyAddress} fallback="Address pending" /></span></p>
                 <p className="flex items-center gap-2 text-slate-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><PhoneLink value={customer.phone} fallback="No phone on file" /></span></p>
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
@@ -661,7 +661,7 @@ export default function CustomersPage() {
                       <section className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Phone Number</p><p className="font-bold text-slate-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" /></p></div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Email Address</p><p className="font-bold text-slate-900"><EmailLink value={selectedCustomer.email} fallback="Not provided" /></p></div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Full Property Address</p><p className="font-bold text-slate-900">{selectedCustomer.propertyAddress || "Not provided"}</p></div>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-black uppercase text-slate-500">Full Property Address</p><p className="font-bold text-slate-900"><AddressLink value={selectedCustomer.propertyAddress} fallback="Not provided" /></p></div>
                       </section>
                       <section className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Roof details</p><p className="mt-2 font-bold text-slate-900">{selectedCustomer.roofDetails || "Not provided"}</p></div>
@@ -707,7 +707,7 @@ export default function CustomersPage() {
                       <button type="button" key={proposal.id} onClick={() => openEstimate(proposal.id)} className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
                         <div className="min-w-0">
                           <p className="font-black text-slate-900">{proposal.title || proposal.scope || "Estimate"}</p>
-                          <p className="truncate text-sm font-bold text-slate-500">{proposal.address || selectedCustomer.propertyAddress}</p>
+                          <p className="truncate text-sm font-bold text-slate-500"><AddressLink value={proposal.address || selectedCustomer.propertyAddress} /></p>
                         </div>
                         <div className="shrink-0 text-right">
                           <p className="font-black text-[#07183f]">${(proposal.total || 0).toLocaleString()}</p>
@@ -730,7 +730,7 @@ export default function CustomersPage() {
                       <button type="button" key={invoice.id} onClick={() => openInvoice(invoice.id)} className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
                         <div className="min-w-0">
                           <p className="font-black text-slate-900">{invoice.invoiceNumber || `Invoice ${invoice.id}`}</p>
-                          <p className="truncate text-sm font-bold text-slate-500">{invoice.propertyAddress || selectedCustomer.propertyAddress}</p>
+                          <p className="truncate text-sm font-bold text-slate-500"><AddressLink value={invoice.propertyAddress || selectedCustomer.propertyAddress} /></p>
                         </div>
                         <div className="shrink-0 text-right">
                           <p className="font-black text-[#07183f]">${invoiceTotal(invoice).toLocaleString()}</p>
