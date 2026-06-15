@@ -239,9 +239,9 @@ function writeCustomerNote(id: string, note: string) {
 function statusTone(status?: string) {
   const value = normalizeText(status);
   if (!value) return "bg-slate-100 text-slate-600";
-  if (["paid", "won", "complete", "completed"].some((token) => value.includes(token))) return "bg-emerald-100 text-emerald-700";
+  if (["paid", "won", "complete", "completed"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
   if (["progress", "active", "scheduled"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
-  if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-rose-100 text-rose-700";
+  if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-orange-100 text-orange-700";
   if (value.includes("new")) return "bg-orange-100 text-orange-700";
   return "bg-slate-100 text-slate-600";
 }
@@ -587,7 +587,7 @@ export default function CustomersPage() {
       </div>
 
       {customersError && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
           {customersError}
         </div>
       )}
@@ -662,7 +662,7 @@ export default function CustomersPage() {
                 <div className="flex gap-2">
                   <button type="button" onClick={() => handleEditCustomer(selectedCustomer)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100"><Edit3 className="h-5 w-5" /></button>
                   {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
-                    <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-5 w-5" /></button>
+                    <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-orange-200 p-2 text-orange-500 hover:bg-orange-50"><Trash2 className="h-5 w-5" /></button>
                   )}
                   <button type="button" onClick={closeCustomerCard} className="pointer-events-auto relative rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
@@ -806,7 +806,7 @@ export default function CustomersPage() {
                   <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows={6} className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none" placeholder="Add internal notes about this customer..." />
                   <div className="mt-3 flex items-center gap-2">
                     <button type="button" onClick={() => handleSaveNote(selectedCustomer.id)} className="rounded-xl bg-[#0A3D91] px-4 py-2 text-sm font-bold text-white">Save note</button>
-                    {customerNotes[selectedCustomer.id] && noteDraft === customerNotes[selectedCustomer.id] && <span className="text-xs font-bold text-emerald-600">Saved</span>}
+                    {customerNotes[selectedCustomer.id] && noteDraft === customerNotes[selectedCustomer.id] && <span className="text-xs font-bold text-blue-600">Saved</span>}
                   </div>
                 </section>
               )}

@@ -197,11 +197,11 @@ export default function PaymentsPage() {
       </div>
 
       {/* Total banner */}
-      <div className={`rounded-2xl p-4 text-center ${tab === "paid" ? "bg-emerald-50" : "bg-amber-50"}`}>
+      <div className={`rounded-2xl p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
           {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
         </p>
-        <p className={`mt-1 text-3xl font-black ${tab === "paid" ? "text-emerald-700" : "text-amber-700"}`}>
+        <p className={`mt-1 text-3xl font-black ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
           {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
         </p>
       </div>
@@ -254,7 +254,7 @@ export default function PaymentsPage() {
                     {tab === "paid" ? (
                       <>
                         <span>Paid {formatDate(dateStr)}</span>
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        <Check className="h-3.5 w-3.5 text-blue-500" />
                       </>
                     ) : (
                       <span>{dateStr ? `Due ${formatDate(dateStr)}` : "No due date"}</span>

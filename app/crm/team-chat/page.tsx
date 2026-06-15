@@ -291,7 +291,7 @@ export default function TeamChatPage() {
         </div>
 
         {error && (
-          <div className="border-t border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700">{error}</div>
+          <div className="border-t border-orange-100 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700">{error}</div>
         )}
 
         <form onSubmit={sendMessage} className="shrink-0 space-y-3 border-t border-slate-100 bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:p-4">

@@ -160,8 +160,8 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 </span>
               </label>
             )}
-            {error && <div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-            {message && <div className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">{message}</div>}
+            {error && <div className="rounded-2xl bg-orange-50 p-3 text-sm text-orange-700">{error}</div>}
+            {message && <div className="rounded-2xl bg-blue-50 p-3 text-sm text-blue-700">{message}</div>}
             <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#f97316] px-5 py-3 font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-[#ea580c] disabled:opacity-60">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {copy[mode].cta}

@@ -58,14 +58,14 @@ const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Door 
 const SOURCE_COLORS: Record<string, string> = {
   AZR:           "bg-orange-100 text-orange-700",
   Google:        "bg-blue-100 text-blue-700",
-  Facebook:      "bg-indigo-100 text-indigo-700",
+  Facebook:      "bg-blue-100 text-blue-700",
   Website:       "bg-sky-100 text-sky-700",
-  Referral:      "bg-emerald-100 text-emerald-700",
-  "Door Knocking": "bg-amber-100 text-amber-700",
-  Yelp:          "bg-red-100 text-red-700",
+  Referral:      "bg-blue-100 text-blue-700",
+  "Door Knocking": "bg-orange-100 text-orange-700",
+  Yelp:          "bg-orange-100 text-orange-700",
   Angi:          "bg-orange-100 text-orange-800",
-  Thumbtack:     "bg-green-100 text-green-700",
-  "Phone Call":  "bg-purple-100 text-purple-700",
+  Thumbtack:     "bg-blue-100 text-blue-700",
+  "Phone Call":  "bg-blue-100 text-blue-700",
   Other:         "bg-slate-100 text-slate-600",
 };
 
@@ -74,13 +74,13 @@ function getSourceColor(source: string) {
 }
 
 function getUrgency(job: Lead) {
-  if (!job.dueDate || job.stage === "completed" || job.stage === "paid") return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
+  if (!job.dueDate || job.stage === "completed" || job.stage === "paid") return { label: "On Track", className: "border-l-blue-500", dot: "bg-blue-500", text: "text-blue-700" };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(`${job.dueDate}T00:00:00`);
   const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86400000);
-  if (diffDays >= 0 && diffDays <= 3) return { label: "Due Soon", className: "border-l-yellow-400", dot: "bg-yellow-400", text: "text-yellow-700" };
-  return { label: "On Track", className: "border-l-emerald-500", dot: "bg-emerald-500", text: "text-emerald-700" };
+  if (diffDays >= 0 && diffDays <= 3) return { label: "Due Soon", className: "border-l-orange-400", dot: "bg-orange-400", text: "text-orange-700" };
+  return { label: "On Track", className: "border-l-blue-500", dot: "bg-blue-500", text: "text-blue-700" };
 }
 
 function parseCallNotes(text: string): Partial<{
@@ -367,14 +367,14 @@ export default function LeadsPage() {
     const currentYear = now.getFullYear();
 
     return [
-      { label: "Due Soon", value: filteredJobs.filter((job) => getUrgency(job).label === "Due Soon").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
-      { label: "Waiting Approval", value: filteredJobs.filter((job) => job.stage === "waiting_approval").length, tone: "text-yellow-700 bg-yellow-50 border-yellow-100" },
+      { label: "Due Soon", value: filteredJobs.filter((job) => getUrgency(job).label === "Due Soon").length, tone: "text-orange-700 bg-orange-50 border-orange-100" },
+      { label: "Waiting Approval", value: filteredJobs.filter((job) => job.stage === "waiting_approval").length, tone: "text-orange-700 bg-orange-50 border-orange-100" },
       { label: "Scheduled This Week", value: filteredJobs.filter((job) => {
         if (!job.dueDate || job.stage !== "scheduled") return false;
         const due = new Date(`${job.dueDate}T00:00:00`);
         return due >= now && due <= weekEnd;
       }).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
-      { label: "Active Jobs", value: filteredJobs.filter((job) => !["completed", "paid"].includes(job.stage)).length, tone: "text-emerald-700 bg-emerald-50 border-emerald-100" },
+      { label: "Active Jobs", value: filteredJobs.filter((job) => !["completed", "paid"].includes(job.stage)).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
       { label: "Completed This Month", value: filteredJobs.filter((job) => {
         if (!["completed", "paid"].includes(job.stage)) return false;
         const dateStr = (job as Lead & { originalDueDate?: string }).originalDueDate;
@@ -633,7 +633,7 @@ export default function LeadsPage() {
                 <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-orange-600"><User className="h-3.5 w-3.5" />Customer Info</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1">
-                    <span className="text-xs font-bold text-slate-500">Full Name <span className="text-red-400">*</span></span>
+                    <span className="text-xs font-bold text-slate-500">Full Name <span className="text-orange-400">*</span></span>
                     <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. John Smith" />
                   </label>
                   <label className="grid gap-1">
@@ -658,7 +658,7 @@ export default function LeadsPage() {
                 <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-orange-600"><Home className="h-3.5 w-3.5" />Property & Job</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1 sm:col-span-2">
-                    <span className="text-xs font-bold text-slate-500">Property Address <span className="text-red-400">*</span></span>
+                    <span className="text-xs font-bold text-slate-500">Property Address <span className="text-orange-400">*</span></span>
                     <AddressAutocomplete
                       value={form.address}
                       onChange={(address) => setForm({ ...form, address })}
@@ -780,7 +780,7 @@ export default function LeadsPage() {
                           <p className="mt-0.5 truncate text-xs font-bold text-slate-500">{job.city}, AZ</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-orange-50 hover:text-orange-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
                           <GripVertical className="h-4 w-4 text-slate-300" />
                         </div>
                       </div>
@@ -810,7 +810,7 @@ export default function LeadsPage() {
                       <div className="mt-2 flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-600"><Camera className="h-3 w-3" />B</span>
                         <span className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-1.5 py-0.5 text-[10px] font-black text-orange-600"><Camera className="h-3 w-3" />P</span>
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-600"><Camera className="h-3 w-3" />A</span>
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-600"><Camera className="h-3 w-3" />A</span>
                         <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-500"><ListChecks className="h-3 w-3" />Checklist</span>
                       </div>
                     </button>
@@ -836,7 +836,7 @@ export default function LeadsPage() {
                   <p className="text-sm font-bold text-slate-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 transition hover:bg-orange-100"><Trash2 className="h-4 w-4" />Delete Job</button>
                   <button type="button" onClick={closeJobCard} className="pointer-events-auto relative rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>
@@ -849,7 +849,7 @@ export default function LeadsPage() {
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Phone
                   <div className="flex items-center gap-1">
                     <input value={selectedJob.phone} onChange={(event) => updateJob(selectedJob.id, { phone: event.target.value })} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" />
-                    {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white hover:bg-emerald-600"><Phone className="h-4 w-4" /></a>}
+                    {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></a>}
                   </div>
                 </label>
                 <label className="grid gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Email
@@ -879,13 +879,13 @@ export default function LeadsPage() {
               </div>
 
               <div className="space-y-3">
-                {fileError && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{fileError}</p>}
+                {fileError && <p className="rounded-xl bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">{fileError}</p>}
 
                 {/* Photo Checklist */}
                 <div className="rounded-2xl border border-slate-200 bg-white">
                   <button type="button" onClick={() => setChecklistOpen((v) => !v)} className="flex w-full items-center justify-between p-4">
                     <div className="flex items-center gap-2 text-sm font-black text-[#0A3D91]"><ListChecks className="h-4 w-4 text-orange-500" />Photo Checklist</div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-black ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-black ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
                   </button>
                   {checklistOpen && (
                     <div className="border-t border-slate-100 px-4 pb-4">
@@ -894,8 +894,8 @@ export default function LeadsPage() {
                         {PHOTO_CHECKLIST_ITEMS.map((item) => (
                           <li key={item}>
                             <button type="button" onClick={() => setPhotoChecklist((prev) => ({ ...prev, [item]: !prev[item] }))} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-sm transition hover:bg-slate-50">
-                              {photoChecklist[item] ? <CheckSquare className="h-5 w-5 shrink-0 text-emerald-500" /> : <Square className="h-5 w-5 shrink-0 text-slate-300" />}
-                              <span className={photoChecklist[item] ? "font-bold text-emerald-700 line-through" : "font-semibold text-slate-700"}>{item}</span>
+                              {photoChecklist[item] ? <CheckSquare className="h-5 w-5 shrink-0 text-blue-500" /> : <Square className="h-5 w-5 shrink-0 text-slate-300" />}
+                              <span className={photoChecklist[item] ? "font-bold text-blue-700 line-through" : "font-semibold text-slate-700"}>{item}</span>
                             </button>
                           </li>
                         ))}
@@ -911,7 +911,7 @@ export default function LeadsPage() {
                     {([
                       { type: "Before" as const, photos: beforePhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
                       { type: "Progress" as const, photos: progressPhotos, color: "bg-orange-500 hover:bg-orange-600", badge: "bg-orange-100 text-orange-700" },
-                      { type: "After" as const, photos: afterPhotos, color: "bg-emerald-600 hover:bg-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+                      { type: "After" as const, photos: afterPhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
                     ]).map(({ type, photos, color, badge }) => (
                       <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
                         <div className="flex items-center justify-between">
@@ -1028,7 +1028,7 @@ export default function LeadsPage() {
 
       {/* Live Camera Overlay */}
       {liveCamera && (() => {
-        const accentMap = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-emerald-600" } as const;
+        const accentMap = { Before: "bg-blue-600", Progress: "bg-orange-500", After: "bg-blue-600" } as const;
         const existingCount = jobFiles.filter((f) => f.photoType === liveCamera.type).length;
         return (
           <LiveCameraCapture

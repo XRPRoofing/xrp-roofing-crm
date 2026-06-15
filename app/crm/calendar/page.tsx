@@ -403,12 +403,12 @@ export default function CalendarPage() {
             <p className="flex items-center font-semibold text-slate-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking Google Calendar...</p>
           )}
           {!loading && connected && (
-            <p className="font-bold text-emerald-700">Google Calendar connected. Showing your next {events.length} upcoming events.</p>
+            <p className="font-bold text-blue-700">Google Calendar connected. Showing your next {events.length} upcoming events.</p>
           )}
           {!loading && !connected && (
             <p className="font-bold text-slate-700">Google Calendar is not connected yet. Click Connect Google to authorize access.</p>
           )}
-          {error && <p className="mt-2 font-semibold text-red-600">{error}</p>}
+          {error && <p className="mt-2 font-semibold text-orange-600">{error}</p>}
           {statusMessage && <p className="mt-2 font-semibold text-orange-700">{statusMessage}</p>}
         </div>
       </div>
@@ -526,7 +526,7 @@ export default function CalendarPage() {
                     <div className="mt-3 flex items-center gap-2">
                       <button type="button" onClick={() => setSelectedEvent(event)} className="flex-1 rounded-xl bg-orange-500 px-3 py-2 text-xs font-black text-white transition hover:bg-orange-600">Open</button>
                       {tel && (
-                        <a href={tel} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600">
+                        <a href={tel} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600">
                           <Phone className="h-4 w-4" />
                         </a>
                       )}
@@ -617,7 +617,7 @@ export default function CalendarPage() {
                 )}
               </div>
               {tel && (
-                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600">
+                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-500 px-3 py-2 text-sm font-bold text-white hover:bg-blue-600">
                   <Phone className="h-4 w-4" />{phone}
                 </a>
               )}
@@ -672,7 +672,7 @@ export default function CalendarPage() {
                     <div className="flex items-center gap-2">
                       <input type="tel" inputMode="tel" value={eventForm.phone} onChange={(event) => setEventForm({ ...eventForm, phone: event.target.value })} className="flex-1 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Phone number" />
                       {telHref(eventForm.phone) && (
-                        <a href={telHref(eventForm.phone)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 font-bold text-white hover:bg-emerald-600">
+                        <a href={telHref(eventForm.phone)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-bold text-white hover:bg-blue-600">
                           <Phone className="h-4 w-4" />Call
                         </a>
                       )}

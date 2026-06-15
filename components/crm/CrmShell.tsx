@@ -456,7 +456,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <p className="mt-2 text-xl font-black">{globalIncomingCall.name}</p>
           <p className="mt-1 text-sm font-bold text-slate-600"><PhoneLink value={globalIncomingCall.phone} /></p>
           <div className="mt-4 flex gap-2">
-            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700">Answer</button>
+            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-blue-700">Answer</button>
             <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
           </div>
         </div>
@@ -500,8 +500,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <button onClick={() => { logout(); setOpen(false); }} className="relative mx-4 mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-red-300 transition hover:bg-white/10 hover:text-red-200">
-          <span className="rounded-xl bg-white/10 p-2 text-red-300"><LogOut className="h-4 w-4" /></span>
+        <button onClick={() => { logout(); setOpen(false); }} className="relative mx-4 mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-orange-300 transition hover:bg-white/10 hover:text-orange-200">
+          <span className="rounded-xl bg-white/10 p-2 text-orange-300"><LogOut className="h-4 w-4" /></span>
           Logout
         </button>
         <div className="relative mx-4 mb-6 mt-2 rounded-3xl bg-white/10 p-4 text-sm text-blue-100 ring-1 ring-white/10 backdrop-blur">
@@ -520,7 +520,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0 flex-1 lg:hidden">
               <div className="flex items-center gap-2">
                 <p className="truncate text-xs font-black uppercase tracking-[0.18em] text-orange-600">XRP CRM App</p>
-                <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncActive ? "bg-emerald-500 animate-pulse" : "bg-emerald-400/60"}`} title={syncActive ? "Syncing" : "Live"} />
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncActive ? "bg-blue-500 animate-pulse" : "bg-blue-400/60"}`} title={syncActive ? "Syncing" : "Live"} />
               </div>
               <p className="truncate text-sm font-black text-[#0A3D91]">{activeModule?.label || "Dashboard"}</p>
             </div>
@@ -585,7 +585,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{notification.message}</p>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
-                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-red-600 hover:bg-red-50">Delete</button>
+                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-orange-600 hover:bg-orange-50">Delete</button>
                           </div>
                         </div>
                       ))}
@@ -595,8 +595,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             )}
-            <div className="hidden items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-400/15 px-3 py-2 text-xs font-black text-emerald-100 xl:flex" title="Real-time sync active across all devices">
-              <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-emerald-400 animate-pulse" : "bg-emerald-400/60"}`} />
+            <div className="hidden items-center gap-2 rounded-2xl border border-blue-300/40 bg-blue-400/15 px-3 py-2 text-xs font-black text-blue-100 xl:flex" title="Real-time sync active across all devices">
+              <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-blue-400 animate-pulse" : "bg-blue-400/60"}`} />
               <span>{syncActive ? "Syncing" : "Live"}</span>
             </div>
             <button onClick={logout} className="hidden items-center gap-2 rounded-2xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-600 sm:flex">
@@ -666,7 +666,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           <Link href="/crm/team-chat" className="fixed bottom-24 right-5 z-40 flex items-center gap-3 rounded-full bg-[#0A3D91] px-4 py-3 text-sm font-black text-white shadow-2xl shadow-blue-950/30 ring-4 ring-white/80 transition hover:-translate-y-0.5 hover:bg-blue-800 lg:bottom-8">
             <span className="relative rounded-full bg-orange-500 p-2">
               <MessageCircle className="h-5 w-5" />
-              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
+              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
             </span>
             <span className="hidden sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
           </Link>
