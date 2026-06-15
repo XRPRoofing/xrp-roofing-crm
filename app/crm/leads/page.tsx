@@ -205,9 +205,8 @@ export default function LeadsPage() {
     if (jobCardHistoryRef.current) {
       jobCardHistoryRef.current = false;
       window.history.back();
-    } else {
-      setSelectedJobId(null);
     }
+    setSelectedJobId(null);
   }, []);
 
   function openJobCard(jobId: string) {

@@ -567,9 +567,8 @@ export default function InvoicesPage() {
     if (invoiceCardHistoryRef.current) {
       invoiceCardHistoryRef.current = false;
       window.history.back();
-    } else {
-      setSelectedInvoiceId(null);
     }
+    setSelectedInvoiceId(null);
   }, []);
 
   function pushInvoiceHistory() {

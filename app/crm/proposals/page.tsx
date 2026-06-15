@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
@@ -410,7 +410,27 @@ export default function ProposalsPage() {
   const [proposalFilter, setProposalFilter] = useState<"all" | "drafts">("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeProposal, setActiveProposal] = useState<Proposal | null>(null);
+  const proposalCardHistoryRef = useRef(false);
   const proposalSearchParams = useSearchParams();
+
+  const closeProposalCard = useCallback(() => {
+    if (proposalCardHistoryRef.current) {
+      proposalCardHistoryRef.current = false;
+      window.history.back();
+    }
+    setActiveProposal(null);
+  }, []);
+
+  useEffect(() => {
+    function handlePopState() {
+      if (proposalCardHistoryRef.current) {
+        proposalCardHistoryRef.current = false;
+        setActiveProposal(null);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
   const [deletedProposal, setDeletedProposal] = useState<Proposal | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
@@ -627,7 +647,11 @@ export default function ProposalsPage() {
     const proposalId = proposalSearchParams.get("proposal");
     if (proposalId && proposals.length > 0 && !activeProposal) {
       const match = proposals.find((p) => p.id === proposalId && !p.deletedAt);
-      if (match) setActiveProposal(match);
+      if (match) {
+        setActiveProposal(match);
+        window.history.pushState({ proposalCardOpen: true }, "");
+        proposalCardHistoryRef.current = true;
+      }
     }
   }, [proposalSearchParams, proposals, activeProposal]);
 
@@ -880,6 +904,8 @@ export default function ProposalsPage() {
     setIsPreviewing(false);
     setActiveSection("Estimate");
     setActiveProposal(proposal);
+    window.history.pushState({ proposalCardOpen: true }, "");
+    proposalCardHistoryRef.current = true;
 
     if (!proposal.brochures?.length && proposalSyncEnabled()) {
       fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`)
@@ -1051,6 +1077,7 @@ export default function ProposalsPage() {
     setDeletedProposal(trashedProposal);
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
     if (activeProposal?.id === proposal.id) {
+      if (proposalCardHistoryRef.current) { proposalCardHistoryRef.current = false; window.history.back(); }
       setActiveProposal(null);
     }
   }
@@ -1180,7 +1207,7 @@ export default function ProposalsPage() {
         <div className="sticky top-16 z-30 border-b border-slate-200 bg-white shadow-sm lg:top-20 print:hidden">
           {/* Row 1 — back + address */}
           <div className="flex h-10 items-center justify-between px-4">
-            <button type="button" onClick={() => setActiveProposal(null)} className="text-sm font-bold text-blue-700">← Back to proposals</button>
+            <button type="button" onClick={closeProposalCard} className="text-sm font-bold text-blue-700">← Back to proposals</button>
             <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
           </div>
           {/* Row 2 — action buttons, scrollable on mobile */}
