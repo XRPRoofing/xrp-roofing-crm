@@ -583,9 +583,16 @@ export default function InvoicesPage() {
         setSelectedInvoiceId(null);
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeInvoiceCard();
+    }
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeInvoiceCard]);
 
   // Auto-select an invoice when navigated from global search with ?invoice=<id>
   useEffect(() => {

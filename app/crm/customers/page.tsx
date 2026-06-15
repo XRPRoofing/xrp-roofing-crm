@@ -358,9 +358,16 @@ export default function CustomersPage() {
         setSelectedCustomerId(null);
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeCustomerCard();
+    }
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeCustomerCard]);
 
   const filteredCustomers = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -636,7 +643,7 @@ export default function CustomersPage() {
       </div>
 
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
+        <div className="fixed inset-0 z-[60] flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
               <div className="flex items-start justify-between gap-4 p-5 pb-3">
@@ -653,7 +660,7 @@ export default function CustomersPage() {
                   {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
                     <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-xl border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="h-5 w-5" /></button>
                   )}
-                  <button type="button" onClick={closeCustomerCard} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                  <button type="button" onClick={closeCustomerCard} className="pointer-events-auto relative rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>
               <div className="flex gap-1 overflow-x-auto px-3">
