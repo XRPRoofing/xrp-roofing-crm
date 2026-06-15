@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
@@ -259,6 +259,7 @@ export default function CustomersPage() {
   // /api/customers) — never seeded/demo customers derived from jobs.
   const customerList = savedCustomers;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -354,6 +355,18 @@ export default function CustomersPage() {
       ].some((value) => normalizeText(value).includes(query));
     });
   }, [customerList, jobList, search]);
+
+  // Auto-select a customer when navigated from global search with ?customer=<id>
+  useEffect(() => {
+    const customerId = searchParams.get("customer");
+    if (customerId && customerList.length > 0 && !selectedCustomerId) {
+      const match = customerList.find((c) => c.id === customerId);
+      if (match) {
+        setSelectedCustomerId(match.id);
+        setActiveTab("Contact Info");
+      }
+    }
+  }, [searchParams, customerList, selectedCustomerId]);
 
   // Estimates (proposals), invoices, and per-customer notes power the profile
   // tabs. They are re-read on mount, on window focus, and on cross-tab storage

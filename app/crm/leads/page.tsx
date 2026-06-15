@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
@@ -160,6 +160,7 @@ export default function LeadsPage() {
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showCallPaste, setShowCallPaste] = useState(false);
   const [callPasteText, setCallPasteText] = useState("");
   const [form, setForm] = useState({
@@ -198,6 +199,15 @@ export default function LeadsPage() {
   const afterPhotos = jobFiles.filter((f) => f.photoType === "After");
   const otherPhotos = jobFiles.filter((f) => f.photoType === "Job Photo");
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
+
+  // Auto-select a job when navigated from global search with ?job=<id>
+  useEffect(() => {
+    const jobId = searchParams.get("job");
+    if (jobId && jobs.length > 0 && !selectedJobId) {
+      const match = jobs.find((j) => j.id === jobId);
+      if (match) setSelectedJobId(match.id);
+    }
+  }, [searchParams, jobs, selectedJobId]);
 
   // Resolve the current user's display name for note attribution.
   useEffect(() => {
