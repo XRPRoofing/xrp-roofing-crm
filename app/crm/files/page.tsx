@@ -178,7 +178,7 @@ function NewFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated
             <span className="text-xs font-black uppercase tracking-wide text-slate-500">Work type (optional)</span>
             <input value={workType} onChange={(event) => setWorkType(event.target.value)} placeholder="e.g. Repair, Inspection" className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
           </label>
-          {error && <p className="text-sm font-bold text-red-600">{error}</p>}
+          {error && <p className="text-sm font-bold text-orange-600">{error}</p>}
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-2">

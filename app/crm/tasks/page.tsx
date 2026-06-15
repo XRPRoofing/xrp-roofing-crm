@@ -151,7 +151,7 @@ export default function TasksPage() {
           <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
           <h1 className="mt-1 text-2xl font-black text-[#0A3D91] sm:text-3xl">Task Board</h1>
           <div className="mt-1 flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : "bg-emerald-500"}`} />
+            <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
             <p className="text-xs font-semibold text-slate-500">
               {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${lastSync.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
             </p>
@@ -173,14 +173,14 @@ export default function TasksPage() {
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
         <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
         <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
-        <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-purple-50 border-purple-300" />
-        <MetricCard label="For Invoice" value={metrics.forInvoice}  active={filterStatus === "For Invoice"}           onClick={() => setFilterStatus(filterStatus === "For Invoice" ? null : "For Invoice")}           color="bg-amber-50 border-amber-300" />
+        <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
+        <MetricCard label="For Invoice" value={metrics.forInvoice}  active={filterStatus === "For Invoice"}           onClick={() => setFilterStatus(filterStatus === "For Invoice" ? null : "For Invoice")}           color="bg-orange-50 border-orange-300" />
         <MetricCard label="Inv. Sent"   value={metrics.invoiceSent} active={filterStatus === "Invoice Sent"}          onClick={() => setFilterStatus(filterStatus === "Invoice Sent" ? null : "Invoice Sent")}          color="bg-sky-50 border-sky-300" />
-        <MetricCard label="Follow Up"   value={metrics.followUp}    active={filterStatus === "Invoice Follow Up"}     onClick={() => setFilterStatus(filterStatus === "Invoice Follow Up" ? null : "Invoice Follow Up")}     color="bg-yellow-50 border-yellow-300" />
-        <MetricCard label="Paid"         value={metrics.paid}        active={filterStatus === "Paid"}                  onClick={() => setFilterStatus(filterStatus === "Paid" ? null : "Paid")}                  color="bg-emerald-50 border-emerald-300" />
-        <MetricCard label="Rev. Reqs"   value={metrics.reviewReqs}  active={filterStatus === "Review Request"}        onClick={() => setFilterStatus(filterStatus === "Review Request" ? null : "Review Request")}        color="bg-indigo-50 border-indigo-300" />
-        <MetricCard label="Reviews"     value={metrics.reviewRcvd}  active={filterStatus === "Review Received"}       onClick={() => setFilterStatus(filterStatus === "Review Received" ? null : "Review Received")}       color="bg-green-50 border-green-300" />
-        <MetricCard label="Unsatisfied" value={metrics.unsatisfied} active={false}                                    onClick={() => {}}                                                                                  color="bg-red-50 border-red-300" />
+        <MetricCard label="Follow Up"   value={metrics.followUp}    active={filterStatus === "Invoice Follow Up"}     onClick={() => setFilterStatus(filterStatus === "Invoice Follow Up" ? null : "Invoice Follow Up")}     color="bg-orange-50 border-orange-300" />
+        <MetricCard label="Paid"         value={metrics.paid}        active={filterStatus === "Paid"}                  onClick={() => setFilterStatus(filterStatus === "Paid" ? null : "Paid")}                  color="bg-blue-50 border-blue-300" />
+        <MetricCard label="Rev. Reqs"   value={metrics.reviewReqs}  active={filterStatus === "Review Request"}        onClick={() => setFilterStatus(filterStatus === "Review Request" ? null : "Review Request")}        color="bg-blue-50 border-blue-300" />
+        <MetricCard label="Reviews"     value={metrics.reviewRcvd}  active={filterStatus === "Review Received"}       onClick={() => setFilterStatus(filterStatus === "Review Received" ? null : "Review Received")}       color="bg-blue-50 border-blue-300" />
+        <MetricCard label="Unsatisfied" value={metrics.unsatisfied} active={false}                                    onClick={() => {}}                                                                                  color="bg-orange-50 border-orange-300" />
         <MetricCard label="Closed"      value={metrics.closed}      active={filterStatus === "Closed"}                onClick={() => setFilterStatus(filterStatus === "Closed" ? null : "Closed")}                color="bg-slate-100 border-slate-300" />
       </div>
 
@@ -201,7 +201,7 @@ export default function TasksPage() {
                 <div className="flex items-center gap-2.5">
                   <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
                   <span className={`text-sm font-black ${c.text}`}>{status}</span>
-                  {hasAlert && <span className="h-2 w-2 rounded-full bg-red-500" />}
+                  {hasAlert && <span className="h-2 w-2 rounded-full bg-orange-500" />}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-black ${c.bg} ${c.text}`}>{colTasks.length}</span>
@@ -227,23 +227,23 @@ export default function TasksPage() {
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteTask(task); }} className="hidden rounded-lg p-1 text-slate-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete task"><Trash2 className="h-3.5 w-3.5" /></button>
-                          <span className="text-sm font-black text-emerald-700">{task.invoiceAmount}</span>
+                          <span className="text-sm font-black text-blue-700">{task.invoiceAmount}</span>
                         </div>
                       </div>
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-xs text-slate-400">{task.assignedUser}</span>
                         <div className="flex items-center gap-1.5">
-                          {task.satisfactionResult === "yes" && <ThumbsUp className="h-3.5 w-3.5 text-emerald-500" />}
-                          {task.satisfactionResult === "no" && <ThumbsDown className="h-3.5 w-3.5 text-red-500" />}
-                          {task.reviewSubmitted && <Star className="h-3.5 w-3.5 text-yellow-500" />}
+                          {task.satisfactionResult === "yes" && <ThumbsUp className="h-3.5 w-3.5 text-blue-500" />}
+                          {task.satisfactionResult === "no" && <ThumbsDown className="h-3.5 w-3.5 text-orange-500" />}
+                          {task.reviewSubmitted && <Star className="h-3.5 w-3.5 text-orange-500" />}
                           {task.invoiceNumber && <span className="text-[10px] font-bold text-slate-400">#{task.invoiceNumber}</span>}
                         </div>
                       </div>
                       {status === "Customer Satisfaction" && !task.satisfactionChecked && (
-                        <div className="mt-2 rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700">⚡ Satisfaction check needed</div>
+                        <div className="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">⚡ Satisfaction check needed</div>
                       )}
                       {status === "Review Request" && !task.reviewRequestSentAt && (
-                        <div className="mt-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700">⚡ Review request not sent yet</div>
+                        <div className="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">⚡ Review request not sent yet</div>
                       )}
                     </button>
                   ))}
@@ -293,10 +293,10 @@ export default function TasksPage() {
                       <button type="button" onClick={(e) => { e.stopPropagation(); deleteTask(task); }} className="hidden shrink-0 rounded-lg p-0.5 text-slate-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete task"><Trash2 className="h-3 w-3" /></button>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black text-emerald-700">{task.invoiceAmount}</span>
-                      {task.satisfactionResult === "yes" && <ThumbsUp className="h-3 w-3 text-emerald-500" />}
-                      {task.satisfactionResult === "no" && <ThumbsDown className="h-3 w-3 text-red-500" />}
-                      {task.reviewSubmitted && <Star className="h-3 w-3 text-yellow-500" />}
+                      <span className="text-[10px] font-black text-blue-700">{task.invoiceAmount}</span>
+                      {task.satisfactionResult === "yes" && <ThumbsUp className="h-3 w-3 text-blue-500" />}
+                      {task.satisfactionResult === "no" && <ThumbsDown className="h-3 w-3 text-orange-500" />}
+                      {task.reviewSubmitted && <Star className="h-3 w-3 text-orange-500" />}
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-1">
                       <span className="truncate text-[10px] text-slate-400">{task.assignedUser}</span>
@@ -304,12 +304,12 @@ export default function TasksPage() {
                     </div>
                     {/* Quick actions */}
                     {status === "Customer Satisfaction" && !task.satisfactionChecked && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); openSatModal(task); }} className="mt-2 w-full rounded-lg bg-teal-600 py-1 text-[10px] font-black text-white hover:bg-teal-700">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); openSatModal(task); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-black text-white hover:bg-blue-700">
                         <CheckSquare className="mr-1 inline h-3 w-3" />Satisfaction Check
                       </button>
                     )}
                     {status === "Review Request" && !task.reviewRequestSentAt && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-indigo-600 py-1 text-[10px] font-black text-white hover:bg-indigo-700">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-black text-white hover:bg-blue-700">
                         <Zap className="mr-1 inline h-3 w-3" />Send Review Request
                       </button>
                     )}
@@ -359,9 +359,9 @@ export default function TasksPage() {
 
             {/* Satisfaction */}
             {selectedTask.satisfactionChecked && (
-              <div className={`mt-4 rounded-2xl p-3 ${selectedTask.satisfactionResult === "yes" ? "bg-emerald-50" : "bg-red-50"}`}>
+              <div className={`mt-4 rounded-2xl p-3 ${selectedTask.satisfactionResult === "yes" ? "bg-blue-50" : "bg-orange-50"}`}>
                 <p className="text-xs font-black text-slate-700">Customer Satisfaction</p>
-                <p className={`mt-1 text-sm font-black ${selectedTask.satisfactionResult === "yes" ? "text-emerald-700" : "text-red-700"}`}>
+                <p className={`mt-1 text-sm font-black ${selectedTask.satisfactionResult === "yes" ? "text-blue-700" : "text-orange-700"}`}>
                   {selectedTask.satisfactionResult === "yes" ? "✓ Satisfied" : "✗ Not Satisfied"}
                 </p>
                 {selectedTask.satisfactionNotes && <p className="mt-1 text-xs text-slate-600">{selectedTask.satisfactionNotes}</p>}
@@ -370,13 +370,13 @@ export default function TasksPage() {
 
             {/* Review tracking */}
             {selectedTask.reviewRequestSentAt && (
-              <div className="mt-4 rounded-2xl bg-indigo-50 p-3">
-                <p className="text-xs font-black text-indigo-700">Review Request Sent</p>
-                <p className="mt-0.5 text-[11px] text-indigo-600">{fmt(selectedTask.reviewRequestSentAt)}</p>
+              <div className="mt-4 rounded-2xl bg-blue-50 p-3">
+                <p className="text-xs font-black text-blue-700">Review Request Sent</p>
+                <p className="mt-0.5 text-[11px] text-blue-600">{fmt(selectedTask.reviewRequestSentAt)}</p>
                 <div className="mt-1 flex gap-2 text-[10px] font-bold">
-                  {selectedTask.reviewSmsSent && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-700">SMS ✓</span>}
-                  {selectedTask.reviewEmailSent && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-700">Email ✓</span>}
-                  {selectedTask.reviewSubmitted && <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700">Review Received ✓</span>}
+                  {selectedTask.reviewSmsSent && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">SMS ✓</span>}
+                  {selectedTask.reviewEmailSent && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Email ✓</span>}
+                  {selectedTask.reviewSubmitted && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Review Received ✓</span>}
                 </div>
               </div>
             )}
@@ -396,21 +396,21 @@ export default function TasksPage() {
 
             {/* Satisfaction CTA */}
             {selectedTask.status === "Customer Satisfaction" && !selectedTask.satisfactionChecked && (
-              <button type="button" onClick={() => openSatModal(selectedTask)} className="mt-4 w-full rounded-2xl bg-teal-600 py-3 text-sm font-black text-white hover:bg-teal-700">
+              <button type="button" onClick={() => openSatModal(selectedTask)} className="mt-4 w-full rounded-2xl bg-blue-600 py-3 text-sm font-black text-white hover:bg-blue-700">
                 <CheckSquare className="mr-2 inline h-4 w-4" />Run Satisfaction Check
               </button>
             )}
 
             {/* Review request CTA */}
             {selectedTask.status === "Review Request" && !selectedTask.reviewRequestSentAt && (
-              <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-2xl bg-indigo-600 py-3 text-sm font-black text-white hover:bg-indigo-700">
+              <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-2xl bg-blue-600 py-3 text-sm font-black text-white hover:bg-blue-700">
                 <Zap className="mr-2 inline h-4 w-4" />Send Review Request (SMS + Email)
               </button>
             )}
 
             {/* Review received CTA */}
             {selectedTask.status === "Review Request" && selectedTask.reviewRequestSentAt && !selectedTask.reviewSubmitted && (
-              <button type="button" onClick={() => { moveTask(selectedTask.id, "Review Received"); refresh(); setSelectedTask(null); }} className="mt-2 w-full rounded-2xl border border-green-300 bg-green-50 py-3 text-sm font-black text-green-700 hover:bg-green-100">
+              <button type="button" onClick={() => { moveTask(selectedTask.id, "Review Received"); refresh(); setSelectedTask(null); }} className="mt-2 w-full rounded-2xl border border-blue-300 bg-blue-50 py-3 text-sm font-black text-blue-700 hover:bg-blue-100">
                 <Star className="mr-2 inline h-4 w-4" />Mark Review Received
               </button>
             )}
@@ -458,23 +458,23 @@ export default function TasksPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setSatModal(null)}>
           <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-600">Customer Satisfaction Check</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Customer Satisfaction Check</p>
             <h2 className="mt-2 text-lg font-black text-[#0A3D91]">Was the customer satisfied?</h2>
             <p className="mt-1 text-sm font-semibold text-slate-500">{satModal.customerName} — {satModal.jobAddress}</p>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => setSatResult("yes")} className={`flex items-center justify-center gap-2 rounded-2xl border-2 py-4 text-sm font-black transition ${satResult === "yes" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-600 hover:border-emerald-300"}`}>
+              <button type="button" onClick={() => setSatResult("yes")} className={`flex items-center justify-center gap-2 rounded-2xl border-2 py-4 text-sm font-black transition ${satResult === "yes" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:border-blue-300"}`}>
                 <ThumbsUp className="h-5 w-5" /> Yes
               </button>
-              <button type="button" onClick={() => setSatResult("no")} className={`flex items-center justify-center gap-2 rounded-2xl border-2 py-4 text-sm font-black transition ${satResult === "no" ? "border-red-500 bg-red-50 text-red-700" : "border-slate-200 text-slate-600 hover:border-red-300"}`}>
+              <button type="button" onClick={() => setSatResult("no")} className={`flex items-center justify-center gap-2 rounded-2xl border-2 py-4 text-sm font-black transition ${satResult === "no" ? "border-orange-500 bg-orange-50 text-orange-700" : "border-slate-200 text-slate-600 hover:border-orange-300"}`}>
                 <ThumbsDown className="h-5 w-5" /> No
               </button>
             </div>
 
-            <textarea value={satNotes} onChange={(e) => setSatNotes(e.target.value)} placeholder="Optional notes..." rows={2} className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-teal-400" />
+            <textarea value={satNotes} onChange={(e) => setSatNotes(e.target.value)} placeholder="Optional notes..." rows={2} className="mt-4 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-400" />
 
             {satResult === "yes" && (
-              <div className="mt-3 rounded-2xl bg-indigo-50 p-3 text-xs font-semibold text-indigo-700">
+              <div className="mt-3 rounded-2xl bg-blue-50 p-3 text-xs font-semibold text-blue-700">
                 <p className="font-black">Will automatically:</p>
                 <p className="mt-1">• Move to Review Request</p>
                 <p>• Send Google Review SMS + Email</p>
@@ -482,7 +482,7 @@ export default function TasksPage() {
               </div>
             )}
             {satResult === "no" && (
-              <div className="mt-3 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700">
+              <div className="mt-3 rounded-2xl bg-orange-50 p-3 text-xs font-semibold text-orange-700">
                 <p className="font-black">Review request will NOT be sent.</p>
                 <p className="mt-1">• Office staff will be notified</p>
                 <p>• Follow-up task will be created</p>
@@ -491,7 +491,7 @@ export default function TasksPage() {
 
             <div className="mt-5 flex gap-3">
               <button type="button" onClick={() => setSatModal(null)} className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-black text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button type="button" disabled={!satResult} onClick={submitSatisfaction} className="flex-1 rounded-2xl bg-teal-600 py-3 text-sm font-black text-white transition hover:bg-teal-700 disabled:opacity-50">
+              <button type="button" disabled={!satResult} onClick={submitSatisfaction} className="flex-1 rounded-2xl bg-blue-600 py-3 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-50">
                 Confirm
               </button>
             </div>

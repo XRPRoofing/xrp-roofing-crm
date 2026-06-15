@@ -360,16 +360,16 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
   };
 }
 function statusBadgeClass(status: InvoiceStatus) {
-  if (status === "Paid") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
-  if (status === "Paid Mail Check") return "bg-teal-50 text-teal-700 ring-teal-200";
-  if (status === "Partially Paid") return "bg-amber-50 text-amber-700 ring-amber-100";
-  if (status === "Viewed") return "bg-indigo-50 text-indigo-700 ring-indigo-100";
+  if (status === "Paid") return "bg-blue-50 text-blue-700 ring-blue-100";
+  if (status === "Paid Mail Check") return "bg-blue-50 text-blue-700 ring-blue-200";
+  if (status === "Partially Paid") return "bg-orange-50 text-orange-700 ring-orange-100";
+  if (status === "Viewed") return "bg-blue-50 text-blue-700 ring-blue-100";
   if (status === "Sent" || status === "Pending") return "bg-blue-50 text-blue-700 ring-blue-100";
   if (status === "Due Soon") return "bg-orange-50 text-orange-700 ring-orange-100";
-  if (status === "Overdue") return "bg-red-50 text-red-700 ring-red-100";
+  if (status === "Overdue") return "bg-orange-50 text-orange-700 ring-orange-100";
   if (status === "Voided") return "bg-slate-100 text-slate-600 ring-slate-200";
   if (status === "Draft") return "bg-slate-50 text-slate-700 ring-slate-200";
-  return "bg-red-50 text-red-700 ring-red-100";
+  return "bg-orange-50 text-orange-700 ring-orange-100";
 }
 
 function formatDateTime(value?: string) {
@@ -392,9 +392,9 @@ function buildInvoiceTimeline(invoice: Invoice): TimelineStep[] {
 }
 
 function stageHeaderClass(stage: "Unpaid" | "Partially Paid" | "Paid") {
-  if (stage === "Paid") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (stage === "Partially Paid") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-red-200 bg-red-50 text-red-700";
+  if (stage === "Paid") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (stage === "Partially Paid") return "border-orange-200 bg-orange-50 text-orange-700";
+  return "border-orange-200 bg-orange-50 text-orange-700";
 }
 
 /**
@@ -1251,9 +1251,9 @@ export default function InvoicesPage() {
         {/* Mobile: horizontal scroll stats / Desktop: 6-column grid */}
         <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:gap-2 scrollbar-hide">
           {[
-            ["Paid", String(boardTotals.paidCount), "text-emerald-700", "bg-emerald-50/50"],
+            ["Paid", String(boardTotals.paidCount), "text-blue-700", "bg-blue-50/50"],
             ["Unpaid", String(boardTotals.unpaid), "text-slate-950", ""],
-            ["Overdue", String(boardTotals.overdue), "text-red-700", "bg-red-50/50"],
+            ["Overdue", String(boardTotals.overdue), "text-orange-700", "bg-orange-50/50"],
             ["Viewed", String(boardTotals.viewed), "text-blue-700", ""],
             ["Outstanding", currency(boardTotals.balance), "text-slate-950", ""],
             ["Collection", `${boardTotals.collectionRate}%`, "text-slate-950", ""],
@@ -1282,17 +1282,17 @@ export default function InvoicesPage() {
         const totalPending = pendingInvoices.reduce((sum: number, inv: Invoice) => sum + (inv.pendingPayments?.length ?? 0), 0);
         if (totalPending === 0) return null;
         return (
-          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
+          <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 px-4 py-3 shadow-sm">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-sm font-black text-white">{totalPending}</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-400 text-sm font-black text-white">{totalPending}</span>
               <div className="min-w-0 flex-1">
-                <p className="font-black text-amber-900">Offline Payment{totalPending !== 1 ? "s" : ""} Awaiting Verification</p>
-                <p className="text-xs font-semibold text-amber-700">{pendingInvoices.map((inv: Invoice) => inv.clientName).join(", ")} — review and approve or reject below</p>
+                <p className="font-black text-orange-900">Offline Payment{totalPending !== 1 ? "s" : ""} Awaiting Verification</p>
+                <p className="text-xs font-semibold text-orange-700">{pendingInvoices.map((inv: Invoice) => inv.clientName).join(", ")} — review and approve or reject below</p>
               </div>
               <button
                 type="button"
                 onClick={() => { const first = pendingInvoices[0]; if (first) openInvoice(first); }}
-                className="shrink-0 rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-white hover:bg-amber-500 active:scale-95 transition"
+                className="shrink-0 rounded-xl bg-orange-400 px-4 py-2 text-xs font-black text-white hover:bg-orange-500 active:scale-95 transition"
               >
                 Review Now
               </button>
@@ -1336,13 +1336,13 @@ export default function InvoicesPage() {
                           </div>
                           <div>
                             <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-slate-400">Balance</p>
-                            <p className={`mt-0.5 sm:mt-1 text-sm sm:text-base font-bold ${balance > 0 ? "text-red-700" : "text-emerald-700"}`}>{currency(balance)}</p>
+                            <p className={`mt-0.5 sm:mt-1 text-sm sm:text-base font-bold ${balance > 0 ? "text-orange-700" : "text-blue-700"}`}>{currency(balance)}</p>
                           </div>
                         </div>
                         <div className="mt-3 sm:mt-4 flex items-center justify-between border-t border-slate-100 pt-2 sm:pt-3">
                           <p className="text-xs font-semibold text-slate-500">Due {invoice.dueDate}</p>
                           {(invoice.pendingPayments?.length ?? 0) > 0 ? (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-200">⏳ Awaiting Verification</span>
+                            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-black text-orange-700 ring-1 ring-orange-200">⏳ Awaiting Verification</span>
                           ) : (
                             <p className="text-xs font-semibold text-slate-400 hidden sm:block">View details</p>
                           )}
@@ -1352,7 +1352,7 @@ export default function InvoicesPage() {
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100 active:scale-95">Reminder</button>
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>
@@ -1389,9 +1389,9 @@ export default function InvoicesPage() {
               <button onClick={() => setEditing((current) => !current)} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
               <button onClick={() => setShowSendModal(true)} className="rounded-xl sm:rounded-2xl bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition">Send</button>
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-slate-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">PDF</button>
-              <button onClick={() => setShowPaymentModal(true)} className="rounded-xl sm:rounded-2xl bg-emerald-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-emerald-700 active:scale-95 transition">Payment</button>
+              <button onClick={() => setShowPaymentModal(true)} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-xl sm:rounded-2xl bg-slate-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-slate-700 active:scale-95 transition">Mark Paid</button>
-              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-xl sm:rounded-2xl bg-teal-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-teal-700 active:scale-95 transition ring-1 ring-teal-200">Paid Mail Check</button>
+              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-xl sm:rounded-2xl bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
               <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-xl sm:rounded-2xl bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
               <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-xl sm:rounded-2xl border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
             </div>
@@ -1408,8 +1408,8 @@ export default function InvoicesPage() {
                   ] as const).map((indicator) => {
                     const done = Boolean(indicator.at) || indicator.fallbackDone;
                     return (
-                      <span key={indicator.label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ring-1 ${done ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>
-                        <span className={`h-2 w-2 rounded-full ${done ? "bg-emerald-500" : "bg-slate-300"}`} />
+                      <span key={indicator.label} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ring-1 ${done ? "bg-blue-50 text-blue-700 ring-blue-100" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>
+                        <span className={`h-2 w-2 rounded-full ${done ? "bg-blue-500" : "bg-slate-300"}`} />
                         {indicator.label}
                       </span>
                     );
@@ -1426,18 +1426,18 @@ export default function InvoicesPage() {
             </section>
 
             {selectedInvoice.pendingPayments && selectedInvoice.pendingPayments.length > 0 && (
-              <section className="mt-6 rounded-3xl border-2 border-amber-200 bg-amber-50 p-5">
+              <section className="mt-6 rounded-3xl border-2 border-orange-200 bg-orange-50 p-5">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-white">{selectedInvoice.pendingPayments.length}</span>
-                  <h3 className="font-black text-amber-900">Pending Customer Payments — Action Required</h3>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-400 text-[10px] font-black text-white">{selectedInvoice.pendingPayments.length}</span>
+                  <h3 className="font-black text-orange-900">Pending Customer Payments — Action Required</h3>
                 </div>
-                <p className="mt-1 text-xs font-semibold text-amber-700">Customer submitted these payments offline. Review and approve or reject each one.</p>
+                <p className="mt-1 text-xs font-semibold text-orange-700">Customer submitted these payments offline. Review and approve or reject each one.</p>
                 <div className="mt-4 space-y-3">
                   {selectedInvoice.pendingPayments.map((pending: PendingPayment) => (
-                    <div key={pending.id} className="rounded-2xl border border-amber-200 bg-white p-4">
+                    <div key={pending.id} className="rounded-2xl border border-orange-200 bg-white p-4">
                       {/* Status badge */}
-                      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-orange-100 px-3 py-1 text-[11px] font-black text-orange-700 ring-1 ring-orange-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                         Awaiting Verification
                       </div>
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1461,7 +1461,7 @@ export default function InvoicesPage() {
                         <button
                           type="button"
                           onClick={() => void handleApprovePendingPayment(pending)}
-                          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white transition hover:bg-emerald-700 active:scale-95"
+                          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-700 active:scale-95"
                         >
                           ✓ Approve Payment
                         </button>
@@ -1488,7 +1488,7 @@ export default function InvoicesPage() {
                 </div>
                 <div className="mt-3 rounded-2xl bg-white p-3 text-sm font-bold">
                   <div className="flex justify-between gap-3 text-slate-600"><span>Total Invoice</span><span>{currency(calculateTotals(selectedInvoice).finalTotal)}</span></div>
-                  <div className="flex justify-between gap-3 text-emerald-700"><span>Total Deposits Paid</span><span>{currency(getPaidAmount(selectedInvoice))}</span></div>
+                  <div className="flex justify-between gap-3 text-blue-700"><span>Total Deposits Paid</span><span>{currency(getPaidAmount(selectedInvoice))}</span></div>
                   <div className="mt-1 flex justify-between gap-3 border-t border-slate-100 pt-2 font-black text-[#0A3D91]"><span>Remaining Balance</span><span>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</span></div>
                 </div>
               </section>
@@ -1498,8 +1498,8 @@ export default function InvoicesPage() {
                   {buildInvoiceTimeline(selectedInvoice).map((step, index, steps) => (
                     <li key={step.label} className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ${step.done ? "bg-emerald-500" : "bg-slate-300"}`}>{step.done ? "✓" : index + 1}</span>
-                        {index < steps.length - 1 && <span className={`mt-1 w-0.5 flex-1 ${step.done ? "bg-emerald-200" : "bg-slate-200"}`} />}
+                        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black text-white ${step.done ? "bg-blue-500" : "bg-slate-300"}`}>{step.done ? "✓" : index + 1}</span>
+                        {index < steps.length - 1 && <span className={`mt-1 w-0.5 flex-1 ${step.done ? "bg-blue-200" : "bg-slate-200"}`} />}
                       </div>
                       <div className="pb-1">
                         <p className={`text-sm font-black ${step.done ? "text-[#0A3D91]" : "text-slate-400"}`}>{step.label}</p>
@@ -1521,7 +1521,7 @@ export default function InvoicesPage() {
                 <h3 className="font-black text-[#0A3D91]">Client Payment History</h3>
                 <div className="mt-4 grid gap-3 md:grid-cols-5">
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Invoices sent</p><p className="mt-2 text-xl font-black text-[#0A3D91]">{clientHistory.clientInvoices.length}</p></div>
-                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Total paid</p><p className="mt-2 text-xl font-black text-emerald-700">{currency(clientHistory.totalPaid)}</p></div>
+                  <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Total paid</p><p className="mt-2 text-xl font-black text-blue-700">{currency(clientHistory.totalPaid)}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Outstanding</p><p className="mt-2 text-xl font-black text-orange-700">{currency(clientHistory.outstandingBalance)}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Last payment</p><p className="mt-2 text-sm font-black text-[#0A3D91]">{clientHistory.lastPaymentDate}</p></div>
                   <div className="rounded-2xl bg-white p-4"><p className="text-xs font-black uppercase text-slate-500">Methods used</p><p className="mt-2 text-sm font-black text-[#0A3D91]">{clientHistory.methods.join(", ") || "None"}</p></div>
@@ -1644,7 +1644,7 @@ export default function InvoicesPage() {
                       <p className="text-xs font-bold text-slate-500">Issue Date</p>
                       <p className="text-sm font-bold text-slate-800">{inv.issueDate}</p>
                       <p className="mt-1 text-xs font-bold text-slate-500">Due Date</p>
-                      <p className="text-sm font-bold text-red-600">{inv.dueDate}</p>
+                      <p className="text-sm font-bold text-orange-600">{inv.dueDate}</p>
                       {inv.proposalReference && (
                         <>
                           <p className="mt-1 text-xs font-bold text-slate-500">Proposal Ref</p>
@@ -1713,8 +1713,8 @@ export default function InvoicesPage() {
                     </div>
                     {inv.discount > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-emerald-700">Discount applied</span>
-                        <span className="font-semibold text-emerald-700">− {currency(inv.discount)}</span>
+                        <span className="text-blue-700">Discount applied</span>
+                        <span className="font-semibold text-blue-700">− {currency(inv.discount)}</span>
                       </div>
                     )}
                     {getPaidAmount(inv) > 0 && (
@@ -1728,8 +1728,8 @@ export default function InvoicesPage() {
                       <span className="font-black text-[#0A3D91] text-xl">{currency(totals.finalTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-base text-red-700">Balance Due from Customer</span>
-                      <span className="font-black text-xl text-red-700">{currency(balance)}</span>
+                      <span className="font-black text-base text-orange-700">Balance Due from Customer</span>
+                      <span className="font-black text-xl text-orange-700">{currency(balance)}</span>
                     </div>
                   </div>
                 </div>
@@ -1754,11 +1754,11 @@ export default function InvoicesPage() {
                 )}
 
                 {/* ── Transaction fee disclaimer ── */}
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex gap-3">
-                  <span className="shrink-0 text-amber-600 text-lg">ⓘ</span>
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 flex gap-3">
+                  <span className="shrink-0 text-orange-600 text-lg">ⓘ</span>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-amber-800 mb-1">Transaction Fee Notice</p>
-                    <p className="text-xs text-amber-800 leading-relaxed">
+                    <p className="text-xs font-black uppercase tracking-wider text-orange-800 mb-1">Transaction Fee Notice</p>
+                    <p className="text-xs text-orange-800 leading-relaxed">
                       The balance due shown above is the exact amount owed to XRP Roofing. Please be aware that payment processors, banks, credit card providers, or third-party payment platforms may apply additional transaction fees on the customer&apos;s side when submitting payment. These fees are external to XRP Roofing and are <strong>not included in this invoice total</strong> unless explicitly added by the company.
                     </p>
                   </div>
@@ -1778,7 +1778,7 @@ export default function InvoicesPage() {
                   </button>
                   <button
                     onClick={handleConfirmInvoice}
-                    className="flex-1 sm:flex-none rounded-2xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+                    className="flex-1 sm:flex-none rounded-2xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
                   >
                     Confirm & Save →
                   </button>
@@ -1805,7 +1805,7 @@ export default function InvoicesPage() {
             </div>
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowPaymentModal(false)} className="w-full sm:w-auto rounded-2xl border border-slate-200 px-5 py-3 font-bold text-slate-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={() => handleRecordPayment(false)} className="w-full sm:w-auto rounded-2xl bg-emerald-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Save Payment</button>
+              <button onClick={() => handleRecordPayment(false)} className="w-full sm:w-auto rounded-2xl bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Save Payment</button>
             </div>
           </div>
         </div>
@@ -1837,7 +1837,7 @@ export default function InvoicesPage() {
                 placeholder="e.g. Check number not found, amount does not match invoice, please resubmit…"
               />
             </div>
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800">
               ⚠️ The customer will be notified by email that their payment submission was rejected. The invoice will remain unpaid.
             </div>
             <div className="mt-5 flex gap-3">

@@ -49,9 +49,9 @@ type MetricDef = {
 };
 
 function urgencyStyles(u: MetricDef["urgency"]) {
-  if (u === "red")    return { card: "border-red-100 bg-red-50 hover:border-red-300",    num: "text-red-700",    icon: "bg-red-100 text-red-600",    dot: "bg-red-500" };
+  if (u === "red")    return { card: "border-orange-100 bg-orange-50 hover:border-orange-300",    num: "text-orange-700",    icon: "bg-orange-100 text-orange-600",    dot: "bg-orange-500" };
   if (u === "orange") return { card: "border-orange-100 bg-orange-50 hover:border-orange-300", num: "text-orange-700", icon: "bg-orange-100 text-orange-600", dot: "bg-orange-500" };
-  if (u === "yellow") return { card: "border-yellow-100 bg-yellow-50 hover:border-yellow-300", num: "text-yellow-700", icon: "bg-yellow-100 text-yellow-600", dot: "bg-yellow-500" };
+  if (u === "yellow") return { card: "border-orange-100 bg-orange-50 hover:border-orange-300", num: "text-orange-700", icon: "bg-orange-100 text-orange-600", dot: "bg-orange-500" };
   if (u === "blue")   return { card: "border-blue-100 bg-blue-50 hover:border-blue-300",   num: "text-blue-700",   icon: "bg-blue-100 text-blue-600",   dot: "bg-blue-500" };
   return { card: "border-slate-200 bg-white hover:border-slate-300", num: "text-slate-800", icon: "bg-slate-100 text-slate-600", dot: "bg-slate-400" };
 }
@@ -219,12 +219,12 @@ export default function CrmDashboardPage() {
             <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Good morning, XRP Roofing team.</h1>
             <p className="mt-4 max-w-2xl text-blue-100">Track leads, proposals, invoices, and job progress — all actionable items in one view.</p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider ring-1 ${attentionCount > 0 ? "bg-red-500/20 text-red-200 ring-red-400/30" : "bg-emerald-500/20 text-emerald-200 ring-emerald-400/30"}`}>
-                <span className={`h-2 w-2 rounded-full ${attentionCount > 0 ? "bg-red-400 animate-pulse" : "bg-emerald-400"}`} />
+              <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider ring-1 ${attentionCount > 0 ? "bg-orange-500/20 text-orange-200 ring-orange-400/30" : "bg-blue-500/20 text-blue-200 ring-blue-400/30"}`}>
+                <span className={`h-2 w-2 rounded-full ${attentionCount > 0 ? "bg-orange-400 animate-pulse" : "bg-blue-400"}`} />
                 {attentionCount > 0 ? `${attentionCount} items need attention` : "All clear"}
               </span>
               <span className={`flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-blue-50 ring-1 ring-white/15`}>
-                <span className={`h-2 w-2 rounded-full ${syncDot ? "bg-yellow-400 animate-pulse" : "bg-emerald-400"}`} />
+                <span className={`h-2 w-2 rounded-full ${syncDot ? "bg-orange-400 animate-pulse" : "bg-blue-400"}`} />
                 {syncDot ? "Syncing…" : "Live"}
               </span>
             </div>

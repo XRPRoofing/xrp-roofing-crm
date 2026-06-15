@@ -132,7 +132,7 @@ export default function DashboardHeroActions() {
               <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Property address</span><input value={leadForm.propertyAddress} onChange={(event) => setLeadForm((form) => ({ ...form, propertyAddress: event.target.value }))} className={inputClass} placeholder="Street, city, AZ" /></label>
               <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Roof details</span><input value={leadForm.roofDetails} onChange={(event) => setLeadForm((form) => ({ ...form, roofDetails: event.target.value }))} className={inputClass} placeholder="Optional" /></label>
               <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Insurance carrier</span><input value={leadForm.insuranceCarrier} onChange={(event) => setLeadForm((form) => ({ ...form, insuranceCarrier: event.target.value }))} className={inputClass} placeholder="Optional" /></label>
-              {leadError && <p className="text-sm font-medium text-red-600">{leadError}</p>}
+              {leadError && <p className="text-sm font-medium text-orange-600">{leadError}</p>}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
               <button type="button" onClick={() => setLeadOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
@@ -164,8 +164,8 @@ export default function DashboardHeroActions() {
                 <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">End</span><input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((form) => ({ ...form, endTime: event.target.value }))} className={inputClass} /></label>
               </div>
               <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</span><textarea value={scheduleForm.notes} onChange={(event) => setScheduleForm((form) => ({ ...form, notes: event.target.value }))} rows={3} className={`${inputClass} resize-none`} placeholder="Optional details" /></label>
-              {scheduleError && <p className="text-sm font-medium text-red-600">{scheduleError}</p>}
-              {scheduleDone && <p className="text-sm font-medium text-emerald-600">{scheduleDone}</p>}
+              {scheduleError && <p className="text-sm font-medium text-orange-600">{scheduleError}</p>}
+              {scheduleDone && <p className="text-sm font-medium text-blue-600">{scheduleDone}</p>}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
               <button type="button" onClick={() => setScheduleOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
