@@ -331,14 +331,15 @@ export default function CustomersPage() {
     router.push("/crm/invoices");
   }
 
-  const cardHistoryPushedRef = useRef(false);
+  const cardHashRef = useRef(false);
 
   const closeCustomerCard = useCallback(() => {
-    if (cardHistoryPushedRef.current) {
-      cardHistoryPushedRef.current = false;
-      window.history.back();
-    }
     setSelectedCustomerId(null);
+    if (cardHashRef.current) {
+      cardHashRef.current = false;
+      // Remove the hash silently without triggering hashchange
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    }
   }, []);
 
   function openCustomer(customer: Customer) {
@@ -347,24 +348,24 @@ export default function CustomersPage() {
     setEditingCustomerId(null);
     setEditForm(null);
     setNoteDraft(readCustomerNotes()[customer.id] || "");
-    window.history.pushState({ customerCardOpen: true }, "");
-    cardHistoryPushedRef.current = true;
+    window.location.hash = "#card";
+    cardHashRef.current = true;
   }
 
   useEffect(() => {
-    function handlePopState() {
-      if (cardHistoryPushedRef.current) {
-        cardHistoryPushedRef.current = false;
+    function handleHashChange() {
+      if (cardHashRef.current && !window.location.hash.includes("card")) {
+        cardHashRef.current = false;
         setSelectedCustomerId(null);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") closeCustomerCard();
     }
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeCustomerCard]);
@@ -394,8 +395,8 @@ export default function CustomersPage() {
       if (match) {
         setSelectedCustomerId(match.id);
         setActiveTab("Contact Info");
-        window.history.pushState({ customerCardOpen: true }, "");
-        cardHistoryPushedRef.current = true;
+        window.location.hash = "#card";
+        cardHashRef.current = true;
       }
     }
   }, [searchParams, customerList, selectedCustomerId]);
@@ -560,8 +561,11 @@ export default function CustomersPage() {
   async function handleDeleteCustomer(id: string) {
     if (typeof window !== "undefined" && !window.confirm("Delete this customer? This cannot be undone.")) return;
     setSavedCustomers((current) => current.filter((customer) => customer.id !== id));
-    if (cardHistoryPushedRef.current) { cardHistoryPushedRef.current = false; window.history.back(); }
     setSelectedCustomerId(null);
+    if (cardHashRef.current) {
+      cardHashRef.current = false;
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    }
     await deleteCustomerRecord(id);
     await syncFromServer();
   }

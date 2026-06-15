@@ -517,7 +517,7 @@ export default function InvoicesPage() {
     return hasSupabaseConfig() ? [] : initialInvoices;
   });
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
-  const invoiceCardHistoryRef = useRef(false);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -561,35 +561,36 @@ export default function InvoicesPage() {
   const [rejectNotes, setRejectNotes] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
+  const invoiceCardHashRef = useRef(false);
   const searchParams = useSearchParams();
 
   const closeInvoiceCard = useCallback(() => {
-    if (invoiceCardHistoryRef.current) {
-      invoiceCardHistoryRef.current = false;
-      window.history.back();
-    }
     setSelectedInvoiceId(null);
+    if (invoiceCardHashRef.current) {
+      invoiceCardHashRef.current = false;
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    }
   }, []);
 
-  function pushInvoiceHistory() {
-    window.history.pushState({ invoiceCardOpen: true }, "");
-    invoiceCardHistoryRef.current = true;
+  function pushInvoiceHash() {
+    window.location.hash = "#card";
+    invoiceCardHashRef.current = true;
   }
 
   useEffect(() => {
-    function handlePopState() {
-      if (invoiceCardHistoryRef.current) {
-        invoiceCardHistoryRef.current = false;
+    function handleHashChange() {
+      if (invoiceCardHashRef.current && !window.location.hash.includes("card")) {
+        invoiceCardHashRef.current = false;
         setSelectedInvoiceId(null);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") closeInvoiceCard();
     }
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeInvoiceCard]);
@@ -601,7 +602,7 @@ export default function InvoicesPage() {
       const match = invoices.find((inv) => inv.id === invoiceId);
       if (match) {
         setSelectedInvoiceId(match.id);
-        pushInvoiceHistory();
+        pushInvoiceHash();
       }
     }
   }, [searchParams, invoices, selectedInvoiceId]);
@@ -616,7 +617,7 @@ export default function InvoicesPage() {
     intentHandledRef.current = true;
     if (intent.kind === "open") {
       setSelectedInvoiceId(intent.id);
-      pushInvoiceHistory();
+      pushInvoiceHash();
       return;
     }
     setInvoices((current) => {
@@ -896,7 +897,7 @@ export default function InvoicesPage() {
 
   function openInvoice(invoice: Invoice) {
     setSelectedInvoiceId(invoice.id);
-    pushInvoiceHistory();
+    pushInvoiceHash();
     if (!invoice.activity.includes("Viewed")) {
       updateInvoice(invoice, "Viewed");
     }
@@ -919,7 +920,7 @@ export default function InvoicesPage() {
     if (!pendingReviewInvoice) return;
     setInvoices((currentInvoices) => [pendingReviewInvoice, ...currentInvoices]);
     setSelectedInvoiceId(pendingReviewInvoice.id);
-    pushInvoiceHistory();
+    pushInvoiceHash();
     void upsertInvoiceRecord(pendingReviewInvoice as unknown as Record<string, unknown> & { id: string });
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
@@ -936,8 +937,11 @@ export default function InvoicesPage() {
     const deletedInvoice = { ...invoice, isDeleted: true, deletedAt: new Date().toISOString(), activity: [...invoice.activity, "Invoice deleted"] };
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
     if (selectedInvoiceId === invoice.id) {
-      if (invoiceCardHistoryRef.current) { invoiceCardHistoryRef.current = false; window.history.back(); }
       setSelectedInvoiceId(null);
+      if (invoiceCardHashRef.current) {
+        invoiceCardHashRef.current = false;
+        history.replaceState(history.state, "", window.location.pathname + window.location.search);
+      }
     }
     void upsertInvoiceRecord(deletedInvoice as unknown as Record<string, unknown> & { id: string });
   }
@@ -1333,8 +1337,8 @@ export default function InvoicesPage() {
                       {/* Mobile: swipeable action row / Desktop: wrapped buttons */}
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95">View</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHistory(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
-                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHistory(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
+                        <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setSendForm({ template: "Payment reminder", subject: "Reminder: Your XRP Roofing invoice", message: emailTemplates["Payment reminder"] }); setShowSendModal(true); }} className="shrink-0 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95">Reminder</button>
                         <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(invoice); }} className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 active:scale-95">Delete</button>
                       </div>
                     </article>

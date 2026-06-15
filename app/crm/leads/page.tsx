@@ -150,7 +150,7 @@ export default function LeadsPage() {
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const jobCardHistoryRef = useRef(false);
+
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
   const [jobNotes, setJobNotes] = useState<JobNote[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
@@ -201,34 +201,36 @@ export default function LeadsPage() {
   const otherPhotos = jobFiles.filter((f) => f.photoType === "Job Photo");
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 
+  const jobCardHashRef = useRef(false);
+
   const closeJobCard = useCallback(() => {
-    if (jobCardHistoryRef.current) {
-      jobCardHistoryRef.current = false;
-      window.history.back();
-    }
     setSelectedJobId(null);
+    if (jobCardHashRef.current) {
+      jobCardHashRef.current = false;
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    }
   }, []);
 
   function openJobCard(jobId: string) {
     setSelectedJobId(jobId);
-    window.history.pushState({ jobCardOpen: true }, "");
-    jobCardHistoryRef.current = true;
+    window.location.hash = "#card";
+    jobCardHashRef.current = true;
   }
 
   useEffect(() => {
-    function handlePopState() {
-      if (jobCardHistoryRef.current) {
-        jobCardHistoryRef.current = false;
+    function handleHashChange() {
+      if (jobCardHashRef.current && !window.location.hash.includes("card")) {
+        jobCardHashRef.current = false;
         setSelectedJobId(null);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") closeJobCard();
     }
-    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeJobCard]);
@@ -240,8 +242,8 @@ export default function LeadsPage() {
       const match = jobs.find((j) => j.id === jobId);
       if (match) {
         setSelectedJobId(match.id);
-        window.history.pushState({ jobCardOpen: true }, "");
-        jobCardHistoryRef.current = true;
+        window.location.hash = "#card";
+        jobCardHashRef.current = true;
       }
     }
   }, [searchParams, jobs, selectedJobId]);
@@ -449,9 +451,9 @@ export default function LeadsPage() {
   function deleteJob(job: Lead) {
     if (typeof window !== "undefined" && !window.confirm(`Delete "${job.name}"? This permanently removes the job and its photos, notes, and checklist for everyone. This cannot be undone.`)) return;
     const previousJobs = jobs;
-    if (jobCardHistoryRef.current) {
-      jobCardHistoryRef.current = false;
-      window.history.back();
+    if (jobCardHashRef.current) {
+      jobCardHashRef.current = false;
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
     }
     setSelectedJobId(null);
     setJobs((currentJobs) => currentJobs.filter((item) => item.id !== job.id));
