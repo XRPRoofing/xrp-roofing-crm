@@ -821,7 +821,7 @@ export default function LeadsPage() {
           const stageJobs = filteredJobs.filter((job) => job.stage === stage.id);
           const stageValue = stageJobs.reduce((total, job) => total + job.value, 0);
           return (
-            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] min-h-[28rem] w-[16.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
+            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[16.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
               <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
                 <div className="flex items-center justify-between gap-1">
                   <h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
