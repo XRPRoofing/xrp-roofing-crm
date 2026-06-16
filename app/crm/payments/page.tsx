@@ -155,55 +155,57 @@ export default function PaymentsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8 sm:px-6">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-2">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
-          <h1 className="mt-1 text-2xl font-bold text-blue-700">Payments</h1>
+      {/* Sticky Header */}
+      <div className="sticky top-14 z-20 -mx-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-2 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
+            <h1 className="mt-1 text-2xl font-bold text-blue-700">Payments</h1>
+          </div>
+          <button
+            onClick={() => setShowSearch((v) => !v)}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
+            aria-label="Search invoices"
+          >
+            <Search className="h-5 w-5 text-gray-500" />
+          </button>
         </div>
-        <button
-          onClick={() => setShowSearch((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
-          aria-label="Search invoices"
-        >
-          <Search className="h-5 w-5 text-gray-500" />
-        </button>
-      </div>
 
-      {/* Search */}
-      {showSearch && (
-        <input
-          type="text"
-          placeholder="Search by name, invoice #, or address…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-          autoFocus
-        />
-      )}
+        {/* Search */}
+        {showSearch && (
+          <input
+            type="text"
+            placeholder="Search by name, invoice #, or address…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            autoFocus
+          />
+        )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setTab("unpaid")}
-          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
-            tab === "unpaid"
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-          }`}
-        >
-          Unpaid
-        </button>
-        <button
-          onClick={() => setTab("paid")}
-          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
-            tab === "paid"
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-          }`}
-        >
-          Paid
-        </button>
+        {/* Tabs */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setTab("unpaid")}
+            className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
+              tab === "unpaid"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            Unpaid
+          </button>
+          <button
+            onClick={() => setTab("paid")}
+            className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
+              tab === "paid"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            Paid
+          </button>
+        </div>
       </div>
 
       {/* Total banner */}

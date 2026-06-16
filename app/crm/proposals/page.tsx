@@ -1787,16 +1787,17 @@ export default function ProposalsPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
-        <div className="flex gap-8 text-sm font-bold">
-          <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
-          <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
-          <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
-          <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
+      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
+          <div className="flex gap-8 text-sm font-bold">
+            <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
+            <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
+            <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
+            <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
+        <div className="mt-3 rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
             <div className="relative max-w-md flex-1">
@@ -1810,6 +1811,7 @@ export default function ProposalsPage() {
             <button className="px-4 py-3 text-xl text-gray-500">☰</button>
           </div>
         </div>
+      </div>
       </div>
 
       {deletedProposal && (

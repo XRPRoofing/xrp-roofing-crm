@@ -1257,7 +1257,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-16 z-20 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:px-4 sm:py-3 lg:top-20">
+      <div className="sticky top-14 z-20 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
           <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>

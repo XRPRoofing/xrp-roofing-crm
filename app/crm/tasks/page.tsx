@@ -221,35 +221,36 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
-          <h1 className="mt-1 text-2xl font-bold text-blue-700 sm:text-3xl">Task Board</h1>
-          <div className="mt-1 flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
-            <p className="text-xs font-semibold text-gray-500">
-              {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${lastSync.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
-            </p>
+      {/* Sticky Header */}
+      <div className="sticky top-14 z-20 -mx-4 -mt-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
+            <h1 className="mt-1 text-2xl font-bold text-blue-700 sm:text-3xl">Task Board</h1>
+            <div className="mt-1 flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
+              <p className="text-xs font-semibold text-gray-500">
+                {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${lastSync.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowNewTask(true)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95">
+              <Plus className="h-4 w-4" /> New Task
+            </button>
+            <button onClick={() => { setLoading(true); void refresh(); }} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 active:scale-95">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+            {filterStatus && (
+              <button onClick={() => setFilterStatus(null)} className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white">
+                <X className="h-4 w-4" /> {filterStatus}
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowNewTask(true)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95">
-            <Plus className="h-4 w-4" /> New Task
-          </button>
-          <button onClick={() => { setLoading(true); void refresh(); }} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 active:scale-95">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
-          {filterStatus && (
-            <button onClick={() => setFilterStatus(null)} className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white">
-              <X className="h-4 w-4" /> {filterStatus}
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* Type Filter */}
-      <div className="flex items-center gap-2">
+        {/* Type Filter */}
+        <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-gray-400" />
         <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
           {([
@@ -262,6 +263,7 @@ export default function TasksPage() {
             </button>
           ))}
         </div>
+      </div>
       </div>
 
       {/* Metrics */}
