@@ -15,22 +15,22 @@ import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight
 import { PhoneLink, AddressLink, linkifyContactInfo } from "@/components/ContactLinks";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</section>;
+  return <section className={`rounded-lg border border-gray-200 bg-white shadow-sm ${className}`}>{children}</section>;
 }
 
 function Button({ children, variant = "secondary", className = "", onClick }: { children: React.ReactNode; variant?: "primary" | "secondary" | "ghost"; className?: string; onClick?: () => void }) {
   const styles = {
     primary: "bg-blue-600 text-white hover:bg-blue-700",
-    secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-    ghost: "text-slate-600 hover:bg-slate-100",
+    secondary: "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
+    ghost: "text-gray-600 hover:bg-gray-100",
   };
-  return <button type="button" onClick={onClick} className={`inline-flex items-center justify-center rounded-xl px-3.5 py-2 text-sm font-semibold transition ${styles[variant]} ${className}`}>{children}</button>;
+  return <button type="button" onClick={onClick} className={`inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-semibold transition ${styles[variant]} ${className}`}>{children}</button>;
 }
 
 function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "slate" | "green" | "orange" }) {
   const styles = {
     blue: "bg-blue-50 text-blue-700 ring-blue-100",
-    slate: "bg-slate-100 text-slate-600 ring-slate-200",
+    slate: "bg-gray-100 text-gray-600 ring-gray-200",
     green: "bg-blue-50 text-blue-700 ring-blue-100",
     orange: "bg-orange-50 text-orange-700 ring-orange-100",
   };
@@ -43,9 +43,9 @@ const linkifyText = linkifyContactInfo;
 function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: () => void }) {
   return (
     <Card className="hidden h-full flex-col items-center gap-2 overflow-hidden p-2 xl:flex">
-      <button type="button" onClick={onExpand} aria-label="Expand inbox" title="Show conversations" className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"><ChevronRight className="h-4 w-4" /></button>
-      <button type="button" onClick={onNew} aria-label="New conversation" title="New conversation" className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"><Plus className="h-4 w-4" /></button>
-      <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 [writing-mode:vertical-rl]">Inbox</span>
+      <button type="button" onClick={onExpand} aria-label="Expand inbox" title="Show conversations" className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50"><ChevronRight className="h-4 w-4" /></button>
+      <button type="button" onClick={onNew} aria-label="New conversation" title="New conversation" className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition hover:bg-blue-700"><Plus className="h-4 w-4" /></button>
+      <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 [writing-mode:vertical-rl]">Inbox</span>
     </Card>
   );
 }
@@ -108,55 +108,55 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
 
   return (
     <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
-      <div className="border-b border-slate-200 p-4">
+      <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Inbox</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">Conversations</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Inbox</p>
+            <h2 className="mt-1 text-xl font-bold text-gray-950">Conversations</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {onCollapse && <button type="button" onClick={onCollapse} aria-label="Minimize inbox" title="Minimize inbox" className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 xl:flex"><ChevronLeft className="h-4 w-4" /></button>}
+            {onCollapse && <button type="button" onClick={onCollapse} aria-label="Minimize inbox" title="Minimize inbox" className="hidden h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 xl:flex"><ChevronLeft className="h-4 w-4" /></button>}
             <Button variant="primary" className="h-10 w-10 p-0" onClick={onNew} aria-label="New conversation"><Plus className="h-4 w-4" /></Button>
           </div>
         </div>
         <div className="relative mt-4">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search contacts" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search contacts" />
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {inboxFilters.map((name) => {
             const activeFilter = filter === name;
             return (
-              <button key={name} type="button" onClick={() => setFilter(name)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeFilter ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
-                {name} <span className={activeFilter ? "text-blue-100" : "text-slate-400"}>({counts[name]})</span>
+              <button key={name} type="button" onClick={() => setFilter(name)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${activeFilter ? "bg-blue-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-700"}`}>
+                {name} <span className={activeFilter ? "text-blue-100" : "text-gray-400"}>({counts[name]})</span>
               </button>
             );
           })}
         </div>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-        {conversations.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">No conversations yet. Dial, receive a call, or send a text to create an accurate client conversation.</div>}
-        {conversations.length > 0 && visible.length === 0 && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">No conversations match {filter === "All" ? "your search" : `"${filter}"`}.</div>}
+        {conversations.length === 0 && <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600">No conversations yet. Dial, receive a call, or send a text to create an accurate client conversation.</div>}
+        {conversations.length > 0 && visible.length === 0 && <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600">No conversations match {filter === "All" ? "your search" : `"${filter}"`}.</div>}
         {visible.map((conversation) => {
           const selected = conversation.id === active?.id;
           const unreadCount = conversation.isMissedCall ? 0 : conversation.unreadCount;
           const status = conversation.isMissedCall ? "Missed call" : unreadCount > 0 ? "Unread" : "Read";
           const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-blue-700" : "text-blue-600";
           return (
-            <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-xl border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-slate-200 hover:bg-slate-50"}`}>
+            <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-lg border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-50"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   {unreadCount > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden />}
-                  <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-slate-950" : "font-semibold text-slate-800"}`}>{conversation.contact.name}</p>
+                  <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-gray-950" : "font-semibold text-gray-800"}`}>{conversation.contact.name}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {unreadCount > 0 && <Badge tone="blue">{unreadCount}</Badge>}
-                  <span className="text-xs text-slate-500">{conversation.lastActivityAt}</span>
+                  <span className="text-xs text-gray-500">{conversation.lastActivityAt}</span>
                 </div>
               </div>
-              <p className="mt-1 truncate text-sm font-medium text-slate-700"><PhoneLink value={conversation.contact.phone} /></p>
-              <p className="mt-0.5 line-clamp-1 text-xs text-slate-500"><AddressLink value={conversation.contact.address} /></p>
-              <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{linkifyText(conversation.lastMessage)}</p>
+              <p className="mt-1 truncate text-sm font-medium text-gray-700"><PhoneLink value={conversation.contact.phone} /></p>
+              <p className="mt-0.5 line-clamp-1 text-xs text-gray-500"><AddressLink value={conversation.contact.address} /></p>
+              <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-600">{linkifyText(conversation.lastMessage)}</p>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
               </div>
@@ -180,11 +180,11 @@ function CallRow({ message }: { message: ConversationMessage }) {
 
   return (
     <div className="flex justify-center">
-      <div className={`flex w-full max-w-[86%] items-center gap-3 rounded-xl border ${tone.border} ${tone.bg} px-4 py-3`}>
+      <div className={`flex w-full max-w-[86%] items-center gap-3 rounded-lg border ${tone.border} ${tone.bg} px-4 py-3`}>
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ${tone.text} ring-1 ${tone.ring}`}><Icon className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-semibold ${tone.text}`}>{message.body}</p>
-          <p className="mt-0.5 truncate text-xs text-slate-500">{message.author} · {message.timestamp}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-500">{message.author} · {message.timestamp}</p>
         </div>
         {message.recordingUrl && <audio controls src={proxyRecordingUrl(message.recordingUrl)} className="h-8 w-40 max-w-[40%]" />}
       </div>
@@ -201,7 +201,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   if (internal) {
     return (
       <div className="flex justify-center">
-        <div className="max-w-[86%] rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+        <div className="max-w-[86%] rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">
           <span className="font-semibold">{message.timestamp}</span>
           <p className="mt-1 whitespace-pre-wrap break-words leading-5">{linkifyText(message.body)}</p>
         </div>
@@ -211,10 +211,10 @@ function MessageRow({ message }: { message: ConversationMessage }) {
 
   return (
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-800 shadow-sm"}`}>
-        <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-slate-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}</div>
+      <div className={`max-w-[78%] rounded-lg px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-gray-200 bg-white text-gray-800 shadow-sm"}`}>
+        <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}</div>
         <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(message.body)}</p>
-        {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
+        {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
     </div>
   );
@@ -225,7 +225,7 @@ function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; o
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
 
   return (
-    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-950">
+    <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-950">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 font-bold"><Sparkles className="h-3.5 w-3.5" />Call summary</p>
         <span className="text-[11px] font-semibold text-blue-700">{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
@@ -248,24 +248,24 @@ function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEven
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4" onClick={onClose}>
-      <div onClick={(clickEvent) => clickEvent.stopPropagation()} className="flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/50 p-4" onClick={onClose}>
+      <div onClick={(clickEvent) => clickEvent.stopPropagation()} className="flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div>
-            <p className="text-sm font-bold text-slate-950">Call summary</p>
-            <p className="text-xs font-semibold text-slate-500">{new Date(event.createdAt).toLocaleString()}</p>
+            <p className="text-sm font-bold text-gray-950">Call summary</p>
+            <p className="text-xs font-semibold text-gray-500">{new Date(event.createdAt).toLocaleString()}</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700"><Sparkles className="h-3.5 w-3.5" />Summary</p>
-            <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{summary || "Summary is still processing or unavailable."}</p>
+            <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-gray-800">{summary || "Summary is still processing or unavailable."}</p>
           </div>
           {event.recordingUrl && <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="w-full" />}
-          <div className="rounded-xl border border-slate-200 bg-slate-50">
-            <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
-            {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-slate-800">{transcript || "Transcript is still processing or unavailable."}</p>}
+          <div className="rounded-lg border border-gray-200 bg-gray-50">
+            <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-gray-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
+            {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{transcript || "Transcript is still processing or unavailable."}</p>}
           </div>
         </div>
       </div>
@@ -282,33 +282,33 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, callNotes, cal
   return (
     <div className="fixed inset-x-3 bottom-3 z-50 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[340px]">
       <Card className="overflow-hidden border-blue-100 shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Dialer</p>
-            <input value={dialNumber} onChange={(event) => onDialNumberChange(event.target.value)} className="mt-1 w-full bg-transparent text-lg font-bold text-slate-950 outline-none" aria-label="Dial number" placeholder="Enter phone number" />
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Dialer</p>
+            <input value={dialNumber} onChange={(event) => onDialNumberChange(event.target.value)} className="mt-1 w-full bg-transparent text-lg font-bold text-gray-950 outline-none" aria-label="Dial number" placeholder="Enter phone number" />
           </div>
           <div className="flex items-center gap-1">
             {isActiveCall && <Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge>}
-            <button onClick={onMinimize} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100">{isMinimized ? "Open" : "Min"}</button>
-            <button onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100">×</button>
+            <button onClick={onMinimize} className="rounded-lg px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100">{isMinimized ? "Open" : "Min"}</button>
+            <button onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100">×</button>
           </div>
         </div>
         {!isMinimized && (
           <div className="p-3">
-            <p className="mb-2 text-xs text-slate-500">Calling as XRP Roofing · {contactName || dialNumber || "Manual number"}</p>
+            <p className="mb-2 text-xs text-gray-500">Calling as XRP Roofing · {contactName || dialNumber || "Manual number"}</p>
             <div className="mb-3 grid grid-cols-2 gap-2">
-              <button onClick={onStartCall} className="rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-blue-700"><Phone className="mr-2 inline h-4 w-4" />Dial number</button>
-              <button onClick={onEndCall} disabled={!isActiveCall} className="rounded-xl bg-slate-900 px-3 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><PhoneOff className="mr-2 inline h-4 w-4" />End</button>
+              <button onClick={onStartCall} className="rounded-lg bg-blue-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-blue-700"><Phone className="mr-2 inline h-4 w-4" />Dial number</button>
+              <button onClick={onEndCall} disabled={!isActiveCall} className="rounded-lg bg-gray-900 px-3 py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"><PhoneOff className="mr-2 inline h-4 w-4" />End</button>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-base font-semibold">{keys.map((key) => <button key={key} onClick={() => onDialNumberChange(`${dialNumber}${key}`)} className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-slate-800 transition hover:bg-blue-50 hover:text-blue-700">{key}</button>)}</div>
+            <div className="grid grid-cols-3 gap-2 text-center text-base font-semibold">{keys.map((key) => <button key={key} onClick={() => onDialNumberChange(`${dialNumber}${key}`)} className="rounded-lg border border-gray-200 bg-gray-50 py-2.5 text-gray-800 transition hover:bg-blue-50 hover:text-blue-700">{key}</button>)}</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button onClick={onMuteCall} disabled={!isActiveCall} className={`rounded-xl border border-slate-200 p-2.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${isMuted ? "bg-orange-50 text-orange-700" : "text-slate-600"}`}><Mic className="mx-auto h-4 w-4" /></button>
-              <button onClick={onHoldCall} disabled={!isActiveCall || !callSid} className={`rounded-xl border border-slate-200 p-2.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${isHeld ? "bg-orange-50 text-orange-700" : "text-slate-600"}`}><Pause className="mx-auto h-4 w-4" /></button>
+              <button onClick={onMuteCall} disabled={!isActiveCall} className={`rounded-lg border border-gray-200 p-2.5 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${isMuted ? "bg-orange-50 text-orange-700" : "text-gray-600"}`}><Mic className="mx-auto h-4 w-4" /></button>
+              <button onClick={onHoldCall} disabled={!isActiveCall || !callSid} className={`rounded-lg border border-gray-200 p-2.5 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 ${isHeld ? "bg-orange-50 text-orange-700" : "text-gray-600"}`}><Pause className="mx-auto h-4 w-4" /></button>
             </div>
-            {callSid && <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-semibold text-blue-700">Call connected. Add notes below or forward this live call to another number.</div>}
-            {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Forward call</p><div className="flex gap-2"><input value={forwardNumber} onChange={(event) => onForwardNumberChange(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Forward to phone number" /><button onClick={onForwardCall} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">Forward</button></div></div>}
-            {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Call disposition</p><select value={callDisposition} onChange={(event) => onDispositionChange(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"><option value="">Select disposition</option>{dispositions.map((disposition) => <option key={disposition} value={disposition}>{disposition}</option>)}</select></div>}
-            {callSid && <div className="mt-3"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Call notes</p><textarea value={callNotes} onChange={(event) => onNotesChange(event.target.value)} className="min-h-20 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." /><button onClick={onSaveCallNotes} className="mt-2 w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700">Save call notes</button></div>}
+            {callSid && <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs font-semibold text-blue-700">Call connected. Add notes below or forward this live call to another number.</div>}
+            {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-gray-500">Forward call</p><div className="flex gap-2"><input value={forwardNumber} onChange={(event) => onForwardNumberChange(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Forward to phone number" /><button onClick={onForwardCall} className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-bold text-white">Forward</button></div></div>}
+            {callSid && <div className="mt-3 grid gap-2"><p className="text-xs font-bold uppercase tracking-wide text-gray-500">Call disposition</p><select value={callDisposition} onChange={(event) => onDispositionChange(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"><option value="">Select disposition</option>{dispositions.map((disposition) => <option key={disposition} value={disposition}>{disposition}</option>)}</select></div>}
+            {callSid && <div className="mt-3"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Call notes</p><textarea value={callNotes} onChange={(event) => onNotesChange(event.target.value)} className="min-h-20 w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Type live call notes..." /><button onClick={onSaveCallNotes} className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700">Save call notes</button></div>}
           </div>
         )}
       </Card>
@@ -319,8 +319,8 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, callNotes, cal
 function SchedulerPanel({ onSchedule }: { onSchedule: () => void }) {
   return (
     <Card className="p-4">
-      <p className="text-sm font-semibold text-slate-950">Schedule appointment</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">Create an appointment for this contact. It syncs to the CRM calendar.</p>
+      <p className="text-sm font-semibold text-gray-950">Schedule appointment</p>
+      <p className="mt-1 text-xs leading-5 text-gray-500">Create an appointment for this contact. It syncs to the CRM calendar.</p>
       <Button variant="primary" className="mt-3 w-full" onClick={onSchedule}><Calendar className="mr-1.5 h-4 w-4" />New appointment</Button>
     </Card>
   );
@@ -329,8 +329,8 @@ function SchedulerPanel({ onSchedule }: { onSchedule: () => void }) {
 function EditableDetailRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-transparent bg-slate-50 px-2 py-1.5 text-sm leading-5 text-slate-800 outline-none transition hover:border-slate-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
+      <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-transparent bg-gray-50 px-2 py-1.5 text-sm leading-5 text-gray-800 outline-none transition hover:border-gray-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
     </label>
   );
 }
@@ -608,16 +608,16 @@ function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { c
     <aside className="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-1">
       <Card className="p-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1">
-            <input value={contact.name} onChange={(event) => onContactChange("name", event.target.value)} className="w-full rounded-lg border border-transparent bg-transparent px-1 text-lg font-bold text-slate-950 outline-none transition hover:border-slate-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
+            <input value={contact.name} onChange={(event) => onContactChange("name", event.target.value)} className="w-full rounded-lg border border-transparent bg-transparent px-1 text-lg font-bold text-gray-950 outline-none transition hover:border-gray-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
             <button onClick={() => onDial(conversation)} className="mt-1 inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-800"><Phone className="mr-1.5 h-3.5 w-3.5" />{contact.phone}</button>
           </div>
         </div>
       </Card>
 
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-slate-950">Contact Info</h3>
+        <h3 className="text-sm font-bold text-gray-950">Contact Info</h3>
         <div className="mt-4 space-y-4">
           <EditableDetailRow label="Email" value={contact.email} onChange={(value) => onContactChange("email", value)} />
           <EditableDetailRow label="Address" value={contact.address} onChange={(value) => onContactChange("address", value)} />
@@ -626,7 +626,7 @@ function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { c
       </Card>
 
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-slate-950">Job Details</h3>
+        <h3 className="text-sm font-bold text-gray-950">Job Details</h3>
         <div className="mt-4 space-y-4">
           <EditableDetailRow label="Roof type" value={contact.roofType} onChange={(value) => onContactChange("roofType", value)} />
           <EditableDetailRow label="Assigned rep" value={contact.assignedRep} onChange={(value) => onContactChange("assignedRep", value)} />
@@ -637,9 +637,9 @@ function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { c
       </Card>
 
       <Card className="p-5">
-        <h3 className="text-sm font-bold text-slate-950">Activity Timeline</h3>
+        <h3 className="text-sm font-bold text-gray-950">Activity Timeline</h3>
         <div className="mt-4 space-y-3">
-          {conversation.messages.slice(0, 3).map((message) => <div key={message.id} className="border-l-2 border-slate-200 pl-3"><p className="text-sm text-slate-700">{message.body}</p><p className="mt-1 text-xs text-slate-500">{message.timestamp}</p></div>)}
+          {conversation.messages.slice(0, 3).map((message) => <div key={message.id} className="border-l-2 border-gray-200 pl-3"><p className="text-sm text-gray-700">{message.body}</p><p className="mt-1 text-xs text-gray-500">{message.timestamp}</p></div>)}
         </div>
       </Card>
 
@@ -1363,23 +1363,23 @@ export default function ConversationBoard() {
   }
 
   return (
-    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] overflow-x-clip bg-slate-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:flex xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:flex-col xl:overflow-hidden">
+    <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] overflow-x-clip bg-gray-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:flex xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:flex-col xl:overflow-hidden">
       {incomingCall && (
-        <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
+        <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
-          <div className="flex gap-2"><button onClick={handleAnswerIncomingCall} className="inline-flex items-center rounded-xl bg-white px-3.5 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"><Phone className="mr-1.5 h-4 w-4" />Answer</button><button onClick={handleDeclineIncomingCall} className="inline-flex items-center rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"><PhoneOff className="mr-1.5 h-4 w-4" />Decline</button></div>
+          <div className="flex gap-2"><button onClick={handleAnswerIncomingCall} className="inline-flex items-center rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"><Phone className="mr-1.5 h-4 w-4" />Answer</button><button onClick={handleDeclineIncomingCall} className="inline-flex items-center rounded-lg bg-gray-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"><PhoneOff className="mr-1.5 h-4 w-4" />Decline</button></div>
         </div>
       )}
       {isActiveCall && (
-        <div className="sticky top-20 z-40 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-600 px-4 py-3 text-white shadow-sm">
+        <div className="sticky top-20 z-40 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-600 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-blue-300" /><span className="text-sm font-semibold">Active call with {matchedDialContact?.name || dialNumber}</span><Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge></div>
-          <div className="flex gap-2"><Button variant="ghost" className="text-white hover:bg-blue-500" onClick={handleMuteCall}><Mic className="mr-1 h-3 w-3" />{isMuted ? "Unmute" : "Mute"}</Button><Button variant="ghost" className="text-white hover:bg-blue-500" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}>Notes / Forward</Button><button onClick={handleEndCall} className="inline-flex items-center rounded-xl bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"><PhoneOff className="mr-1.5 h-4 w-4" />End</button></div>
+          <div className="flex gap-2"><Button variant="ghost" className="text-white hover:bg-blue-500" onClick={handleMuteCall}><Mic className="mr-1 h-3 w-3" />{isMuted ? "Unmute" : "Mute"}</Button><Button variant="ghost" className="text-white hover:bg-blue-500" onClick={() => { setIsDialerOpen(true); setIsDialerMinimized(false); }}>Notes / Forward</Button><button onClick={handleEndCall} className="inline-flex items-center rounded-lg bg-gray-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"><PhoneOff className="mr-1.5 h-4 w-4" />End</button></div>
         </div>
       )}
 
-      <div className={`${showMobileThread ? "hidden xl:flex" : "flex"} z-30 mb-3 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm xl:shrink-0`}>
+      <div className={`${showMobileThread ? "hidden xl:flex" : "flex"} z-30 mb-3 items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm xl:shrink-0`}>
         <div className="flex min-w-0 items-center gap-2.5">
-          <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">Conversations</h1>
+          <h1 className="text-lg font-bold tracking-tight text-gray-950 sm:text-xl">Conversations</h1>
           <Badge tone={inboundReady ? "green" : "slate"}>{inboundReady ? "Inbound ready" : "Inbound not connected"}</Badge>
           {notificationPermission !== "granted" && <button onClick={handleEnableNotifications} className="hidden rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 sm:inline">Enable notifications</button>}
         </div>
@@ -1396,37 +1396,37 @@ export default function ConversationBoard() {
           </div>
           {inboxCollapsed && <CollapsedInboxRail onExpand={toggleInboxCollapsed} onNew={openNewConversation} />}
         </div>
-        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:h-full`}> 
+        <main className={`${showMobileThread ? "flex" : "hidden xl:flex"} h-[calc(100dvh-8.5rem)] min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm xl:h-full`}> 
           {active ? (
             <>
-              <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-slate-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-3"><button type="button" onClick={() => { setShowMobileThread(false); setShowMobileContact(false); }} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-slate-950">{active.contact.name}</p><p className="text-sm text-slate-500"><AddressLink value={active.contact.address} /></p></div></div>
-                <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><Button className="xl:hidden" onClick={() => setShowMobileContact(true)}><UserRound className="mr-1.5 h-4 w-4" />Contact</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-slate-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
+              <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-gray-200 bg-white px-4 py-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-3"><button type="button" onClick={() => { setShowMobileThread(false); setShowMobileContact(false); }} className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-gray-950">{active.contact.name}</p><p className="text-sm text-gray-500"><AddressLink value={active.contact.address} /></p></div></div>
+                <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><Button className="xl:hidden" onClick={() => setShowMobileContact(true)}><UserRound className="mr-1.5 h-4 w-4" />Contact</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-gray-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-gray-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
-              <div className="relative min-h-0 flex-1 bg-slate-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-slate-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800">Latest messages</button></div>
+              <div className="relative min-h-0 flex-1 bg-gray-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-gray-800">Latest messages</button></div>
             </>
           ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-8 text-center">
-              <div className="max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-gray-50 p-8 text-center">
+              <div className="max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <Phone className="mx-auto h-10 w-10 text-blue-600" />
-                <h2 className="mt-3 text-lg font-bold text-slate-950">No conversation selected</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">Dial a number, receive a call, or send a text. The contact or phone number will appear here with messages, recordings, transcripts, and summaries.</p>
+                <h2 className="mt-3 text-lg font-bold text-gray-950">No conversation selected</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600">Dial a number, receive a call, or send a text. The contact or phone number will appear here with messages, recordings, transcripts, and summaries.</p>
               </div>
             </div>
           )}
-          <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white p-3">
+          <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white p-3">
             <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} onClick={() => setMessageText((prev: string) => prev ? `${prev} ${template}` : template)} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
-            {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
+            {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
             <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) setMessageText((prev: string) => prev ? `${prev} [${file.name}]` : `[${file.name}]`); event.target.value = ""; }} />
-            <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-slate-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-slate-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-xl bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
+            <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
         {active && <div className="hidden xl:block xl:min-h-0"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
         {active && showMobileContact && (
-          <div className="fixed inset-0 z-[60] flex flex-col bg-slate-100 xl:hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Contact</p><p className="text-base font-bold text-slate-950">{active.contact.name}</p></div>
-              <button type="button" onClick={() => setShowMobileContact(false)} aria-label="Close contact" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm"><X className="h-5 w-5" /></button>
+          <div className="fixed inset-0 z-[60] flex flex-col bg-gray-100 xl:hidden">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Contact</p><p className="text-base font-bold text-gray-950">{active.contact.name}</p></div>
+              <button type="button" onClick={() => setShowMobileContact(false)} aria-label="Close contact" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm"><X className="h-5 w-5" /></button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>
           </div>
@@ -1436,19 +1436,19 @@ export default function ConversationBoard() {
       <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
 
       {newConvoOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setNewConvoOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={startNewConversation} className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-              <p className="text-base font-bold text-slate-950">New conversation</p>
-              <button type="button" onClick={() => setNewConvoOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setNewConvoOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={startNewConversation} className="w-full max-w-sm rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+              <p className="text-base font-bold text-gray-950">New conversation</p>
+              <button type="button" onClick={() => setNewConvoOpen(false)} className="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-3 px-5 py-4">
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone number</span><input value={newConvoPhone} onChange={(event) => { setNewConvoPhone(event.target.value); setNewConvoError(""); }} inputMode="tel" autoFocus className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" /></label>
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Name (optional)</span><input value={newConvoName} onChange={(event) => setNewConvoName(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Customer name" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Phone number</span><input value={newConvoPhone} onChange={(event) => { setNewConvoPhone(event.target.value); setNewConvoError(""); }} inputMode="tel" autoFocus className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Name (optional)</span><input value={newConvoName} onChange={(event) => setNewConvoName(event.target.value)} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Customer name" /></label>
               {newConvoError && <p className="text-sm font-medium text-orange-600">{newConvoError}</p>}
-              <p className="text-xs leading-5 text-slate-500">Starts a new SMS conversation. Type your message and tap send.</p>
+              <p className="text-xs leading-5 text-gray-500">Starts a new SMS conversation. Type your message and tap send.</p>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
               <Button onClick={() => setNewConvoOpen(false)}>Cancel</Button>
               <Button variant="primary" onClick={() => startNewConversation()}><MessageCircle className="mr-1.5 h-4 w-4" />Start conversation</Button>
             </div>
@@ -1457,25 +1457,25 @@ export default function ConversationBoard() {
       )}
 
       {scheduleOpen && active && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setScheduleOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-              <p className="text-base font-bold text-slate-950">Schedule appointment</p>
-              <button type="button" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setScheduleOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+              <p className="text-base font-bold text-gray-950">Schedule appointment</p>
+              <button type="button" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1.5 text-gray-500 transition hover:bg-gray-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
-              <p className="text-xs text-slate-500">For {active.contact.name}{active.contact.address ? ` · ${active.contact.address}` : ""}</p>
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Title</span><input value={scheduleForm.title} onChange={(event) => setScheduleForm((form) => ({ ...form, title: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Appointment title" /></label>
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</span><select value={scheduleForm.jobKind} onChange={(event) => setScheduleForm((form) => ({ ...form, jobKind: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white">{appointmentTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Date</span><input type="date" value={scheduleForm.date} onChange={(event) => setScheduleForm((form) => ({ ...form, date: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+              <p className="text-xs text-gray-500">For {active.contact.name}{active.contact.address ? ` · ${active.contact.address}` : ""}</p>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Title</span><input value={scheduleForm.title} onChange={(event) => setScheduleForm((form) => ({ ...form, title: event.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Appointment title" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Type</span><select value={scheduleForm.jobKind} onChange={(event) => setScheduleForm((form) => ({ ...form, jobKind: event.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white">{appointmentTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Date</span><input type="date" value={scheduleForm.date} onChange={(event) => setScheduleForm((form) => ({ ...form, date: event.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Start</span><input type="time" value={scheduleForm.startTime} onChange={(event) => setScheduleForm((form) => ({ ...form, startTime: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
-                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">End</span><input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((form) => ({ ...form, endTime: event.target.value }))} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start</span><input type="time" value={scheduleForm.startTime} onChange={(event) => setScheduleForm((form) => ({ ...form, startTime: event.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
+                <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">End</span><input type="time" value={scheduleForm.endTime} onChange={(event) => setScheduleForm((form) => ({ ...form, endTime: event.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" /></label>
               </div>
-              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</span><textarea value={scheduleForm.notes} onChange={(event) => setScheduleForm((form) => ({ ...form, notes: event.target.value }))} rows={3} className="resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Optional details" /></label>
+              <label className="grid gap-1"><span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Notes</span><textarea value={scheduleForm.notes} onChange={(event) => setScheduleForm((form) => ({ ...form, notes: event.target.value }))} rows={3} className="resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Optional details" /></label>
               {scheduleError && <p className="text-sm font-medium text-orange-600">{scheduleError}</p>}
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
               <Button onClick={() => setScheduleOpen(false)}>Cancel</Button>
               <Button variant="primary" onClick={() => handleSaveSchedule()} className={scheduleSaving ? "pointer-events-none opacity-60" : ""}>{scheduleSaving ? "Saving…" : "Save appointment"}</Button>
             </div>
@@ -1485,7 +1485,7 @@ export default function ConversationBoard() {
 
       {!isDialerOpen && (
         <div className={`fixed bottom-6 right-6 z-40 flex-col items-end gap-3 ${showMobileThread ? "hidden xl:flex" : "flex"}`}>
-          <Link href="/crm/team-chat" className="inline-flex items-center rounded-full bg-[#0A3D91] px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-900">
+          <Link href="/crm/team-chat" className="inline-flex items-center rounded-full bg-blue-600 px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-900">
             <MessageCircle className="mr-2 h-5 w-5" />Team Chat
           </Link>
           <button onClick={() => setIsDialerOpen(true)} className="inline-flex items-center rounded-full bg-blue-600 px-5 py-4 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700">

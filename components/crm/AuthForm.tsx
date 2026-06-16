@@ -112,63 +112,63 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A3D91] px-4 py-10 text-slate-900">
+    <div className="min-h-screen bg-blue-600 px-4 py-10 text-gray-900">
       <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl overflow-hidden rounded-[2rem] bg-white shadow-2xl lg:grid-cols-[1.05fr_0.95fr]">
         <div className="hidden bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div>
-            <div className="inline-flex rounded-2xl bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/15">XRP Roofing CRM</div>
+            <div className="inline-flex rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold ring-1 ring-white/15">XRP Roofing CRM</div>
             <h1 className="mt-10 text-5xl font-bold tracking-tight">Manage leads, jobs, estimates, and crews from one roof-ready workspace.</h1>
             <p className="mt-5 text-lg text-blue-100">Built for daily roofing operations with secure Supabase authentication and role-ready access.</p>
           </div>
           <div className="grid grid-cols-3 gap-3 text-sm text-blue-100">
-            <div className="rounded-2xl bg-white/10 p-4">Leads Pipeline</div>
-            <div className="rounded-2xl bg-white/10 p-4">Estimates</div>
-            <div className="rounded-2xl bg-white/10 p-4">Scheduling</div>
+            <div className="rounded-lg bg-white/10 p-4">Leads Pipeline</div>
+            <div className="rounded-lg bg-white/10 p-4">Estimates</div>
+            <div className="rounded-lg bg-white/10 p-4">Scheduling</div>
           </div>
         </div>
         <div className="flex items-center justify-center p-6 sm:p-10">
           <form onSubmit={handleSubmit} className="w-full max-w-md space-y-5">
             <div>
-              <Link href="/" className="text-sm font-semibold text-[#0A3D91]">← Back to website</Link>
-              <h2 className="mt-8 text-3xl font-bold tracking-tight text-[#0A3D91]">{copy[mode].title}</h2>
-              <p className="mt-2 text-slate-600">{copy[mode].subtitle}</p>
+              <Link href="/" className="text-sm font-semibold text-blue-700">← Back to website</Link>
+              <h2 className="mt-8 text-3xl font-bold tracking-tight text-blue-700">{copy[mode].title}</h2>
+              <p className="mt-2 text-gray-600">{copy[mode].subtitle}</p>
             </div>
             {mode === "signup" && (
               <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Full name</span>
-                <span className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                  <UserRound className="h-5 w-5 text-slate-400" />
+                <span className="text-sm font-semibold text-gray-700">Full name</span>
+                <span className="mt-2 flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                  <UserRound className="h-5 w-5 text-gray-400" />
                   <input className="w-full outline-none" value={name} onChange={(e) => setName(e.target.value)} required />
                 </span>
               </label>
             )}
             {mode !== "reset" && (
               <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Email</span>
-                <span className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                <span className="text-sm font-semibold text-gray-700">Email</span>
+                <span className="mt-2 flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                  <Mail className="h-5 w-5 text-gray-400" />
                   <input type="email" className="w-full outline-none" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </span>
               </label>
             )}
             {mode !== "forgot" && (
               <label className="block">
-                <span className="text-sm font-semibold text-slate-700">Password</span>
-                <span className="mt-2 flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                <span className="text-sm font-semibold text-gray-700">Password</span>
+                <span className="mt-2 flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3">
+                  <Lock className="h-5 w-5 text-gray-400" />
                   <input type="password" className="w-full outline-none" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
                 </span>
               </label>
             )}
-            {error && <div className="rounded-2xl bg-orange-50 p-3 text-sm text-orange-700">{error}</div>}
-            {message && <div className="rounded-2xl bg-blue-50 p-3 text-sm text-blue-700">{message}</div>}
-            <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#f97316] px-5 py-3 font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-[#ea580c] disabled:opacity-60">
+            {error && <div className="rounded-lg bg-orange-50 p-3 text-sm text-orange-700">{error}</div>}
+            {message && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700">{message}</div>}
+            <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f97316] px-5 py-3 font-bold text-white shadow-sm transition hover:bg-[#ea580c] disabled:opacity-60">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {copy[mode].cta}
             </button>
-            <div className="flex justify-between text-sm text-slate-600">
-              {mode !== "login" ? <Link href="/login" className="font-semibold text-[#0A3D91]">Log in</Link> : <Link href="/signup" className="font-semibold text-[#0A3D91]">Create account</Link>}
-              {mode === "login" && <Link href="/forgot-password" className="font-semibold text-[#0A3D91]">Forgot password?</Link>}
+            <div className="flex justify-between text-sm text-gray-600">
+              {mode !== "login" ? <Link href="/login" className="font-semibold text-blue-700">Log in</Link> : <Link href="/signup" className="font-semibold text-blue-700">Create account</Link>}
+              {mode === "login" && <Link href="/forgot-password" className="font-semibold text-blue-700">Forgot password?</Link>}
             </div>
           </form>
         </div>

@@ -27,7 +27,7 @@ export default function BackToJobsLink() {
         window.sessionStorage.removeItem("crm-return-to-jobs");
         router.push("/crm/leads");
       }}
-      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-100"
+      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
     >
       <ArrowLeft className="h-4 w-4" /> Back to Jobs
     </button>

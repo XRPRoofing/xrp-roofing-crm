@@ -436,7 +436,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-gray-50">
       {/* Incoming Call Banner */}
       {globalIncomingCall && !isCrewUser && (
-        <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+        <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Incoming Call</p>
           <p className="mt-1 text-lg font-bold text-gray-900">{globalIncomingCall.name}</p>
           <p className="mt-0.5 text-sm text-gray-500"><PhoneLink value={globalIncomingCall.phone} /></p>

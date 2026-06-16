@@ -52,7 +52,7 @@ const statusStyles: Record<CrewJobStatus, string> = {
   "Mark Done": "bg-blue-50 text-blue-700 ring-blue-100",
   Completed: "bg-blue-50 text-blue-700 ring-blue-100",
   "Proceed to Invoice": "bg-orange-50 text-orange-700 ring-orange-100",
-  "Done Payment": "bg-slate-100 text-slate-700 ring-slate-200",
+  "Done Payment": "bg-gray-100 text-gray-700 ring-gray-200",
 };
 
 function formatAddress(job: CrewJob) {
@@ -414,24 +414,24 @@ export default function CrewWorkflowPage() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="flex items-start justify-between gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")} className="rounded-lg p-1 hover:bg-orange-100"><X className="h-4 w-4" /></button>
         </div>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-orange-600">Production Workflow</p>
-            <h1 className="mt-0.5 text-xl font-black tracking-tight text-[#0A3D91] sm:text-3xl">Roofing Crew Workflow</h1>
-            <p className="crm-board-subtitle mt-1 hidden text-sm font-semibold text-slate-600 sm:block">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-orange-600">Production Workflow</p>
+            <h1 className="mt-0.5 text-xl font-bold tracking-tight text-blue-700 sm:text-3xl">Roofing Crew Workflow</h1>
+            <p className="crm-board-subtitle mt-1 hidden text-sm font-semibold text-gray-600 sm:block">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${supabaseSyncEnabled() ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${supabaseSyncEnabled() ? "bg-blue-50 text-blue-700" : "bg-orange-50 text-orange-700"}`}>
                 <CircleDot className="h-3.5 w-3.5" />{supabaseSyncEnabled() ? "Live sync on" : "Local mode (configure Supabase for live sync)"}
               </span>
               {presence.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                   <UsersRound className="h-3.5 w-3.5" />{presence.length} viewing now
                 </span>
               )}
@@ -439,10 +439,10 @@ export default function CrewWorkflowPage() {
           </div>
           <div className="flex w-full flex-col gap-3 lg:max-w-lg lg:flex-row">
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search jobs, team, scope..." />
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search jobs, team, scope..." />
             </div>
-            <button type="button" onClick={() => setShowCreateJob(true)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"><Plus className="mr-2 inline h-4 w-4" />New Job</button>
+            <button type="button" onClick={() => setShowCreateJob(true)} className="rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"><Plus className="mr-2 inline h-4 w-4" />New Job</button>
           </div>
         </div>
 
@@ -450,7 +450,7 @@ export default function CrewWorkflowPage() {
           {filters.map((filter) => {
             const count = filter.value === "all" ? crewJobs.length : crewJobs.filter((job) => job.status === filter.value).length;
             return (
-              <button key={filter.value} type="button" onClick={() => setActiveFilter(filter.value)} className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-black transition ${activeFilter === filter.value ? "bg-[#0A3D91] text-white shadow-lg shadow-blue-950/10" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>
+              <button key={filter.value} type="button" onClick={() => setActiveFilter(filter.value)} className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition ${activeFilter === filter.value ? "bg-blue-600 text-white shadow-sm" : "bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700"}`}>
                 {filter.label} <span className="ml-1 opacity-70">{count}</span>
               </button>
             );
@@ -458,10 +458,10 @@ export default function CrewWorkflowPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1080px] w-full text-left">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-3">Customer Name</th>
                 <th className="px-4 py-3">Property Address</th>
@@ -471,81 +471,81 @@ export default function CrewWorkflowPage() {
                 <th className="px-4 py-3">Job Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
+            <tbody className="divide-y divide-gray-100 text-sm">
               {filteredJobs.map((job) => {
                 const jobViewers = presence.filter((entry) => entry.jobId === job.id);
                 return (
                   <tr key={job.id} onClick={() => setSelectedJobId(job.id)} className="cursor-pointer bg-white transition hover:bg-blue-50/60">
-                    <td className="px-4 py-3 font-black text-[#0A3D91]">
-                      <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
+                    <td className="px-4 py-3 font-bold text-blue-700">
+                      <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
                     </td>
-                    <td className="max-w-xs truncate px-4 py-3 font-semibold text-slate-600"><AddressLink value={formatAddress(job)} /></td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-700">{member}</span>)}</div></td>
-                    <td className="px-4 py-3 font-bold text-slate-700">{job.scheduleDate}</td>
-                    <td className="max-w-[180px] truncate px-4 py-3 font-semibold text-slate-600">{job.jobScope}</td>
-                    <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${statusStyles[job.status]}`}>{job.status}</span></td>
+                    <td className="max-w-xs truncate px-4 py-3 font-semibold text-gray-600"><AddressLink value={formatAddress(job)} /></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">{member}</span>)}</div></td>
+                    <td className="px-4 py-3 font-bold text-gray-700">{job.scheduleDate}</td>
+                    <td className="max-w-[180px] truncate px-4 py-3 font-semibold text-gray-600">{job.jobScope}</td>
+                    <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[job.status]}`}>{job.status}</span></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        {loading && <div className="p-8 text-center text-sm font-bold text-slate-500">Loading crew jobs…</div>}
-        {!loading && filteredJobs.length === 0 && <div className="p-8 text-center text-sm font-bold text-slate-500">No crew jobs match this filter.</div>}
+        {loading && <div className="p-8 text-center text-sm font-bold text-gray-500">Loading crew jobs…</div>}
+        {!loading && filteredJobs.length === 0 && <div className="p-8 text-center text-sm font-bold text-gray-500">No crew jobs match this filter.</div>}
       </section>
 
       {showCreateJob && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowCreateJob(false)}>
-        <section className="my-auto w-full max-w-2xl rounded-3xl border border-blue-100 bg-blue-50 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowCreateJob(false)}>
+        <section className="my-auto w-full max-w-2xl rounded-lg border border-blue-100 bg-blue-50 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-blue-700">Crew Created Job</p>
-              <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">Create New Job</h2>
+              <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Crew Created Job</p>
+              <h2 className="mt-1 text-2xl font-bold text-blue-700">Create New Job</h2>
             </div>
-            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-xl p-2 text-slate-500 hover:bg-white"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-lg p-2 text-gray-500 hover:bg-white"><X className="h-5 w-5" /></button>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <input value={newJob.name} onChange={(event) => setNewJob({ ...newJob, name: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-1" placeholder="Customer name" />
-            <input value={newJob.phone} onChange={(event) => setNewJob({ ...newJob, phone: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Phone" />
-            <input value={newJob.email} onChange={(event) => setNewJob({ ...newJob, email: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Email" />
-            <input value={newJob.address} onChange={(event) => setNewJob({ ...newJob, address: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-2" placeholder="Property address" />
-            <input value={newJob.city} onChange={(event) => setNewJob({ ...newJob, city: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="City" />
-            <input value={newJob.roofType} onChange={(event) => setNewJob({ ...newJob, roofType: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Roof type" />
-            <input value={newJob.value} onChange={(event) => setNewJob({ ...newJob, value: event.target.value })} type="number" className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Job value" />
-            <input value={newJob.dueDate} onChange={(event) => setNewJob({ ...newJob, dueDate: event.target.value })} type="date" className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none" />
-            <select value={newJob.assignedCrew} onChange={(event) => setNewJob({ ...newJob, assignedCrew: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none">
+            <input value={newJob.name} onChange={(event) => setNewJob({ ...newJob, name: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-1" placeholder="Customer name" />
+            <input value={newJob.phone} onChange={(event) => setNewJob({ ...newJob, phone: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Phone" />
+            <input value={newJob.email} onChange={(event) => setNewJob({ ...newJob, email: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Email" />
+            <input value={newJob.address} onChange={(event) => setNewJob({ ...newJob, address: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-2" placeholder="Property address" />
+            <input value={newJob.city} onChange={(event) => setNewJob({ ...newJob, city: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="City" />
+            <input value={newJob.roofType} onChange={(event) => setNewJob({ ...newJob, roofType: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Roof type" />
+            <input value={newJob.value} onChange={(event) => setNewJob({ ...newJob, value: event.target.value })} type="number" className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Job value" />
+            <input value={newJob.dueDate} onChange={(event) => setNewJob({ ...newJob, dueDate: event.target.value })} type="date" className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" />
+            <select value={newJob.assignedCrew} onChange={(event) => setNewJob({ ...newJob, assignedCrew: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none">
               {crewMembers.map((member) => <option key={member}>{member}</option>)}
             </select>
-            <input value={newJob.jobScope} onChange={(event) => setNewJob({ ...newJob, jobScope: event.target.value })} className="rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job scope" />
-            <textarea value={newJob.jobNotes} onChange={(event) => setNewJob({ ...newJob, jobNotes: event.target.value })} className="min-h-24 rounded-2xl border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job notes" />
+            <input value={newJob.jobScope} onChange={(event) => setNewJob({ ...newJob, jobScope: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job scope" />
+            <textarea value={newJob.jobNotes} onChange={(event) => setNewJob({ ...newJob, jobNotes: event.target.value })} className="min-h-24 rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-3" placeholder="Job notes" />
           </div>
           <div className="mt-4 flex justify-end gap-3">
-            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700">Cancel</button>
-            <button type="button" onClick={() => void handleCreateJob()} className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-black text-white">Create Job</button>
+            <button type="button" onClick={() => setShowCreateJob(false)} className="rounded-lg bg-white px-4 py-3 text-sm font-bold text-gray-700">Cancel</button>
+            <button type="button" onClick={() => void handleCreateJob()} className="rounded-lg bg-orange-500 px-4 py-3 text-sm font-bold text-white">Create Job</button>
           </div>
         </section>
         </div>
       )}
 
       {selectedJob && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 backdrop-blur-sm" onClick={() => setSelectedJobId(null)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-gray-950/30 backdrop-blur-sm" onClick={() => setSelectedJobId(null)}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
+            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-600">Job Details</p>
-                  <h2 className="mt-1 text-2xl font-black text-[#0A3D91]">{selectedJob.name}</h2>
-                  <p className="mt-1 text-sm font-bold text-slate-500"><AddressLink value={formatAddress(selectedJob)} /></p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Job Details</p>
+                  <h2 className="mt-1 text-2xl font-bold text-blue-700">{selectedJob.name}</h2>
+                  <p className="mt-1 text-sm font-bold text-gray-500"><AddressLink value={formatAddress(selectedJob)} /></p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
-                  <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                  <button type="button" onClick={() => void handleDeleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                  <button type="button" onClick={() => setSelectedJobId(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>
               {viewersForSelectedJob.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {viewersForSelectedJob.map((viewer, index) => (
-                    <span key={`${viewer.role}-${viewer.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                    <span key={`${viewer.role}-${viewer.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                       <UsersRound className="h-3.5 w-3.5" />{viewer.role} {viewer.name} is {viewer.action}
                     </span>
                   ))}
@@ -555,38 +555,38 @@ export default function CrewWorkflowPage() {
 
             <div className="space-y-5 p-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Customer Information</p><p className="mt-2 font-black text-slate-900">{selectedJob.name}</p><p className="text-sm font-semibold text-slate-600"><PhoneLink value={selectedJob.phone} /></p><p className="text-sm font-semibold text-slate-600"><EmailLink value={selectedJob.email} /></p></div>
-                <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => updateAssignment(selectedJob.id, { scheduleDate: event.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case text-slate-800 outline-none" /></label>
-                <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case text-slate-800 outline-none" /></label>
-                <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} rows={3} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-slate-800 outline-none" /></label>
-                <label className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-black uppercase text-slate-500 sm:col-span-2">Job Status<select value={selectedJob.status} onChange={(event) => updateAssignment(selectedJob.id, { status: event.target.value as CrewJobStatus })} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold normal-case text-slate-800 outline-none">{crewStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Information</p><p className="mt-2 font-bold text-gray-900">{selectedJob.name}</p><p className="text-sm font-semibold text-gray-600"><PhoneLink value={selectedJob.phone} /></p><p className="text-sm font-semibold text-gray-600"><EmailLink value={selectedJob.email} /></p></div>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => updateAssignment(selectedJob.id, { scheduleDate: event.target.value })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} rows={3} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Status<select value={selectedJob.status} onChange={(event) => updateAssignment(selectedJob.id, { status: event.target.value as CrewJobStatus })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none">{crewStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 flex items-center gap-2 text-sm font-black text-[#0A3D91]"><UsersRound className="h-4 w-4" />Assigned Team</div>
-                <div className="flex flex-wrap gap-2">{crewMembers.map((member) => <button key={member} type="button" onClick={() => toggleCrew(selectedJob, member)} className={`rounded-full px-4 py-2 text-sm font-black transition ${selectedJob.assignedCrew.includes(member) ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50"}`}>{member}</button>)}</div>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-blue-700"><UsersRound className="h-4 w-4" />Assigned Team</div>
+                <div className="flex flex-wrap gap-2">{crewMembers.map((member) => <button key={member} type="button" onClick={() => toggleCrew(selectedJob, member)} className={`rounded-full px-4 py-2 text-sm font-bold transition ${selectedJob.assignedCrew.includes(member) ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-blue-50"}`}>{member}</button>)}</div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                <p className="text-sm font-black text-[#0A3D91]">Uploaded Photos</p>
+              <div className="rounded-lg border border-gray-200 bg-white p-3">
+                <p className="text-sm font-bold text-blue-700">Uploaded Photos</p>
                 <div className="mt-2 space-y-2">
                   {(["Before", "Progress", "After"] as const).map((type) => {
                     const count = type === "Before" ? selectedJob.completion.beforePhotos.length : type === "Progress" ? selectedJob.completion.progressPhotos.length : selectedJob.completion.afterPhotos.length;
                     return (
-                      <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+                      <div key={type} className="rounded-lg border border-gray-200 bg-gray-50 p-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{type}</p>
-                          <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">{count}</span>
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{type}</p>
+                          <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">{count}</span>
                         </div>
                         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => setLiveCamera({ jobId: selectedJob.id, type })}
-                            className="flex items-center justify-center gap-1.5 rounded-xl bg-[#0A3D91] px-2 py-2 text-xs font-black text-white transition hover:bg-blue-800 active:scale-95"
+                            className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 py-2 text-xs font-bold text-white transition hover:bg-blue-800 active:scale-95"
                           >
                             <Camera className="h-4 w-4" /> Camera
                           </button>
-                          <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-2 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
+                          <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-2 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100">
                             <UploadCloud className="h-4 w-4" /> Upload
                             <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
                           </label>
@@ -596,68 +596,68 @@ export default function CrewWorkflowPage() {
                   })}
                 </div>
                 {photosLoading ? (
-                  <div className="mt-2 grid gap-2 sm:grid-cols-3">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-20 w-full animate-pulse rounded-lg bg-slate-200" />)}</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-20 w-full animate-pulse rounded-lg bg-gray-200" />)}</div>
                 ) : (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-20 w-full rounded-lg object-cover" />)}</div>
                 )}
-                {!photosLoading && selectedPhotos.length === 0 && <p className="mt-1.5 text-xs font-semibold text-slate-500">No photos uploaded yet.</p>}
+                {!photosLoading && selectedPhotos.length === 0 && <p className="mt-1.5 text-xs font-semibold text-gray-500">No photos uploaded yet.</p>}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#0A3D91]">Checklist</p>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-sm font-bold text-blue-700">Checklist</p>
                 <div className="mt-3 space-y-2">
                   {selectedChecklist.map((item) => (
-                    <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
-                      <input type="checkbox" checked={item.done} onChange={() => handleToggleChecklist(item)} className="h-4 w-4 rounded border-slate-300" />
-                      <span className={item.done ? "line-through text-slate-400" : ""}>{item.label}</span>
+                    <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm font-bold text-gray-700">
+                      <input type="checkbox" checked={item.done} onChange={() => handleToggleChecklist(item)} className="h-4 w-4 rounded border-gray-300" />
+                      <span className={item.done ? "line-through text-gray-400" : ""}>{item.label}</span>
                     </label>
                   ))}
-                  {selectedChecklist.length === 0 && <p className="text-sm font-semibold text-slate-500">No checklist items yet.</p>}
+                  {selectedChecklist.length === 0 && <p className="text-sm font-semibold text-gray-500">No checklist items yet.</p>}
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <input value={checklistDraft} onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddChecklistItem(selectedJob); } }} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add checklist item" />
-                  <button type="button" onClick={() => void handleAddChecklistItem(selectedJob)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">Add</button>
+                  <input value={checklistDraft} onChange={(event) => setChecklistDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddChecklistItem(selectedJob); } }} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add checklist item" />
+                  <button type="button" onClick={() => void handleAddChecklistItem(selectedJob)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white">Add</button>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#0A3D91]">Notes</p>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-sm font-bold text-blue-700">Notes</p>
                 <div className="mt-3 space-y-2">
                   {selectedNotes.map((note) => (
-                    <div key={note.id} className="rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                      <p className="font-semibold text-slate-700">{note.body}</p>
-                      <p className="mt-1 text-xs font-bold text-slate-400">{note.author} • {new Date(note.createdAt).toLocaleString()}</p>
+                    <div key={note.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                      <p className="font-semibold text-gray-700">{note.body}</p>
+                      <p className="mt-1 text-xs font-bold text-gray-400">{note.author} • {new Date(note.createdAt).toLocaleString()}</p>
                     </div>
                   ))}
-                  {selectedNotes.length === 0 && <p className="text-sm font-semibold text-slate-500">No notes yet.</p>}
+                  {selectedNotes.length === 0 && <p className="text-sm font-semibold text-gray-500">No notes yet.</p>}
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <input value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddNote(selectedJob); } }} className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note" />
-                  <button type="button" onClick={() => void handleAddNote(selectedJob)} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-black text-white">Add</button>
+                  <input value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void handleAddNote(selectedJob); } }} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note" />
+                  <button type="button" onClick={() => void handleAddNote(selectedJob)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white">Add</button>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-sm font-black text-[#0A3D91]">Completion Notes</p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{selectedJob.completion.notes || "No completion notes submitted yet."}</p>
-                <p className="mt-3 text-sm font-black text-[#0A3D91]">Materials Used</p>
-                <p className="mt-1 text-sm font-semibold text-slate-700">{selectedJob.completion.materialsUsed || "No materials recorded."}</p>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-sm font-bold text-blue-700">Completion Notes</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-gray-700">{selectedJob.completion.notes || "No completion notes submitted yet."}</p>
+                <p className="mt-3 text-sm font-bold text-blue-700">Materials Used</p>
+                <p className="mt-1 text-sm font-semibold text-gray-700">{selectedJob.completion.materialsUsed || "No materials recorded."}</p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-black text-[#0A3D91]">Status History</p>
-                <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
-                  <p>Current status: <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${statusStyles[selectedJob.status]}`}>{selectedJob.status}</span></p>
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-sm font-bold text-blue-700">Status History</p>
+                <div className="mt-3 space-y-2 text-sm font-semibold text-gray-600">
+                  <p>Current status: <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[selectedJob.status]}`}>{selectedJob.status}</span></p>
                   {selectedJob.completion.submittedAt && <p>Marked done: {new Date(selectedJob.completion.submittedAt).toLocaleString()}</p>}
                   {selectedJob.adminNotification && <p>{selectedJob.adminNotification}</p>}
                 </div>
               </div>
 
               {selectedJob.status === "Mark Done" && (
-                <div className="sticky bottom-0 -mx-5 border-t border-slate-200 bg-white p-5">
+                <div className="sticky bottom-0 -mx-5 border-t border-gray-200 bg-white p-5">
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => updateAssignment(selectedJob.id, { status: "Completed" })} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white"><CheckCircle2 className="mr-2 inline h-4 w-4" />Approve Job</button>
-                    <button type="button" onClick={() => updateAssignment(selectedJob.id, { status: "In Progress" })} className="rounded-full bg-white px-4 py-2 text-sm font-black text-orange-700 ring-1 ring-orange-200"><RotateCcw className="mr-2 inline h-4 w-4" />Return To Team</button>
+                    <button type="button" onClick={() => updateAssignment(selectedJob.id, { status: "Completed" })} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white"><CheckCircle2 className="mr-2 inline h-4 w-4" />Approve Job</button>
+                    <button type="button" onClick={() => updateAssignment(selectedJob.id, { status: "In Progress" })} className="rounded-full bg-white px-4 py-2 text-sm font-bold text-orange-700 ring-1 ring-orange-200"><RotateCcw className="mr-2 inline h-4 w-4" />Return To Team</button>
                   </div>
                 </div>
               )}

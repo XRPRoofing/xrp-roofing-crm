@@ -1224,26 +1224,26 @@ export default function ProposalsPage() {
 
   if (activeProposal) {
     return (
-      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-slate-100 font-serif sm:-mx-6 lg:-mx-8 print:m-0 print:min-h-0 print:bg-white">
-        <div className="sticky top-16 z-30 border-b border-slate-200 bg-white shadow-sm lg:top-20 print:hidden">
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-gray-100 font-serif sm:-mx-6 lg:-mx-8 print:m-0 print:min-h-0 print:bg-white">
+        <div className="sticky top-16 z-30 border-b border-gray-200 bg-white shadow-sm lg:top-20 print:hidden">
           {/* Row 1 — back + address */}
           <div className="flex h-10 items-center justify-between px-4">
             <button type="button" onClick={closeProposalCard} className="text-sm font-bold text-blue-700">← Back to proposals</button>
-            <div className="hidden text-sm font-semibold text-slate-700 md:block">{editorForm.address}</div>
+            <div className="hidden text-sm font-semibold text-gray-700 md:block">{editorForm.address}</div>
           </div>
           {/* Row 2 — action buttons, scrollable on mobile */}
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-700">{activeProposal.status}</span>
-            <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">Save</button>
-            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Delete</button>
-            <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
-            <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-slate-100 px-4 py-1.5 text-xs font-black text-slate-700 active:scale-95 print:hidden">Print</button>
-            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white active:scale-95">Send</button>
+            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status}</span>
+            <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Save</button>
+            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
+            <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
+            <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
+            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send</button>
             {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
-              <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-black text-orange-700 active:scale-95">Mark as Signed Offline</button>
+              <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 active:scale-95">Mark as Signed Offline</button>
             )}
             {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
-              <label className="shrink-0 cursor-pointer rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-700 active:scale-95">
+              <label className="shrink-0 cursor-pointer rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">
                 Upload Signed Proposal
                 <input type="file" accept="image/*,.pdf" onChange={(event) => handleUploadSignedDocument(event.target.files?.[0])} className="hidden" />
               </label>
@@ -1253,39 +1253,39 @@ export default function ProposalsPage() {
 
         {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
           <div className="border-b border-blue-200 bg-blue-50 px-4 py-4 print:hidden">
-            <div className="mx-auto max-w-5xl rounded-2xl bg-white p-5 shadow-sm">
+            <div className="mx-auto max-w-5xl rounded-lg bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-black uppercase tracking-wider text-blue-700">Signed proposal copy</p>
-                <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700">🔒 Locked</span>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Signed proposal copy</p>
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">🔒 Locked</span>
               </div>
-              <p className="mt-2 text-sm font-bold text-slate-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
+              <p className="mt-2 text-sm font-bold text-gray-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted package</p>
-                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Accepted package</p>
+                  <p className="mt-0.5 text-sm font-bold text-blue-700">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Accepted price</p>
-                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Accepted price</p>
+                  <p className="mt-0.5 text-sm font-bold text-blue-700">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Version</p>
-                  <p className="mt-0.5 text-sm font-black text-[#0A3D91]">v{activeProposal.proposalVersion ?? 1}</p>
+                <div className="rounded-lg bg-gray-50 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Version</p>
+                  <p className="mt-0.5 text-sm font-bold text-blue-700">v{activeProposal.proposalVersion ?? 1}</p>
                 </div>
               </div>
-              {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-slate-200 bg-white object-contain p-2" />}
+              {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-gray-200 bg-white object-contain p-2" />}
               {activeProposal.status === "Signed Offline" && (
-                <div className="mt-3 rounded-xl bg-orange-50 px-3 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-orange-700">Signed In Person</p>
-                  <p className="mt-0.5 text-sm text-slate-700">This proposal was signed offline (in person) by {activeProposal.offlineSignedBy || activeProposal.customerName}.</p>
+                <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Signed In Person</p>
+                  <p className="mt-0.5 text-sm text-gray-700">This proposal was signed offline (in person) by {activeProposal.offlineSignedBy || activeProposal.customerName}.</p>
                 </div>
               )}
               {activeProposal.offlineSignatureFile && (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Uploaded Signed Document</p>
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Uploaded Signed Document</p>
                   <div className="mt-2 flex items-center gap-3">
                     {activeProposal.offlineSignatureFile.startsWith("data:image") ? (
-                      <Image src={activeProposal.offlineSignatureFile} alt="Signed proposal" width={200} height={140} className="max-h-36 w-auto rounded-lg border border-slate-200 object-contain" />
+                      <Image src={activeProposal.offlineSignatureFile} alt="Signed proposal" width={200} height={140} className="max-h-36 w-auto rounded-lg border border-gray-200 object-contain" />
                     ) : (
                       <a href={activeProposal.offlineSignatureFile} download={activeProposal.offlineSignatureFileName || "signed-proposal.pdf"} className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100">
                         📄 {activeProposal.offlineSignatureFileName || "signed-proposal.pdf"}
@@ -1300,156 +1300,156 @@ export default function ProposalsPage() {
 
         <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[280px_1fr]"}`} id="proposal-print-area">
           {!isPreviewing && (
-          <aside className="border-r border-slate-200 bg-white p-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <aside className="border-r border-gray-200 bg-white p-4">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Customer</p>
-                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-[#0A3D91] outline-none" />
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Customer</p>
+                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 outline-none" />
                   <AddressAutocomplete
                     value={editorForm.address}
                     onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
                     placeholder="Start typing address..."
-                    className="mt-2 !rounded-lg !py-2 !text-xs text-slate-600"
+                    className="mt-2 !rounded-lg !py-2 !text-xs text-gray-600"
                   />
-                  <input value={editorForm.customerPhone} onChange={(event) => setEditorForm({ ...editorForm, customerPhone: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 outline-none" placeholder="Customer phone" />
-                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
+                  <input value={editorForm.customerPhone} onChange={(event) => setEditorForm({ ...editorForm, customerPhone: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none" placeholder="Customer phone" />
+                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
                 </div>
-                <button className="text-slate-400">•••</button>
+                <button className="text-gray-400">•••</button>
               </div>
             </div>
-            <button className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-bold text-blue-700">View job details</button>
+            <button className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-sm font-bold text-blue-700">View job details</button>
             <div className="mt-5">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Proposal template</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Proposal template</p>
               <div className="space-y-2">
                 {templates.map((template) => (
-                  <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-xl p-3 text-left ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-300" : "bg-slate-50"}`}>
-                    <span className="block text-sm font-black text-[#0A3D91]">{template.label}</span>
-                    <span className="mt-1 block text-xs font-semibold text-slate-500">{template.description}</span>
+                  <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-lg p-3 text-left ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-300" : "bg-gray-50"}`}>
+                    <span className="block text-sm font-bold text-blue-700">{template.label}</span>
+                    <span className="mt-1 block text-xs font-semibold text-gray-500">{template.description}</span>
                   </button>
                 ))}
               </div>
             </div>
             <div className="mt-5 space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Proposal title
-                <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Proposal summary
-                <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-20 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Cover photo URL
-                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" placeholder="/images/logo.jpeg" />
+                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" placeholder="/images/logo.jpeg" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Cover text
-                <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Scope
-                <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-2 min-h-40 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-2 min-h-40 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Total
-                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" />
+                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
                 {isProposalLocked(activeProposal) && <span className="mt-1 block text-[10px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Customer notes
-                <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Terms and conditions
-                <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm normal-case tracking-normal text-slate-700 outline-none" />
+                <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
               </label>
             </div>
             <div className="mt-5">
               {/* Good / Better / Best toggle */}
-              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-black text-[#0A3D91]">Good / Better / Best</p>
-                  <p className="text-xs font-semibold text-slate-500">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
+                  <p className="text-sm font-bold text-blue-700">Good / Better / Best</p>
+                  <p className="text-xs font-semibold text-gray-500">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditorForm({ ...editorForm, showPackages: !editorForm.showPackages })}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${editorForm.showPackages ? "bg-blue-600" : "bg-slate-300"}`}
+                  className={`relative h-6 w-11 rounded-full transition-colors ${editorForm.showPackages ? "bg-blue-600" : "bg-gray-300"}`}
                 >
                   <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editorForm.showPackages ? "translate-x-5" : "translate-x-0.5"}`} />
                 </button>
               </label>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Proposal sections</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Proposal sections</p>
               <div className="space-y-2">
                 {proposalSections.filter((section) => editorForm.showPackages || !["BEST", "BETTER", "GOOD"].includes(section)).map((section) => (
-                  <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-xl px-4 py-3 text-left text-sm font-bold ${section === activeSection ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "bg-slate-50 text-slate-600"}`}>
+                  <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-lg px-4 py-3 text-left text-sm font-bold ${section === activeSection ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "bg-gray-50 text-gray-600"}`}>
                     {section}
                   </button>
                 ))}
               </div>
-              <button className="mt-3 w-full rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-center text-xl font-light text-blue-700">+</button>
+              <button className="mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-center text-xl font-light text-blue-700">+</button>
             </div>
           </aside>
           )}
 
           <main className="p-6 print:p-0">
             <div className="mx-auto max-w-[760px] print:max-w-none">
-              <p className="mb-5 text-center text-sm font-black text-slate-700 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
-              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-slate-200 print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-slate-200"}`}>
-                <div className="grid gap-6 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:grid-cols-2">
+              <p className="mb-5 text-center text-sm font-bold text-gray-700 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
+              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-gray-200 print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-gray-200"}`}>
+                <div className="grid gap-6 rounded-lg border border-gray-200 bg-gray-50 p-6 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Client Info</p>
-                    <p className="mt-3 text-xl font-black text-[#0A3D91]">{editorForm.customerName}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{editorForm.address}</p>
-                    {editorForm.customerPhone && <p className="mt-2 text-sm font-bold text-slate-700">{editorForm.customerPhone}</p>}
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Client Info</p>
+                    <p className="mt-3 text-xl font-bold text-blue-700">{editorForm.customerName}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{editorForm.address}</p>
+                    {editorForm.customerPhone && <p className="mt-2 text-sm font-bold text-gray-700">{editorForm.customerPhone}</p>}
                     {editorForm.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{editorForm.customerEmail}</p>}
                   </div>
-                  <div className="border-t border-slate-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Prepared By</p>
-                    <p className="mt-3 text-xl font-black text-[#0A3D91]">XRP Roofing</p>
-                    <p className="mt-2 text-sm font-bold text-slate-700">Jonathan Gonzalez</p>
-                    <p className="mt-2 text-sm text-slate-600">(623) 300-8097</p>
+                  <div className="border-t border-gray-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Prepared By</p>
+                    <p className="mt-3 text-xl font-bold text-blue-700">XRP Roofing</p>
+                    <p className="mt-2 text-sm font-bold text-gray-700">Jonathan Gonzalez</p>
+                    <p className="mt-2 text-sm text-gray-600">(623) 300-8097</p>
                     <p className="mt-1 text-sm text-blue-700">info@xrproofing.com</p>
-                    <p className="mt-1 text-sm text-slate-600">xrproofing.com</p>
+                    <p className="mt-1 text-sm text-gray-600">xrproofing.com</p>
                   </div>
                 </div>
 
                 <div className="my-8 text-center">
                   {isPreviewing ? (
-                    <h1 className={`text-3xl font-black tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-[#0A3D91]"}`}>ROOFING PROPOSAL</h1>
+                    <h1 className={`text-3xl font-bold tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-blue-700"}`}>ROOFING PROPOSAL</h1>
                   ) : (
-                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-black tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-[#0A3D91]"}`} />
+                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-bold tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-blue-700"}`} />
                   )}
-                  <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-black uppercase tracking-wider">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">ID {activeProposal.id}</span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">Issued {new Date().toLocaleDateString()}</span>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wider">
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">ID {activeProposal.id}</span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">Issued {new Date().toLocaleDateString()}</span>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{activeProposal.status}</span>
                   </div>
                 </div>
 
                 {(isPreviewing || activeSection === "Cover") && (
-                  <div className="mt-8 rounded-3xl bg-slate-50 p-8 text-center">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Cover page</p>
-                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-2xl bg-white object-contain shadow-sm" />
-                    <p className="mt-5 text-3xl font-black text-[#0A3D91]">{editorForm.title}</p>
-                    <p className="mt-4 text-lg font-bold text-slate-700">{editorForm.customerName}</p>
-                    <p className="mt-2 text-sm text-slate-500">{editorForm.address}</p>
+                  <div className="mt-8 rounded-lg bg-gray-50 p-8 text-center">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Cover page</p>
+                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-lg bg-white object-contain shadow-sm" />
+                    <p className="mt-5 text-3xl font-bold text-blue-700">{editorForm.title}</p>
+                    <p className="mt-4 text-lg font-bold text-gray-700">{editorForm.customerName}</p>
+                    <p className="mt-2 text-sm text-gray-500">{editorForm.address}</p>
                     {isPreviewing ? (
-                      <p className="mx-auto mt-6 max-w-xl whitespace-pre-line text-sm leading-7 text-slate-600">{editorForm.coverText}</p>
+                      <p className="mx-auto mt-6 max-w-xl whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.coverText}</p>
                     ) : (
-                      <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mx-auto mt-6 min-h-28 w-full max-w-xl resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm leading-7 text-slate-600 outline-none" />
+                      <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mx-auto mt-6 min-h-28 w-full max-w-xl resize-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-center text-sm leading-7 text-gray-600 outline-none" />
                     )}
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Inspection Photos") && (
                   <div className={`mt-8 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Inspection Photos</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Inspection Photos</p>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       {normalizeInspectionPhotos(editorForm.inspectionPhotos).map((photo, index) => (
-                        <div key={photo.label} className={`rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
-                          <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-xl bg-white text-sm font-bold text-slate-500">
+                        <div key={photo.label} className={`rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
+                          <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-lg bg-white text-sm font-bold text-gray-500">
                             {photo.image ? (
                               <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-52 w-full object-cover" />
                             ) : (
@@ -1457,14 +1457,14 @@ export default function ProposalsPage() {
                             )}
                           </div>
                           {isPreviewing ? (
-                            photo.note && <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{photo.note}</p>
+                            photo.note && <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">{photo.note}</p>
                           ) : (
                             <>
-                              <label className="mt-3 block rounded-xl bg-blue-50 px-4 py-3 text-center text-sm font-black text-blue-700">
+                              <label className="mt-3 block rounded-lg bg-blue-50 px-4 py-3 text-center text-sm font-bold text-blue-700">
                                 Upload photo
                                 <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
                               </label>
-                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-600 outline-none" placeholder={`${photo.label} notes`} />
+                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-24 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-600 outline-none" placeholder={`${photo.label} notes`} />
                             </>
                           )}
                         </div>
@@ -1475,17 +1475,17 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
                   <div className="mt-8 grid gap-6 md:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-5">
-                      <p className="text-xs font-black uppercase tracking-wider text-slate-500">Prepared for</p>
-                      <p className="mt-2 text-lg font-black text-[#0A3D91]">{editorForm.customerName}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">{editorForm.address}</p>
+                    <div className="rounded-lg bg-gray-50 p-5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Prepared for</p>
+                      <p className="mt-2 text-lg font-bold text-blue-700">{editorForm.customerName}</p>
+                      <p className="mt-1 text-sm leading-6 text-gray-600">{editorForm.address}</p>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 p-5">
-                      <p className="text-xs font-black uppercase tracking-wider text-slate-500">Proposal summary</p>
+                    <div className="rounded-lg bg-gray-50 p-5">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Proposal summary</p>
                       {isPreviewing ? (
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{editorForm.summary}</p>
+                        <p className="mt-2 text-sm leading-6 text-gray-600">{editorForm.summary}</p>
                       ) : (
-                        <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-6 text-slate-600 outline-none" />
+                        <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-6 text-gray-600 outline-none" />
                       )}
                     </div>
                   </div>
@@ -1493,30 +1493,30 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Estimate") && (
                   <div className="mt-8">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Description of Work</p>
-                    <div className="mt-4 border-y border-slate-300 py-5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Description of Work</p>
+                    <div className="mt-4 border-y border-gray-300 py-5">
                       {isPreviewing ? (
                         <>
-                          <p className="whitespace-pre-line text-sm leading-7 text-slate-700">{editorForm.scope}</p>
-                          <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{editorForm.notes}</p>
+                          <p className="whitespace-pre-line text-sm leading-7 text-gray-700">{editorForm.scope}</p>
+                          <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700">{editorForm.notes}</p>
                         </>
                       ) : (
                         <>
-                          <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="min-h-96 w-full resize-y border-none bg-transparent p-0 text-sm leading-7 text-slate-700 outline-none" />
-                          <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-4 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-slate-700 outline-none" />
+                          <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="min-h-96 w-full resize-y border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
+                          <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-4 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
                         </>
                       )}
                     </div>
                     <div className="mt-4 flex justify-between text-sm">
-                      <span className="font-bold text-slate-700">Proposal total</span>
-                      <span className="font-black text-[#0A3D91]">${(Number(editorForm.total) || 0).toLocaleString()}</span>
+                      <span className="font-bold text-gray-700">Proposal total</span>
+                      <span className="font-bold text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
 
                 {isPreviewing && editorForm.showPackages && (
                   <div className="mt-8">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Package Options</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Package Options</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-3 print:block print:space-y-4">
                       {(["good", "better", "best"] as const).map((option) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
@@ -1524,14 +1524,14 @@ export default function ProposalsPage() {
                         const scopeLines = packageOption.scope.split(/\r?\n|✓|•|·|;/).map((l: string) => l.replace(/^[-*✓\s]+/, "").trim()).filter(Boolean);
                         const isScopeExpanded = previewExpandedScopes[option] ?? false;
                         return (
-                          <div key={option} className={`rounded-3xl border p-5 print:break-inside-avoid ${selected ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100" : "border-slate-200 bg-white"}`}>
-                            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">{option}</p>
-                            <p className="mt-2 text-xl font-black uppercase text-[#0A3D91]">{option} Package</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-500">Professional roofing option for this project.</p>
+                          <div key={option} className={`rounded-lg border p-5 print:break-inside-avoid ${selected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-gray-200 bg-white"}`}>
+                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">{option}</p>
+                            <p className="mt-2 text-xl font-bold uppercase text-blue-700">{option} Package</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-500">Professional roofing option for this project.</p>
                             <div className={`relative mt-5 overflow-hidden print:!max-h-none ${!isScopeExpanded ? "max-h-32" : ""}`}>
                               <ul className="space-y-2">
                                 {scopeLines.map((line: string, i: number) => (
-                                  <li key={i} className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+                                  <li key={i} className="flex items-start gap-2 text-sm leading-6 text-gray-700">
                                     <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 fill-blue-600" aria-hidden="true"><path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.3 6.8-6.3a1 1 0 0 1 1.9 0z" /></svg>
                                     <span>{line}</span>
                                   </li>
@@ -1547,8 +1547,8 @@ export default function ProposalsPage() {
                                 {isScopeExpanded ? "Show less" : "See full scope of work"}
                               </button>
                             )}
-                            <p className="mt-5 text-2xl font-black text-blue-700">${packageOption.price.toLocaleString()}</p>
-                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black print:hidden ${selected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
+                            <p className="mt-5 text-2xl font-bold text-blue-700">${packageOption.price.toLocaleString()}</p>
+                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-lg px-4 py-3 text-sm font-bold print:hidden ${selected ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
                           </div>
                         );
                       })}
@@ -1558,69 +1558,69 @@ export default function ProposalsPage() {
 
                 {!isPreviewing && editorForm.showPackages && (["GOOD", "BETTER", "BEST"].includes(activeSection)) && (
                   <div className="mt-8">
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">{activeSection} proposal option</p>
-                    <div className="mt-4 rounded-2xl border border-slate-200 p-5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{activeSection} proposal option</p>
+                    <div className="mt-4 rounded-lg border border-gray-200 p-5">
                       <div className="flex items-center justify-between">
-                        <p className="text-2xl font-black text-[#0A3D91]">{activeSection} Roofing Package</p>
+                        <p className="text-2xl font-bold text-blue-700">{activeSection} Roofing Package</p>
                         {isPreviewing ? (
-                          <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
+                          <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
                         ) : (
-                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; const newPrice = Number(event.target.value) || 0; const newPackages = { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: newPrice } }; setEditorForm({ ...editorForm, packages: newPackages, total: option === "best" ? String(newPrice) : editorForm.total }); }} className="w-32 rounded-full bg-blue-50 px-4 py-2 text-right text-sm font-black text-blue-700 outline-none" />
+                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; const newPrice = Number(event.target.value) || 0; const newPackages = { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: newPrice } }; setEditorForm({ ...editorForm, packages: newPackages, total: option === "best" ? String(newPrice) : editorForm.total }); }} className="w-32 rounded-full bg-blue-50 px-4 py-2 text-right text-sm font-bold text-blue-700 outline-none" />
                         )}
                       </div>
                       {isPreviewing ? (
-                        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-slate-700">{normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope}</p>
+                        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-gray-700">{normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope}</p>
                       ) : (
-                        <textarea value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; setEditorForm({ ...editorForm, packages: { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], scope: event.target.value } } }); }} className="mt-5 min-h-64 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-slate-700 outline-none" />
+                        <textarea value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; setEditorForm({ ...editorForm, packages: { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], scope: event.target.value } } }); }} className="mt-5 min-h-64 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
                       )}
                     </div>
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-8 rounded-3xl border border-blue-100 bg-blue-50 p-6">
-                    <p className="text-xs font-black uppercase tracking-wider text-blue-700">Total Summary</p>
+                  <div className="mt-8 rounded-lg border border-blue-100 bg-blue-50 p-6">
+                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Total Summary</p>
                     <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                       <div>
-                        {editorForm.showPackages && <p className="text-sm font-bold text-slate-600">Selected Package</p>}
-                        {editorForm.showPackages && <p className="mt-1 text-xl font-black uppercase text-[#0A3D91]">{activeProposal.selectedOption || "best"}</p>}
-                        {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-slate-600">{editorForm.notes}</p>}
+                        {editorForm.showPackages && <p className="text-sm font-bold text-gray-600">Selected Package</p>}
+                        {editorForm.showPackages && <p className="mt-1 text-xl font-bold uppercase text-blue-700">{activeProposal.selectedOption || "best"}</p>}
+                        {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-gray-600">{editorForm.notes}</p>}
                       </div>
                       <div className="text-left md:text-right">
-                        <p className="text-sm font-bold text-slate-600">Total Price</p>
-                        <p className="mt-1 text-4xl font-black text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</p>
+                        <p className="text-sm font-bold text-gray-600">Total Price</p>
+                        <p className="mt-1 text-4xl font-bold text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Terms and Conditions") && (
-                  <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                    <p className="text-2xl font-black text-[#0A3D91]">Terms and Conditions</p>
+                  <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
+                    <p className="text-2xl font-bold text-blue-700">Terms and Conditions</p>
                     {isPreviewing ? (
-                      <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700">
+                      <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 text-sm leading-7 text-gray-700">
                         {editorForm.terms.split("\n\n").map((section, index) => (
                           <p key={index} className="mb-4 whitespace-pre-line">{section}</p>
                         ))}
                       </div>
                     ) : (
-                      <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-3 min-h-32 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-slate-600 outline-none" />
+                      <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-3 min-h-32 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
                     )}
                   </div>
                 )}
 
                 {editorBrochures.length > 0 && (isPreviewing || activeSection === "Terms and Conditions") && (
-                  <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                    <p className="text-2xl font-black text-[#0A3D91]">Product Brochure</p>
+                  <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
+                    <p className="text-2xl font-bold text-blue-700">Product Brochure</p>
                     <div className="mt-4 space-y-4">
                       {editorBrochures.map((file, index) => (
                         <div key={index}>
                           {file.type.startsWith("image/") ? (
-                            <img src={file.dataUrl} alt={file.name} className="w-full rounded-xl" />
+                            <img src={file.dataUrl} alt={file.name} className="w-full rounded-lg" />
                           ) : (
-                            <div className="rounded-xl border border-slate-200 bg-white p-4">
-                              <p className="text-sm font-bold text-slate-700">{file.name}</p>
-                              <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm font-black text-blue-600 hover:underline">Download {file.name}</a>
+                            <div className="rounded-lg border border-gray-200 bg-white p-4">
+                              <p className="text-sm font-bold text-gray-700">{file.name}</p>
+                              <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm font-bold text-blue-600 hover:underline">Download {file.name}</a>
                             </div>
                           )}
                         </div>
@@ -1630,106 +1630,106 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-8 rounded-3xl border border-slate-200 p-6">
+                  <div className="mt-8 rounded-lg border border-gray-200 p-6">
                     <label className="hidden print:hidden">
-                      <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300" />
+                      <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-gray-300" />
                       <span>I agree to the Terms and Conditions</span>
                     </label>
-                    <p className="hidden text-sm font-bold text-slate-700 print:block">By signing below, I agree to the Terms and Conditions outlined above.</p>
+                    <p className="hidden text-sm font-bold text-gray-700 print:block">By signing below, I agree to the Terms and Conditions outlined above.</p>
                     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_180px]">
-                      <label className="block text-xs font-black uppercase tracking-wider text-slate-500">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                         Client Signature
-                        <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-5 text-2xl font-semibold italic outline-none print:rounded-none print:border-0 print:border-b-2 print:border-slate-400 print:py-8" placeholder="Type full legal name" />
+                        <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-5 text-2xl font-semibold italic outline-none print:rounded-none print:border-0 print:border-b-2 print:border-gray-400 print:py-8" placeholder="Type full legal name" />
                       </label>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">Date</p>
-                        <p className="mt-3 font-black text-[#0A3D91]">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Date</p>
+                        <p className="mt-3 font-bold text-blue-700">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                       </div>
                     </div>
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
                   </div>
                 )}
 
-                <div className="mt-12 flex items-end justify-between border-t border-slate-300 pt-4">
-                  <div className="text-xs text-slate-500">
-                    <p className="font-black text-slate-700">XRP Roofing</p>
+                <div className="mt-12 flex items-end justify-between border-t border-gray-300 pt-4">
+                  <div className="text-xs text-gray-500">
+                    <p className="font-bold text-gray-700">XRP Roofing</p>
                     <p>ROC #350898</p>
                     <p>info@xrproofing.com</p>
                   </div>
-                  <div className="text-right text-xl font-black text-[#0A3D91]">XRP<br /><span className="text-xs tracking-[0.25em]">ROOFING</span></div>
+                  <div className="text-right text-xl font-bold text-blue-700">XRP<br /><span className="text-xs tracking-[0.25em]">ROOFING</span></div>
                 </div>
               </div>
             </div>
           </main>
         </div>
         {showOfflineSignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50">
-            <div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50">
+            <div className="w-full max-w-md rounded-lg bg-white p-7 shadow-2xl">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-black text-slate-900">Mark as Signed Offline</h2>
-                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="text-2xl text-slate-400 hover:text-slate-600">&times;</button>
+                <h2 className="text-lg font-bold text-gray-900">Mark as Signed Offline</h2>
+                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
               </div>
-              <p className="mt-3 text-sm text-slate-600">Record that this proposal was signed in person. The proposal will be locked and marked as accepted.</p>
-              <label className="mt-5 block text-xs font-black uppercase tracking-wider text-slate-500">
+              <p className="mt-3 text-sm text-gray-600">Record that this proposal was signed in person. The proposal will be locked and marked as accepted.</p>
+              <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Signed by (customer name)
-                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-[#0A3D91] outline-none focus:border-blue-500" placeholder="Customer full name" />
+                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-blue-700 outline-none focus:border-blue-500" placeholder="Customer full name" />
               </label>
               <div className="mt-6 flex items-center gap-3">
-                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-600">Cancel</button>
-                <button type="button" onClick={handleMarkSignedOffline} className="flex-1 rounded-xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-100 hover:bg-orange-600">Confirm Signed Offline</button>
+                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-lg border border-gray-200 px-5 py-3 text-sm font-bold text-gray-600">Cancel</button>
+                <button type="button" onClick={handleMarkSignedOffline} className="flex-1 rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-orange-600">Confirm Signed Offline</button>
               </div>
-              <p className="mt-4 text-xs text-slate-500">After confirming, you can upload a photo or PDF of the signed document using the &ldquo;Upload Signed Proposal&rdquo; button.</p>
+              <p className="mt-4 text-xs text-gray-500">After confirming, you can upload a photo or PDF of the signed document using the &ldquo;Upload Signed Proposal&rdquo; button.</p>
             </div>
           </div>
         )}
         {showSendModal && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50">
+          <div className="fixed inset-0 z-50 flex justify-end bg-gray-950/50">
             <div className="flex h-full w-full max-w-[530px] flex-col bg-white shadow-2xl">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-7 py-5 shadow-sm">
-                <div className="flex items-center gap-3 text-xl font-black text-slate-900">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-7 py-5 shadow-sm">
+                <div className="flex items-center gap-3 text-xl font-bold text-gray-900">
                   <span className="text-blue-600">✉</span>
                   <span>Send proposal</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setIsPreviewing(true)} className="hidden rounded-full border border-blue-600 px-4 py-2 text-xs font-black text-blue-600 sm:inline-flex">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-100">✈ Send</button>
-                  <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-slate-500">×</button>
+                  <button type="button" onClick={() => setIsPreviewing(true)} className="hidden rounded-full border border-blue-600 px-4 py-2 text-xs font-bold text-blue-600 sm:inline-flex">↗ Preview</button>
+                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm">✈ Send</button>
+                  <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-gray-500">×</button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <div className="bg-slate-50 px-7 py-6">
+                <div className="bg-gray-50 px-7 py-6">
                   <div className="grid grid-cols-[44px_1fr] gap-4">
-                    <p className="pt-3 text-sm font-black text-slate-900">To:</p>
-                    <div className="rounded-lg border border-slate-200 bg-white p-4">
-                      <input value={sendForm.toName} onChange={(event) => setSendForm({ ...sendForm, toName: event.target.value })} className="w-full border-none text-sm font-black text-slate-900 outline-none" />
-                      <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
+                    <p className="pt-3 text-sm font-bold text-gray-900">To:</p>
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      <input value={sendForm.toName} onChange={(event) => setSendForm({ ...sendForm, toName: event.target.value })} className="w-full border-none text-sm font-bold text-gray-900 outline-none" />
+                      <div className="mt-3 flex items-center justify-between gap-3 text-sm text-gray-600">
                         <span>Customer</span>
-                        <input value={sendForm.toEmail} onChange={(event) => setSendForm({ ...sendForm, toEmail: event.target.value })} className="max-w-[230px] border-none text-right text-sm text-slate-600 outline-none" />
+                        <input value={sendForm.toEmail} onChange={(event) => setSendForm({ ...sendForm, toEmail: event.target.value })} className="max-w-[230px] border-none text-right text-sm text-gray-600 outline-none" />
                       </div>
                     </div>
                   </div>
                   <label className="ml-[60px] mt-3 block text-sm font-bold text-blue-600">
                     Add Cc recipients...
-                    <input value={sendForm.ccRecipients} onChange={(event) => setSendForm({ ...sendForm, ccRecipients: event.target.value })} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700 outline-none" placeholder="email@example.com, another@example.com" />
+                    <input value={sendForm.ccRecipients} onChange={(event) => setSendForm({ ...sendForm, ccRecipients: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-normal text-gray-700 outline-none" placeholder="email@example.com, another@example.com" />
                   </label>
                 </div>
                 <div className="space-y-5 px-7 py-6">
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-black text-slate-900">Email Template</p>
-                      <button type="button" onClick={() => { setShowSendModal(false); setActiveTab("templates"); }} className="text-xs font-black text-blue-600">⊞ Manage templates</button>
+                      <p className="text-sm font-bold text-gray-900">Email Template</p>
+                      <button type="button" onClick={() => { setShowSendModal(false); setActiveTab("templates"); }} className="text-xs font-bold text-blue-600">⊞ Manage templates</button>
                     </div>
-                    <select value={sendForm.emailTemplateId} onChange={(event) => handleSelectEmailTemplate(event.target.value, sendForm.toName)} className="w-full rounded border border-slate-200 px-4 py-3 text-sm font-bold outline-none">
+                    <select value={sendForm.emailTemplateId} onChange={(event) => handleSelectEmailTemplate(event.target.value, sendForm.toName)} className="w-full rounded border border-gray-200 px-4 py-3 text-sm font-bold outline-none">
                       {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
                     </select>
                   </div>
-                  <label className="block text-sm font-black text-slate-900">
+                  <label className="block text-sm font-bold text-gray-900">
                     Subject*
-                    <input required value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="mt-3 w-full rounded border border-slate-200 px-4 py-3 text-sm font-normal outline-none" />
+                    <input required value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="mt-3 w-full rounded border border-gray-200 px-4 py-3 text-sm font-normal outline-none" />
                   </label>
-                  <label className="block text-sm font-black text-slate-900">
+                  <label className="block text-sm font-bold text-gray-900">
                     Message*
-                    <div className="mt-3 flex items-center gap-6 border border-slate-200 px-4 py-3 text-sm font-bold text-slate-800">
+                    <div className="mt-3 flex items-center gap-6 border border-gray-200 px-4 py-3 text-sm font-bold text-gray-800">
                       <span>B</span>
                       <span className="italic">I</span>
                       <span className="underline">U</span>
@@ -1737,32 +1737,32 @@ export default function ProposalsPage() {
                       <span>Dynamic fields⌄</span>
                       <span>Attach</span>
                     </div>
-                    <textarea required value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-56 w-full border-x border-b border-slate-200 px-5 py-4 text-sm font-normal leading-7 outline-none" />
+                    <textarea required value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-56 w-full border-x border-b border-gray-200 px-5 py-4 text-sm font-normal leading-7 outline-none" />
                   </label>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="rounded-t-xl bg-slate-200 py-5 text-center">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="rounded-t-xl bg-gray-200 py-5 text-center">
                       <Image src="/images/logo.jpeg" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
                     </div>
-                    <div className="rounded-b-xl bg-white p-5 text-sm leading-7 text-slate-700">
+                    <div className="rounded-b-xl bg-white p-5 text-sm leading-7 text-gray-700">
                       <p className="whitespace-pre-line">{sendForm.message}</p>
-                      <div className="mt-5 rounded-xl border border-slate-200 p-4 text-center">
+                      <div className="mt-5 rounded-lg border border-gray-200 p-4 text-center">
                         <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={180} height={100} className="mx-auto max-h-28 w-auto object-contain" />
-                        <p className="mt-3 font-black text-[#0A3D91]">{editorForm.title}</p>
-                        <p className="mt-2 whitespace-pre-line text-xs leading-5 text-slate-600">{editorForm.coverText}</p>
+                        <p className="mt-3 font-bold text-blue-700">{editorForm.title}</p>
+                        <p className="mt-2 whitespace-pre-line text-xs leading-5 text-gray-600">{editorForm.coverText}</p>
                       </div>
                       <div className="mt-5 text-center">
-                        <span className="inline-block rounded-full bg-blue-600 px-5 py-2 text-sm font-black text-white">View Proposal</span>
+                        <span className="inline-block rounded-full bg-blue-600 px-5 py-2 text-sm font-bold text-white">View Proposal</span>
                       </div>
                     </div>
                   </div>
-                  {sendNotice && <p className="whitespace-pre-line rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
+                  {sendNotice && <p className="whitespace-pre-line rounded-lg bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
                 </div>
               </div>
-              <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-slate-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
-                <button type="button" onClick={() => setShowSendModal(false)} className="text-sm font-black text-blue-600">Cancel</button>
+              <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
+                <button type="button" onClick={() => setShowSendModal(false)} className="text-sm font-bold text-blue-600">Cancel</button>
                 <div className="flex gap-3">
-                  <button type="button" onClick={() => setIsPreviewing(true)} className="rounded-full border border-blue-600 px-6 py-3 text-sm font-black text-blue-600">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white">✈ Send proposal</button>
+                  <button type="button" onClick={() => setIsPreviewing(true)} className="rounded-full border border-blue-600 px-6 py-3 text-sm font-bold text-blue-600">↗ Preview</button>
+                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white">✈ Send proposal</button>
                 </div>
               </div>
             </div>
@@ -1779,41 +1779,41 @@ export default function ProposalsPage() {
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-orange-300">Proposal Center</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight">Proposals</h1>
+            <p className="text-xs font-bold uppercase tracking-wide text-orange-300">Proposal Center</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Proposals</h1>
             <p className="crm-board-subtitle mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
           </div>
-          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-2xl bg-orange-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-600">⊕ Proposal</button>
+          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-orange-600">⊕ Proposal</button>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/70 bg-white/95 px-5 pt-4 shadow-lg shadow-blue-950/5">
-        <div className="flex gap-8 text-sm font-black">
-          <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Proposals</button>
-          <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Drafts</button>
-          <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Templates</button>
-          <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-600"}`}>Settings</button>
+      <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
+        <div className="flex gap-8 text-sm font-bold">
+          <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
+          <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
+          <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
+          <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/70 bg-white/95 p-4 shadow-lg shadow-blue-950/5">
+      <div className="rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
             <div className="relative max-w-md flex-1">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
-              <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white" placeholder="Search for a customer or address..." />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
+              <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white" placeholder="Search for a customer or address..." />
             </div>
-            <button className="w-fit rounded-full bg-slate-50 px-5 py-3 text-sm font-black text-blue-600">▽ Filter</button>
+            <button className="w-fit rounded-full bg-gray-50 px-5 py-3 text-sm font-bold text-blue-600">▽ Filter</button>
           </div>
-          <div className="flex overflow-hidden rounded-lg border border-slate-200">
+          <div className="flex overflow-hidden rounded-lg border border-gray-200">
             <button className="bg-blue-50 px-4 py-3 text-xl text-blue-700 ring-1 ring-blue-500">▦</button>
-            <button className="px-4 py-3 text-xl text-slate-500">☰</button>
+            <button className="px-4 py-3 text-xl text-gray-500">☰</button>
           </div>
         </div>
       </div>
 
       {deletedProposal && (
-        <div className="flex items-center justify-between rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-900">
+        <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-900">
           <span>Deleted proposal for {deletedProposal.customerName}.</span>
           <button type="button" onClick={handleUndoDelete} className="rounded-full bg-white px-4 py-2 text-blue-700 shadow-sm">Undo</button>
         </div>
@@ -1821,45 +1821,45 @@ export default function ProposalsPage() {
 
       {activeTab === "templates" && (
         <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
-          <form onSubmit={handleCreateTemplate} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-black text-[#0A3D91]">Create proposal template</h2>
+          <form onSubmit={handleCreateTemplate} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-bold text-blue-700">Create proposal template</h2>
             <div className="mt-4 space-y-3">
-              <input required value={templateForm.label} onChange={(event) => setTemplateForm({ ...templateForm, label: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Template name" />
-              <input value={templateForm.description} onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Short description" />
-              <input required value={templateForm.title} onChange={(event) => setTemplateForm({ ...templateForm, title: event.target.value })} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Proposal title" />
-              <textarea value={templateForm.summary} onChange={(event) => setTemplateForm({ ...templateForm, summary: event.target.value })} className="min-h-28 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Proposal summary" />
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-black uppercase tracking-wider text-slate-500">Template package options</p>
+              <input required value={templateForm.label} onChange={(event) => setTemplateForm({ ...templateForm, label: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none" placeholder="Template name" />
+              <input value={templateForm.description} onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none" placeholder="Short description" />
+              <input required value={templateForm.title} onChange={(event) => setTemplateForm({ ...templateForm, title: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none" placeholder="Proposal title" />
+              <textarea value={templateForm.summary} onChange={(event) => setTemplateForm({ ...templateForm, summary: event.target.value })} className="min-h-28 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none" placeholder="Proposal summary" />
+              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Template package options</p>
                 {(["good", "better", "best"] as const).map((option) => (
-                  <div key={option} className="rounded-xl bg-white p-3">
+                  <div key={option} className="rounded-lg bg-white p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-black uppercase text-[#0A3D91]">{option}</p>
-                      <input type="number" value={normalizePackages(templateForm.packages)[option].price} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], price: Number(event.target.value) || 0 } } })} className="w-28 rounded-lg border border-slate-200 px-3 py-2 text-right text-xs font-black text-blue-700 outline-none" placeholder="Price" />
+                      <p className="text-xs font-bold uppercase text-blue-700">{option}</p>
+                      <input type="number" value={normalizePackages(templateForm.packages)[option].price} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], price: Number(event.target.value) || 0 } } })} className="w-28 rounded-lg border border-gray-200 px-3 py-2 text-right text-xs font-bold text-blue-700 outline-none" placeholder="Price" />
                     </div>
-                    <textarea value={normalizePackages(templateForm.packages)[option].scope} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], scope: event.target.value } } })} className="mt-2 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs leading-5 text-slate-600 outline-none" placeholder={`${option.toUpperCase()} included services`} />
+                    <textarea value={normalizePackages(templateForm.packages)[option].scope} onChange={(event) => setTemplateForm({ ...templateForm, packages: { ...normalizePackages(templateForm.packages), [option]: { ...normalizePackages(templateForm.packages)[option], scope: event.target.value } } })} className="mt-2 min-h-20 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs leading-5 text-gray-600 outline-none" placeholder={`${option.toUpperCase()} included services`} />
                   </div>
                 ))}
               </div>
-              <textarea value={templateForm.terms} onChange={(event) => setTemplateForm({ ...templateForm, terms: event.target.value })} className="min-h-36 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none" placeholder="Default terms and conditions" />
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <textarea value={templateForm.terms} onChange={(event) => setTemplateForm({ ...templateForm, terms: event.target.value })} className="min-h-36 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none" placeholder="Default terms and conditions" />
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">Include Brochure</p>
-                    <p className="mt-1 text-xs text-slate-400">Attach brochure files to this template</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Include Brochure</p>
+                    <p className="mt-1 text-xs text-gray-400">Attach brochure files to this template</p>
                   </div>
-                  <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochureEnabled: !templateForm.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${templateForm.brochureEnabled ? "bg-blue-600" : "bg-slate-300"}`}>
+                  <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochureEnabled: !templateForm.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${templateForm.brochureEnabled ? "bg-blue-600" : "bg-gray-300"}`}>
                     <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${templateForm.brochureEnabled ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
                 {templateForm.brochureEnabled && (
                   <div className="mt-3 space-y-2">
                     {(templateForm.brochures || []).map((file, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                      <div key={index} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs font-bold text-gray-700">
                         <span className="truncate">{file.name}</span>
                         <button type="button" onClick={() => setTemplateForm({ ...templateForm, brochures: (templateForm.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
                       </div>
                     ))}
-                    <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
+                    <label className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-xs font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">
                       + Add brochure file (PDF, image)
                       <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(event) => {
                         const files = event.target.files;
@@ -1878,65 +1878,65 @@ export default function ProposalsPage() {
                   </div>
                 )}
               </div>
-              <button className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Save template</button>
+              <button className="w-full rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white">Save template</button>
             </div>
           </form>
           <div className="grid gap-3">
             {templates.map((template) => (
-              <div key={template.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div key={template.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <input value={template.label} onChange={(event) => handleUpdateTemplate({ ...template, label: event.target.value })} className="w-full border-none bg-transparent text-lg font-black text-[#0A3D91] outline-none" />
-                    <input value={template.description} onChange={(event) => handleUpdateTemplate({ ...template, description: event.target.value })} className="mt-1 w-full border-none bg-transparent text-sm text-slate-500 outline-none" />
+                    <input value={template.label} onChange={(event) => handleUpdateTemplate({ ...template, label: event.target.value })} className="w-full border-none bg-transparent text-lg font-bold text-blue-700 outline-none" />
+                    <input value={template.description} onChange={(event) => handleUpdateTemplate({ ...template, description: event.target.value })} className="mt-1 w-full border-none bg-transparent text-sm text-gray-500 outline-none" />
                   </div>
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">Saved</span>
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Saved</span>
                 </div>
-                <label className="mt-4 block text-xs font-black uppercase tracking-wider text-slate-500">
+                <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-gray-500">
                   Proposal title
-                  <input value={template.title} onChange={(event) => handleUpdateTemplate({ ...template, title: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case tracking-normal text-slate-800 outline-none" />
+                  <input value={template.title} onChange={(event) => handleUpdateTemplate({ ...template, title: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm normal-case tracking-normal text-gray-800 outline-none" />
                 </label>
-                <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                <label className="mt-3 block text-xs font-bold uppercase tracking-wider text-gray-500">
                   Proposal summary
-                  <textarea value={template.summary} onChange={(event) => handleUpdateTemplate({ ...template, summary: event.target.value })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-slate-600 outline-none" />
+                  <textarea value={template.summary} onChange={(event) => handleUpdateTemplate({ ...template, summary: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-gray-600 outline-none" />
                 </label>
-                <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                <label className="mt-3 block text-xs font-bold uppercase tracking-wider text-gray-500">
                   Terms and Conditions
-                  <textarea value={template.terms} onChange={(event) => handleUpdateTemplate({ ...template, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-slate-600 outline-none" />
+                  <textarea value={template.terms} onChange={(event) => handleUpdateTemplate({ ...template, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-gray-600 outline-none" />
                 </label>
-                <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-500">GOOD / BETTER / BEST packages</p>
+                <div className="mt-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">GOOD / BETTER / BEST packages</p>
                   {(["good", "better", "best"] as const).map((option) => {
                     const templatePackages = normalizePackages(template.packages);
                     return (
-                      <div key={option} className="rounded-xl bg-white p-3">
+                      <div key={option} className="rounded-lg bg-white p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-black uppercase text-[#0A3D91]">{option}</p>
-                          <input type="number" value={templatePackages[option].price} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], price: Number(event.target.value) || 0 } } })} className="w-32 rounded-xl border border-slate-200 px-3 py-2 text-right text-sm font-black text-blue-700 outline-none" />
+                          <p className="text-sm font-bold uppercase text-blue-700">{option}</p>
+                          <input type="number" value={templatePackages[option].price} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], price: Number(event.target.value) || 0 } } })} className="w-32 rounded-lg border border-gray-200 px-3 py-2 text-right text-sm font-bold text-blue-700 outline-none" />
                         </div>
-                        <textarea value={templatePackages[option].scope} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], scope: event.target.value } } })} className="mt-2 min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm leading-6 text-slate-600 outline-none" />
+                        <textarea value={templatePackages[option].scope} onChange={(event) => handleUpdateTemplate({ ...template, packages: { ...templatePackages, [option]: { ...templatePackages[option], scope: event.target.value } } })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm leading-6 text-gray-600 outline-none" />
                       </div>
                     );
                   })}
                 </div>
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-wider text-slate-500">Include Brochure</p>
-                      <p className="mt-1 text-xs text-slate-400">Attach brochure files to proposals using this template</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Include Brochure</p>
+                      <p className="mt-1 text-xs text-gray-400">Attach brochure files to proposals using this template</p>
                     </div>
-                    <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochureEnabled: !template.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${template.brochureEnabled ? "bg-blue-600" : "bg-slate-300"}`}>
+                    <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochureEnabled: !template.brochureEnabled })} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${template.brochureEnabled ? "bg-blue-600" : "bg-gray-300"}`}>
                       <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition ${template.brochureEnabled ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                   </div>
                   {template.brochureEnabled && (
                     <div className="mt-3 space-y-2">
                       {(template.brochures || []).map((file, index) => (
-                        <div key={index} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                        <div key={index} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs font-bold text-gray-700">
                           <span className="truncate">{file.name}</span>
                           <button type="button" onClick={() => handleUpdateTemplate({ ...template, brochures: (template.brochures || []).filter((_, i) => i !== index) })} className="ml-2 shrink-0 text-red-500 hover:text-red-700">Remove</button>
                         </div>
                       ))}
-                      <label className="flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-xs font-black text-slate-500 transition hover:border-blue-400 hover:text-blue-600">
+                      <label className="flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-xs font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">
                         + Add brochure file (PDF, image)
                         <input type="file" accept="image/*,.pdf" multiple className="hidden" onChange={(event) => {
                           const files = event.target.files;
@@ -1969,35 +1969,35 @@ export default function ProposalsPage() {
           <div className="mt-8">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Email Templates</p>
-                <h2 className="mt-1 text-xl font-black text-[#0A3D91]">Proposal email templates</h2>
-                <p className="mt-1 text-sm text-slate-500">Saved email templates used when sending proposals. Use <code className="rounded bg-slate-100 px-1 text-xs">{"{{customer_name}}"}</code> for dynamic customer name.</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Email Templates</p>
+                <h2 className="mt-1 text-xl font-bold text-blue-700">Proposal email templates</h2>
+                <p className="mt-1 text-sm text-gray-500">Saved email templates used when sending proposals. Use <code className="rounded bg-gray-100 px-1 text-xs">{"{{customer_name}}"}</code> for dynamic customer name.</p>
               </div>
               <button type="button" onClick={() => {
                 const newId = `email-${Date.now()}`;
                 setEmailTemplates((prev) => [...prev, { id: newId, label: "New Email Template", subject: "Proposal for {{customer_name}}", message: "Dear {{customer_name}},\n\n\n\nThank you,\nXRP Roofing" }]);
-              }} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-blue-700">+ New email template</button>
+              }} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700">+ New email template</button>
             </div>
             <div className="grid gap-3">
               {emailTemplates.map((et) => (
-                <div key={et.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div key={et.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
-                    <label className="flex-1 text-xs font-black uppercase tracking-wider text-slate-500">
+                    <label className="flex-1 text-xs font-bold uppercase tracking-wider text-gray-500">
                       Template name
-                      <input value={et.label} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, label: event.target.value } : t))} className="mt-2 w-full border-none bg-transparent text-lg font-black normal-case tracking-normal text-[#0A3D91] outline-none" />
+                      <input value={et.label} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, label: event.target.value } : t))} className="mt-2 w-full border-none bg-transparent text-lg font-bold normal-case tracking-normal text-blue-700 outline-none" />
                     </label>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">Saved</span>
-                      <button type="button" onClick={() => { if (window.confirm(`Delete email template "${et.label}"?`)) setEmailTemplates((prev) => prev.filter((t) => t.id !== et.id)); }} className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600 hover:bg-red-100">Delete</button>
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Saved</span>
+                      <button type="button" onClick={() => { if (window.confirm(`Delete email template "${et.label}"?`)) setEmailTemplates((prev) => prev.filter((t) => t.id !== et.id)); }} className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-100">Delete</button>
                     </div>
                   </div>
-                  <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                  <label className="mt-3 block text-xs font-bold uppercase tracking-wider text-gray-500">
                     Subject line
-                    <input value={et.subject} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, subject: event.target.value } : t))} className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case tracking-normal text-slate-800 outline-none" />
+                    <input value={et.subject} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, subject: event.target.value } : t))} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm normal-case tracking-normal text-gray-800 outline-none" />
                   </label>
-                  <label className="mt-3 block text-xs font-black uppercase tracking-wider text-slate-500">
+                  <label className="mt-3 block text-xs font-bold uppercase tracking-wider text-gray-500">
                     Email body
-                    <textarea value={et.message} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, message: event.target.value } : t))} className="mt-2 min-h-32 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-slate-600 outline-none" />
+                    <textarea value={et.message} onChange={(event) => setEmailTemplates((prev) => prev.map((t) => t.id === et.id ? { ...t, message: event.target.value } : t))} className="mt-2 min-h-32 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm normal-case leading-6 tracking-normal text-gray-600 outline-none" />
                   </label>
                 </div>
               ))}
@@ -2008,22 +2008,22 @@ export default function ProposalsPage() {
 
       {activeTab === "settings" && (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Settings</p>
-                <h2 className="mt-2 text-2xl font-black text-[#0A3D91]">Proposal trash bin</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Deleted proposals are hidden from the proposal board and drafts. They stay here for {trashRetentionDays} days before they are removed completely.</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Settings</p>
+                <h2 className="mt-2 text-2xl font-bold text-blue-700">Proposal trash bin</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Deleted proposals are hidden from the proposal board and drafts. They stay here for {trashRetentionDays} days before they are removed completely.</p>
               </div>
-              <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-black text-slate-700 hover:bg-white">Clear expired trash</button>
+              <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-gray-200 bg-gray-50 px-5 py-3 text-sm font-bold text-gray-700 hover:bg-white">Clear expired trash</button>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             {trashedProposals.length === 0 ? (
-              <div className="rounded-2xl bg-slate-50 p-8 text-center">
-                <p className="text-lg font-black text-[#0A3D91]">Trash bin is empty</p>
-                <p className="mt-2 text-sm text-slate-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
+              <div className="rounded-lg bg-gray-50 p-8 text-center">
+                <p className="text-lg font-bold text-blue-700">Trash bin is empty</p>
+                <p className="mt-2 text-sm text-gray-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -2033,15 +2033,15 @@ export default function ProposalsPage() {
                   const daysLeft = Math.max(0, trashRetentionDays - daysUsed);
 
                   return (
-                    <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center">
+                    <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 md:flex-row md:items-center">
                       <div>
-                        <p className="text-base font-black text-[#0A3D91]">{proposal.customerName}</p>
-                        <p className="mt-1 text-sm text-slate-600">{proposal.address}</p>
-                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Deleted {deletedAt.toLocaleDateString()} · Permanently deletes in {daysLeft} days</p>
+                        <p className="text-base font-bold text-blue-700">{proposal.customerName}</p>
+                        <p className="mt-1 text-sm text-gray-600">{proposal.address}</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-gray-500">Deleted {deletedAt.toLocaleDateString()} · Permanently deletes in {daysLeft} days</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white">Restore</button>
-                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-black text-red-700">Delete forever</button>
+                        <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">Restore</button>
+                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-bold text-red-700">Delete forever</button>
                       </div>
                     </div>
                   );
@@ -2053,25 +2053,25 @@ export default function ProposalsPage() {
       )}
 
       {activeTab !== "templates" && activeTab !== "settings" && showCreateForm && (
-      <form onSubmit={handleCreateProposal} className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <form onSubmit={handleCreateProposal} className="rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setProposalMode("job")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "job" ? "bg-[#0A3D91] text-white" : "bg-slate-100 text-slate-700"}`}>From selected job</button>
-          <button type="button" onClick={() => setProposalMode("new")} className={`rounded-2xl px-4 py-2 text-sm font-black ${proposalMode === "new" ? "bg-[#0A3D91] text-white" : "bg-slate-100 text-slate-700"}`}>New proposal</button>
+          <button type="button" onClick={() => setProposalMode("job")} className={`rounded-lg px-4 py-2 text-sm font-bold ${proposalMode === "job" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"}`}>From selected job</button>
+          <button type="button" onClick={() => setProposalMode("new")} className={`rounded-lg px-4 py-2 text-sm font-bold ${proposalMode === "new" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"}`}>New proposal</button>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-end">
           {proposalMode === "job" ? (
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
+            <label className="grid gap-2 text-sm font-bold text-gray-700">
               Search job by name or address
-              <input value={jobSearch} onChange={(event) => setJobSearch(event.target.value)} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Enter address, customer name, roof type..." />
+              <input value={jobSearch} onChange={(event) => setJobSearch(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Enter address, customer name, roof type..." />
             </label>
           ) : (
             <>
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
+              <label className="grid gap-2 text-sm font-bold text-gray-700">
                 Customer name
-                <input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Customer name" />
+                <input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Customer name" />
               </label>
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
+              <label className="grid gap-2 text-sm font-bold text-gray-700">
                 Searchable address
                 <AddressAutocomplete
                   value={address}
@@ -2082,35 +2082,35 @@ export default function ProposalsPage() {
               </label>
             </>
           )}
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
+          <label className="grid gap-2 text-sm font-bold text-gray-700">
             Proposal scope
-            <input value={scope} onChange={(event) => setScope(event.target.value)} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Roof repair, replacement, coating..." />
+            <input value={scope} onChange={(event) => setScope(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Roof repair, replacement, coating..." />
           </label>
           {proposalMode === "new" && (
-            <label className="grid gap-2 text-sm font-bold text-slate-700">
+            <label className="grid gap-2 text-sm font-bold text-gray-700">
               Proposal total
-              <input type="number" value={total} onChange={(event) => setTotal(event.target.value)} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Amount" />
+              <input type="number" value={total} onChange={(event) => setTotal(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Amount" />
             </label>
           )}
-          <button className="rounded-2xl bg-orange-500 px-5 py-3 font-bold text-white shadow-lg shadow-orange-200">Create proposal</button>
+          <button className="rounded-lg bg-orange-500 px-5 py-3 font-bold text-white shadow-sm">Create proposal</button>
         </div>
         {proposalMode === "job" && (
           <div className="mt-4 grid gap-2 pb-20 md:grid-cols-2 lg:pb-0 xl:grid-cols-3">
             {filteredJobs.map((job) => (
-              <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`rounded-2xl p-4 text-left text-sm ${selectedJobId === job.id ? "bg-orange-50 ring-2 ring-orange-400" : "bg-slate-50"}`}>
-                <span className="block font-black text-[#0A3D91]">{job.name}</span>
-                <span className="mt-1 block text-slate-500">{job.address}, {job.city}</span>
+              <button key={job.id} type="button" onClick={() => setSelectedJobId(job.id)} className={`rounded-lg p-4 text-left text-sm ${selectedJobId === job.id ? "bg-orange-50 ring-2 ring-orange-400" : "bg-gray-50"}`}>
+                <span className="block font-bold text-blue-700">{job.name}</span>
+                <span className="mt-1 block text-gray-500">{job.address}, {job.city}</span>
                 <span className="mt-2 block font-bold text-orange-700">${job.value.toLocaleString()}</span>
               </button>
             ))}
             {filteredJobs.length === 0 && (
-              <p className="col-span-full py-6 text-center text-sm font-semibold text-slate-400">No jobs found. Add jobs in the Leads board first.</p>
+              <p className="col-span-full py-6 text-center text-sm font-semibold text-gray-400">No jobs found. Add jobs in the Leads board first.</p>
             )}
           </div>
         )}
         {proposalMode === "job" && selectedJob && (
-          <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            <span className="font-black text-[#0A3D91]">{selectedJob.name}</span> · {selectedJob.address}, {selectedJob.city} · {selectedJob.assignedTo}
+          <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+            <span className="font-bold text-blue-700">{selectedJob.name}</span> · {selectedJob.address}, {selectedJob.city} · {selectedJob.assignedTo}
           </div>
         )}
       </form>
@@ -2119,33 +2119,33 @@ export default function ProposalsPage() {
       {activeTab !== "templates" && activeTab !== "settings" && (
       <div className="space-y-3 pb-20 pr-2 lg:pb-0">
         {filteredProposals.map((proposal) => (
-          <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-3xl border border-white/70 bg-white/95 p-4 text-left shadow-lg shadow-blue-950/5 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
+          <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-lg border border-white/70 bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
             <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-black leading-4 text-[#0A3D91] shadow-sm">XRP<br />ROOF</div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-bold leading-4 text-blue-700 shadow-sm">XRP<br />ROOF</div>
               <div>
-                <p className="font-black text-[#0A3D91]">{proposal.address}</p>
-                <p className="mt-1 text-sm text-slate-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
-                <p className="mt-1 text-xs text-slate-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
+                <p className="font-bold text-blue-700">{proposal.address}</p>
+                <p className="mt-1 text-sm text-gray-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
               </div>
             </div>
             </button>
             <div className="flex items-center justify-end gap-3">
               <div className="text-right">
-                <p className="font-black text-slate-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
-                <p className="mt-1 text-xs font-bold uppercase text-slate-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
+                <p className="font-bold text-gray-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
+                <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
-              <span className={`rounded-full px-4 py-1 text-sm font-black ${proposal.status === "Draft" ? "bg-slate-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-slate-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
-              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">Delete</button>
-              <span className="text-xl font-black text-slate-500">⋯</span>
+              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
+              <span className="text-xl font-bold text-gray-500">⋯</span>
             </div>
           </div>
         ))}
         {filteredProposals.length === 0 && !dataLoaded && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center font-semibold text-slate-500">Loading proposals…</div>
+          <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">Loading proposals…</div>
         )}
         {filteredProposals.length === 0 && dataLoaded && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center font-semibold text-slate-500">No proposals match your search.</div>
+          <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">No proposals match your search.</div>
         )}
       </div>
       )}
