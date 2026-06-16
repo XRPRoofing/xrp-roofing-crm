@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -16,6 +16,30 @@ import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
+import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
+
+type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
+
+const PROPOSAL_STATUS_STYLES: Record<string, string> = {
+  Draft: "bg-gray-100 text-gray-600",
+  Sent: "bg-sky-100 text-sky-700",
+  Viewed: "bg-amber-100 text-amber-700",
+  Approved: "bg-emerald-100 text-emerald-700",
+  Won: "bg-emerald-100 text-emerald-700",
+  Signed: "bg-emerald-100 text-emerald-700",
+  "Signed Offline": "bg-emerald-100 text-emerald-700",
+  Rejected: "bg-red-100 text-red-700",
+  Expired: "bg-gray-100 text-gray-500",
+};
+
+function getProposalStatusStyle(status: string) {
+  return PROPOSAL_STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600";
+}
+
+function getProposalStatusLabel(status: string) {
+  if (status === "Won" || status === "Approved" || status === "Signed" || status === "Signed Offline") return "Won";
+  return status;
+}
 
 const arizonaBounds = {
   north: 37.0043,
@@ -150,6 +174,7 @@ export default function LeadsPage() {
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [proposalStatusMap, setProposalStatusMap] = useState<Record<string, string>>({});
 
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
   const [jobNotes, setJobNotes] = useState<JobNote[]>([]);
@@ -442,7 +467,30 @@ export default function LeadsPage() {
       setJobs(data.jobs.map(normalizeJob));
       setJobNotes(data.notes);
     }).catch(() => {});
+    void loadProposalRecords<ProposalSnap>().then((proposals) => {
+      const map: Record<string, string> = {};
+      for (const p of proposals) {
+        if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
+      }
+      setProposalStatusMap(map);
+    }).catch(() => {});
   });
+
+  useEffect(() => {
+    let mounted = true;
+    function buildMap(proposals: ProposalSnap[]) {
+      const map: Record<string, string> = {};
+      for (const p of proposals) {
+        if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
+      }
+      if (mounted) setProposalStatusMap(map);
+    }
+    void loadProposalRecords<ProposalSnap>().then(buildMap).catch(() => {});
+    const unsub = subscribeToProposalRecords(() => {
+      void loadProposalRecords<ProposalSnap>().then(buildMap).catch(() => {});
+    });
+    return () => { mounted = false; unsub(); };
+  }, []);
 
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
@@ -768,66 +816,47 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex gap-3 overflow-x-auto pb-6">
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-4">
         {leadStages.map((stage) => {
           const stageJobs = filteredJobs.filter((job) => job.stage === stage.id);
           const stageValue = stageJobs.reduce((total, job) => total + job.value, 0);
           return (
-            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-19rem)] min-h-[30rem] w-[18rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-2 shadow-sm">
-              <div className="sticky top-0 z-10 mb-2 shrink-0 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
-                <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
-                <p className="mt-1 text-xs text-gray-500">{stageJobs.length} Jobs • {formatMoney(stageValue)}</p>
+            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] min-h-[28rem] w-[16.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
+              <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
+                <div className="flex items-center justify-between gap-1">
+                  <h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
+                  <span className="shrink-0 text-[11px] font-medium text-gray-400">{stageJobs.length}</span>
+                </div>
+                <p className="mt-0.5 text-[10px] text-gray-500">{formatMoney(stageValue)}</p>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-0.5 pb-1">
+              <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-0.5 pb-1">
                 {stageJobs.map((job) => {
                   const urgency = getUrgency(job);
+                  const pStatus = proposalStatusMap[job.id];
                   return (
-                    <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-lg border border-l-4 bg-white p-3 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg active:cursor-grabbing ${urgency.className}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold leading-tight text-gray-900">{job.name}</p>
-                          <p className="mt-0.5 truncate text-xs text-gray-500">{job.city}, AZ</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded-lg p-1 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3.5 w-3.5" /></button>
-                          <GripVertical className="h-4 w-4 text-gray-300" />
+                    <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="min-w-0 truncate text-xs font-bold leading-tight text-gray-900">{job.name}</p>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded p-0.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3 w-3" /></button>
+                          <GripVertical className="h-3.5 w-3.5 text-gray-300" />
                         </div>
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <p className="text-base font-bold text-blue-700">{formatMoney(job.value)}</p>
-                        {urgency.label !== "On Track" && (
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${urgency.text}`}><span className={`h-2 w-2 rounded-full ${urgency.dot}`} />{urgency.label}</span>
-                        )}
-                      </div>
-                      <div className="mt-1.5 flex items-center justify-between gap-1">
-                        <p className="truncate text-xs font-bold text-gray-700">{job.assignedTo || "Unassigned"}</p>
-                        {job.source && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setSourceFilter(sourceFilter === job.source ? null : job.source); }}
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold transition hover:opacity-80 ${getSourceColor(job.source)}`}
-                          >
-                            {job.source}
-                          </button>
-                        )}
-                      </div>
-                      <div className="mt-2 rounded-lg bg-gray-50 px-2 py-1.5">
-                        <p className="truncate text-xs font-medium text-gray-700">Next: {job.nextAction || "Review job"}</p>
-                        {job.inspectionDate && <p className="mt-0.5 truncate text-xs font-semibold text-blue-600">Appt: {job.inspectionDate}</p>}
-                        <p className="mt-0.5 text-xs text-gray-500">Due: {formatDueDate(job.dueDate)}</p>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-600"><Camera className="h-3 w-3" />B</span>
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-1.5 py-0.5 text-[10px] font-bold text-orange-600"><Camera className="h-3 w-3" />P</span>
-                        <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-600"><Camera className="h-3 w-3" />A</span>
-                        <span className="ml-auto inline-flex items-center gap-1 rounded-lg bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500"><ListChecks className="h-3 w-3" />Checklist</span>
+                      <p className="mt-0.5 truncate text-[11px] leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
+                      <div className="mt-1 flex items-center justify-between gap-1">
+                        <span className="text-sm font-bold leading-none text-blue-700">{formatMoney(job.value)}</span>
+                        {pStatus ? (
+                          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-2.5 w-2.5" />{getProposalStatusLabel(pStatus)}</span>
+                        ) : urgency.label !== "On Track" ? (
+                          <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                        ) : null}
                       </div>
                     </button>
                   );
                 })}
                 {stageJobs.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-white p-5 text-center text-xs font-bold text-gray-500">Drop jobs here</div>
+                  <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center text-[11px] font-bold text-gray-400">Drop jobs here</div>
                 )}
               </div>
             </section>
