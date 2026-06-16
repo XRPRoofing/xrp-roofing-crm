@@ -672,42 +672,42 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         <main className={`crm-main flex-1 px-4 py-4 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
           <div className="mx-auto max-w-[1400px]">{children}</div>
         </main>
-
-        {/* Mobile Bottom Navigation */}
-        {mobileBottomNav.length > 0 && (
-          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white lg:hidden">
-            <div className="flex items-center justify-around px-1 py-1">
-              {mobileBottomNav.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-colors ${
-                      active ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    <Icon className={`h-5 w-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
-
-        {/* Team Chat FAB */}
-        {showTeamChatFloatingButton && (
-          <Link href="/crm/team-chat" className={`fixed right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3 ${mobileBottomNav.length > 0 ? "bottom-[72px] lg:bottom-6" : "bottom-6"}`}>
-            <span className="relative">
-              <MessageCircle className="h-5 w-5" />
-              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>}
-            </span>
-            <span className="hidden text-sm font-medium sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
-          </Link>
-        )}
       </div>
+
+      {/* Mobile Bottom Navigation — rendered at root level so no parent transform/flex can break fixed positioning */}
+      {mobileBottomNav.length > 0 && (
+        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ WebkitTransform: "translateZ(0)" }}>
+          <div className="flex items-center justify-around px-1 py-1">
+            {mobileBottomNav.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-colors ${
+                    active ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
+      {/* Team Chat FAB */}
+      {showTeamChatFloatingButton && (
+        <Link href="/crm/team-chat" className={`fixed right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3 ${mobileBottomNav.length > 0 ? "bottom-[72px] lg:bottom-6" : "bottom-6"}`}>
+          <span className="relative">
+            <MessageCircle className="h-5 w-5" />
+            {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>}
+          </span>
+          <span className="hidden text-sm font-medium sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
+        </Link>
+      )}
     </div>
   );
 }
