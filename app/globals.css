@@ -45,53 +45,53 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  /* Brand blue palette centered on #0A3D91 */
-  --color-blue-50: #EEF3FB;
-  --color-blue-100: #D4E2F5;
-  --color-blue-200: #A8C3EB;
-  --color-blue-300: #7CA5E0;
-  --color-blue-400: #5087D5;
-  --color-blue-500: #2B6BC4;
-  --color-blue-600: #0A3D91;
-  --color-blue-700: #083580;
-  --color-blue-800: #072C6B;
-  --color-blue-900: #052256;
-  --color-blue-950: #041840;
+  /* Brand blue palette centered on #2563EB */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #0A3D91;
-  --primary-foreground: #FFFFFF;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: #0A3D91;
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: #F97316;
-  --accent-foreground: #FFFFFF;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #2B6BC4;
+  --radius: 0.5rem;
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f9fafb;
+  --secondary-foreground: #1f2937;
+  --muted: #f9fafb;
+  --muted-foreground: #6b7280;
+  --accent: #f97316;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #3b82f6;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #0A3D91;
-  --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #0A3D91;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #072C6B;
-  --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #083580;
-  --sidebar-ring: #2B6BC4;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #3b82f6;
 }
 
 .dark {
@@ -101,8 +101,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #2B6BC4;
-  --primary-foreground: #FFFFFF;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -112,20 +112,20 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #2B6BC4;
+  --ring: #3b82f6;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: #052256;
+  --sidebar: #1f2937;
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #0A3D91;
+  --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: #072C6B;
+  --sidebar-accent: #374151;
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #2B6BC4;
+  --sidebar-ring: #3b82f6;
 }
 
 @layer base {
@@ -140,8 +140,8 @@
 /* Mobile: keep board headers compact so content is reachable without dragging. */
 @media (max-width: 639px) {
   .crm-main h1 {
-    font-size: 1.5rem;
-    line-height: 1.9rem;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
   }
   .crm-main p.crm-board-subtitle {
     display: none;
@@ -235,8 +235,6 @@
     width: 0.75rem !important;
     height: 0.75rem !important;
   }
-
-
 
   /* Terms section: allow flowing across pages, compact text */
   #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 {

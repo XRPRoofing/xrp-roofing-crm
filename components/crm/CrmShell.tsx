@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, ShieldCheck, UploadCloud, UsersRound, X, Zap } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -33,14 +33,6 @@ const navigation = [
   { href: "/crm/files", label: "Files", shortLabel: "Files", icon: UploadCloud },
   { href: "/crm/automations", label: "Automations", shortLabel: "Auto", icon: Zap },
   { href: "/crm/settings", label: "Settings", shortLabel: "Settings", icon: Settings },
-];
-
-const mobilePrimaryNavigation = ["/crm", "/crm/team-chat", "/crm/leads", "/crm/calendar", "/crm/crew", "/crm/payments", "/crm/files"];
-
-const quickStats = [
-  { label: "Live jobs", value: "24" },
-  { label: "Pipeline", value: "$1.2M" },
-  { label: "Tasks", value: "18" },
 ];
 
 type SearchResult = {
@@ -78,11 +70,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const isCrewUser = userRole === "crew";
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
-  const mobileNavigation = isCrewUser
-    ? visibleNavigation
-    : mobilePrimaryNavigation
-        .map((href) => navigation.find((item) => item.href === href))
-        .filter((item): item is (typeof navigation)[number] => Boolean(item));
   const activeModule = visibleNavigation.find((item) => pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href)));
 
   useEffect(() => {
@@ -128,10 +115,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setNotifications(readCrmNotifications());
     }
 
-    // Load from Supabase first for cross-device sync, then fall back to localStorage
     void loadNotificationsFromSupabase().then((n) => setNotifications(n)).catch(() => refreshNotifications());
 
-    // Subscribe to real-time notification changes from Supabase
     const unsubRemote = subscribeToNotifications((n) => setNotifications(n));
 
     window.addEventListener("crm-notifications-updated", refreshNotifications);
@@ -260,8 +245,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
-  // Sync unread count to the PWA app icon badge (Works on installed PWA —
-  // Android Chrome + iOS Safari 16.4+).
   useEffect(() => {
     if (typeof navigator === "undefined") return;
     if ("setAppBadge" in navigator) {
@@ -273,7 +256,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     }
   }, [unreadTeamChatCount]);
 
-  // Request notification permission once so OS push toasts work.
   useEffect(() => {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
       void Notification.requestPermission();
@@ -283,7 +265,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const runSearch = useCallback((query: string) => {
     if (!query.trim()) { setSearchResults([]); setSearchOpen(false); return; }
     const q = query.toLowerCase();
-    // Normalize a phone string to digits, stripping US country code "1" from 11-digit numbers
     function normPhone(raw: string): string {
       const digits = raw.replace(/\D/g, "");
       return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
@@ -292,7 +273,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const results: SearchResult[] = [];
     const MAX = 20;
 
-    // Match against standard haystack OR normalized phone digits
     function hit(fields: (string | undefined)[], phones: (string | undefined)[]): boolean {
       const haystack = fields.filter(Boolean).join(" ").toLowerCase();
       if (haystack.includes(q)) return true;
@@ -416,7 +396,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [syncActive, setSyncActive] = useState(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Global real-time sync indicator — flashes when any Supabase table changes
   useEffect(() => {
     if (!hasSupabaseConfig()) return;
     function flash() {
@@ -444,117 +423,128 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   if (checkingAuth) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#D4E2F5,transparent_32%),#f8fafc] text-sm font-semibold text-slate-600">
-        <div className="rounded-3xl border border-white/70 bg-white/80 px-6 py-5 shadow-xl shadow-slate-200 backdrop-blur">Opening CRM app...</div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4 text-sm font-medium text-gray-600 shadow-sm">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          Loading...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-slate-100 text-slate-900 lg:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.22),transparent_30%),radial-gradient(circle_at_top_right,rgba(10,61,145,0.28),transparent_32%),linear-gradient(135deg,#072C6B_0%,#0A3D91_42%,#2B6BC4_100%)]">
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Incoming Call Banner */}
       {globalIncomingCall && !isCrewUser && (
-        <div className="fixed right-4 top-24 z-[80] w-[min(92vw,380px)] rounded-3xl border border-orange-200 bg-white p-5 text-slate-950 shadow-2xl shadow-slate-950/25">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-orange-600">Incoming Call</p>
-          <p className="mt-2 text-xl font-black">{globalIncomingCall.name}</p>
-          <p className="mt-1 text-sm font-bold text-slate-600"><PhoneLink value={globalIncomingCall.phone} /></p>
-          <div className="mt-4 flex gap-2">
-            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white transition hover:bg-blue-700">Answer</button>
-            <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">Decline</button>
+        <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Incoming Call</p>
+          <p className="mt-1 text-lg font-bold text-gray-900">{globalIncomingCall.name}</p>
+          <p className="mt-0.5 text-sm text-gray-500"><PhoneLink value={globalIncomingCall.phone} /></p>
+          <div className="mt-3 flex gap-2">
+            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-lg bg-green-600 px-3 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-green-700">Answer</button>
+            <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Decline</button>
           </div>
         </div>
       )}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden bg-[#0A3D91] text-white shadow-2xl shadow-slate-950/30 transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.35),transparent_32%),radial-gradient(circle_at_bottom,rgba(10,61,145,0.35),transparent_35%)]" />
-        <div className="relative flex h-24 items-center justify-between px-6">
-          <Link href={isCrewUser ? "/crm/crew" : "/crm"} className="group flex items-center gap-3" onClick={() => setOpen(false)}>
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#0A3D91] shadow-lg shadow-slate-950/25">XR</span>
-            <span>
-              <span className="block text-xl font-black tracking-tight">XRP CRM</span>
-              <span className="mt-0.5 block text-xs font-bold uppercase tracking-[0.2em] text-orange-200">Roofing OS</span>
-            </span>
+
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+        {/* Logo */}
+        <div className="flex h-16 items-center gap-3 border-b border-gray-100 px-5">
+          <Link href={isCrewUser ? "/crm/crew" : "/crm"} className="flex items-center gap-3" onClick={() => setOpen(false)}>
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">XR</span>
+            <span className="text-base font-bold text-gray-900">XRP Roofing</span>
           </Link>
-          <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-blue-100 hover:bg-white/10 lg:hidden"><X className="h-6 w-6" /></button>
+          <button onClick={() => setOpen(false)} className="ml-auto rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 lg:hidden">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <div className="relative mx-4 mb-4 hidden grid-cols-3 gap-2 rounded-3xl bg-white/10 p-2 ring-1 ring-white/10 sm:grid">
-          {(isCrewUser ? [{ label: "Crew", value: "Portal" }, { label: "Access", value: "Field" }, { label: "Jobs", value: "Only" }] : quickStats).map((stat) => (
-            <div key={stat.label} className="rounded-2xl bg-white/10 px-2 py-3 text-center">
-              <p className="text-sm font-black text-white">{stat.value}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-blue-100">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-        <nav className="scrollbar-hide relative min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-36 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {visibleNavigation.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
-            const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
-            return (
-              <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className={`group flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${active ? "bg-white text-[#0A3D91] shadow-lg shadow-slate-950/20" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
-                <span className="flex items-center gap-3">
-                  <span className={`relative rounded-xl p-2 ${active ? "bg-orange-100 text-orange-600" : "bg-white/10 text-blue-100 group-hover:text-white"}`}>
-                    <Icon className="h-4 w-4" />
-                    {showChatBadge && <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-[#0A3D91]">{unreadTeamChatCount}</span>}
-                  </span>
-                  {item.label}
-                </span>
-                {showChatBadge ? <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-black text-white">{unreadTeamChatCount}</span> : active && <span className="h-2 w-2 rounded-full bg-orange-500" />}
-              </Link>
-            );
-          })}
-        </nav>
-        <button onClick={() => { logout(); setOpen(false); }} className="relative mx-4 mb-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-orange-300 transition hover:bg-white/10 hover:text-orange-200">
-          <span className="rounded-xl bg-white/10 p-2 text-orange-300"><LogOut className="h-4 w-4" /></span>
-          Logout
-        </button>
-        <div className="relative mx-4 mb-6 mt-2 rounded-3xl bg-white/10 p-4 text-sm text-blue-100 ring-1 ring-white/10 backdrop-blur">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-orange-300" />
-            <p className="font-bold text-white">Secure team workspace</p>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="space-y-0.5">
+            {visibleNavigation.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
+              const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
+                >
+                  <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`} />
+                  <span className="flex-1">{item.label}</span>
+                  {showChatBadge && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>
+                  )}
+                  {active && !showChatBadge && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
+                </Link>
+              );
+            })}
           </div>
-          <p className="mt-2 leading-6">{isCrewUser ? "Crew access is limited to assigned roofing workflow only." : "Admin, sales, production, and office workflows in one professional CRM."}</p>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="border-t border-gray-100 px-3 py-3">
+          <button onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
+            <LogOut className="h-[18px] w-[18px] text-gray-400" />
+            <span>Log out</span>
+          </button>
         </div>
       </aside>
-      {open && <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden" />}
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur-xl lg:border-white/10 lg:bg-[#0A3D91]/95 lg:text-white lg:shadow-xl lg:shadow-slate-950/20">
-          <div className="flex h-16 items-center gap-3 px-3 sm:px-5 lg:h-20 lg:px-8">
-            <button onClick={() => setOpen(true)} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm lg:hidden"><Menu className="h-5 w-5" /></button>
+
+      {/* Mobile Overlay */}
+      {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
+
+      {/* Main Content Area */}
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
+          <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+            {/* Hamburger (mobile) */}
+            <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Page Title (mobile) */}
             <div className="min-w-0 flex-1 lg:hidden">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-xs font-black uppercase tracking-[0.18em] text-orange-600">XRP CRM App</p>
-                <span className={`inline-block h-1.5 w-1.5 rounded-full ${syncActive ? "bg-blue-500 animate-pulse" : "bg-blue-400/60"}`} title={syncActive ? "Syncing" : "Live"} />
-              </div>
-              <p className="truncate text-sm font-black text-[#0A3D91]">{activeModule?.label || "Dashboard"}</p>
+              <p className="truncate text-sm font-semibold text-gray-900">{activeModule?.label || "Dashboard"}</p>
             </div>
-            <button type="button" onClick={() => { setMobileSearchOpen((v) => !v); setTimeout(() => mobileSearchInputRef.current?.focus(), 100); }} className="rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm hover:bg-white lg:hidden"><Search className="h-5 w-5" /></button>
-            <div className="hidden min-w-0 lg:block">
-              <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">{isCrewUser ? "Crew Workspace" : "Command Center"}</p>
-              <p className="mt-1 text-sm font-semibold text-blue-100">{isCrewUser ? "Assigned jobs and completion workflow" : "Roofing operations dashboard"}</p>
-            </div>
-            <div ref={searchRef} className="relative hidden max-w-2xl flex-1 lg:ml-6 lg:block">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-100" />
-              <input value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }} onKeyDown={handleSearchKeyDown} onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }} className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 pl-12 pr-4 text-sm text-white shadow-sm outline-none transition placeholder:text-blue-100 focus:border-orange-300 focus:bg-white/15 focus:shadow-md focus:ring-4 focus:ring-orange-300/10" placeholder={isCrewUser ? "Search assigned crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
+
+            {/* Desktop Search */}
+            <div ref={searchRef} className="relative hidden max-w-lg flex-1 lg:block">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
+                onKeyDown={handleSearchKeyDown}
+                onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                placeholder={isCrewUser ? "Search crew jobs..." : "Search jobs, customers, proposals, invoices..."}
+              />
               {searchOpen && searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                   {(["Jobs", "Customers", "Proposals", "Invoices"] as const).map((cat) => {
                     const items = searchResults.filter((r) => r.category === cat);
                     if (items.length === 0) return null;
                     return (
                       <div key={cat}>
-                        <p className="sticky top-0 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{cat}</p>
+                        <p className="sticky top-0 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{cat}</p>
                         {items.map((result, i) => {
                           const globalIdx = searchResults.indexOf(result);
                           return (
-                            <button key={`${result.category}-${i}`} type="button" onClick={() => navigateToResult(result)} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                                {result.icon === "job" && <BriefcaseBusiness className="h-4 w-4" />}
-                                {result.icon === "customer" && <UsersRound className="h-4 w-4" />}
-                                {result.icon === "proposal" && <FileText className="h-4 w-4" />}
-                                {result.icon === "invoice" && <ClipboardList className="h-4 w-4" />}
+                            <button key={`${result.category}-${i}`} type="button" onClick={() => navigateToResult(result)} className={`flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-gray-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500">
+                                {result.icon === "job" && <BriefcaseBusiness className="h-3.5 w-3.5" />}
+                                {result.icon === "customer" && <UsersRound className="h-3.5 w-3.5" />}
+                                {result.icon === "proposal" && <FileText className="h-3.5 w-3.5" />}
+                                {result.icon === "invoice" && <ClipboardList className="h-3.5 w-3.5" />}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-bold text-slate-900">{result.label}</span>
-                                {result.sub && <span className="block truncate text-xs text-slate-500">{result.sub}</span>}
+                                <span className="block truncate text-sm font-medium text-gray-900">{result.label}</span>
+                                {result.sub && <span className="block truncate text-xs text-gray-500">{result.sub}</span>}
                               </span>
                             </button>
                           );
@@ -565,71 +555,96 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
-            {!isCrewUser && (
-              <div className="relative">
-                <button onClick={handleToggleNotifications} className="relative rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] shadow-sm hover:bg-white lg:border-white/15 lg:bg-white/10 lg:p-3 lg:text-white lg:hover:bg-white/15">
-                  <Bell className="h-5 w-5" />
-                  {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-black text-white ring-2 ring-white">{unreadNotifications}</span>}
-                </button>
-                {notificationsOpen && (
-                  <div className="absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-900 shadow-2xl shadow-slate-950/20">
-                    <div className="border-b border-slate-200 p-4">
-                      <p className="text-sm font-black text-[#0A3D91]">Notifications</p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">Recent CRM changes and movements</p>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto p-2">
-                      {notifications.map((notification) => (
-                        <div key={notification.id} className="rounded-2xl p-3 hover:bg-slate-50">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-black text-slate-900">{notification.title}</p>
-                            {!notification.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-orange-500" />}
-                          </div>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{notification.message}</p>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
-                            <button onClick={() => handleDeleteNotification(notification.id)} className="rounded-full px-2 py-1 text-[11px] font-black text-red-600 hover:bg-red-50">Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                      {notifications.length === 0 && <p className="p-5 text-center text-sm font-semibold text-slate-500">No notifications yet.</p>}
-                    </div>
-                  </div>
-                )}
+
+            {/* Right Actions */}
+            <div className="flex items-center gap-2">
+              {/* Sync indicator */}
+              <div className="hidden items-center gap-1.5 rounded-md border border-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-500 sm:flex">
+                <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+                <span>{syncActive ? "Syncing" : "Live"}</span>
               </div>
-            )}
-            <div className="hidden items-center gap-2 rounded-2xl border border-blue-300/40 bg-blue-400/15 px-3 py-2 text-xs font-black text-blue-100 xl:flex" title="Real-time sync active across all devices">
-              <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-blue-400 animate-pulse" : "bg-blue-400/60"}`} />
-              <span>{syncActive ? "Syncing" : "Live"}</span>
+
+              {/* Mobile Search Toggle */}
+              <button type="button" onClick={() => { setMobileSearchOpen((v) => !v); setTimeout(() => mobileSearchInputRef.current?.focus(), 100); }} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
+                <Search className="h-5 w-5" />
+              </button>
+
+              {/* Notifications */}
+              {!isCrewUser && (
+                <div className="relative">
+                  <button onClick={handleToggleNotifications} className="relative rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <Bell className="h-5 w-5" />
+                    {unreadNotifications > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{unreadNotifications}</span>}
+                  </button>
+                  {notificationsOpen && (
+                    <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div className="border-b border-gray-100 px-4 py-3">
+                        <p className="text-sm font-semibold text-gray-900">Notifications</p>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {notifications.map((notification) => (
+                          <div key={notification.id} className="border-b border-gray-50 px-4 py-3 hover:bg-gray-50">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium text-gray-900">{notification.title}</p>
+                              {!notification.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+                            </div>
+                            <p className="mt-0.5 text-xs text-gray-500">{notification.message}</p>
+                            <div className="mt-2 flex items-center justify-between">
+                              <p className="text-[11px] text-gray-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                              <button onClick={() => handleDeleteNotification(notification.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">Delete</button>
+                            </div>
+                          </div>
+                        ))}
+                        {notifications.length === 0 && <p className="p-5 text-center text-sm text-gray-400">No notifications yet.</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Logout (desktop) */}
+              <button onClick={logout} className="hidden items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-800 sm:flex lg:flex">
+                <LogOut className="h-4 w-4" /> Log out
+              </button>
             </div>
-            <button onClick={logout} className="hidden items-center gap-2 rounded-2xl bg-orange-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:bg-orange-600 sm:flex">
-              <LogOut className="h-4 w-4" /> Logout
-            </button>
           </div>
+
+          {/* Mobile Search Expanded */}
           {mobileSearchOpen && (
-            <div ref={mobileSearchRef} className="relative border-t border-slate-200 px-3 py-2 lg:hidden">
-              <Search className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input ref={mobileSearchInputRef} value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }} onKeyDown={handleSearchKeyDown} onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-300/20" placeholder={isCrewUser ? "Search crew jobs..." : "Search jobs, customers, proposals, invoices..."} />
+            <div ref={mobileSearchRef} className="border-t border-gray-100 px-4 py-2 lg:hidden">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  ref={mobileSearchInputRef}
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
+                  onKeyDown={handleSearchKeyDown}
+                  onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  placeholder={isCrewUser ? "Search crew jobs..." : "Search jobs, customers, proposals, invoices..."}
+                />
+              </div>
               {searchOpen && searchResults.length > 0 && (
-                <div className="absolute left-3 right-3 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div className="mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                   {(["Jobs", "Customers", "Proposals", "Invoices"] as const).map((cat) => {
                     const items = searchResults.filter((r) => r.category === cat);
                     if (items.length === 0) return null;
                     return (
                       <div key={cat}>
-                        <p className="sticky top-0 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{cat}</p>
+                        <p className="sticky top-0 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{cat}</p>
                         {items.map((result, i) => {
                           const globalIdx = searchResults.indexOf(result);
                           return (
-                            <button key={`${result.category}-${i}`} type="button" onClick={() => { navigateToResult(result); setMobileSearchOpen(false); }} className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                                {result.icon === "job" && <BriefcaseBusiness className="h-4 w-4" />}
-                                {result.icon === "customer" && <UsersRound className="h-4 w-4" />}
-                                {result.icon === "proposal" && <FileText className="h-4 w-4" />}
-                                {result.icon === "invoice" && <ClipboardList className="h-4 w-4" />}
+                            <button key={`${result.category}-${i}`} type="button" onClick={() => { navigateToResult(result); setMobileSearchOpen(false); }} className={`flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-gray-50 ${globalIdx === searchIndex ? "bg-blue-50" : ""}`}>
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500">
+                                {result.icon === "job" && <BriefcaseBusiness className="h-3.5 w-3.5" />}
+                                {result.icon === "customer" && <UsersRound className="h-3.5 w-3.5" />}
+                                {result.icon === "proposal" && <FileText className="h-3.5 w-3.5" />}
+                                {result.icon === "invoice" && <ClipboardList className="h-3.5 w-3.5" />}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-bold text-slate-900">{result.label}</span>
-                                {result.sub && <span className="block truncate text-xs text-slate-500">{result.sub}</span>}
+                                <span className="block truncate text-sm font-medium text-gray-900">{result.label}</span>
+                                {result.sub && <span className="block truncate text-xs text-gray-500">{result.sub}</span>}
                               </span>
                             </button>
                           );
@@ -642,35 +657,20 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </header>
-        <main className="crm-main px-2 pb-24 pt-3 sm:px-5 sm:py-6 lg:px-8">
-          <div className="mx-auto max-w-[1600px] rounded-3xl bg-slate-50 p-3 sm:p-6 lg:rounded-[2rem] lg:bg-slate-50/95 lg:shadow-2xl lg:shadow-slate-950/20 lg:backdrop-blur">{children}</div>
-        </main>
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:hidden">
-          <div className={`mx-auto grid max-w-md gap-1 ${mobileNavigation.length >= 7 ? "grid-cols-7" : mobileNavigation.length >= 6 ? "grid-cols-6" : "grid-cols-5"}`}>
-            {mobileNavigation.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
-              const showChatBadge = item.href === "/crm/team-chat" && unreadTeamChatCount > 0;
-              return (
-                <Link key={item.href} href={item.href} className={`relative flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${active ? "bg-[#0A3D91] text-white" : "text-slate-500 hover:bg-slate-100 hover:text-[#0A3D91]"}`}>
-                  <span className="relative">
-                    <Icon className="h-5 w-5" />
-                    {showChatBadge && <span className="absolute -right-3 -top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
-                  </span>
-                  <span>{item.shortLabel}</span>
-                </Link>
-              );
-            })}
 
-          </div>
-        </nav>
+        {/* Main Content */}
+        <main className="crm-main flex-1 px-4 py-4 sm:px-6 sm:py-6">
+          <div className="mx-auto max-w-[1400px]">{children}</div>
+        </main>
+
+        {/* Team Chat FAB */}
         {showTeamChatFloatingButton && (
-          <Link href="/crm/team-chat" className="fixed bottom-24 right-5 z-40 flex items-center gap-3 rounded-full bg-[#0A3D91] px-4 py-3 text-sm font-black text-white shadow-2xl shadow-blue-950/30 ring-4 ring-white/80 transition hover:-translate-y-0.5 hover:bg-blue-800 lg:bottom-8">
-            <span className="relative rounded-full bg-orange-500 p-2">
+          <Link href="/crm/team-chat" className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3">
+            <span className="relative">
               <MessageCircle className="h-5 w-5" />
-              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[11px] font-black text-white ring-2 ring-white">{unreadTeamChatCount}</span>}
+              {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>}
             </span>
-            <span className="hidden sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
+            <span className="hidden text-sm font-medium sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
           </Link>
         )}
       </div>
