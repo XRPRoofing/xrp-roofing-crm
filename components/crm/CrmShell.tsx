@@ -450,7 +450,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] bg-gray-50">
+    <div className="flex min-h-screen min-h-[100dvh] overflow-x-hidden bg-gray-50">
       {/* Incoming Call Banner */}
       {globalIncomingCall && !isCrewUser && (
         <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
@@ -516,7 +516,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden lg:pl-64">
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
           <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
@@ -676,8 +676,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className={`crm-main flex-1 px-4 py-4 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
-          <div className="mx-auto max-w-[1400px]">{children}</div>
+        <main className={`crm-main flex-1 overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
+          <div className="mx-auto max-w-full lg:max-w-[1400px]">{children}</div>
         </main>
       </div>
 

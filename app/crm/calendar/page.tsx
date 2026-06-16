@@ -445,10 +445,10 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-full overflow-x-hidden">
       {/* ── Status Messages ─────────────────────────────────────────── */}
       {(error || statusMessage || (!loading && !connected)) && (
-        <div className="rounded-lg border border-gray-200 bg-white p-3">
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
           {!loading && !connected && (
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-700">Google Calendar is not connected.</p>
@@ -460,41 +460,43 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* ── Top Toolbar ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={goToToday} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-            Today
-          </button>
-          <button type="button" onClick={() => shiftMonth(-1)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Previous month">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button type="button" onClick={() => shiftMonth(1)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Next month">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">{monthLabel}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={loadEvents} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Refresh">
-            <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button type="button" className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">
-            Monthly <ChevronDown className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
-            <Plus className="h-4 w-4" /> Event
-          </button>
+      {/* ── Top Toolbar (sticky) ──────────────────────────────────── */}
+      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white px-4 py-3 sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={goToToday} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm">
+              Today
+            </button>
+            <button type="button" onClick={() => shiftMonth(-1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Previous month">
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+            <button type="button" onClick={() => shiftMonth(1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Next month">
+              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+            <h1 className="text-base font-bold text-gray-900 sm:text-xl">{monthLabel}</h1>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button type="button" onClick={loadEvents} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 sm:p-2" aria-label="Refresh">
+              <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+            <button type="button" className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 sm:px-3 sm:py-2 sm:text-sm">
+              Monthly <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+            </button>
+            <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm">
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Event
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Main Layout: Calendar + Sidebar ─────────────────────────── */}
-      <div className="flex gap-4">
+      <div className="mt-4 flex gap-4">
         {/* Calendar Grid */}
-        <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white">
           {/* Weekday Headers */}
           <div className="grid grid-cols-7 border-b border-gray-200">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="border-r border-gray-100 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 last:border-r-0">
+              <div key={day} className="border-r border-gray-100 px-0.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500 last:border-r-0 sm:px-2 sm:py-3 sm:text-xs">
                 {day}
               </div>
             ))}
@@ -511,11 +513,11 @@ export default function CalendarPage() {
               return (
                 <div
                   key={`${key}-${index}`}
-                  className={`min-h-[120px] border-b border-r border-gray-100 p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                  className={`min-h-[60px] border-b border-r border-gray-100 p-0.5 sm:min-h-[120px] sm:p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
                 >
                   {/* Day number */}
-                  <div className="mb-1 text-right">
-                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}>
+                  <div className="mb-0.5 text-right sm:mb-1">
+                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}>
                       {cell.date.getDate()}
                     </span>
                   </div>
@@ -530,10 +532,11 @@ export default function CalendarPage() {
                           key={event.id}
                           type="button"
                           onClick={() => setSelectedEvent(event)}
-                          className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight border ${config.color} hover:opacity-80 transition`}
+                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-medium leading-tight border sm:px-1.5 sm:text-[11px] ${config.color} hover:opacity-80 transition`}
                           title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
                         >
-                          {event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}
+                          <span className="hidden sm:inline">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}</span>
+                          <span className="sm:hidden">{(event.summary || "Untitled").slice(0, 3)}...</span>
                         </button>
                       );
                     })}
@@ -543,9 +546,10 @@ export default function CalendarPage() {
                         onClick={() => {
                           if (dayEvents[maxVisible]) setSelectedEvent(dayEvents[maxVisible]);
                         }}
-                        className="block w-full px-1.5 text-left text-[11px] font-semibold text-blue-600 hover:underline"
+                        className="block w-full px-0.5 text-left text-[9px] font-semibold text-blue-600 hover:underline sm:px-1.5 sm:text-[11px]"
                       >
-                        +{dayEvents.length - maxVisible} more
+                        +{dayEvents.length - maxVisible}
+                        <span className="hidden sm:inline"> more</span>
                       </button>
                     )}
                   </div>
