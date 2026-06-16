@@ -50,7 +50,7 @@ function compressForChat(file: File): Promise<string> {
 function renderMessageText(message: string) {
   return message.split(/(@[\w.-]+)/g).map((part, index) => {
     if (part.startsWith("@")) {
-      return <span key={`${part}-${index}`} className="rounded-full bg-orange-100 px-1.5 py-0.5 font-black text-orange-700">{part}</span>;
+      return <span key={`${part}-${index}`} className="rounded-full bg-orange-100 px-1.5 py-0.5 font-bold text-orange-700">{part}</span>;
     }
 
     return part;
@@ -207,39 +207,39 @@ export default function TeamChatPage() {
 
   return (
     <div className="flex h-[calc(100dvh-11.5rem)] flex-col gap-3 overflow-hidden lg:h-auto lg:gap-5 lg:overflow-visible">
-      <section className="shrink-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6">
+      <section className="shrink-0 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6">
         <div className="flex items-center justify-between gap-3 lg:gap-4">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Team Chat</p>
-            <h1 className="mt-1 text-xl font-black text-[#0A3D91] sm:mt-2 sm:text-3xl">General Chat</h1>
-            <p className="crm-board-subtitle mt-2 hidden text-slate-600 sm:block">One shared room for authenticated CRM users. No private messages, channels, or team setup.</p>
+            <h1 className="mt-1 text-xl font-bold text-blue-700 sm:mt-2 sm:text-3xl">General Chat</h1>
+            <p className="crm-board-subtitle mt-2 hidden text-gray-600 sm:block">One shared room for authenticated CRM users. No private messages, channels, or team setup.</p>
           </div>
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 sm:px-4 sm:py-3 sm:text-sm">
+          <div className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 sm:px-4 sm:py-3 sm:text-sm">
             <UsersRound className="h-5 w-5" /> <span className="hidden sm:inline">All CRM Users</span>
           </div>
         </div>
       </section>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm sm:rounded-[2rem]">
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-4">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm sm:rounded-[2rem]">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-4">
           <div className="flex items-center gap-3">
-            <span className="rounded-2xl bg-orange-100 p-3 text-orange-600"><MessageCircle className="h-5 w-5" /></span>
+            <span className="rounded-lg bg-orange-100 p-3 text-orange-600"><MessageCircle className="h-5 w-5" /></span>
             <div>
-              <h2 className="font-black text-[#0A3D91]">General Chat</h2>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{messages.length} messages</p>
+              <h2 className="font-bold text-blue-700">General Chat</h2>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{messages.length} messages</p>
             </div>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50/70 p-4 sm:p-6 lg:h-[55vh] lg:flex-none">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-gray-50/70 p-4 sm:p-6 lg:h-[55vh] lg:flex-none">
           {loading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className={`flex gap-3 ${i % 2 === 0 ? "" : "flex-row-reverse"}`}>
-                  <div className="h-11 w-11 shrink-0 animate-pulse rounded-2xl bg-slate-200" />
+                  <div className="h-11 w-11 shrink-0 animate-pulse rounded-lg bg-gray-200" />
                   <div className="space-y-2">
-                    <div className={`h-3 animate-pulse rounded-full bg-slate-200 ${i % 3 === 0 ? "w-48" : i % 3 === 1 ? "w-64" : "w-56"}`} />
-                    <div className={`h-12 animate-pulse rounded-3xl bg-slate-200 ${i % 2 === 0 ? "w-72" : "w-60"}`} />
+                    <div className={`h-3 animate-pulse rounded-full bg-gray-200 ${i % 3 === 0 ? "w-48" : i % 3 === 1 ? "w-64" : "w-56"}`} />
+                    <div className={`h-12 animate-pulse rounded-lg bg-gray-200 ${i % 2 === 0 ? "w-72" : "w-60"}`} />
                   </div>
                 </div>
               ))}
@@ -247,8 +247,8 @@ export default function TeamChatPage() {
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageCircle className="h-12 w-12 text-orange-500" />
-              <p className="mt-4 font-black text-[#0A3D91]">No messages yet</p>
-              <p className="mt-1 text-sm text-slate-500">Start the General Chat with the first team update.</p>
+              <p className="mt-4 font-bold text-blue-700">No messages yet</p>
+              <p className="mt-1 text-sm text-gray-500">Start the General Chat with the first team update.</p>
             </div>
           ) : (
             messages.map((chatMessage) => {
@@ -256,12 +256,12 @@ export default function TeamChatPage() {
               return (
                 <article key={chatMessage.id} className={`flex gap-3 ${isMine ? "flex-row-reverse" : ""}`}>
                   {chatMessage.user_avatar_url ? (
-                    <Image src={chatMessage.user_avatar_url} alt={chatMessage.user_name} width={44} height={44} unoptimized className="h-11 w-11 rounded-2xl object-cover" />
+                    <Image src={chatMessage.user_avatar_url} alt={chatMessage.user_name} width={44} height={44} unoptimized className="h-11 w-11 rounded-lg object-cover" />
                   ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0A3D91] text-sm font-black text-white">{getInitials(chatMessage.user_name)}</div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">{getInitials(chatMessage.user_name)}</div>
                   )}
-                  <div className={`max-w-3xl rounded-3xl border px-4 py-3 shadow-sm ${isMine ? "border-blue-100 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-900"}`}>
-                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-black ${isMine ? "text-blue-100" : "text-slate-500"}`}>
+                  <div className={`max-w-3xl rounded-lg border px-4 py-3 shadow-sm ${isMine ? "border-blue-100 bg-blue-600 text-white" : "border-gray-200 bg-white text-gray-900"}`}>
+                    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold ${isMine ? "text-blue-100" : "text-gray-500"}`}>
                       <span>{chatMessage.user_name}</span>
                       <span>{formatChatTimestamp(chatMessage.created_at)}</span>
                     </div>
@@ -270,12 +270,12 @@ export default function TeamChatPage() {
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {chatMessage.attachments.map((attachment) => (
                           attachment.dataUrl ? (
-                            <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/30 bg-white/10">
+                            <a key={attachment.id} href={attachment.dataUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-white/30 bg-white/10">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={attachment.dataUrl} alt={attachment.name} loading="lazy" className="h-40 w-full object-cover" />
                             </a>
                           ) : (
-                            <div key={attachment.id} className="flex h-40 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xs font-bold text-white/60">
+                            <div key={attachment.id} className="flex h-40 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-xs font-bold text-white/60">
                               📎 {attachment.name}
                             </div>
                           )
@@ -294,33 +294,33 @@ export default function TeamChatPage() {
           <div className="border-t border-orange-100 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700">{error}</div>
         )}
 
-        <form onSubmit={sendMessage} className="shrink-0 space-y-3 border-t border-slate-100 bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:p-4">
+        <form onSubmit={sendMessage} className="shrink-0 space-y-3 border-t border-gray-100 bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:p-4">
           {attachments.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-4">
               {attachments.map((attachment) => (
-                <div key={attachment.id} className="relative overflow-hidden rounded-2xl border border-slate-200">
+                <div key={attachment.id} className="relative overflow-hidden rounded-lg border border-gray-200">
                   <Image src={attachment.dataUrl} alt={attachment.name} width={240} height={160} unoptimized className="h-28 w-full object-cover" />
-                  <button type="button" onClick={() => setAttachments((currentAttachments) => currentAttachments.filter((item) => item.id !== attachment.id))} className="absolute right-2 top-2 rounded-full bg-slate-950/70 p-1 text-white"><X className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => setAttachments((currentAttachments) => currentAttachments.filter((item) => item.id !== attachment.id))} className="absolute right-2 top-2 rounded-full bg-gray-950/70 p-1 text-white"><X className="h-4 w-4" /></button>
                 </div>
               ))}
             </div>
           )}
           {showEmojis && (
-            <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
               {quickChatEmojis.map((emoji) => (
-                <button key={emoji} type="button" onClick={() => setMessage((currentMessage) => `${currentMessage}${emoji}`)} className="rounded-xl bg-white px-3 py-2 text-xl shadow-sm hover:bg-orange-50">{emoji}</button>
+                <button key={emoji} type="button" onClick={() => setMessage((currentMessage) => `${currentMessage}${emoji}`)} className="rounded-lg bg-white px-3 py-2 text-xl shadow-sm hover:bg-orange-50">{emoji}</button>
               ))}
             </div>
           )}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <button type="button" onClick={insertMention} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3"><AtSign className="h-5 w-5" /></button>
-            <button type="button" onClick={() => setShowEmojis((current) => !current)} className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3"><SmilePlus className="h-5 w-5" /></button>
-            <label className="shrink-0 cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-[#0A3D91] hover:bg-white sm:p-3">
+            <button type="button" onClick={insertMention} className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-blue-700 hover:bg-white sm:p-3"><AtSign className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setShowEmojis((current) => !current)} className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-blue-700 hover:bg-white sm:p-3"><SmilePlus className="h-5 w-5" /></button>
+            <label className="shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-blue-700 hover:bg-white sm:p-3">
               <ImagePlus className="h-5 w-5" />
               <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => handlePhotoUpload(event.target.files)} />
             </label>
-            <input value={message} onChange={(event) => setMessage(event.target.value)} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 sm:px-4" placeholder="Message General Chat..." maxLength={1000} />
-            <button disabled={sending || (!message.trim() && attachments.length === 0) || !currentUser} className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-orange-500 px-3 py-3 text-sm font-black text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5">
+            <input value={message} onChange={(event) => setMessage(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-semibold outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 sm:px-4" placeholder="Message General Chat..." maxLength={1000} />
+            <button disabled={sending || (!message.trim() && attachments.length === 0) || !currentUser} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-orange-500 px-3 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5">
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
               <span className="hidden sm:inline">Send</span>
             </button>

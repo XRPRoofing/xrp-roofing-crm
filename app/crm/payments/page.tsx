@@ -159,14 +159,14 @@ export default function PaymentsPage() {
       <div className="flex items-center justify-between pt-2">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
-          <h1 className="mt-1 text-2xl font-black text-[#0A3D91]">Payments</h1>
+          <h1 className="mt-1 text-2xl font-bold text-blue-700">Payments</h1>
         </div>
         <button
           onClick={() => setShowSearch((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-slate-100"
+          className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-100"
           aria-label="Search invoices"
         >
-          <Search className="h-5 w-5 text-slate-500" />
+          <Search className="h-5 w-5 text-gray-500" />
         </button>
       </div>
 
@@ -177,7 +177,7 @@ export default function PaymentsPage() {
           placeholder="Search by name, invoice #, or address…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+          className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
           autoFocus
         />
       )}
@@ -186,20 +186,20 @@ export default function PaymentsPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setTab("unpaid")}
-          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-black uppercase tracking-wide transition ${
+          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
             tab === "unpaid"
-              ? "border-[#0A3D91] bg-[#0A3D91] text-white"
-              : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
           }`}
         >
           Unpaid
         </button>
         <button
           onClick={() => setTab("paid")}
-          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-black uppercase tracking-wide transition ${
+          className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
             tab === "paid"
-              ? "border-[#0A3D91] bg-[#0A3D91] text-white"
-              : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
           }`}
         >
           Paid
@@ -207,23 +207,23 @@ export default function PaymentsPage() {
       </div>
 
       {/* Total banner */}
-      <div className={`rounded-2xl p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+      <div className={`rounded-lg p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
           {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
         </p>
-        <p className={`mt-1 text-3xl font-black ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
+        <p className={`mt-1 text-3xl font-bold ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
           {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
         </p>
       </div>
 
       {/* Sort controls */}
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-xs text-gray-500">
         <span className="font-semibold">
           {currentYear} sorted by {sortLabel}
         </span>
         <button
           onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-slate-100"
+          className="flex items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-gray-100"
           aria-label="Toggle sort direction"
         >
           <ArrowUpDown className="h-3.5 w-3.5" />
@@ -234,15 +234,15 @@ export default function PaymentsPage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100" />
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />
           ))}
         </div>
       ) : displayedInvoices.length === 0 ? (
-        <p className="py-12 text-center text-sm font-semibold text-slate-400">
+        <p className="py-12 text-center text-sm font-semibold text-gray-400">
           {search.trim() ? "No matching invoices." : `No ${tab} invoices.`}
         </p>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-gray-100">
           {displayedInvoices.map((inv) => {
             const total = computeTotal(inv);
             const paidAmount = computePaid(inv);
@@ -252,15 +252,15 @@ export default function PaymentsPage() {
             return (
               <article
                 key={inv.id}
-                className="flex cursor-pointer items-center justify-between py-4 transition hover:bg-slate-50 active:bg-slate-100"
+                className="flex cursor-pointer items-center justify-between py-4 transition hover:bg-gray-50 active:bg-gray-100"
                 onClick={() => openInvoice(inv.id)}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-900">
+                  <p className="truncate text-sm font-bold text-gray-900">
                     {inv.invoiceNumber ? `#${inv.invoiceNumber}` : "No #"}
                     {inv.clientName ? `: ${inv.clientName}` : ""}
                   </p>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
                     {tab === "paid" ? (
                       <>
                         <span>Paid {formatDate(dateStr)}</span>
@@ -271,7 +271,7 @@ export default function PaymentsPage() {
                     )}
                   </div>
                 </div>
-                <span className="ml-4 whitespace-nowrap text-sm font-bold text-slate-800">
+                <span className="ml-4 whitespace-nowrap text-sm font-bold text-gray-800">
                   {formatMoney(displayAmount)}
                 </span>
               </article>

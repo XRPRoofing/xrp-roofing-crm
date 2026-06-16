@@ -68,35 +68,35 @@ export default function FilesPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
-            <h1 className="mt-2 text-3xl font-black text-[#0A3D91]">Files & Photo Uploads</h1>
-            <p className="crm-board-subtitle mt-2 text-slate-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
+            <h1 className="mt-2 text-3xl font-bold text-blue-700">Files & Photo Uploads</h1>
+            <p className="crm-board-subtitle mt-2 text-gray-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="rounded-2xl bg-blue-50 px-5 py-3"><p className="text-2xl font-black text-blue-700">{folders.length}</p><p className="text-xs font-black uppercase text-blue-600">Folders</p></div>
-            <div className="rounded-2xl bg-orange-50 px-5 py-3"><p className="text-2xl font-black text-orange-700">{totalPhotos}</p><p className="text-xs font-black uppercase text-orange-600">Photos</p></div>
+            <div className="rounded-lg bg-blue-50 px-5 py-3"><p className="text-2xl font-bold text-blue-700">{folders.length}</p><p className="text-xs font-bold uppercase text-blue-600">Folders</p></div>
+            <div className="rounded-lg bg-orange-50 px-5 py-3"><p className="text-2xl font-bold text-orange-700">{totalPhotos}</p><p className="text-xs font-bold uppercase text-orange-600">Photos</p></div>
           </div>
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search address, customer, repair, maintenance..." />
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search address, customer, repair, maintenance..." />
           </div>
-          <button type="button" onClick={() => setShowNewFolder(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-blue-700">
+          <button type="button" onClick={() => setShowNewFolder(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">
             <FolderPlus className="h-5 w-5" /> New Folder
           </button>
         </div>
       </section>
 
       {filteredFolders.length === 0 ? (
-        <section className="rounded-[2rem] border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
+        <section className="rounded-[2rem] border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
           <UploadCloud className="mx-auto h-12 w-12 text-orange-500" />
-          <p className="mt-4 font-black text-[#0A3D91]">No folders yet</p>
-          <p className="mt-1 text-sm text-slate-500">Crew photos sync here into folders automatically — or tap <span className="font-black text-blue-700">New Folder</span> to create one and add photos yourself.</p>
+          <p className="mt-4 font-bold text-blue-700">No folders yet</p>
+          <p className="mt-1 text-sm text-gray-500">Crew photos sync here into folders automatically — or tap <span className="font-bold text-blue-700">New Folder</span> to create one and add photos yourself.</p>
         </section>
       ) : (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -104,18 +104,18 @@ export default function FilesPage() {
             <Link
               key={folder.id}
               href={`/crm/files/${encodeURIComponent(folder.id)}`}
-              className="group flex flex-col rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+              className="group flex flex-col rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><FolderOpen className="h-6 w-6" /></span>
-                <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black text-orange-700">{folder.files.length} {folder.files.length === 1 ? "photo" : "photos"}</span>
+                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><FolderOpen className="h-6 w-6" /></span>
+                <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">{folder.files.length} {folder.files.length === 1 ? "photo" : "photos"}</span>
               </div>
-              <h2 className="mt-4 text-lg font-black leading-snug text-[#0A3D91]">{folder.address}</h2>
-              <p className="mt-1 text-sm font-bold text-slate-600">{folder.customerName}</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-500">{folder.workType}</p>
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <p className="text-xs font-bold text-slate-400">Last updated {formatDate(folder.updatedAt)}</p>
-                <span className="flex items-center gap-1 text-xs font-black text-blue-600 opacity-0 transition group-hover:opacity-100">Open <ChevronRight className="h-4 w-4" /></span>
+              <h2 className="mt-4 text-lg font-bold leading-snug text-blue-700">{folder.address}</h2>
+              <p className="mt-1 text-sm font-bold text-gray-600">{folder.customerName}</p>
+              <p className="mt-0.5 text-sm font-semibold text-gray-500">{folder.workType}</p>
+              <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
+                <p className="text-xs font-bold text-gray-400">Last updated {formatDate(folder.updatedAt)}</p>
+                <span className="flex items-center gap-1 text-xs font-bold text-blue-600 opacity-0 transition group-hover:opacity-100">Open <ChevronRight className="h-4 w-4" /></span>
               </div>
             </Link>
           ))}
@@ -155,35 +155,35 @@ function NewFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" onClick={onClose}>
       <form onClick={(event) => event.stopPropagation()} onSubmit={submit} className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
-            <h2 className="mt-1 text-xl font-black text-[#0A3D91]">New Folder</h2>
+            <h2 className="mt-1 text-xl font-bold text-blue-700">New Folder</h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded-full bg-slate-100 p-2 text-slate-600"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} className="rounded-full bg-gray-100 p-2 text-gray-600"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="mt-5 space-y-3">
           <label className="block">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Folder name / address</span>
-            <input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. 123 Main St, Phoenix" className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Folder name / address</span>
+            <input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. 123 Main St, Phoenix" className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
           </label>
           <label className="block">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Customer (optional)</span>
-            <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Customer name" className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Customer (optional)</span>
+            <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Customer name" className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
           </label>
           <label className="block">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-500">Work type (optional)</span>
-            <input value={workType} onChange={(event) => setWorkType(event.target.value)} placeholder="e.g. Repair, Inspection" className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
+            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Work type (optional)</span>
+            <input value={workType} onChange={(event) => setWorkType(event.target.value)} placeholder="e.g. Repair, Inspection" className="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white" />
           </label>
           {error && <p className="text-sm font-bold text-orange-600">{error}</p>}
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-black text-slate-500 hover:text-slate-700">Cancel</button>
-          <button type="submit" disabled={!name.trim() || saving} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50">{saving ? "Creating…" : "Create Folder"}</button>
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700">Cancel</button>
+          <button type="submit" disabled={!name.trim() || saving} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50">{saving ? "Creating…" : "Create Folder"}</button>
         </div>
       </form>
     </div>

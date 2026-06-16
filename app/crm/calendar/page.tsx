@@ -374,50 +374,50 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-6">
-      <div className="sticky top-16 z-30 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-8 lg:top-20">
+      <div className="sticky top-16 z-30 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-8 lg:top-20">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Scheduling</p>
               <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">Arizona MT</span>
             </div>
-            <h1 className="mt-0.5 text-lg font-black text-[#0A3D91] sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
-            <p className="crm-board-subtitle mt-1 hidden text-slate-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments. All times shown in Arizona Mountain Time.</p>
-            <p className="mt-1 text-xs text-slate-500 sm:hidden">All times in Arizona MT</p>
+            <h1 className="mt-0.5 text-lg font-bold text-blue-700 sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
+            <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments. All times shown in Arizona Mountain Time.</p>
+            <p className="mt-1 text-xs text-gray-500 sm:hidden">All times in Arizona MT</p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-xl bg-[#0A3D91] px-3 py-2 text-sm font-bold text-white sm:rounded-2xl sm:px-4 sm:py-3">
+            <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white sm:rounded-lg sm:px-4 sm:py-3">
               <Plus className="mr-1.5 inline h-4 w-4" />New appointment
             </button>
-            <button onClick={loadEvents} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 sm:rounded-2xl sm:px-4 sm:py-3">
+            <button onClick={loadEvents} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 sm:rounded-lg sm:px-4 sm:py-3">
               <RefreshCw className="mr-1.5 inline h-4 w-4" />Refresh
             </button>
-            <a href="/api/google-calendar/connect" className="rounded-xl bg-orange-500 px-3 py-2 text-sm font-bold text-white shadow-lg shadow-orange-200 sm:rounded-2xl sm:px-4 sm:py-3">
+            <a href="/api/google-calendar/connect" className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white shadow-sm sm:rounded-lg sm:px-4 sm:py-3">
               <CalendarDays className="mr-1.5 inline h-4 w-4" />{connected ? "Reconnect" : "Connect Google"}
             </a>
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm sm:mt-6 sm:p-4 sm:text-base">
+        <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm sm:mt-6 sm:p-4 sm:text-base">
           {loading && (
-            <p className="flex items-center font-semibold text-slate-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking Google Calendar...</p>
+            <p className="flex items-center font-semibold text-gray-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking Google Calendar...</p>
           )}
           {!loading && connected && (
             <p className="font-bold text-blue-700">Google Calendar connected. Showing your next {events.length} upcoming events.</p>
           )}
           {!loading && !connected && (
-            <p className="font-bold text-slate-700">Google Calendar is not connected yet. Click Connect Google to authorize access.</p>
+            <p className="font-bold text-gray-700">Google Calendar is not connected yet. Click Connect Google to authorize access.</p>
           )}
           {error && <p className="mt-2 font-semibold text-orange-600">{error}</p>}
           {statusMessage && <p className="mt-2 font-semibold text-orange-700">{statusMessage}</p>}
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <div className="rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-black text-[#0A3D91] sm:text-2xl">{monthLabel}</h2>
+          <h2 className="text-xl font-bold text-blue-700 sm:text-2xl">{monthLabel}</h2>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
+            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 hover:text-orange-600">
               <ChevronLeft className="h-5 w-5" />
             </button>
             <button type="button" onClick={() => {
@@ -431,16 +431,16 @@ export default function CalendarPage() {
               const year = Number(parts.find((p) => p.type === "year")?.value);
               const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
               setMonthCursor(new Date(year, month, 1));
-            }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:text-orange-600">
+            }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 hover:text-orange-600">
               Today
             </button>
-            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600">
+            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 hover:text-orange-600">
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-slate-400 sm:text-xs">
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-gray-400 sm:text-xs">
           {WEEKDAYS.map((weekday) => (
             <div key={weekday} className="py-1">
               <span className="sm:hidden">{weekday.charAt(0)}</span>
@@ -451,14 +451,14 @@ export default function CalendarPage() {
 
         <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-2">
           {calendarCells.map((cellDate, index) => {
-            if (!cellDate) return <div key={`empty-${index}`} className="min-h-16 rounded-xl bg-slate-50/40 sm:min-h-28" />;
+            if (!cellDate) return <div key={`empty-${index}`} className="min-h-16 rounded-lg bg-gray-50/40 sm:min-h-28" />;
             const key = dateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
             const dayEvents = eventsByDate[key] || [];
             const isToday = key === todayKey;
             const isSelected = key === activeDayKey;
             return (
-              <div key={key} onClick={() => openDay(key)} className={`min-h-16 cursor-pointer rounded-xl border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-slate-100 bg-slate-50 hover:border-orange-200"}`}>
-                <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-slate-500"}`}>
+              <div key={key} onClick={() => openDay(key)} className={`min-h-16 cursor-pointer rounded-lg border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-gray-100 bg-gray-50 hover:border-orange-200"}`}>
+                <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-gray-500"}`}>
                   {isToday ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white sm:h-6 sm:w-6">{cellDate.getDate()}</span> : cellDate.getDate()}
                 </div>
                 <div className="mt-1 space-y-1">
@@ -469,7 +469,7 @@ export default function CalendarPage() {
                       key={event.id}
                       type="button"
                       onClick={(clickEvent) => { clickEvent.stopPropagation(); openDay(key, event); }}
-                      className="hidden w-full truncate rounded-lg bg-orange-50 px-1.5 py-1 text-left text-[11px] font-black leading-tight text-orange-700 ring-1 ring-orange-100 sm:block"
+                      className="hidden w-full truncate rounded-lg bg-orange-50 px-1.5 py-1 text-left text-[11px] font-bold leading-tight text-orange-700 ring-1 ring-orange-100 sm:block"
                     >
                       {formatEventTime(event)} · {event.summary || "Untitled event"}
                     </button>
@@ -478,7 +478,7 @@ export default function CalendarPage() {
                       (replaces the cramped chips + hidden "+N more"). */}
                   {dayEvents.length > 0 && (
                     <span
-                      className={`block rounded-lg bg-orange-500 px-1.5 py-0.5 text-center text-[10px] font-black text-white sm:hidden`}
+                      className={`block rounded-lg bg-orange-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white sm:hidden`}
                     >
                       {dayEvents.length}
                     </span>
@@ -492,13 +492,13 @@ export default function CalendarPage() {
           })}
         </div>
 
-        <div ref={agendaRef} className="mt-4 scroll-mt-20 border-t border-slate-100 pt-4">
+        <div ref={agendaRef} className="mt-4 scroll-mt-20 border-t border-gray-100 pt-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-[0.16em] text-orange-600">{activeDayLabel}</h3>
-            <span className="text-xs font-bold text-slate-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"} · swipe →</span>
+            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">{activeDayLabel}</h3>
+            <span className="text-xs font-bold text-gray-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"} · swipe →</span>
           </div>
           {agendaEvents.length === 0 ? (
-            <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">No events on this day. Tap any date above to see its appointments.</p>
+            <p className="mt-3 rounded-lg bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500">No events on this day. Tap any date above to see its appointments.</p>
           ) : (
             // Horizontal, swipeable strip: every event on the day is its own card
             // you can scroll to and open — nothing is hidden behind "+N more".
@@ -507,24 +507,24 @@ export default function CalendarPage() {
                 const details = getEventDetails(event);
                 const tel = telHref(details.phone);
                 return (
-                  <div key={event.id} className="flex w-[80%] max-w-[20rem] shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:w-72">
+                  <div key={event.id} className="flex w-[80%] max-w-[20rem] shrink-0 snap-start flex-col rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:w-72">
                     <button type="button" onClick={() => setSelectedEvent(event)} className="flex flex-1 items-start gap-3 text-left">
-                      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-orange-50 px-1.5 py-2 text-center text-orange-700">
+                      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-orange-50 px-1.5 py-2 text-center text-orange-700">
                         <Clock className="h-3.5 w-3.5" />
-                        <span className="mt-0.5 text-[11px] font-black leading-tight">{formatEventTime(event)}</span>
+                        <span className="mt-0.5 text-[11px] font-bold leading-tight">{formatEventTime(event)}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-[#0A3D91]">{event.summary || "Untitled event"}</p>
+                        <p className="truncate text-sm font-bold text-blue-700">{event.summary || "Untitled event"}</p>
                         {details.name !== "Not provided" && (
-                          <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-slate-600"><User className="h-3 w-3 shrink-0 text-slate-400" />{details.name}</p>
+                          <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-gray-600"><User className="h-3 w-3 shrink-0 text-gray-400" />{details.name}</p>
                         )}
                         {details.address !== "Not provided" && (
-                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-slate-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" /><AddressLink value={details.address} /></p>
+                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-gray-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" /><AddressLink value={details.address} /></p>
                         )}
                       </div>
                     </button>
                     <div className="mt-3 flex items-center gap-2">
-                      <button type="button" onClick={() => setSelectedEvent(event)} className="flex-1 rounded-xl bg-orange-500 px-3 py-2 text-xs font-black text-white transition hover:bg-orange-600">Open</button>
+                      <button type="button" onClick={() => setSelectedEvent(event)} className="flex-1 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-orange-600">Open</button>
                       {tel && (
                         <a href={tel} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600">
                           <Phone className="h-4 w-4" />
@@ -540,29 +540,29 @@ export default function CalendarPage() {
       </div>
 
       {newScheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-3 sm:p-4" onClick={() => setNewScheduleOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4" onClick={() => setNewScheduleOpen(false)}>
           <form
             id="new-appointment"
             onSubmit={handleCreateEvent}
             onClick={(event) => event.stopPropagation()}
-            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New schedule</p>
-                <h2 className="mt-0.5 text-lg font-black text-[#0A3D91] sm:text-2xl">Create appointment</h2>
+                <h2 className="mt-0.5 text-lg font-bold text-blue-700 sm:text-2xl">Create appointment</h2>
               </div>
-              <button type="button" onClick={() => setNewScheduleOpen(false)} aria-label="Close" className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <button type="button" onClick={() => setNewScheduleOpen(false)} aria-label="Close" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-              {!connected && <p className="mb-3 rounded-2xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">Connect Google first</p>}
+              {!connected && <p className="mb-3 rounded-lg bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">Connect Google first</p>}
               <div className="grid gap-3 sm:grid-cols-2">
-                <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Appointment title" />
-                <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Customer name" />
-                <input type="tel" inputMode="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" placeholder="Phone number (for click-to-call)" />
+                <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Appointment title" />
+                <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Customer name" />
+                <input type="tel" inputMode="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Phone number (for click-to-call)" />
                 <div className="sm:col-span-2">
                   <AddressAutocomplete
                     value={form.address}
@@ -571,25 +571,25 @@ export default function CalendarPage() {
                     required
                   />
                 </div>
-                <select required value={form.jobKind} onChange={(event) => setForm({ ...form, jobKind: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2">
+                <select required value={form.jobKind} onChange={(event) => setForm({ ...form, jobKind: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2">
                   <option>Repair</option>
                   <option>Replacement</option>
                   <option>Installation</option>
                   <option>Maintenance</option>
                 </select>
-                <input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" />
-                <input required type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" />
-                <input required type="time" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none" />
-                <input value={form.guestEmails} onChange={(event) => setForm({ ...form, guestEmails: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Guest emails, separated by commas" />
-                <input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Notes" />
+                <input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2" />
+                <input required type="time" value={form.startTime} onChange={(event) => setForm({ ...form, startTime: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" />
+                <input required type="time" value={form.endTime} onChange={(event) => setForm({ ...form, endTime: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" />
+                <input value={form.guestEmails} onChange={(event) => setForm({ ...form, guestEmails: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Guest emails, separated by commas" />
+                <input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2" placeholder="Notes" />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
-              <button type="button" onClick={() => setNewScheduleOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-50">
+            <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-3 sm:px-6">
+              <button type="button" onClick={() => setNewScheduleOpen(false)} className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
-              <button disabled={!connected || saving} className="rounded-2xl bg-orange-500 px-5 py-2.5 font-bold text-white shadow-lg shadow-orange-200 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+              <button disabled={!connected || saving} className="rounded-lg bg-orange-500 px-5 py-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
                 {saving ? "Saving..." : "Save to Calendar"}
               </button>
             </div>
@@ -597,80 +597,80 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-black text-[#0A3D91]">Upcoming Google Calendar events</h2>
+      <div className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-bold text-blue-700">Upcoming Google Calendar events</h2>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {events.map((event) => {
             const phone = getEventDetails(event).phone;
             const tel = telHref(phone);
             return (
-            <article key={event.id} onClick={() => setSelectedEvent(event)} className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <article key={event.id} onClick={() => setSelectedEvent(event)} className="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-black text-[#0A3D91]">{event.summary || "Untitled event"}</p>
+                  <p className="font-bold text-blue-700">{event.summary || "Untitled event"}</p>
                   <p className="mt-1 text-sm font-semibold text-orange-600">{formatEventDate(event)}</p>
                 </div>
                 {event.htmlLink && (
-                  <a href={event.htmlLink} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="rounded-xl bg-white p-2 text-slate-500 hover:text-orange-600">
+                  <a href={event.htmlLink} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="rounded-lg bg-white p-2 text-gray-500 hover:text-orange-600">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
               </div>
               {tel && (
-                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-500 px-3 py-2 text-sm font-bold text-white hover:bg-blue-600">
+                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-500 px-3 py-2 text-sm font-bold text-white hover:bg-blue-600">
                   <Phone className="h-4 w-4" />{phone}
                 </a>
               )}
-              {event.description && <p className="mt-3 line-clamp-2 text-sm text-slate-600">{event.description}</p>}
+              {event.description && <p className="mt-3 line-clamp-2 text-sm text-gray-600">{event.description}</p>}
             </article>
             );
           })}
           {!loading && connected && events.length === 0 && (
-            <p className="rounded-2xl bg-slate-50 p-4 font-semibold text-slate-600">No upcoming events found.</p>
+            <p className="rounded-lg bg-gray-50 p-4 font-semibold text-gray-600">No upcoming events found.</p>
           )}
         </div>
       </div>
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4">
           <form onSubmit={handleUpdateEvent} className="mx-auto my-6 grid max-w-6xl gap-6 lg:grid-cols-[1fr_260px]">
             <div className="rounded-[2rem] bg-white p-6 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <input required value={eventForm.title} onChange={(event) => setEventForm({ ...eventForm, title: event.target.value })} className="w-full border-0 text-3xl font-normal text-[#0A3D91] outline-none" placeholder="Add title" />
-                <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+                <input required value={eventForm.title} onChange={(event) => setEventForm({ ...eventForm, title: event.target.value })} className="w-full border-0 text-3xl font-normal text-blue-700 outline-none" placeholder="Add title" />
+                <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <input required type="date" value={eventForm.date} onChange={(event) => setEventForm({ ...eventForm, date: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" />
-                <input required type="time" value={eventForm.startTime} onChange={(event) => setEventForm({ ...eventForm, startTime: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" />
-                <span className="font-semibold text-slate-600">to</span>
-                <input required type="time" value={eventForm.endTime} onChange={(event) => setEventForm({ ...eventForm, endTime: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" />
-                <span className="font-semibold text-slate-700">(GMT-07:00) Mountain Standard Time - Phoenix</span>
+                <input required type="date" value={eventForm.date} onChange={(event) => setEventForm({ ...eventForm, date: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none" />
+                <input required type="time" value={eventForm.startTime} onChange={(event) => setEventForm({ ...eventForm, startTime: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none" />
+                <span className="font-semibold text-gray-600">to</span>
+                <input required type="time" value={eventForm.endTime} onChange={(event) => setEventForm({ ...eventForm, endTime: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none" />
+                <span className="font-semibold text-gray-700">(GMT-07:00) Mountain Standard Time - Phoenix</span>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 font-semibold text-slate-700">
+                <label className="flex items-center gap-2 font-semibold text-gray-700">
                   <input type="checkbox" className="h-4 w-4" /> All day
                 </label>
-                <button type="button" className="rounded-lg bg-slate-100 px-4 py-3 font-semibold text-slate-700">Does not repeat</button>
+                <button type="button" className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">Does not repeat</button>
               </div>
 
-              <div className="mt-8 rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-sm">
-                <div className="flex gap-8 border-b border-slate-200">
+              <div className="mt-8 rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-sm">
+                <div className="flex gap-8 border-b border-gray-200">
                   <button type="button" className="border-b-2 border-blue-600 px-2 pb-3 font-bold text-blue-600">Event details</button>
-                  <button type="button" className="px-2 pb-3 font-bold text-slate-500">Find a time</button>
+                  <button type="button" className="px-2 pb-3 font-bold text-gray-500">Find a time</button>
                 </div>
 
                 <div className="mt-6 grid gap-4">
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <User className="h-5 w-5 text-slate-500" />
-                    <input required value={eventForm.name} onChange={(event) => setEventForm({ ...eventForm, name: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Customer name" />
+                    <User className="h-5 w-5 text-gray-500" />
+                    <input required value={eventForm.name} onChange={(event) => setEventForm({ ...eventForm, name: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Customer name" />
                   </label>
                   <div className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <Phone className="h-5 w-5 text-slate-500" />
+                    <Phone className="h-5 w-5 text-gray-500" />
                     <div className="flex items-center gap-2">
-                      <input type="tel" inputMode="tel" value={eventForm.phone} onChange={(event) => setEventForm({ ...eventForm, phone: event.target.value })} className="flex-1 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Phone number" />
+                      <input type="tel" inputMode="tel" value={eventForm.phone} onChange={(event) => setEventForm({ ...eventForm, phone: event.target.value })} className="flex-1 rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Phone number" />
                       {telHref(eventForm.phone) && (
                         <a href={telHref(eventForm.phone)} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-bold text-white hover:bg-blue-600">
                           <Phone className="h-4 w-4" />Call
@@ -679,9 +679,9 @@ export default function CalendarPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <MapPin className="h-5 w-5 text-slate-500" />
+                    <MapPin className="h-5 w-5 text-gray-500" />
                     <div className="flex items-center gap-2">
-                      <input required value={eventForm.address} onChange={(event) => setEventForm({ ...eventForm, address: event.target.value })} className="flex-1 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Job address" />
+                      <input required value={eventForm.address} onChange={(event) => setEventForm({ ...eventForm, address: event.target.value })} className="flex-1 rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Job address" />
                       {eventForm.address && (
                         <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(eventForm.address)}`} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-bold text-white hover:bg-blue-600">
                           <MapPin className="h-4 w-4" />Map
@@ -690,8 +690,8 @@ export default function CalendarPage() {
                     </div>
                   </div>
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <Briefcase className="h-5 w-5 text-slate-500" />
-                    <select required value={eventForm.jobKind} onChange={(event) => setEventForm({ ...eventForm, jobKind: event.target.value })} className="rounded-lg bg-slate-100 px-4 py-3 outline-none">
+                    <Briefcase className="h-5 w-5 text-gray-500" />
+                    <select required value={eventForm.jobKind} onChange={(event) => setEventForm({ ...eventForm, jobKind: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none">
                       <option>Repair</option>
                       <option>Replacement</option>
                       <option>Installation</option>
@@ -699,44 +699,44 @@ export default function CalendarPage() {
                     </select>
                   </label>
                   <div className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <Bell className="h-5 w-5 text-slate-500" />
+                    <Bell className="h-5 w-5 text-gray-500" />
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-lg bg-slate-100 px-4 py-3 font-semibold text-slate-700">Notification</span>
-                      <span className="rounded-lg bg-slate-100 px-4 py-3 font-semibold text-slate-700">10</span>
-                      <span className="rounded-lg bg-slate-100 px-4 py-3 font-semibold text-slate-700">minutes</span>
+                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">Notification</span>
+                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">10</span>
+                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">minutes</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-[28px_1fr] items-start gap-4">
-                    <AlignLeft className="mt-3 h-5 w-5 text-slate-500" />
-                    <textarea value={eventForm.notes} onChange={(event) => setEventForm({ ...eventForm, notes: event.target.value })} className="min-h-48 rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Add description / notes" />
+                    <AlignLeft className="mt-3 h-5 w-5 text-gray-500" />
+                    <textarea value={eventForm.notes} onChange={(event) => setEventForm({ ...eventForm, notes: event.target.value })} className="min-h-48 rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Add description / notes" />
                   </div>
                 </div>
               </div>
 
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                 {selectedEvent.htmlLink && (
-                  <a href={selectedEvent.htmlLink} target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-slate-200 px-4 py-3 font-bold text-slate-700">
+                  <a href={selectedEvent.htmlLink} target="_blank" rel="noreferrer" className="inline-flex rounded-lg border border-gray-200 px-4 py-3 font-bold text-gray-700">
                     <ExternalLink className="mr-2 h-4 w-4" />Open in Google Calendar
                   </a>
                 )}
-                <button disabled={updating} className="rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white disabled:bg-slate-300">
+                <button disabled={updating} className="rounded-lg bg-blue-600 px-6 py-3 font-bold text-white disabled:bg-gray-300">
                   {updating ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </div>
 
             <aside className="rounded-[2rem] bg-white p-5 shadow-2xl">
-              <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-                <Clock className="h-5 w-5 text-slate-500" />
-                <h3 className="font-black text-[#0A3D91]">Guests</h3>
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
+                <Clock className="h-5 w-5 text-gray-500" />
+                <h3 className="font-bold text-blue-700">Guests</h3>
               </div>
-              <textarea value={eventForm.guestEmails} onChange={(event) => setEventForm({ ...eventForm, guestEmails: event.target.value })} className="mt-5 min-h-24 w-full rounded-lg bg-slate-100 px-4 py-3 outline-none" placeholder="Add guest emails, separated by commas" />
-              <p className="mt-2 text-xs font-semibold text-slate-500">Saving changes will send the Google Calendar invite/update to each guest.</p>
+              <textarea value={eventForm.guestEmails} onChange={(event) => setEventForm({ ...eventForm, guestEmails: event.target.value })} className="mt-5 min-h-24 w-full rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Add guest emails, separated by commas" />
+              <p className="mt-2 text-xs font-semibold text-gray-500">Saving changes will send the Google Calendar invite/update to each guest.</p>
               <div className="mt-8 space-y-4">
-                <p className="font-bold text-slate-700">Guest permissions</p>
-                <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" className="h-4 w-4" />Modify event</label>
-                <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" defaultChecked className="h-4 w-4" />Invite others</label>
-                <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" defaultChecked className="h-4 w-4" />See guest list</label>
+                <p className="font-bold text-gray-700">Guest permissions</p>
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700"><input type="checkbox" className="h-4 w-4" />Modify event</label>
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700"><input type="checkbox" defaultChecked className="h-4 w-4" />Invite others</label>
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700"><input type="checkbox" defaultChecked className="h-4 w-4" />See guest list</label>
               </div>
             </aside>
           </form>

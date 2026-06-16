@@ -447,7 +447,7 @@ export default function PhotoAnnotator({
       {/* Top bar */}
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white">
         <button type="button" onClick={onCancel} className="p-1 text-white hover:opacity-70"><X className="h-6 w-6" /></button>
-        <div className="flex items-center gap-6 text-sm font-black">
+        <div className="flex items-center gap-6 text-sm font-bold">
           <button type="button" onClick={handleUndo} disabled={strokes.length === 0 && shapes.length === 0} className="flex items-center gap-1 disabled:opacity-30 hover:opacity-70">
             <Undo2 className="h-4 w-4" /> Undo
           </button>
@@ -459,7 +459,7 @@ export default function PhotoAnnotator({
         <div className="relative">
           <button type="button" onClick={() => setShowColorPicker((v) => !v)} className="h-8 w-8 rounded-full border-4 border-white/40 shadow-lg" style={{ backgroundColor: color }} />
           {showColorPicker && (
-            <div className="absolute right-0 top-10 z-10 flex gap-2 rounded-2xl bg-slate-800 p-3 shadow-xl">
+            <div className="absolute right-0 top-10 z-10 flex gap-2 rounded-lg bg-gray-800 p-3 shadow-xl">
               {PALETTE.map((c) => (
                 <button key={c} type="button" onClick={() => { setColor(c); setShowColorPicker(false); }} className={`h-7 w-7 rounded-full border-2 transition ${color === c ? "border-white scale-110" : "border-white/20"}`} style={{ backgroundColor: c }} />
               ))}
@@ -481,23 +481,23 @@ export default function PhotoAnnotator({
         />
 
         {/* Right-side vertical toolbar */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 rounded-2xl bg-black/60 p-1.5 backdrop-blur-sm">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 rounded-lg bg-black/60 p-1.5 backdrop-blur-sm">
           {toolBtns.map(({ t, icon, label }) => (
             <button key={t} type="button" title={label} onClick={() => { setTool(t); setSelectedId(null); }}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl transition ${tool === t ? "bg-white/20 text-white" : "text-slate-400 hover:bg-white/10 hover:text-white"}`}>
+              className={`flex h-11 w-11 items-center justify-center rounded-lg transition ${tool === t ? "bg-white/20 text-white" : "text-gray-400 hover:bg-white/10 hover:text-white"}`}>
               {icon}
             </button>
           ))}
           <div className="my-1 h-px bg-white/10" />
-          <button type="button" title="Rotate" className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 hover:bg-white/10 hover:text-white"><RotateCcw className="h-5 w-5" /></button>
-          <button type="button" title="Crop" className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 hover:bg-white/10 hover:text-white"><Crop className="h-5 w-5" /></button>
-          <button type="button" title="Adjust" className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-400 hover:bg-white/10 hover:text-white"><SlidersHorizontal className="h-5 w-5" /></button>
+          <button type="button" title="Rotate" className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white"><RotateCcw className="h-5 w-5" /></button>
+          <button type="button" title="Crop" className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white"><Crop className="h-5 w-5" /></button>
+          <button type="button" title="Adjust" className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white"><SlidersHorizontal className="h-5 w-5" /></button>
         </div>
 
         {/* Floating action bar for selected shape */}
         {actionPos && selectedId && (
           <div
-            className="absolute flex items-center gap-px rounded-2xl bg-slate-800/95 p-1 shadow-2xl backdrop-blur-sm"
+            className="absolute flex items-center gap-px rounded-lg bg-gray-800/95 p-1 shadow-2xl backdrop-blur-sm"
             style={{ left: actionPos.x - 60, top: actionPos.y }}
           >
             {canShowText && (
@@ -508,14 +508,14 @@ export default function PhotoAnnotator({
                   const val = s.kind === "arrow" ? s.label : s.kind === "text" ? s.text : "";
                   setTextPopup({ shapeId: selectedId, value: val });
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white hover:bg-white/10">
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-white hover:bg-white/10">
                 <Type className="h-4 w-4" />
               </button>
             )}
-            <button type="button" title="Duplicate" onClick={duplicateSelected} className="flex h-9 w-9 items-center justify-center rounded-xl text-white hover:bg-white/10">
+            <button type="button" title="Duplicate" onClick={duplicateSelected} className="flex h-9 w-9 items-center justify-center rounded-lg text-white hover:bg-white/10">
               <Copy className="h-4 w-4" />
             </button>
-            <button type="button" title="Delete" onClick={deleteSelected} className="flex h-9 w-9 items-center justify-center rounded-xl text-red-400 hover:bg-white/10">
+            <button type="button" title="Delete" onClick={deleteSelected} className="flex h-9 w-9 items-center justify-center rounded-lg text-red-400 hover:bg-white/10">
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
@@ -525,11 +525,11 @@ export default function PhotoAnnotator({
       {/* Text popup */}
       {textPopup && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60" onClick={() => setTextPopup(null)}>
-          <div className="w-72 rounded-2xl bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-72 rounded-lg bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex gap-2">
               {(["Abc", "ft. in.", "m. cm."] as const).map((mode) => (
                 <button key={mode} type="button"
-                  className={`rounded-xl px-3 py-1.5 text-xs font-black ${mode === "Abc" ? "bg-[#0A3D91] text-white" : "border border-slate-300 text-slate-600"}`}>
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${mode === "Abc" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-600"}`}>
                   {mode}
                 </button>
               ))}
@@ -540,11 +540,11 @@ export default function PhotoAnnotator({
               onChange={(e) => setTextPopup((p) => p ? { ...p, value: e.target.value } : p)}
               onKeyDown={(e) => { if (e.key === "Enter") commitTextPopup(textPopup.value); if (e.key === "Escape") setTextPopup(null); }}
               placeholder="Text"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-blue-400 focus:bg-white"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold text-gray-800 outline-none focus:border-blue-400 focus:bg-white"
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => setTextPopup(null)} className="rounded-xl px-4 py-2 text-sm font-black text-slate-500 hover:text-slate-700">Cancel</button>
-              <button type="button" onClick={() => commitTextPopup(textPopup.value)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">Save</button>
+              <button type="button" onClick={() => setTextPopup(null)} className="rounded-lg px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700">Cancel</button>
+              <button type="button" onClick={() => commitTextPopup(textPopup.value)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Save</button>
             </div>
           </div>
         </div>
@@ -554,21 +554,21 @@ export default function PhotoAnnotator({
       <div className="shrink-0 border-t border-white/10 bg-black px-4 pb-[env(safe-area-inset-bottom)] pt-3">
         {/* Stroke size */}
         <div className="mb-3 flex items-center gap-2">
-          <Minus className="h-3 w-3 text-slate-500" />
+          <Minus className="h-3 w-3 text-gray-500" />
           <input type="range" min={3} max={24} value={size} onChange={(e) => setSize(Number(e.target.value))}
             className="flex-1 accent-white" />
-          <span className="w-6 text-center text-xs font-black text-white">{size}</span>
+          <span className="w-6 text-center text-xs font-bold text-white">{size}</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-slate-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span>
+          <span className="text-gray-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg></span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Add a description…"
-            className="flex-1 bg-transparent text-sm font-semibold text-white placeholder:text-slate-500 outline-none"
+            className="flex-1 bg-transparent text-sm font-semibold text-white placeholder:text-gray-500 outline-none"
           />
           <button type="button" onClick={handleSave} disabled={!ready}
-            className="rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:bg-blue-700 disabled:opacity-40">
+            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 disabled:opacity-40">
             {index + 1 < images.length ? "Next" : "Save"}
           </button>
         </div>
