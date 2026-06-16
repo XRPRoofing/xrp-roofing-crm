@@ -516,7 +516,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden lg:pl-64">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-clip lg:pl-64">
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
           <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
