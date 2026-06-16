@@ -68,7 +68,7 @@ export default function FilesPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="sticky top-14 z-20 rounded-[2rem] border border-gray-200 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>

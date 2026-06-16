@@ -539,7 +539,7 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
+      <div className="sticky top-14 z-20 -mx-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Jobs Board</h1>
