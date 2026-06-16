@@ -7,7 +7,7 @@
  */
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { officeTaskStatuses, readOfficeTasks, saveOfficeTasks, type OfficeTask } from "@/lib/office-tasks";
+import { officeTaskStatuses, readDeletedTaskIds, readOfficeTasks, saveOfficeTasks, type OfficeTask } from "@/lib/office-tasks";
 
 const TABLE = "office_tasks";
 
@@ -67,9 +67,13 @@ export async function loadTasksFromSupabase(): Promise<OfficeTask[]> {
       void supabase.from(TABLE).delete().in("id", duplicateIds).then(() => {});
     }
 
+    // Filter out deleted and archived tasks
+    const deletedIds = new Set(readDeletedTaskIds());
+    const visible = deduped.filter((t) => !deletedIds.has(t.id) && !t.archived);
+
     // Also keep localStorage in sync for offline fallback
-    saveOfficeTasks(deduped);
-    return deduped;
+    saveOfficeTasks(visible);
+    return visible;
   } catch {
     return readOfficeTasks();
   }
