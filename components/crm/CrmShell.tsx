@@ -683,7 +683,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation — rendered at root level so no parent transform/flex can break fixed positioning */}
       {mobileBottomNav.length > 0 && (
-        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ WebkitTransform: "translateZ(0)", willChange: "transform", touchAction: "none", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}>
+        <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform", touchAction: "none", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}>
           <div className="flex items-center justify-around px-1 py-1">
             {mobileBottomNav.map((item) => {
               const Icon = item.icon;

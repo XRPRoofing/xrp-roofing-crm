@@ -224,7 +224,7 @@ export default function CrmDashboardPage() {
   return (
     <div className="space-y-4 sm:space-y-5">
       {/* ── Welcome Header ──────────────────────────────────────────── */}
-      <section className="rounded-xl border border-gray-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
+      <section className="sticky top-14 z-20 rounded-xl border border-gray-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-6 sm:py-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-gray-900 sm:text-xl">

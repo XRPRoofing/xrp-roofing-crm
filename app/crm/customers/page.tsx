@@ -567,16 +567,26 @@ export default function CustomersPage() {
     await syncFromServer(edited.id, true);
   }
 
-  async function handleDeleteCustomer(id: string) {
-    if (typeof window !== "undefined" && !window.confirm("Delete this customer? This cannot be undone.")) return;
-    setSavedCustomers((current) => current.filter((customer) => customer.id !== id));
+  const [showDeleteCustomerModal, setShowDeleteCustomerModal] = useState(false);
+  const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<string | null>(null);
+
+  function handleDeleteCustomer(id: string) {
+    setDeleteCustomerTarget(id);
+    setShowDeleteCustomerModal(true);
+  }
+
+  async function confirmDeleteCustomer() {
+    if (!deleteCustomerTarget) return;
+    setSavedCustomers((current) => current.filter((customer) => customer.id !== deleteCustomerTarget));
     setSelectedCustomerId(null);
     cardHashRef.current = false;
     const url = new URL(window.location.href);
     url.searchParams.delete("customer");
     url.hash = "";
     history.replaceState(history.state, "", url.pathname + url.search);
-    await deleteCustomerRecord(id);
+    setShowDeleteCustomerModal(false);
+    setDeleteCustomerTarget(null);
+    await deleteCustomerRecord(deleteCustomerTarget);
     await syncFromServer();
   }
 
@@ -587,13 +597,15 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
-          <h1 className="mt-2 text-3xl font-bold text-blue-700">Customers ({customerList.length})</h1>
-          <p className="crm-board-subtitle mt-2 text-gray-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
+      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
+            <h1 className="mt-2 text-3xl font-bold text-blue-700">Customers ({customerList.length})</h1>
+            <p className="crm-board-subtitle mt-2 text-gray-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
+          </div>
+          <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-orange-500 px-4 py-3 font-bold text-white shadow-sm"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
         </div>
-        <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-orange-500 px-4 py-3 font-bold text-white shadow-sm"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
       </div>
 
       {customersError && (
@@ -849,6 +861,29 @@ export default function CustomersPage() {
               )}
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* ── Delete Customer Confirmation Modal ── */}
+      {showDeleteCustomerModal && deleteCustomerTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteCustomerModal(false); setDeleteCustomerTarget(null); }}>
+          <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Customer</h2>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-900">{savedCustomers.find((c) => c.id === deleteCustomerTarget)?.name || "Customer"}</p>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">This will permanently remove the customer record from all devices. It will not reappear after refresh or synchronization.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => { setShowDeleteCustomerModal(false); setDeleteCustomerTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { void confirmDeleteCustomer(); }} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

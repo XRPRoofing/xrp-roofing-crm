@@ -461,7 +461,7 @@ export default function CalendarPage() {
       )}
 
       {/* ── Top Toolbar (sticky) ──────────────────────────────────── */}
-      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white px-4 py-3 sm:-mx-6 sm:px-6">
+      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3">
             <button type="button" onClick={goToToday} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:px-4 sm:py-2 sm:text-sm">

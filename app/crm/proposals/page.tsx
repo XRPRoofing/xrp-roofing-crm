@@ -439,6 +439,8 @@ export default function ProposalsPage() {
     };
   }, [closeProposalCard]);
   const [deletedProposal, setDeletedProposal] = useState<Proposal | null>(null);
+  const [showPermDeleteConfirm, setShowPermDeleteConfirm] = useState(false);
+  const [permDeleteTarget, setPermDeleteTarget] = useState<Proposal | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
   const [showSendModal, setShowSendModal] = useState(false);
@@ -455,6 +457,8 @@ export default function ProposalsPage() {
     message: "",
   });
   const [sendNotice, setSendNotice] = useState("");
+  const [sendConfirmation, setSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; proposalNumber: string; message: string } | null>(null);
+  const [sendingProposal, setSendingProposal] = useState(false);
   const [templateForm, setTemplateForm] = useState({
     label: "",
     description: "",
@@ -1033,6 +1037,9 @@ export default function ProposalsPage() {
   async function handleSendProposal() {
     if (!activeProposal) return;
 
+    setSendingProposal(true);
+    setSendNotice("");
+
     const sentProposal = saveActiveProposal({
       status: "Sent",
       ccRecipients: sendForm.ccRecipients,
@@ -1056,37 +1063,53 @@ export default function ProposalsPage() {
       body: JSON.stringify(proposalForLink),
     }).catch(() => {});
 
-    // Show success immediately — the email fires in the background; we only
-    // update the notice if it fails.
-    setSendNotice(`Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}`);
+    try {
+      const response = await fetch("/api/proposals/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toName: sendForm.toName,
+          toEmail: sendForm.toEmail,
+          ccRecipients: sendForm.ccRecipients,
+          subject: sendForm.subject,
+          message: sendForm.message,
+          proposalLink,
+          coverPhoto: sentProposal?.coverPhoto || editorForm.coverPhoto,
+          coverTitle: sentProposal?.title || editorForm.title,
+          coverText: sentProposal?.coverText || editorForm.coverText,
+        }),
+      });
 
-    fetch("/api/proposals/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        toName: sendForm.toName,
-        toEmail: sendForm.toEmail,
-        ccRecipients: sendForm.ccRecipients,
-        subject: sendForm.subject,
-        message: sendForm.message,
-        proposalLink,
-        coverPhoto: sentProposal?.coverPhoto || editorForm.coverPhoto,
-        coverTitle: sentProposal?.title || editorForm.title,
-        coverText: sentProposal?.coverText || editorForm.coverText,
-      }),
-    }).then(async (response) => {
       if (!response.ok) {
         const data = await response.json().catch(() => null) as { error?: string } | null;
         const serverError = typeof data?.error === "string" ? data.error : "Unable to send proposal email";
         if (serverError === "Email service is not configured") {
-          setSendNotice(`Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}`);
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
         } else {
-          setSendNotice(`${serverError}\n\nProposal link: ${proposalLink}`);
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `${serverError}\n\nProposal link: ${proposalLink}` });
         }
+      } else {
+        // Log send activity
+        const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
+        sendLog.unshift({
+          type: "Proposal",
+          sentBy: "CRM User",
+          sentAt: new Date().toISOString(),
+          customerName: sendForm.toName,
+          documentNumber: proposalForLink.id,
+          deliveryMethod: "Email",
+          recipient: sendForm.toEmail,
+        });
+        window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
+
+        setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
+        setShowSendModal(false);
       }
-    }).catch(() => {
-      setSendNotice(`Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}`);
-    });
+    } catch {
+      setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}` });
+    } finally {
+      setSendingProposal(false);
+    }
   }
 
   function handleDeleteProposal(proposal: Proposal) {
@@ -1235,7 +1258,7 @@ export default function ProposalsPage() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Save</button>
-            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
+            <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send</button>
@@ -1692,7 +1715,7 @@ export default function ProposalsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => setIsPreviewing(true)} className="hidden rounded-full border border-blue-600 px-4 py-2 text-xs font-bold text-blue-600 sm:inline-flex">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm">✈ Send</button>
+                  <button type="button" onClick={handleSendProposal} disabled={sendingProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingProposal ? "Sending…" : "✈ Send"}</button>
                   <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-gray-500">×</button>
                 </div>
               </div>
@@ -1762,8 +1785,33 @@ export default function ProposalsPage() {
                 <button type="button" onClick={() => setShowSendModal(false)} className="text-sm font-bold text-blue-600">Cancel</button>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setIsPreviewing(true)} className="rounded-full border border-blue-600 px-6 py-3 text-sm font-bold text-blue-600">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white">✈ Send proposal</button>
+                  <button type="button" onClick={handleSendProposal} disabled={sendingProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingProposal ? "Sending…" : "✈ Send proposal"}</button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Proposal Send Confirmation Modal ── */}
+        {sendConfirmation && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
+              {sendConfirmation.type === "success" ? (
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                  <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                </div>
+              ) : (
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                  <svg className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </div>
+              )}
+              <h3 className="mt-5 text-xl font-bold text-gray-900">{sendConfirmation.type === "success" ? "Proposal Sent Successfully" : "Failed to Send Proposal"}</h3>
+              <p className="mt-2 text-sm text-gray-600">{sendConfirmation.type === "success" ? `Your proposal was successfully sent to ${sendConfirmation.customerName}.` : sendConfirmation.message}</p>
+              <div className="mt-6 flex justify-center gap-3">
+                {sendConfirmation.type === "success" && (
+                  <button type="button" onClick={() => setSendConfirmation(null)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">View Proposal</button>
+                )}
+                <button type="button" onClick={() => setSendConfirmation(null)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Close</button>
               </div>
             </div>
           </div>
@@ -1787,16 +1835,17 @@ export default function ProposalsPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
-        <div className="flex gap-8 text-sm font-bold">
-          <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
-          <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
-          <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
-          <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
+      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
+          <div className="flex gap-8 text-sm font-bold">
+            <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
+            <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
+            <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
+            <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
+          </div>
         </div>
-      </div>
 
-      <div className="rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
+        <div className="mt-3 rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row">
             <div className="relative max-w-md flex-1">
@@ -1810,6 +1859,7 @@ export default function ProposalsPage() {
             <button className="px-4 py-3 text-xl text-gray-500">☰</button>
           </div>
         </div>
+      </div>
       </div>
 
       {deletedProposal && (
@@ -2136,7 +2186,7 @@ export default function ProposalsPage() {
                 <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
-              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
               <span className="text-xl font-bold text-gray-500">⋯</span>
             </div>
           </div>
@@ -2148,6 +2198,31 @@ export default function ProposalsPage() {
           <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">No proposals match your search.</div>
         )}
       </div>
+      )}
+
+      {/* ── Permanent Delete Confirmation Modal ── */}
+      {showPermDeleteConfirm && permDeleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }}>
+          <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Proposal</h2>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-900">{permDeleteTarget.customerName}</p>
+              <p className="text-xs text-red-700 mt-1">{permDeleteTarget.address}</p>
+              <p className="text-xs text-red-700">${permDeleteTarget.total.toLocaleString()}</p>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">This will permanently remove the proposal from all devices. It will not reappear after refresh or synchronization.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { handlePermanentDeleteProposal(permDeleteTarget); setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

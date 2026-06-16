@@ -9,6 +9,7 @@ import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -134,7 +135,9 @@ function readStoredInvoices(): Invoice[] | null {
   const savedInvoices = window.localStorage.getItem(invoicesStorageKey);
   if (!savedInvoices) return null;
   try {
-    return JSON.parse(savedInvoices) as Invoice[];
+    const parsed = JSON.parse(savedInvoices) as Invoice[];
+    // Filter out deleted records to prevent reappearance after refresh
+    return parsed.filter((inv) => !inv.isDeleted);
   } catch {
     return null;
   }
@@ -513,6 +516,93 @@ function propagatePaidStatus(invoice: Invoice) {
 
 }
 
+type MobileInvoiceTab = "All" | "Paid" | "Unpaid" | "Overdue";
+
+function MobileInvoiceList({
+  invoices,
+  getComputedStatus: computeStatus,
+  calculateTotals: calcTotals,
+  currency: fmt,
+  statusBadgeClass: badgeCls,
+  openInvoice,
+}: {
+  invoices: Invoice[];
+  getComputedStatus: (inv: Invoice) => InvoiceStatus;
+  calculateTotals: (inv: Pick<Invoice, "lineItems" | "discount">) => { subtotal: number; tax: number; finalTotal: number };
+  currency: (v: number) => string;
+  statusBadgeClass: (s: InvoiceStatus) => string;
+  openInvoice: (inv: Invoice) => void;
+}) {
+  const [tab, setTab] = useState<MobileInvoiceTab>("All");
+
+  const tabbed = useMemo(() => {
+    return invoices.filter((inv) => {
+      const s = computeStatus(inv);
+      if (tab === "All") return true;
+      if (tab === "Paid") return s === "Paid" || s === "Paid Mail Check";
+      if (tab === "Overdue") return s === "Overdue";
+      // Unpaid = everything that isn't Paid/Voided
+      return s !== "Paid" && s !== "Paid Mail Check" && s !== "Voided";
+    });
+  }, [invoices, tab, computeStatus]);
+
+  const counts = useMemo(() => ({
+    All: invoices.length,
+    Paid: invoices.filter((inv) => { const s = computeStatus(inv); return s === "Paid" || s === "Paid Mail Check"; }).length,
+    Unpaid: invoices.filter((inv) => { const s = computeStatus(inv); return s !== "Paid" && s !== "Paid Mail Check" && s !== "Voided"; }).length,
+    Overdue: invoices.filter((inv) => computeStatus(inv) === "Overdue").length,
+  }), [invoices, computeStatus]);
+
+  const tabs: MobileInvoiceTab[] = ["All", "Paid", "Unpaid", "Overdue"];
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`flex-1 py-3 text-center text-xs font-bold transition ${tab === t ? "border-b-2 border-blue-600 text-blue-700 bg-blue-50/50" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {t} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${tab === t ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{counts[t]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Invoice list */}
+      <div className="divide-y divide-gray-100">
+        {tabbed.map((invoice) => {
+          const status = computeStatus(invoice);
+          const totals = calcTotals(invoice);
+          return (
+            <button
+              key={invoice.id}
+              type="button"
+              onClick={() => openInvoice(invoice)}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-gray-50"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-gray-900">{invoice.clientName}</p>
+                <p className="mt-0.5 truncate text-xs text-gray-500">{invoice.invoiceNumber}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold text-gray-900">{fmt(totals.finalTotal)}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-gray-400">Due {invoice.dueDate}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${badgeCls(status)}`}>{status}</span>
+            </button>
+          );
+        })}
+        {tabbed.length === 0 && (
+          <div className="py-10 text-center text-sm font-semibold text-gray-400">No invoices match this filter.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     // Always start with cached data for instant display, then upgrade from Supabase.
@@ -533,6 +623,8 @@ export default function InvoicesPage() {
   const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
+  const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
   const [createForm, setCreateForm] = useState<Invoice>({
     id: "",
     invoiceNumber: createInvoiceNumber(invoices.length),
@@ -564,6 +656,19 @@ export default function InvoicesPage() {
   const [rejectModal, setRejectModal] = useState<{ pending: PendingPayment; invoiceId: string } | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+
+  // Mark as Paid confirmation modal state
+  const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
+  const [markPaidConfirmText, setMarkPaidConfirmText] = useState("");
+  const [markPaidMethod, setMarkPaidMethod] = useState<PaymentMethod>("Cash");
+  const [markPaidCheckImage, setMarkPaidCheckImage] = useState<string | null>(null);
+  const [markPaidDocuments, setMarkPaidDocuments] = useState<{ name: string; dataUrl: string }[]>([]);
+  const [markPaidNotes, setMarkPaidNotes] = useState("");
+  const [markPaidReference, setMarkPaidReference] = useState("");
+
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
 
   const invoiceCardHashRef = useRef(false);
   const searchParams = useSearchParams();
@@ -947,10 +1052,17 @@ export default function InvoicesPage() {
   }
 
   function handleDeleteInvoice(invoice: Invoice) {
-    if (!window.confirm(`Delete invoice ${invoice.invoiceNumber} for ${invoice.clientName}?`)) return;
-    const deletedInvoice = { ...invoice, isDeleted: true, deletedAt: new Date().toISOString(), activity: [...invoice.activity, "Invoice deleted"] };
-    setInvoices((current) => current.filter((item) => item.id !== invoice.id));
-    if (selectedInvoiceId === invoice.id) {
+    setDeleteTarget(invoice);
+    setShowDeleteModal(true);
+  }
+
+  function confirmDeleteInvoice() {
+    if (!deleteTarget) return;
+    const now = new Date().toISOString();
+    const auditEntry = `[AUDIT] Deleted | By: ${currentUserEmail || "Office"} | ${now}`;
+    const deletedInvoice = { ...deleteTarget, isDeleted: true, deletedAt: now, activity: [auditEntry, "Invoice deleted permanently", ...deleteTarget.activity] };
+    setInvoices((current) => current.filter((item) => item.id !== deleteTarget.id));
+    if (selectedInvoiceId === deleteTarget.id) {
       setSelectedInvoiceId(null);
       invoiceCardHashRef.current = false;
       const url = new URL(window.location.href);
@@ -959,6 +1071,16 @@ export default function InvoicesPage() {
       history.replaceState(history.state, "", url.pathname + url.search);
     }
     void upsertInvoiceRecord(deletedInvoice as unknown as Record<string, unknown> & { id: string });
+    // Also remove from localStorage to prevent reappearance
+    void deleteInvoiceRecord(deleteTarget.id);
+    setShowDeleteModal(false);
+    setDeleteTarget(null);
+    addCrmNotification({
+      title: "Invoice deleted",
+      message: `${deleteTarget.invoiceNumber} for ${deleteTarget.clientName} permanently deleted`,
+      actor: currentUserEmail || "Office",
+      module: "Invoices",
+    });
   }
 
   function handleStartInvoice() {
@@ -996,7 +1118,7 @@ export default function InvoicesPage() {
     const totals = calculateTotals(selectedInvoice);
     const balance = Math.max(totals.finalTotal - getPaidAmount(selectedInvoice), 0);
 
-    setSendForm((currentForm) => ({ ...currentForm, message: "Sending invoice email..." }));
+    setSendingInvoice(true);
 
     const sentAt = new Date().toISOString();
     const sentBy = currentUserEmail || "CRM user";
@@ -1034,10 +1156,27 @@ export default function InvoicesPage() {
       }
 
       updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
+
+      // Log send activity
+      const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
+      sendLog.unshift({
+        type: "Invoice",
+        sentBy,
+        sentAt,
+        customerName: selectedInvoice.clientName,
+        documentNumber: selectedInvoice.invoiceNumber,
+        deliveryMethod: "Email",
+        recipient: selectedInvoice.email,
+      });
+      window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
+
       setShowSendModal(false);
+      setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent to ${selectedInvoice.email}.` });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
-      setSendForm((currentForm) => ({ ...currentForm, message: `${sendForm.message}\n\n${message}` }));
+      setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message });
+    } finally {
+      setSendingInvoice(false);
     }
   }
 
@@ -1100,8 +1239,95 @@ export default function InvoicesPage() {
     if (!selectedInvoice) return;
     const balance = Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0);
     if (balance <= 0) return;
-    const payment: Payment = { amount: balance, date: today, method: "Cash", reference: "OFFLINE", notes: "Payment Received Offline", offline: true };
-    updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, "Payment Received Offline");
+    setMarkPaidConfirmText("");
+    setMarkPaidMethod("Cash");
+    setMarkPaidCheckImage(null);
+    setMarkPaidDocuments([]);
+    setMarkPaidNotes("");
+    setMarkPaidReference("");
+    setShowMarkPaidModal(true);
+  }
+
+  function handleConfirmMarkPaid() {
+    if (!selectedInvoice || markPaidConfirmText !== "CONFIRM") return;
+    const balance = Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0);
+    const now = new Date().toISOString();
+    const payment: Payment = {
+      amount: balance,
+      date: today,
+      method: markPaidMethod,
+      reference: markPaidReference || `OFFLINE-${markPaidMethod.toUpperCase()}`,
+      notes: markPaidNotes || `Payment recorded offline via ${markPaidMethod}`,
+      offline: true,
+    };
+    // Build audit trail entry
+    const auditEntry = `[AUDIT] Marked as Paid | Method: ${markPaidMethod} | Amount: ${currency(balance)} | By: ${currentUserEmail || "Office"} | ${now}${markPaidCheckImage ? " | Check image uploaded" : ""}${markPaidDocuments.length > 0 ? ` | ${markPaidDocuments.length} document(s) uploaded` : ""}`;
+    // Build payment history entry
+    const historyEntry = `[PAYMENT] ${currency(balance)} via ${markPaidMethod} | Ref: ${payment.reference} | Recorded by: ${currentUserEmail || "Office"} | ${now}`;
+
+    const updatedInvoice: Invoice = {
+      ...selectedInvoice,
+      payments: [...selectedInvoice.payments, payment],
+      activity: [auditEntry, historyEntry, ...selectedInvoice.activity],
+      paidAt: now,
+    };
+
+    // If check payment with image, add to pending for admin verification
+    if (markPaidMethod === "Check" && markPaidCheckImage) {
+      const pendingPayment: PendingPayment = {
+        id: `check-${Date.now()}`,
+        amount: balance,
+        method: "Check",
+        checkNumber: markPaidReference,
+        checkImageBase64: markPaidCheckImage,
+        checkImageMimeType: "image/jpeg",
+        notes: markPaidNotes || "Check payment - awaiting admin verification",
+        submittedAt: now,
+        status: "pending_verification",
+      };
+      updatedInvoice.pendingPayments = [...(selectedInvoice.pendingPayments || []), pendingPayment];
+      // Don't actually mark as paid yet — needs admin approval
+      updatedInvoice.payments = selectedInvoice.payments; // revert direct payment
+      updateInvoice(updatedInvoice, `Check payment submitted for verification: ${currency(balance)}`);
+    } else {
+      updateInvoice(updatedInvoice, `Payment Received Offline: ${markPaidMethod} ${currency(balance)}`);
+    }
+
+    // Auto-save payment documents to customer files
+    if (markPaidCheckImage || markPaidDocuments.length > 0) {
+      savePaymentDocumentsToCustomerFiles({
+        customerName: selectedInvoice.clientName,
+        address: selectedInvoice.propertyAddress,
+        jobId: selectedInvoice.id,
+        invoiceNumber: selectedInvoice.invoiceNumber,
+        uploadedBy: currentUserEmail || "Office",
+        documents: markPaidDocuments,
+        checkImage: markPaidCheckImage,
+      });
+    }
+
+    setShowMarkPaidModal(false);
+    addCrmNotification({
+      title: markPaidMethod === "Check" ? "Check payment submitted" : "Payment recorded",
+      message: `${selectedInvoice.clientName} — ${markPaidMethod} ${currency(balance)} on ${selectedInvoice.invoiceNumber}`,
+      actor: currentUserEmail || "Office",
+      module: "Invoices",
+    });
+  }
+
+  function handleMarkPaidFileUpload(e: React.ChangeEvent<HTMLInputElement>, type: "check" | "document") {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      if (type === "check") {
+        setMarkPaidCheckImage(dataUrl);
+      } else {
+        setMarkPaidDocuments((prev) => [...prev, { name: file.name, dataUrl }]);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleApprovePendingPayment(pending: PendingPayment) {
@@ -1115,10 +1341,14 @@ export default function InvoicesPage() {
       offline: true,
     };
     const nextPending = (selectedInvoice.pendingPayments || []).filter((item: PendingPayment) => item.id !== pending.id);
+    const now = new Date().toISOString();
+    const auditEntry = `[AUDIT] Payment approved | Method: ${pending.method} | Amount: ${currency(pending.amount)} | Approved by: ${currentUserEmail || "Office"} | ${now}`;
+    const paymentEntry = `[PAYMENT] ${currency(pending.amount)} via ${pending.method} | Ref: ${payment.reference} | Approved by: ${currentUserEmail || "Office"} | ${now}`;
     const nextInvoice: Invoice = {
       ...selectedInvoice,
       payments: [...selectedInvoice.payments, payment],
       pendingPayments: nextPending,
+      activity: [auditEntry, paymentEntry, ...selectedInvoice.activity],
     };
     const newStatus = getComputedStatus(nextInvoice);
     updateInvoice(nextInvoice, `Payment approved by office: ${pending.method} ${currency(pending.amount)}`);
@@ -1257,7 +1487,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-16 z-20 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:px-4 sm:py-3 lg:top-20">
+      <div className="sticky top-14 z-20 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
           <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
@@ -1315,7 +1545,20 @@ export default function InvoicesPage() {
         );
       })()}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* ── Mobile: Filtered list view ── */}
+      <div className="md:hidden">
+        <MobileInvoiceList
+          invoices={filteredInvoices}
+          getComputedStatus={getComputedStatus}
+          calculateTotals={calculateTotals}
+          currency={currency}
+          statusBadgeClass={statusBadgeClass}
+          openInvoice={openInvoice}
+        />
+      </div>
+
+      {/* ── Desktop: Column board view ── */}
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(boardGroups) as Array<keyof typeof boardGroups>).map((stage) => {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
@@ -1362,7 +1605,6 @@ export default function InvoicesPage() {
                           )}
                         </div>
                       </button>
-                      {/* Mobile: swipeable action row / Desktop: wrapped buttons */}
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-200 active:scale-95">View</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
@@ -1405,8 +1647,8 @@ export default function InvoicesPage() {
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
               <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
-              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Paid Mail Check" }, "Marked as Paid Mail Check")} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
-              <button onClick={() => updateInvoice({ ...selectedInvoice, status: "Voided" }, "Invoice voided")} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); }} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); }} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
               <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
@@ -1523,9 +1765,15 @@ export default function InvoicesPage() {
                   ))}
                 </ol>
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-gray-500">Full activity log</summary>
+                  <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-gray-500">Full activity log & audit trail</summary>
                   <div className="mt-2 space-y-2">
-                    {selectedInvoice.activity.map((item, index) => <p key={index} className="rounded-lg bg-white p-3 text-sm font-semibold text-gray-600">{item}</p>)}
+                    {selectedInvoice.activity.map((item, index) => (
+                      <p key={index} className={`rounded-lg p-3 text-sm font-semibold ${item.startsWith("[AUDIT]") ? "bg-amber-50 text-amber-800 border border-amber-200" : item.startsWith("[PAYMENT]") ? "bg-blue-50 text-blue-800 border border-blue-200" : "bg-white text-gray-600"}`}>
+                        {item.startsWith("[AUDIT]") && <span className="mr-1 inline-block rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-900">Audit</span>}
+                        {item.startsWith("[PAYMENT]") && <span className="mr-1 inline-block rounded bg-blue-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-blue-900">Payment</span>}
+                        {item.replace(/^\[(AUDIT|PAYMENT)\]\s*/, "")}
+                      </p>
+                    ))}
                   </div>
                 </details>
               </section>
@@ -1894,7 +2142,151 @@ export default function InvoicesPage() {
             </div>
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={handleSendInvoice} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Send Invoice</button>
+              <button onClick={handleSendInvoice} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50">{sendingInvoice ? "Sending\u2026" : "Send Invoice"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invoice Send Confirmation Modal ── */}
+      {invoiceSendConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
+            {invoiceSendConfirmation.type === "success" ? (
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </div>
+            ) : (
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                <svg className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </div>
+            )}
+            <h3 className="mt-5 text-xl font-bold text-gray-900">{invoiceSendConfirmation.type === "success" ? "Invoice Sent Successfully" : "Failed to Send Invoice"}</h3>
+            <p className="mt-2 text-sm text-gray-600">{invoiceSendConfirmation.type === "success" ? `Your invoice was successfully sent to ${invoiceSendConfirmation.customerName}.` : invoiceSendConfirmation.message}</p>
+            <div className="mt-6 flex justify-center gap-3">
+              {invoiceSendConfirmation.type === "success" && selectedInvoice && (
+                <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">View Invoice</button>
+              )}
+              <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mark as Paid Confirmation Modal ── */}
+      {showMarkPaidModal && selectedInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowMarkPaidModal(false)}>
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-gray-900">Confirm Payment</h2>
+            <p className="mt-1 text-sm text-gray-600">Mark invoice <span className="font-bold">{selectedInvoice.invoiceNumber}</span> for <span className="font-bold">{selectedInvoice.clientName}</span> as paid.</p>
+            <p className="mt-1 text-lg font-bold text-blue-700">{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
+
+            <div className="mt-4 space-y-4">
+              {/* Payment Method */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500">Payment Method</label>
+                <select value={markPaidMethod} onChange={(e) => setMarkPaidMethod(e.target.value as PaymentMethod)} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400">
+                  {(["Cash", "Check", "Bank Transfer", "Zelle"] as PaymentMethod[]).map((m) => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+
+              {/* Reference / Check Number */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500">{markPaidMethod === "Check" ? "Check Number" : "Reference"}</label>
+                <input value={markPaidReference} onChange={(e) => setMarkPaidReference(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-400" placeholder={markPaidMethod === "Check" ? "Enter check number" : "Payment reference"} />
+              </div>
+
+              {/* Check Image Upload */}
+              {markPaidMethod === "Check" && (
+                <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Upload Check Image</p>
+                  <p className="text-xs text-blue-600">Check payments require admin verification before being marked as paid.</p>
+                  {markPaidCheckImage ? (
+                    <div className="relative">
+                      <img src={markPaidCheckImage} alt="Check" className="h-32 w-full rounded-lg object-cover border border-gray-200" />
+                      <button type="button" onClick={() => setMarkPaidCheckImage(null)} className="absolute right-2 top-2 rounded-full bg-red-600 p-1 text-white">✕</button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-blue-300 bg-white py-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-50">
+                      📷 Take Photo or Upload Check Image
+                      <input type="file" accept="image/*" capture="environment" onChange={(e) => handleMarkPaidFileUpload(e, "check")} className="hidden" />
+                    </label>
+                  )}
+                </div>
+              )}
+
+              {/* Supporting Documents Upload */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500">Upload Supporting Documents</label>
+                <label className="mt-1 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-100">
+                  📎 Upload Documents
+                  <input type="file" accept="image/*,.pdf,.doc,.docx" onChange={(e) => handleMarkPaidFileUpload(e, "document")} className="hidden" />
+                </label>
+                {markPaidDocuments.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {markPaidDocuments.map((doc, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs">
+                        <span className="font-medium text-gray-700">{doc.name}</span>
+                        <button type="button" onClick={() => setMarkPaidDocuments((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 font-bold">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500">Notes</label>
+                <textarea value={markPaidNotes} onChange={(e) => setMarkPaidNotes(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-400" rows={2} placeholder="Optional payment notes..." />
+              </div>
+
+              {/* CONFIRM input */}
+              <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-4">
+                <p className="text-sm font-bold text-orange-800">Type <span className="rounded bg-orange-200 px-2 py-0.5 font-mono">CONFIRM</span> to process this payment</p>
+                <input
+                  value={markPaidConfirmText}
+                  onChange={(e) => setMarkPaidConfirmText(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-orange-300 px-4 py-3 text-center text-lg font-bold tracking-wider outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                  placeholder="Type CONFIRM"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => setShowMarkPaidModal(false)} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={handleConfirmMarkPaid}
+                disabled={markPaidConfirmText !== "CONFIRM"}
+                className={`flex-1 rounded-lg px-4 py-3 text-sm font-bold text-white transition ${markPaidConfirmText === "CONFIRM" ? "bg-blue-600 hover:bg-blue-700 active:scale-95" : "bg-gray-300 cursor-not-allowed"}`}
+              >
+                {markPaidMethod === "Check" ? "Submit for Verification" : "Confirm Payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {showDeleteModal && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}>
+          <div className="w-full max-w-md rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Invoice</h2>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-900">Invoice: <span className="font-bold">{deleteTarget.invoiceNumber}</span></p>
+              <p className="text-sm text-red-800">Client: {deleteTarget.clientName}</p>
+              <p className="text-sm text-red-800">Amount: {currency(calculateTotals(deleteTarget).finalTotal)}</p>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">This will permanently remove the invoice from all devices. It will not reappear after refresh or synchronization.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmDeleteInvoice} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
             </div>
           </div>
         </div>
@@ -1902,8 +2294,5 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
-
-
 
 
