@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   FileSignature,
+  FileUp,
   MoreHorizontal,
   Pencil,
   PlusCircle,
@@ -175,7 +176,14 @@ export default function PdfSignerBoardPage() {
 
   /* Forms */
   const [docForm, setDocForm] = useState({ jobAddress: "", customerName: "", documentName: "", createdBy: "" });
+  const [docFile, setDocFile] = useState<{ name: string; dataUrl: string } | null>(null);
   const [tplForm, setTplForm] = useState({ name: "", description: "", createdBy: "" });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const quickUploadRef = useRef<HTMLInputElement>(null);
+
+  /* Upload state */
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const MAX_PDF_SIZE = 5 * 1024 * 1024; // 5 MB
 
   /* ── Load data ──────────────────────────────────────────────────── */
   useEffect(() => {
@@ -215,6 +223,46 @@ export default function PdfSignerBoardPage() {
 
   /* ── Handlers ───────────────────────────────────────────────────── */
 
+  function handleFileSelect(file: File, isQuickUpload: boolean = false) {
+    setUploadError(null);
+    if (file.type !== "application/pdf") {
+      setUploadError("Only PDF files are accepted.");
+      return;
+    }
+    if (file.size > MAX_PDF_SIZE) {
+      setUploadError(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 5 MB.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      if (isQuickUpload) {
+        const docName = file.name.replace(/\.pdf$/i, "");
+        const doc: PdfDocument = {
+          id: newDocId(),
+          jobAddress: "",
+          customerName: "",
+          documentName: docName,
+          dateCreated: new Date().toISOString().slice(0, 10),
+          dateCompleted: null,
+          createdBy: "XRP Roofing",
+          status: "Draft",
+          pdfDataUrl: dataUrl,
+          pdfFileName: file.name,
+        };
+        setDocuments(upsertDocument(doc));
+        showToast(`"${docName}" uploaded successfully`);
+      } else {
+        setDocFile({ name: file.name, dataUrl });
+        if (!docForm.documentName.trim()) {
+          setDocForm((prev) => ({ ...prev, documentName: file.name.replace(/\.pdf$/i, "") }));
+        }
+      }
+    };
+    reader.onerror = () => setUploadError("Failed to read file.");
+    reader.readAsDataURL(file);
+  }
+
   function handleCreateDoc() {
     if (!docForm.documentName.trim()) return;
     const doc: PdfDocument = {
@@ -226,9 +274,13 @@ export default function PdfSignerBoardPage() {
       dateCompleted: null,
       createdBy: docForm.createdBy.trim() || "XRP Roofing",
       status: "Draft",
+      pdfDataUrl: docFile?.dataUrl,
+      pdfFileName: docFile?.name,
     };
     setDocuments(upsertDocument(doc));
     setDocForm({ jobAddress: "", customerName: "", documentName: "", createdBy: "" });
+    setDocFile(null);
+    setUploadError(null);
     setCreateDocOpen(false);
     showToast("Document created successfully");
   }
@@ -299,13 +351,20 @@ export default function PdfSignerBoardPage() {
   }
 
   function handleDownload(doc: PdfDocument) {
-    const content = `PDF Signer Document\n\nDocument: ${doc.documentName}\nCustomer: ${doc.customerName}\nAddress: ${doc.jobAddress}\nStatus: ${doc.status}\nCreated: ${doc.dateCreated}\n${doc.signedBy ? `Signed by: ${doc.signedBy}\nSigned at: ${doc.signedAt}\n` : ""}`;
-    const blob = new Blob([content], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${doc.documentName.replace(/\s+/g, "_")}.txt`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (doc.pdfDataUrl) {
+      const a = document.createElement("a");
+      a.href = doc.pdfDataUrl;
+      a.download = doc.pdfFileName || `${doc.documentName.replace(/\s+/g, "_")}.pdf`;
+      a.click();
+    } else {
+      const content = `PDF Signer Document\n\nDocument: ${doc.documentName}\nCustomer: ${doc.customerName}\nAddress: ${doc.jobAddress}\nStatus: ${doc.status}\nCreated: ${doc.dateCreated}\n${doc.signedBy ? `Signed by: ${doc.signedBy}\nSigned at: ${doc.signedAt}\n` : ""}`;
+      const blob = new Blob([content], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${doc.documentName.replace(/\s+/g, "_")}.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
     showToast("Document downloaded");
   }
 
@@ -325,6 +384,15 @@ export default function PdfSignerBoardPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">PDF Signer</h1>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => quickUploadRef.current?.click()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            <FileUp className="h-4 w-4" />
+            Upload PDF
+          </button>
+          <input ref={quickUploadRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f, true); e.target.value = ""; }} />
           <button
             type="button"
             onClick={() => { setCreateTplOpen(true); setActiveTab("templates"); }}
@@ -432,7 +500,12 @@ export default function PdfSignerBoardPage() {
                       </td>
                       <td className="max-w-[200px] truncate px-4 py-3 text-gray-700" title={doc.jobAddress}>{doc.jobAddress}</td>
                       <td className="max-w-[140px] truncate px-4 py-3 text-gray-700" title={doc.customerName}>{doc.customerName}</td>
-                      <td className="max-w-[160px] truncate px-4 py-3 text-gray-700" title={doc.documentName}>{doc.documentName}</td>
+                      <td className="max-w-[160px] px-4 py-3 text-gray-700" title={doc.documentName}>
+                        <span className="flex items-center gap-1.5 truncate">
+                          {doc.pdfDataUrl && <FileUp className="h-3.5 w-3.5 shrink-0 text-blue-500" />}
+                          {doc.documentName}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-500">{formatShortDate(doc.dateCreated)}</td>
                       <td className="px-4 py-3 text-gray-500">{doc.dateCompleted ? formatShortDate(doc.dateCompleted) : ""}</td>
                       <td className="px-4 py-3 text-gray-700">{doc.createdBy}</td>
@@ -459,7 +532,7 @@ export default function PdfSignerBoardPage() {
                                   <Eye className="h-3.5 w-3.5" /> Mark as viewed
                                 </button>
                               )}
-                              {doc.status === "Completed" && (
+                              {(doc.status === "Completed" || doc.pdfDataUrl) && (
                                 <button type="button" onClick={() => handleDownload(doc)} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                   <Download className="h-3.5 w-3.5" /> Download
                                 </button>
@@ -506,7 +579,7 @@ export default function PdfSignerBoardPage() {
                           <FileSignature className="h-4 w-4" />
                         </button>
                       )}
-                      {doc.status === "Completed" && (
+                      {(doc.status === "Completed" || doc.pdfDataUrl) && (
                         <button type="button" onClick={() => handleDownload(doc)} className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100">
                           <Download className="h-4 w-4" />
                         </button>
@@ -586,6 +659,31 @@ export default function PdfSignerBoardPage() {
               <button type="button" onClick={() => setCreateDocOpen(false)} className="rounded-md p-1 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="mt-4 space-y-3">
+              {/* PDF File Upload */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Upload PDF file</label>
+                <div
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-6 transition hover:border-blue-400 hover:bg-blue-50/30"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
+                >
+                  <Upload className="h-8 w-8 text-gray-400" />
+                  {docFile ? (
+                    <div className="mt-2 text-center">
+                      <p className="text-sm font-medium text-blue-600">{docFile.name}</p>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setDocFile(null); }} className="mt-1 text-xs text-red-500 hover:text-red-700">Remove</button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-center">
+                      <p className="text-sm font-medium text-gray-600">Click to upload or drag & drop</p>
+                      <p className="text-xs text-gray-400">PDF files only, max 5 MB</p>
+                    </div>
+                  )}
+                  <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); e.target.value = ""; }} />
+                </div>
+                {uploadError && <p className="mt-1 text-xs font-medium text-red-500">{uploadError}</p>}
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">Document name *</label>
                 <input className={inputClass} placeholder="e.g. ACORD Form 2025" value={docForm.documentName} onChange={(e) => setDocForm({ ...docForm, documentName: e.target.value })} />
@@ -675,18 +773,28 @@ export default function PdfSignerBoardPage() {
                 </div>
               )}
 
-              {/* PDF placeholder */}
-              <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
-                <div className="text-center">
-                  <FileSignature className="mx-auto h-10 w-10 text-gray-300" />
-                  <p className="mt-2 text-sm text-gray-400">PDF document preview</p>
-                  <p className="text-xs text-gray-300">{previewDoc.documentName}</p>
+              {/* PDF viewer / placeholder */}
+              {previewDoc.pdfDataUrl ? (
+                <div className="overflow-hidden rounded-lg border border-gray-200">
+                  <iframe
+                    src={previewDoc.pdfDataUrl}
+                    title={previewDoc.documentName}
+                    className="h-[400px] w-full"
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
+                  <div className="text-center">
+                    <FileSignature className="mx-auto h-10 w-10 text-gray-300" />
+                    <p className="mt-2 text-sm text-gray-400">No PDF file attached</p>
+                    <p className="text-xs text-gray-300">{previewDoc.documentName}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              {previewDoc.status === "Completed" && (
+              {(previewDoc.status === "Completed" || previewDoc.pdfDataUrl) && (
                 <button type="button" onClick={() => { handleDownload(previewDoc); setPreviewDoc(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                   <Download className="h-4 w-4" /> Download
                 </button>
@@ -711,8 +819,17 @@ export default function PdfSignerBoardPage() {
               <button type="button" onClick={() => setSigningDoc(null)} className="rounded-md p-1 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-              Customer <strong>{signingDoc.customerName}</strong> — {signingDoc.jobAddress}
+              Customer <strong>{signingDoc.customerName || "(no customer)"}</strong>{signingDoc.jobAddress ? ` — ${signingDoc.jobAddress}` : ""}
             </div>
+            {signingDoc.pdfDataUrl && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200">
+                <iframe
+                  src={signingDoc.pdfDataUrl}
+                  title={signingDoc.documentName}
+                  className="h-[250px] w-full"
+                />
+              </div>
+            )}
             <div className="mt-4">
               <SignaturePad onSave={handleSignDoc} onCancel={() => setSigningDoc(null)} />
             </div>
