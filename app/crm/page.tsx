@@ -241,9 +241,6 @@ export default function CrmDashboardPage() {
         </div>
       </section>
 
-      {/* ── Calendar Shortcut ──────────────────────────────────────── */}
-      <DashboardCalendar />
-
       {/* ── Summary Stats Row ───────────────────────────────────────── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
@@ -279,6 +276,9 @@ export default function CrmDashboardPage() {
           <p className="text-xs text-gray-400">from paid invoices</p>
         </div>
       </section>
+
+      {/* ── Calendar Shortcut ──────────────────────────────────────── */}
+      <DashboardCalendar />
 
       {/* ── Action Items ────────────────────────────────────────────── */}
       <section>

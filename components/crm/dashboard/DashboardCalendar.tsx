@@ -151,12 +151,12 @@ export default function DashboardCalendar() {
   }, [weekDays]);
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white px-4 py-4 sm:px-5 sm:py-4">
+    <section className="mx-auto w-full max-w-5xl rounded-xl border border-gray-200 bg-white px-4 py-5 sm:px-6 sm:py-5">
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-gray-900">{headerDate}</h2>
-          <p className="text-xs text-gray-500">Your upcoming events are displayed below</p>
+          <h2 className="text-lg font-bold text-gray-900">{headerDate}</h2>
+          <p className="text-sm text-gray-500">Your upcoming events are displayed below</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -195,13 +195,13 @@ export default function DashboardCalendar() {
 
       {/* Week grid */}
       {!connected && !loading ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-6 text-center">
-          <Calendar className="mx-auto h-8 w-8 text-gray-300" />
-          <p className="mt-2 text-sm text-gray-500">Google Calendar not connected</p>
+        <div className="rounded-lg border border-dashed border-gray-300 p-10 text-center">
+          <Calendar className="mx-auto h-10 w-10 text-gray-300" />
+          <p className="mt-3 text-sm text-gray-500">Google Calendar not connected</p>
           <button
             type="button"
             onClick={() => router.push("/crm/calendar")}
-            className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+            className="mt-2 text-sm font-medium text-blue-600 hover:underline"
           >
             Connect in Calendar settings
           </button>
@@ -216,31 +216,31 @@ export default function DashboardCalendar() {
             return (
               <div
                 key={key}
-                className={`min-h-[140px] ${isToday ? "bg-blue-50/40" : "bg-white"}`}
+                className={`min-h-[180px] ${isToday ? "bg-blue-50/40" : "bg-white"}`}
               >
                 {/* Day header */}
-                <div className={`border-b px-2 py-1.5 text-center ${isToday ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"}`}>
-                  <p className={`text-[10px] font-semibold uppercase tracking-wide ${isToday ? "text-blue-600" : "text-gray-500"}`}>
+                <div className={`border-b px-2 py-2 text-center ${isToday ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? "text-blue-600" : "text-gray-500"}`}>
                     {WEEKDAY_LABELS[idx]}
                   </p>
-                  <p className={`text-sm font-bold ${isToday ? "text-blue-700" : "text-gray-900"}`}>
+                  <p className={`text-base font-bold ${isToday ? "text-blue-700" : "text-gray-900"}`}>
                     {day.getDate()}
                   </p>
                 </div>
 
                 {/* Events */}
-                <div className="space-y-0.5 p-1">
+                <div className="space-y-1 p-1.5">
                   {loading ? (
-                    <div className="h-4 w-full animate-pulse rounded bg-gray-100" />
+                    <div className="h-5 w-full animate-pulse rounded bg-gray-100" />
                   ) : dayEvents.length === 0 ? null : (
-                    dayEvents.slice(0, 5).map((ev) => {
+                    dayEvents.slice(0, 6).map((ev) => {
                       const time = formatEventTime(ev);
                       const title = ev.summary || "Untitled";
                       const isMaterial = title.toLowerCase().includes("material");
                       return (
                         <div
                           key={ev.id}
-                          className={`cursor-pointer rounded px-1 py-0.5 text-[10px] leading-tight transition hover:opacity-80 ${
+                          className={`cursor-pointer rounded px-1.5 py-1 text-[11px] leading-tight transition hover:opacity-80 ${
                             isMaterial
                               ? "border-l-2 border-orange-400 bg-orange-50 text-orange-800"
                               : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
@@ -250,14 +250,14 @@ export default function DashboardCalendar() {
                         >
                           <span className="line-clamp-2">
                             {title}
-                            {time && <span className="ml-0.5 text-[9px] text-gray-500">{time}</span>}
+                            {time && <span className="ml-0.5 text-[10px] text-gray-500">{time}</span>}
                           </span>
                         </div>
                       );
                     })
                   )}
-                  {dayEvents.length > 5 && (
-                    <p className="px-1 text-[9px] text-gray-400">+{dayEvents.length - 5} more</p>
+                  {dayEvents.length > 6 && (
+                    <p className="px-1 text-[10px] text-gray-400">+{dayEvents.length - 6} more</p>
                   )}
                 </div>
               </div>
