@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckSquare, ChevronDown, ChevronRight, Clock, RefreshCw, Star, ThumbsDown, ThumbsUp, Trash2, X, Zap } from "lucide-react";
+import { Archive, Briefcase, CheckSquare, ChevronDown, ChevronRight, Clock, ClipboardList, Filter, Plus, RefreshCw, Star, ThumbsDown, ThumbsUp, Trash2, X, Zap } from "lucide-react";
 import {
   addTaskTimelineEntry,
+  archiveOfficeTask,
   deleteOfficeTask,
   officeTaskStatusColors,
   officeTaskStatuses,
   readOfficeTasks,
   recordCustomerSatisfaction,
   recordReviewRequestSent,
+  saveOfficeTasks,
   updateOfficeTaskStatus,
   type OfficeTask,
   type OfficeTaskStatus,
@@ -32,11 +34,21 @@ function MetricCard({ label, value, active, onClick, color }: { label: string; v
   );
 }
 
+type TaskTypeFilter = "all" | "job" | "manual";
+
+function TaskBadge({ isManual }: { isManual?: boolean }) {
+  if (isManual) {
+    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Manual</span>;
+  }
+  return <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 px-1.5 py-0.5 text-[9px] font-bold text-cyan-700"><Briefcase className="h-2.5 w-2.5" />Job</span>;
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<OfficeTask[]>(() => readOfficeTasks());
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<OfficeTaskStatus | null>(null);
+  const [filterType, setFilterType] = useState<TaskTypeFilter>("all");
   const [selectedTask, setSelectedTask] = useState<OfficeTask | null>(null);
   const [satModal, setSatModal] = useState<OfficeTask | null>(null);
   const [satResult, setSatResult] = useState<"yes" | "no" | null>(null);
@@ -45,6 +57,14 @@ export default function TasksPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [expandedCol, setExpandedCol] = useState<OfficeTaskStatus | null>(null);
   const dragOverCol = useRef<OfficeTaskStatus | null>(null);
+
+  // Manual task modal
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newAssigned, setNewAssigned] = useState("Office Staff");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newStatus, setNewStatus] = useState<OfficeTaskStatus>("Job Scheduled");
 
   const refresh = useCallback(async () => {
     const fresh = await loadTasksFromSupabase();
@@ -78,11 +98,18 @@ export default function TasksPage() {
 
   useAutoRefresh(() => { void refresh(); });
 
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+    if (filterType === "job") result = result.filter((t) => !t.isManual);
+    if (filterType === "manual") result = result.filter((t) => t.isManual);
+    return result;
+  }, [tasks, filterType]);
+
   const groupedTasks = useMemo(() =>
     officeTaskStatuses.map((status) => ({
       status,
-      tasks: tasks.filter((t) => t.status === status && (!filterStatus || t.status === filterStatus)),
-    })), [tasks, filterStatus]);
+      tasks: filteredTasks.filter((t) => t.status === status && (!filterStatus || t.status === filterStatus)),
+    })), [filteredTasks, filterStatus]);
 
   const metrics = useMemo(() => ({
     scheduled:    tasks.filter((t) => t.status === "Job Scheduled").length,
@@ -99,21 +126,27 @@ export default function TasksPage() {
   }), [tasks]);
 
   function deleteTask(task: OfficeTask) {
-    if (!window.confirm(`Delete task for "${task.customerName}"? This cannot be undone.`)) return;
+    const label = task.isManual ? task.title : task.customerName;
+    if (!window.confirm(`Delete task "${label}"? This cannot be undone.`)) return;
     deleteOfficeTask(task.id);
     void deleteTaskFromSupabase(task.id);
     setSelectedTask(null);
     setTasks((current) => current.filter((t) => t.id !== task.id));
   }
 
+  function archiveTask(task: OfficeTask) {
+    if (!window.confirm(`Archive task for "${task.customerName}"? It will be hidden from the board.`)) return;
+    archiveOfficeTask(task.id);
+    void upsertTaskToSupabase({ ...task, archived: true });
+    setSelectedTask(null);
+    setTasks((current) => current.filter((t) => t.id !== task.id));
+  }
+
   function moveTask(taskId: string, status: OfficeTaskStatus) {
     updateOfficeTaskStatus(taskId, status);
-    // Read from localStorage (updated synchronously) for immediate UI — avoids
-    // race with fire-and-forget Supabase save that refresh() would hit.
     const fresh = readOfficeTasks();
     setTasks(fresh);
     if (selectedTask?.id === taskId) setSelectedTask((prev) => prev ? { ...prev, status } : null);
-    // Persist the moved task directly to Supabase
     const moved = fresh.find((t) => t.id === taskId);
     if (moved) void upsertTaskToSupabase(moved);
   }
@@ -141,7 +174,41 @@ export default function TasksPage() {
     refresh();
   }
 
+  function createManualTask() {
+    if (!newTitle.trim()) return;
+    const now = new Date().toISOString();
+    const task: OfficeTask = {
+      id: `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      jobId: "",
+      title: newTitle.trim(),
+      customerName: newTitle.trim(),
+      jobAddress: newDescription.trim() || "Manual Task",
+      invoiceAmount: "",
+      assignedUser: newAssigned.trim() || "Office Staff",
+      dueDate: newDueDate || "No due date",
+      status: newStatus,
+      jobLink: "",
+      createdAt: now,
+      updatedAt: now,
+      isManual: true,
+      timeline: [{ id: `${Date.now()}`, event: "Manual task created", at: now, by: "Office" }],
+    };
+    const existing = readOfficeTasks();
+    saveOfficeTasks([task, ...existing]);
+    void upsertTaskToSupabase(task);
+    setTasks(readOfficeTasks());
+    setShowNewTask(false);
+    setNewTitle("");
+    setNewDescription("");
+    setNewAssigned("Office Staff");
+    setNewDueDate("");
+    setNewStatus("Job Scheduled");
+  }
+
   const colors = officeTaskStatusColors;
+
+  const manualCount = tasks.filter((t) => t.isManual).length;
+  const jobCount = tasks.filter((t) => !t.isManual).length;
 
   return (
     <div className="space-y-4">
@@ -158,6 +225,9 @@ export default function TasksPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowNewTask(true)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95">
+            <Plus className="h-4 w-4" /> New Task
+          </button>
           <button onClick={() => { setLoading(true); void refresh(); }} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 active:scale-95">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
@@ -166,6 +236,22 @@ export default function TasksPage() {
               <X className="h-4 w-4" /> {filterStatus}
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Type Filter */}
+      <div className="flex items-center gap-2">
+        <Filter className="h-4 w-4 text-gray-400" />
+        <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
+          {([
+            { key: "all" as TaskTypeFilter, label: "All", count: tasks.length },
+            { key: "job" as TaskTypeFilter, label: "Job Tasks", count: jobCount },
+            { key: "manual" as TaskTypeFilter, label: "Manual Tasks", count: manualCount },
+          ]).map(({ key, label, count }) => (
+            <button key={key} type="button" onClick={() => setFilterType(key)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition ${filterType === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}>
+              {label} <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${filterType === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -209,7 +295,7 @@ export default function TasksPage() {
                 </div>
               </button>
               {isOpen && (
-                <div className="space-y-2 p-2">
+                <div className="max-h-[60vh] space-y-2 overflow-y-auto p-2">
                   {colTasks.length === 0 && (
                     <p className="rounded-lg border border-dashed border-gray-200 py-6 text-center text-xs font-semibold text-gray-400">No tasks in this column</p>
                   )}
@@ -222,12 +308,16 @@ export default function TasksPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-bold text-gray-900">{task.customerName}</p>
-                          <p className="mt-0.5 truncate text-xs font-semibold text-gray-500">{task.jobAddress}</p>
+                          <div className="mb-1"><TaskBadge isManual={task.isManual} /></div>
+                          <p className="truncate text-sm font-bold text-gray-900">{task.isManual ? task.title : task.customerName}</p>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                          {!task.isManual && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); archiveTask(task); }} className="hidden rounded-lg p-1 text-gray-300 transition hover:bg-amber-50 hover:text-amber-600 group-hover:flex" aria-label="Archive task"><Archive className="h-3.5 w-3.5" /></button>
+                          )}
                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteTask(task); }} className="hidden rounded-lg p-1 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete task"><Trash2 className="h-3.5 w-3.5" /></button>
-                          <span className="text-sm font-bold text-blue-700">{task.invoiceAmount}</span>
+                          {!task.isManual && <span className="text-sm font-bold text-blue-700">{task.invoiceAmount}</span>}
                         </div>
                       </div>
                       <div className="mt-2 flex items-center justify-between">
@@ -239,10 +329,10 @@ export default function TasksPage() {
                           {task.invoiceNumber && <span className="text-[10px] font-bold text-gray-400">#{task.invoiceNumber}</span>}
                         </div>
                       </div>
-                      {status === "Customer Satisfaction" && !task.satisfactionChecked && (
+                      {status === "Customer Satisfaction" && !task.satisfactionChecked && !task.isManual && (
                         <div className="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">⚡ Satisfaction check needed</div>
                       )}
-                      {status === "Review Request" && !task.reviewRequestSentAt && (
+                      {status === "Review Request" && !task.reviewRequestSentAt && !task.isManual && (
                         <div className="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">⚡ Review request not sent yet</div>
                       )}
                     </button>
@@ -262,6 +352,7 @@ export default function TasksPage() {
             <section
               key={status}
               className="flex w-56 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
+              style={{ maxHeight: "calc(100vh - 260px)" }}
               onDragOver={(e) => { e.preventDefault(); dragOverCol.current = status; }}
               onDrop={() => handleDrop(status)}
             >
@@ -274,7 +365,7 @@ export default function TasksPage() {
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
               </div>
 
-              {/* Cards */}
+              {/* Cards — fully scrollable */}
               <div className="flex min-h-[80px] flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
                 {colTasks.map((task) => (
                   <article
@@ -285,15 +376,22 @@ export default function TasksPage() {
                     onClick={() => setSelectedTask(task)}
                     className={`group cursor-pointer rounded-lg border bg-white p-2.5 shadow-sm transition hover:shadow-md hover:-translate-y-0.5 ${draggedId === task.id ? "opacity-40" : ""} ${c.border}`}
                   >
+                    <div className="mb-1"><TaskBadge isManual={task.isManual} /></div>
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-gray-900">{task.customerName}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-500">{task.jobAddress}</p>
+                        <p className="truncate text-xs font-bold text-gray-900">{task.isManual ? task.title : task.customerName}</p>
+                        <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
                       </div>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); deleteTask(task); }} className="hidden shrink-0 rounded-lg p-0.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete task"><Trash2 className="h-3 w-3" /></button>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        {!task.isManual && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); archiveTask(task); }} className="hidden shrink-0 rounded-lg p-0.5 text-gray-300 transition hover:bg-amber-50 hover:text-amber-600 group-hover:flex" aria-label="Archive task"><Archive className="h-3 w-3" /></button>
+                        )}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); deleteTask(task); }} className="hidden shrink-0 rounded-lg p-0.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete task"><Trash2 className="h-3 w-3" /></button>
+                      </div>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-bold text-blue-700">{task.invoiceAmount}</span>
+                      {!task.isManual && <span className="text-[10px] font-bold text-blue-700">{task.invoiceAmount}</span>}
+                      {task.isManual && task.dueDate && task.dueDate !== "No due date" && <span className="text-[10px] font-bold text-violet-600">{task.dueDate}</span>}
                       {task.satisfactionResult === "yes" && <ThumbsUp className="h-3 w-3 text-blue-500" />}
                       {task.satisfactionResult === "no" && <ThumbsDown className="h-3 w-3 text-orange-500" />}
                       {task.reviewSubmitted && <Star className="h-3 w-3 text-orange-500" />}
@@ -303,12 +401,12 @@ export default function TasksPage() {
                       {task.invoiceNumber && <span className="text-[9px] font-bold text-gray-400">#{task.invoiceNumber}</span>}
                     </div>
                     {/* Quick actions */}
-                    {status === "Customer Satisfaction" && !task.satisfactionChecked && (
+                    {status === "Customer Satisfaction" && !task.satisfactionChecked && !task.isManual && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); openSatModal(task); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">
                         <CheckSquare className="mr-1 inline h-3 w-3" />Satisfaction Check
                       </button>
                     )}
-                    {status === "Review Request" && !task.reviewRequestSentAt && (
+                    {status === "Review Request" && !task.reviewRequestSentAt && !task.isManual && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">
                         <Zap className="mr-1 inline h-3 w-3" />Send Review Request
                       </button>
@@ -331,25 +429,39 @@ export default function TasksPage() {
           <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className={`text-[10px] font-bold uppercase tracking-widest ${officeTaskStatusColors[selectedTask.status].text}`}>{selectedTask.status}</p>
-                <h2 className="mt-1 text-lg font-bold text-blue-700">{selectedTask.customerName}</h2>
-                <p className="text-sm font-semibold text-gray-500">{selectedTask.jobAddress}</p>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${officeTaskStatusColors[selectedTask.status].text}`}>{selectedTask.status}</p>
+                  <TaskBadge isManual={selectedTask.isManual} />
+                </div>
+                <h2 className="mt-1 text-lg font-bold text-blue-700">{selectedTask.isManual ? selectedTask.title : selectedTask.customerName}</h2>
+                <p className="text-sm font-semibold text-gray-500">{selectedTask.isManual ? (selectedTask.jobAddress !== "Manual Task" ? selectedTask.jobAddress : "") : selectedTask.jobAddress}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {!selectedTask.isManual && (
+                  <button type="button" onClick={() => archiveTask(selectedTask)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"><Archive className="h-4 w-4" />Archive</button>
+                )}
                 <button type="button" onClick={() => deleteTask(selectedTask)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete</button>
                 <button onClick={() => setSelectedTask(null)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-5 w-5" /></button>
               </div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              {[
-                ["Invoice #", selectedTask.invoiceNumber || "—"],
-                ["Amount", selectedTask.invoiceAmount],
-                ["Inv. Status", selectedTask.invoiceStatus || "—"],
-                ["Assigned", selectedTask.assignedUser],
-                ["Due", selectedTask.dueDate],
-                ["Created", fmt(selectedTask.createdAt)],
-              ].map(([label, val]) => (
+              {(selectedTask.isManual
+                ? [
+                    ["Title", selectedTask.title],
+                    ["Assigned", selectedTask.assignedUser],
+                    ["Due", selectedTask.dueDate],
+                    ["Created", fmt(selectedTask.createdAt)],
+                  ]
+                : [
+                    ["Invoice #", selectedTask.invoiceNumber || "—"],
+                    ["Amount", selectedTask.invoiceAmount],
+                    ["Inv. Status", selectedTask.invoiceStatus || "—"],
+                    ["Assigned", selectedTask.assignedUser],
+                    ["Due", selectedTask.dueDate],
+                    ["Created", fmt(selectedTask.createdAt)],
+                  ]
+              ).map(([label, val]) => (
                 <div key={label} className="rounded-lg bg-gray-50 px-3 py-2">
                   <p className="font-bold uppercase tracking-wide text-gray-400" style={{ fontSize: "9px" }}>{label}</p>
                   <p className="mt-0.5 font-bold text-gray-800">{val}</p>
@@ -358,7 +470,7 @@ export default function TasksPage() {
             </div>
 
             {/* Satisfaction */}
-            {selectedTask.satisfactionChecked && (
+            {selectedTask.satisfactionChecked && !selectedTask.isManual && (
               <div className={`mt-4 rounded-lg p-3 ${selectedTask.satisfactionResult === "yes" ? "bg-blue-50" : "bg-orange-50"}`}>
                 <p className="text-xs font-bold text-gray-700">Customer Satisfaction</p>
                 <p className={`mt-1 text-sm font-bold ${selectedTask.satisfactionResult === "yes" ? "text-blue-700" : "text-orange-700"}`}>
@@ -369,7 +481,7 @@ export default function TasksPage() {
             )}
 
             {/* Review tracking */}
-            {selectedTask.reviewRequestSentAt && (
+            {selectedTask.reviewRequestSentAt && !selectedTask.isManual && (
               <div className="mt-4 rounded-lg bg-blue-50 p-3">
                 <p className="text-xs font-bold text-blue-700">Review Request Sent</p>
                 <p className="mt-0.5 text-[11px] text-blue-600">{fmt(selectedTask.reviewRequestSentAt)}</p>
@@ -395,21 +507,21 @@ export default function TasksPage() {
             </div>
 
             {/* Satisfaction CTA */}
-            {selectedTask.status === "Customer Satisfaction" && !selectedTask.satisfactionChecked && (
+            {selectedTask.status === "Customer Satisfaction" && !selectedTask.satisfactionChecked && !selectedTask.isManual && (
               <button type="button" onClick={() => openSatModal(selectedTask)} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
                 <CheckSquare className="mr-2 inline h-4 w-4" />Run Satisfaction Check
               </button>
             )}
 
             {/* Review request CTA */}
-            {selectedTask.status === "Review Request" && !selectedTask.reviewRequestSentAt && (
+            {selectedTask.status === "Review Request" && !selectedTask.reviewRequestSentAt && !selectedTask.isManual && (
               <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
                 <Zap className="mr-2 inline h-4 w-4" />Send Review Request (SMS + Email)
               </button>
             )}
 
             {/* Review received CTA */}
-            {selectedTask.status === "Review Request" && selectedTask.reviewRequestSentAt && !selectedTask.reviewSubmitted && (
+            {selectedTask.status === "Review Request" && selectedTask.reviewRequestSentAt && !selectedTask.reviewSubmitted && !selectedTask.isManual && (
               <button type="button" onClick={() => { moveTask(selectedTask.id, "Review Received"); refresh(); setSelectedTask(null); }} className="mt-2 w-full rounded-lg border border-blue-300 bg-blue-50 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100">
                 <Star className="mr-2 inline h-4 w-4" />Mark Review Received
               </button>
@@ -423,10 +535,19 @@ export default function TasksPage() {
             )}
 
             {/* Open job link */}
-            <Link href={selectedTask.jobLink} className="mt-3 block text-center text-xs font-bold text-blue-700 underline">Open Job Record</Link>
+            {!selectedTask.isManual && selectedTask.jobLink && (
+              <Link href={selectedTask.jobLink} className="mt-3 block text-center text-xs font-bold text-blue-700 underline">Open Job Record</Link>
+            )}
+
+            {/* Archive for job tasks */}
+            {!selectedTask.isManual && (
+              <button type="button" onClick={() => archiveTask(selectedTask)} className="mt-3 w-full rounded-lg border border-amber-200 bg-amber-50 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100 flex items-center justify-center gap-2">
+                <Archive className="h-4 w-4" />Archive Task
+              </button>
+            )}
 
             {/* Delete task */}
-            <button type="button" onClick={() => deleteTask(selectedTask)} className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 flex items-center justify-center gap-2">
+            <button type="button" onClick={() => deleteTask(selectedTask)} className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 flex items-center justify-center gap-2">
               <Trash2 className="h-4 w-4" />Delete Task
             </button>
 
@@ -448,6 +569,59 @@ export default function TasksPage() {
                   ))}
                 </ol>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Manual Task Modal */}
+      {showNewTask && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowNewTask(false)}>
+          <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Manual Task</p>
+                <h2 className="mt-1 text-lg font-bold text-blue-700">Create Task</h2>
+              </div>
+              <button onClick={() => setShowNewTask(false)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Task Title *</label>
+                <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="e.g., Follow up with supplier, Office meeting..." className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" autoFocus />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Description</label>
+                <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Optional description or notes..." rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Assigned To</label>
+                  <input type="text" value={newAssigned} onChange={(e) => setNewAssigned(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Due Date</label>
+                  <input type="date" value={newDueDate} onChange={(e) => setNewDueDate(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Initial Status</label>
+                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value as OfficeTaskStatus)} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
+                  {officeTaskStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button type="button" onClick={() => setShowNewTask(false)} className="flex-1 rounded-lg border border-gray-200 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" disabled={!newTitle.trim()} onClick={createManualTask} className="flex-1 rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                <Plus className="h-4 w-4" />Create Task
+              </button>
             </div>
           </div>
         </div>

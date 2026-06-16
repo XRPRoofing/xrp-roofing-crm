@@ -36,6 +36,10 @@ export type OfficeTask = {
   jobLink: string;
   createdAt: string;
   updatedAt: string;
+  // Manual task flag (non-job office/admin tasks)
+  isManual?: boolean;
+  // Archived (hidden from board but not deleted)
+  archived?: boolean;
   // Customer satisfaction
   satisfactionChecked?: boolean;
   satisfactionResult?: "yes" | "no";
@@ -53,6 +57,7 @@ export type OfficeTask = {
 };
 
 export const officeTaskStorageKey = "xrp-crm-office-tasks";
+export const deletedTaskIdsKey = "xrp-crm-deleted-task-ids";
 
 export const officeTaskStatuses: OfficeTaskStatus[] = [
   "Job Scheduled",
@@ -82,10 +87,28 @@ export const officeTaskStatusColors: Record<OfficeTaskStatus, { bg: string; text
   "Closed":              { bg: "bg-slate-100",  text: "text-slate-600",   border: "border-slate-200",   dot: "bg-slate-400" },
 };
 
+export function readDeletedTaskIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(deletedTaskIdsKey) || "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+function addDeletedTaskId(id: string) {
+  if (typeof window === "undefined") return;
+  const ids = new Set(readDeletedTaskIds());
+  ids.add(id);
+  window.localStorage.setItem(deletedTaskIdsKey, JSON.stringify([...ids]));
+}
+
 export function readOfficeTasks(): OfficeTask[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem(officeTaskStorageKey) || "[]") as OfficeTask[];
+    const deleted = new Set(readDeletedTaskIds());
+    const all = JSON.parse(window.localStorage.getItem(officeTaskStorageKey) || "[]") as OfficeTask[];
+    return all.filter((t) => !deleted.has(t.id));
   } catch {
     return [];
   }
@@ -121,6 +144,8 @@ export function ensureInvoiceTaskForJob(input: {
   assignedTo?: string;
 }) {
   if (typeof window === "undefined") return;
+  const deletedIds = new Set(readDeletedTaskIds());
+  if (deletedIds.has(`invoice-${input.id}`)) return;
   const tasks = readOfficeTasks();
   const invoiceTaskId = `invoice-${input.id}`;
   if (tasks.some((t) => t.id === invoiceTaskId)) return;
@@ -262,8 +287,11 @@ export type CrewJobSyncInput = {
 export function syncCrewJobToTaskBoard(input: CrewJobSyncInput, eventLabel?: string) {
   if (typeof window === "undefined") return;
 
-  const tasks = readOfficeTasks();
+  const deletedIds = new Set(readDeletedTaskIds());
   const taskId = `invoice-${input.id}`;
+  if (deletedIds.has(taskId)) return;
+
+  const tasks = readOfficeTasks();
   const now = new Date().toISOString();
   const targetStatus: OfficeTaskStatus = input.status ? (CREW_TO_TASK_STATUS[input.status] || "Job Scheduled") : "Job Scheduled";
   const existing = tasks.find((t) => t.jobId === input.id);
@@ -326,11 +354,23 @@ export function addTaskTimelineEntry(taskId: string, event: string, note?: strin
   saveOfficeTasks(updated);
 }
 
+export function archiveOfficeTask(taskId: string) {
+  const tasks = readOfficeTasks();
+  const now = new Date().toISOString();
+  const updated = tasks.map((task) => {
+    if (task.id !== taskId) return task;
+    return addTimelineEntry({ ...task, archived: true, updatedAt: now }, "Archived (hidden from board)", undefined, "Office");
+  });
+  saveOfficeTasks(updated);
+}
+
 export function deleteOfficeTask(taskId: string) {
-  const tasks = readOfficeTasks().filter((t) => t.id !== taskId);
-  window.localStorage.setItem(officeTaskStorageKey, JSON.stringify(tasks));
+  addDeletedTaskId(taskId);
+  const all = (() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(officeTaskStorageKey) || "[]") as OfficeTask[];
+    } catch { return []; }
+  })();
+  window.localStorage.setItem(officeTaskStorageKey, JSON.stringify(all.filter((t) => t.id !== taskId)));
   window.dispatchEvent(new Event("crm-office-tasks-updated"));
-  // Do NOT call saveAllTasksToSupabase here — that would re-upsert the
-  // deleted task. The caller (tasks/page.tsx) calls deleteTaskFromSupabase
-  // directly to remove the row from Supabase.
 }
