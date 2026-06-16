@@ -1584,7 +1584,7 @@ export default function InvoicesPage() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
-                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
+                <label className="text-xs font-black uppercase tracking-wider text-blue-700">Create from Signed Proposal or Job <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
                 <select 
                   value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
                   onChange={(event) => handlePrefillFromJob(event.target.value)} 
@@ -1592,7 +1592,7 @@ export default function InvoicesPage() {
                 >
                   <option value="">— No proposal (legacy / direct invoice) —</option>
                   {wonProposals.length === 0 ? (
-                    <option value="" disabled>No signed proposals available</option>
+                    <option value="" disabled>No signed proposals or jobs available</option>
                   ) : (
                     wonProposals.map((proposal) => {
                       const pkg = getProposalSelectedPackage(proposal);
@@ -1606,7 +1606,7 @@ export default function InvoicesPage() {
                 </select>
                 {wonProposals.length === 0 && (
                   <p className="mt-2 text-xs text-slate-500">
-                    No signed proposals available — you can still create a direct invoice below.
+                    No signed proposals or jobs available — you can still create a direct invoice below.
                   </p>
                 )}
               </div>
