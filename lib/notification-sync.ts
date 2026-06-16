@@ -109,20 +109,39 @@ export async function loadNotificationsFromSupabase(): Promise<CrmNotification[]
   }
 }
 
-/** Subscribe to real-time notification changes from Supabase. */
+const notificationListeners = new Set<(notifications: CrmNotification[]) => void>();
+let notificationChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
+/**
+ * Subscribe to real-time notification changes from Supabase.
+ * Uses a shared channel so multiple callers don't create duplicate connections.
+ */
 export function subscribeToNotifications(onUpdate: (notifications: CrmNotification[]) => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
-  try {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`crm-notifications-realtime-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
-        const notifications = await loadNotificationsFromSupabase();
-        onUpdate(notifications);
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  } catch {
-    return () => {};
+
+  notificationListeners.add(onUpdate);
+
+  if (!notificationChannel) {
+    try {
+      const supabase = createClient();
+      notificationChannel = supabase
+        .channel("crm-notifications-realtime-shared")
+        .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
+          const notifications = await loadNotificationsFromSupabase();
+          notificationListeners.forEach((cb) => cb(notifications));
+        })
+        .subscribe();
+    } catch {
+      notificationChannel = null;
+      return () => {};
+    }
   }
+
+  return () => {
+    notificationListeners.delete(onUpdate);
+    if (notificationListeners.size === 0 && notificationChannel) {
+      try { createClient().removeChannel(notificationChannel); } catch { /* ignore */ }
+      notificationChannel = null;
+    }
+  };
 }

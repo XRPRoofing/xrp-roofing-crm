@@ -72,22 +72,23 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const visibleNavigation = isCrewUser ? navigation.filter((item) => ["/crm/crew", "/crm/team-chat"].includes(item.href)) : navigation;
   const activeModule = visibleNavigation.find((item) => pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href)));
 
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+
   useEffect(() => {
     let mounted = true;
 
     if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
       setUserRole("admin");
       setCheckingAuth(false);
-      return () => {
-        mounted = false;
-      };
+      return () => { mounted = false; };
     }
 
     createClient().auth.getSession().then(({ data }) => {
       if (!mounted) return;
 
       if (!data.session) {
-        router.replace(`/login?redirectedFrom=${encodeURIComponent(pathname)}`);
+        router.replace(`/login?redirectedFrom=${encodeURIComponent(pathnameRef.current)}`);
         return;
       }
 
@@ -95,7 +96,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setCurrentUserId(data.session.user.id);
       setUserRole(role);
 
-      if (role === "crew" && !["/crm/crew", "/crm/team-chat"].includes(pathname)) {
+      if (role === "crew" && !["/crm/crew", "/crm/team-chat"].includes(pathnameRef.current)) {
         router.replace("/crm/crew");
         return;
       }
@@ -103,10 +104,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setCheckingAuth(false);
     });
 
-    return () => {
-      mounted = false;
-    };
-  }, [pathname, router]);
+    return () => { mounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   useEffect(() => {
     if (isCrewUser) return;
@@ -326,6 +326,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setSearchIndex(-1);
   }, []);
 
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedSearch = useCallback((query: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!query.trim()) { setSearchResults([]); setSearchOpen(false); return; }
+    searchDebounceRef.current = setTimeout(() => runSearch(query), 200);
+  }, [runSearch]);
+
   function handleSearchKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") { setSearchOpen(false); return; }
     if (!searchOpen || searchResults.length === 0) {
@@ -528,7 +535,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
+                onChange={(e) => { setSearchQuery(e.target.value); debouncedSearch(e.target.value); }}
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
@@ -627,7 +634,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 <input
                   ref={mobileSearchInputRef}
                   value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); runSearch(e.target.value); }}
+                  onChange={(e) => { setSearchQuery(e.target.value); debouncedSearch(e.target.value); }}
                   onKeyDown={handleSearchKeyDown}
                   onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
                   className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"

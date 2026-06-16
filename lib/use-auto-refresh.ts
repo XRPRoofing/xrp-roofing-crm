@@ -1,12 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
-
-// Detect if user is on a mobile device
-function isMobileDevice(): boolean {
-  if (typeof window === "undefined") return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
+import { useEffect, useRef } from "react";
 
 /**
  * Re-run `onRefresh` whenever the user returns to the page so data is reloaded
@@ -14,10 +8,10 @@ function isMobileDevice(): boolean {
  *  - window `focus` (switching back to the tab/window)
  *  - `visibilitychange` -> visible (returning from another app, esp. on mobile)
  *  - cross-tab `storage` writes on the same device
- *  - an optional polling interval as a safety net
+ *  - a safety-net polling interval (default 60s; callers can override)
  *
- * MOBILE: Automatically uses aggressive 5-second polling to ensure data stays fresh
- * on mobile devices where background tab suspension is common.
+ * Refreshes are debounced so rapid events (e.g. focus + visibilitychange firing
+ * together) only trigger one callback.
  *
  * The latest callback is held in a ref so callers can pass an inline function
  * without re-binding listeners on every render.
@@ -29,36 +23,38 @@ export function useAutoRefresh(onRefresh: () => void, { intervalMs }: { interval
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const run = () => callbackRef.current();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRun = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => callbackRef.current(), 300);
+    };
+
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        // Always refresh when becoming visible (critical for mobile)
-        run();
+        debouncedRun();
       }
     };
 
-    window.addEventListener("focus", run);
-    window.addEventListener("storage", run);
+    window.addEventListener("focus", debouncedRun);
+    window.addEventListener("storage", debouncedRun);
     document.addEventListener("visibilitychange", onVisible);
 
-    // Mobile gets aggressive polling (5 seconds), desktop uses provided interval or none
-    const mobileDefault = isMobileDevice() ? 5000 : 0;
-    const finalInterval = intervalMs ?? mobileDefault;
-    
-    const timer = finalInterval > 0 ? window.setInterval(run, finalInterval) : undefined;
+    const finalInterval = intervalMs ?? 60_000;
+    const timer = finalInterval > 0 ? window.setInterval(debouncedRun, finalInterval) : undefined;
 
     return () => {
-      window.removeEventListener("focus", run);
-      window.removeEventListener("storage", run);
+      window.removeEventListener("focus", debouncedRun);
+      window.removeEventListener("storage", debouncedRun);
       document.removeEventListener("visibilitychange", onVisible);
+      if (debounceTimer) clearTimeout(debounceTimer);
       if (timer) window.clearInterval(timer);
     };
   }, [intervalMs]);
 }
 
 /**
- * Hook specifically for mobile devices that forces refresh every time
- * the app comes to foreground (most aggressive sync strategy)
+ * Hook for ensuring data freshness when the app returns to the foreground.
+ * Refreshes on visibility change and pageshow events with debouncing.
  */
 export function useMobileAggressiveSync(onRefresh: () => void) {
   const callbackRef = useRef(onRefresh);
@@ -67,34 +63,34 @@ export function useMobileAggressiveSync(onRefresh: () => void) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Force refresh every time app becomes visible
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRun = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => callbackRef.current(), 300);
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        // Small delay to ensure network is ready
-        setTimeout(() => callbackRef.current(), 100);
+        debouncedRun();
       }
     };
 
-    // Force refresh on page show (when returning from background on mobile)
     const handlePageShow = () => {
-      setTimeout(() => callbackRef.current(), 100);
+      debouncedRun();
     };
 
-    // Refresh immediately on mount
     callbackRef.current();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pageshow", handlePageShow);
 
-    // Mobile aggressive polling every 5 seconds
-    const mobileInterval = window.setInterval(() => {
-      callbackRef.current();
-    }, 5000);
+    const timer = window.setInterval(debouncedRun, 60_000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pageshow", handlePageShow);
-      window.clearInterval(mobileInterval);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.clearInterval(timer);
     };
   }, []);
 }

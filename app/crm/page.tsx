@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -13,8 +14,9 @@ import {
   TrendingUp,
   UserX,
 } from "lucide-react";
-import DashboardCalendar from "@/components/crm/dashboard/DashboardCalendar";
-import DashboardHeroActions from "@/components/crm/dashboard/DashboardHeroActions";
+
+const DashboardCalendar = dynamic(() => import("@/components/crm/dashboard/DashboardCalendar"), { ssr: false });
+const DashboardHeroActions = dynamic(() => import("@/components/crm/dashboard/DashboardHeroActions"), { ssr: false });
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { loadAllInvoices, subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
