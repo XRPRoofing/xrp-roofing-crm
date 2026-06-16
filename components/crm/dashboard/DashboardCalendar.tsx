@@ -151,7 +151,7 @@ export default function DashboardCalendar() {
   }, [weekDays]);
 
   return (
-    <section className="mx-auto w-full max-w-5xl rounded-xl border border-gray-200 bg-white px-4 py-5 sm:px-6 sm:py-5">
+    <section className="rounded-xl border border-gray-200 bg-white px-4 py-5 sm:px-6 sm:py-5">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
