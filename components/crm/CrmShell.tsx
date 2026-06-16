@@ -450,7 +450,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen min-h-[100dvh] bg-gray-50">
       {/* Incoming Call Banner */}
       {globalIncomingCall && !isCrewUser && (
         <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
@@ -683,7 +683,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation — rendered at root level so no parent transform/flex can break fixed positioning */}
       {mobileBottomNav.length > 0 && (
-        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ WebkitTransform: "translateZ(0)" }}>
+        <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ WebkitTransform: "translateZ(0)", willChange: "transform", touchAction: "none", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}>
           <div className="flex items-center justify-around px-1 py-1">
             {mobileBottomNav.map((item) => {
               const Icon = item.icon;

@@ -38,7 +38,7 @@ type TaskTypeFilter = "all" | "job" | "manual";
 
 function TaskBadge({ isManual }: { isManual?: boolean }) {
   if (isManual) {
-    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Manual</span>;
+    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Daily</span>;
   }
   return <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 px-1.5 py-0.5 text-[9px] font-bold text-cyan-700"><Briefcase className="h-2.5 w-2.5" />Job</span>;
 }
@@ -182,7 +182,7 @@ export default function TasksPage() {
       jobId: "",
       title: newTitle.trim(),
       customerName: newTitle.trim(),
-      jobAddress: newDescription.trim() || "Manual Task",
+      jobAddress: newDescription.trim() || "Daily Task",
       invoiceAmount: "",
       assignedUser: newAssigned.trim() || "Office Staff",
       dueDate: newDueDate || "No due date",
@@ -191,7 +191,7 @@ export default function TasksPage() {
       createdAt: now,
       updatedAt: now,
       isManual: true,
-      timeline: [{ id: `${Date.now()}`, event: "Manual task created", at: now, by: "Office" }],
+      timeline: [{ id: `${Date.now()}`, event: "Daily task created", at: now, by: "Office" }],
     };
     const existing = readOfficeTasks();
     saveOfficeTasks([task, ...existing]);
@@ -246,7 +246,7 @@ export default function TasksPage() {
           {([
             { key: "all" as TaskTypeFilter, label: "All", count: tasks.length },
             { key: "job" as TaskTypeFilter, label: "Job Tasks", count: jobCount },
-            { key: "manual" as TaskTypeFilter, label: "Manual Tasks", count: manualCount },
+            { key: "manual" as TaskTypeFilter, label: "Daily Tasks", count: manualCount },
           ]).map(({ key, label, count }) => (
             <button key={key} type="button" onClick={() => setFilterType(key)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition ${filterType === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}>
               {label} <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${filterType === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
@@ -310,7 +310,7 @@ export default function TasksPage() {
                         <div className="min-w-0">
                           <div className="mb-1"><TaskBadge isManual={task.isManual} /></div>
                           <p className="truncate text-sm font-bold text-gray-900">{task.isManual ? task.title : task.customerName}</p>
-                          <p className="mt-0.5 truncate text-xs font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Daily Task" && task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           {!task.isManual && (
@@ -380,7 +380,7 @@ export default function TasksPage() {
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-gray-900">{task.isManual ? task.title : task.customerName}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
+                        <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Daily Task" && task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-0.5">
                         {!task.isManual && (
@@ -434,7 +434,7 @@ export default function TasksPage() {
                   <TaskBadge isManual={selectedTask.isManual} />
                 </div>
                 <h2 className="mt-1 text-lg font-bold text-blue-700">{selectedTask.isManual ? selectedTask.title : selectedTask.customerName}</h2>
-                <p className="text-sm font-semibold text-gray-500">{selectedTask.isManual ? (selectedTask.jobAddress !== "Manual Task" ? selectedTask.jobAddress : "") : selectedTask.jobAddress}</p>
+                <p className="text-sm font-semibold text-gray-500">{selectedTask.isManual ? (selectedTask.jobAddress !== "Daily Task" && selectedTask.jobAddress !== "Manual Task" ? selectedTask.jobAddress : "") : selectedTask.jobAddress}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 {!selectedTask.isManual && (
@@ -574,14 +574,14 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* New Manual Task Modal */}
+      {/* New Daily Task Modal */}
       {showNewTask && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowNewTask(false)}>
           <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Manual Task</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Daily Task</p>
                 <h2 className="mt-1 text-lg font-bold text-blue-700">Create Task</h2>
               </div>
               <button onClick={() => setShowNewTask(false)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-5 w-5" /></button>
