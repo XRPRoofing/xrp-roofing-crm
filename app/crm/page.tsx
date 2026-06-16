@@ -13,12 +13,15 @@ import {
   TrendingUp,
   UserX,
 } from "lucide-react";
+import DashboardCalendar from "@/components/crm/dashboard/DashboardCalendar";
 import DashboardHeroActions from "@/components/crm/dashboard/DashboardHeroActions";
 import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
 import { loadAllInvoices, subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
+
+const COMPLETED_STAGES = new Set(["completed", "paid"]);
 
 type ProposalSnap = { id: string; status: string; sentToEmail?: string; viewedAt?: string; signedAt?: string; deletedAt?: string; total?: number };
 type InvoiceSnap  = { id: string; status: string; dueDate: string; sentAt?: string; viewedAt?: string; emailOpenedAt?: string; payments?: { amount: number }[]; lineItems?: { unitPrice: number; quantity: number; tax?: number }[] };
@@ -212,6 +215,9 @@ export default function CrmDashboardPage() {
   /* Summary stats */
   const totalRevenue = invoices.filter(invoicePaid).reduce((s, i) => s + invoiceTotal(i), 0);
   const signedProposals = proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length;
+  const activeJobs = jobs.filter((j) => !COMPLETED_STAGES.has(j.stage)).length;
+  const paidInvoiceCount = invoices.filter(invoicePaid).length;
+  const sentProposalCount = proposals.filter((p) => p.status !== "Draft").length;
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -235,6 +241,9 @@ export default function CrmDashboardPage() {
         </div>
       </section>
 
+      {/* ── Calendar Shortcut ──────────────────────────────────────── */}
+      <DashboardCalendar />
+
       {/* ── Summary Stats Row ───────────────────────────────────────── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
@@ -243,6 +252,7 @@ export default function CrmDashboardPage() {
             <span className="text-xs font-medium text-gray-500">Total Jobs</span>
           </div>
           <p className="mt-2 text-2xl font-bold text-gray-900">{jobs.length}</p>
+          <p className="text-xs text-gray-400">{activeJobs} active</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="flex items-center gap-2">
@@ -250,7 +260,7 @@ export default function CrmDashboardPage() {
             <span className="text-xs font-medium text-gray-500">Proposals</span>
           </div>
           <p className="mt-2 text-2xl font-bold text-gray-900">{proposals.length}</p>
-          <p className="text-xs text-gray-400">{signedProposals} signed</p>
+          <p className="text-xs text-gray-400">{signedProposals} signed &middot; {sentProposalCount} sent</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="flex items-center gap-2">
@@ -258,7 +268,7 @@ export default function CrmDashboardPage() {
             <span className="text-xs font-medium text-gray-500">Invoices</span>
           </div>
           <p className="mt-2 text-2xl font-bold text-gray-900">{invoices.length}</p>
-          <p className="text-xs text-gray-400">{invoices.filter(invoicePaid).length} paid</p>
+          <p className="text-xs text-gray-400">{paidInvoiceCount} paid</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="flex items-center gap-2">
