@@ -513,6 +513,93 @@ function propagatePaidStatus(invoice: Invoice) {
 
 }
 
+type MobileInvoiceTab = "All" | "Paid" | "Unpaid" | "Overdue";
+
+function MobileInvoiceList({
+  invoices,
+  getComputedStatus: computeStatus,
+  calculateTotals: calcTotals,
+  currency: fmt,
+  statusBadgeClass: badgeCls,
+  openInvoice,
+}: {
+  invoices: Invoice[];
+  getComputedStatus: (inv: Invoice) => InvoiceStatus;
+  calculateTotals: (inv: Pick<Invoice, "lineItems" | "discount">) => { subtotal: number; tax: number; finalTotal: number };
+  currency: (v: number) => string;
+  statusBadgeClass: (s: InvoiceStatus) => string;
+  openInvoice: (inv: Invoice) => void;
+}) {
+  const [tab, setTab] = useState<MobileInvoiceTab>("All");
+
+  const tabbed = useMemo(() => {
+    return invoices.filter((inv) => {
+      const s = computeStatus(inv);
+      if (tab === "All") return true;
+      if (tab === "Paid") return s === "Paid" || s === "Paid Mail Check";
+      if (tab === "Overdue") return s === "Overdue";
+      // Unpaid = everything that isn't Paid/Voided
+      return s !== "Paid" && s !== "Paid Mail Check" && s !== "Voided";
+    });
+  }, [invoices, tab, computeStatus]);
+
+  const counts = useMemo(() => ({
+    All: invoices.length,
+    Paid: invoices.filter((inv) => { const s = computeStatus(inv); return s === "Paid" || s === "Paid Mail Check"; }).length,
+    Unpaid: invoices.filter((inv) => { const s = computeStatus(inv); return s !== "Paid" && s !== "Paid Mail Check" && s !== "Voided"; }).length,
+    Overdue: invoices.filter((inv) => computeStatus(inv) === "Overdue").length,
+  }), [invoices, computeStatus]);
+
+  const tabs: MobileInvoiceTab[] = ["All", "Paid", "Unpaid", "Overdue"];
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`flex-1 py-3 text-center text-xs font-bold transition ${tab === t ? "border-b-2 border-blue-600 text-blue-700 bg-blue-50/50" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {t} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${tab === t ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{counts[t]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Invoice list */}
+      <div className="divide-y divide-gray-100">
+        {tabbed.map((invoice) => {
+          const status = computeStatus(invoice);
+          const totals = calcTotals(invoice);
+          return (
+            <button
+              key={invoice.id}
+              type="button"
+              onClick={() => openInvoice(invoice)}
+              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-gray-50"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-gray-900">{invoice.clientName}</p>
+                <p className="mt-0.5 truncate text-xs text-gray-500">{invoice.invoiceNumber}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold text-gray-900">{fmt(totals.finalTotal)}</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-gray-400">Due {invoice.dueDate}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${badgeCls(status)}`}>{status}</span>
+            </button>
+          );
+        })}
+        {tabbed.length === 0 && (
+          <div className="py-10 text-center text-sm font-semibold text-gray-400">No invoices match this filter.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     // Always start with cached data for instant display, then upgrade from Supabase.
@@ -1315,7 +1402,20 @@ export default function InvoicesPage() {
         );
       })()}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* ── Mobile: Filtered list view ── */}
+      <div className="md:hidden">
+        <MobileInvoiceList
+          invoices={filteredInvoices}
+          getComputedStatus={getComputedStatus}
+          calculateTotals={calculateTotals}
+          currency={currency}
+          statusBadgeClass={statusBadgeClass}
+          openInvoice={openInvoice}
+        />
+      </div>
+
+      {/* ── Desktop: Column board view ── */}
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(boardGroups) as Array<keyof typeof boardGroups>).map((stage) => {
           const invoicesInStage = boardGroups[stage];
           const stageTotal = invoicesInStage.reduce((total, invoice) => total + calculateTotals(invoice).finalTotal, 0);
@@ -1362,7 +1462,6 @@ export default function InvoicesPage() {
                           )}
                         </div>
                       </button>
-                      {/* Mobile: swipeable action row / Desktop: wrapped buttons */}
                       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap scrollbar-hide">
                         <button type="button" onClick={() => openInvoice(invoice)} className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-200 active:scale-95">View</button>
                         <button type="button" onClick={() => { setSelectedInvoiceId(invoice.id); pushInvoiceHash(); setEditing(true); }} className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95">Edit</button>
