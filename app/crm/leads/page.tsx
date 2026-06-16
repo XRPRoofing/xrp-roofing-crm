@@ -552,7 +552,8 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:grid-cols-5">
+        {/* KPI summary cards hidden for cleaner Kanban focus — logic preserved */}
+        <div className="hidden">
           {dashboardMetrics.map((metric) => (
             <div key={metric.label} className={`rounded-xl border px-2 py-1.5 shadow-sm sm:rounded-2xl sm:px-4 sm:py-3 ${metric.tone}`}>
               <p className="text-base font-black leading-none sm:text-2xl">{metric.value}</p>
