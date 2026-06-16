@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarCheck, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -10,6 +10,7 @@ import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount
 import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { subscribeToCrewData } from "@/lib/crew-sync";
+import ToastContainer from "@/components/crm/Toast";
 import { PhoneLink } from "@/components/ContactLinks";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
@@ -29,6 +30,7 @@ const navigation = [
   { href: "/crm/invoices", label: "Invoice", shortLabel: "Invoice", icon: ClipboardList },
   { href: "/crm/payments", label: "Payments", shortLabel: "Pay", icon: CreditCard },
   { href: "/crm/calendar", label: "Calendar", shortLabel: "Calendar", icon: CalendarDays },
+  { href: "/crm/schedule", label: "Schedule", shortLabel: "Schedule", icon: CalendarCheck },
   { href: "/crm/pdf-signer-board", label: "PDF Signer Board", shortLabel: "PDF", icon: FileSignature },
   { href: "/crm/files", label: "Files", shortLabel: "Files", icon: UploadCloud },
   { href: "/crm/automations", label: "Automations", shortLabel: "Auto", icon: Zap },
@@ -669,13 +671,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className={`crm-main flex-1 px-4 py-4 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
+        <main className={`crm-main flex-1 px-4 py-4 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`} style={{ contentVisibility: "auto" }}>
           <div className="mx-auto max-w-[1400px]">{children}</div>
         </main>
 
         {/* Mobile Bottom Navigation */}
         {mobileBottomNav.length > 0 && (
-          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white lg:hidden">
+          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white lg:hidden" style={{ willChange: "transform", contain: "layout style" }}>
             <div className="flex items-center justify-around px-1 py-1">
               {mobileBottomNav.map((item) => {
                 const Icon = item.icon;
@@ -698,6 +700,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Team Chat FAB */}
+        <ToastContainer />
+
         {showTeamChatFloatingButton && (
           <Link href="/crm/team-chat" className={`fixed right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3 ${mobileBottomNav.length > 0 ? "bottom-[72px] lg:bottom-6" : "bottom-6"}`}>
             <span className="relative">

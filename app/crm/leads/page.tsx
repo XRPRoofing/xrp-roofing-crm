@@ -16,6 +16,7 @@ import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
+import { showToast } from "@/components/crm/Toast";
 
 const arizonaBounds = {
   north: 37.0043,
@@ -448,6 +449,7 @@ export default function LeadsPage() {
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
     void updateJobRecord(jobId, updates).catch(() => {});
+    showToast("Job updated");
   }
 
   function updateJobStage(jobId: string, stage: LeadStage) {
@@ -1000,16 +1002,39 @@ export default function LeadsPage() {
 
                 {activityOpen && (
                   <div className="rounded-lg border border-gray-200 bg-white p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Activity History</p>
-                    <ul className="mt-2 space-y-2">
-                      {jobFiles.length === 0 && <li className="text-sm font-semibold text-gray-500">No document or photo activity yet.</li>}
-                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
-                        <li key={file.id} className="flex items-center justify-between gap-2 text-sm">
-                          <span className="truncate font-bold text-gray-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Document · ") : `Photo · ${file.name}`}</span>
-                          <span className="shrink-0 text-xs font-semibold text-gray-400">{new Date(file.createdAt).toLocaleString()}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Activity Timeline</p>
+                    <div className="mt-3 max-h-72 space-y-0 overflow-y-auto">
+                      {(() => {
+                        type ActivityEntry = { id: string; type: "photo" | "note" | "status" | "call"; title: string; detail?: string; actor?: string; timestamp: string; recordingUrl?: string };
+                        const entries: ActivityEntry[] = [];
+                        jobFiles.forEach((file) => entries.push({ id: file.id, type: "photo", title: file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Document: ") : `Photo: ${file.name}`, detail: file.photoType, actor: file.uploadedBy || "Office", timestamp: file.createdAt }));
+                        jobNotes.filter((n) => n.jobId === selectedJobId).forEach((note) => entries.push({ id: note.id, type: "note", title: note.body, actor: note.author, timestamp: note.createdAt }));
+                        try {
+                          const conversations = JSON.parse(window.localStorage.getItem("xrp-crm-conversations-v2") || "[]") as { jobId?: string; messages?: { id: string; channel: string; direction: string; author: string; body: string; timestamp: string; recordingUrl?: string }[] }[];
+                          const jobConvos = conversations.filter((c) => c.jobId === selectedJobId);
+                          jobConvos.forEach((convo) => (convo.messages || []).filter((m) => m.channel === "call").forEach((m) => entries.push({ id: m.id, type: "call", title: `${m.direction === "inbound" ? "Incoming" : "Outgoing"} call`, detail: m.body, actor: m.author, timestamp: m.timestamp, recordingUrl: m.recordingUrl })));
+                        } catch { /* no conversations */ }
+                        if (selectedJob) {
+                          entries.push({ id: `status-${selectedJob.id}`, type: "status", title: `Current status: ${selectedJob.stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}`, detail: selectedJob.nextAction || undefined, actor: selectedJob.assignedTo, timestamp: new Date().toISOString() });
+                        }
+                        entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+                        if (entries.length === 0) return <p className="text-sm font-semibold text-gray-500">No activity yet.</p>;
+                        return entries.map((entry, idx) => (
+                          <div key={entry.id} className="relative flex gap-3 pb-4">
+                            <div className="flex flex-col items-center">
+                              <div className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${entry.type === "call" ? "bg-green-500" : entry.type === "note" ? "bg-orange-400" : entry.type === "status" ? "bg-blue-500" : "bg-gray-400"}`} />
+                              {idx < entries.length - 1 && <div className="mt-0.5 w-px flex-1 bg-gray-200" />}
+                            </div>
+                            <div className="min-w-0 flex-1 -mt-0.5">
+                              <p className="text-sm font-semibold text-gray-800">{entry.title}</p>
+                              {entry.detail && <p className="mt-0.5 truncate text-xs text-gray-500">{entry.detail}</p>}
+                              {entry.recordingUrl && <a href={entry.recordingUrl} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-block text-xs font-bold text-blue-600 hover:underline">Play recording</a>}
+                              <p className="mt-0.5 text-[11px] text-gray-400">{entry.actor && `${entry.actor} · `}{new Date(entry.timestamp).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>

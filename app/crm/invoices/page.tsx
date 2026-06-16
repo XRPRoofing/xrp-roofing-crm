@@ -18,6 +18,7 @@ import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
+import { showToast } from "@/components/crm/Toast";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
@@ -907,6 +908,7 @@ export default function InvoicesPage() {
     const updatedInvoice = { ...nextInvoice, status, activity: [...(activity ? [activity] : []), ...statusActivity, ...nextInvoice.activity] };
     setInvoices((currentInvoices) => currentInvoices.map((invoice) => invoice.id === updatedInvoice.id ? updatedInvoice : invoice));
     void upsertInvoiceRecord(updatedInvoice as unknown as Record<string, unknown> & { id: string });
+    showToast(activity || "Invoice updated");
   }
 
   function openInvoice(invoice: Invoice) {
@@ -939,6 +941,7 @@ export default function InvoicesPage() {
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
     setShowReviewModal(false);
+    showToast("Invoice created successfully");
   }
 
   function handleEditFromReview() {

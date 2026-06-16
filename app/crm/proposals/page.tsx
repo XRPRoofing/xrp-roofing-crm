@@ -11,6 +11,9 @@ import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { showToast } from "@/components/crm/Toast";
+import SignaturePad from "@/components/crm/SignaturePad";
+import JobPhotoSelector from "@/components/crm/JobPhotoSelector";
 import type { Lead } from "@/types/crm";
 
 type Proposal = {
@@ -97,6 +100,32 @@ type ProposalTemplate = {
 };
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
+
+function generateProposalNumber(existingProposals: { id: string }[]): string {
+  const year = new Date().getFullYear();
+  const existingNumbers = existingProposals
+    .map((p) => p.id)
+    .map((id) => {
+      const match = id.match(/XRP-PROP-\d{4}-(\d+)/);
+      return match ? Number(match[1]) : 0;
+    });
+  const nextNum = Math.max(0, ...existingNumbers) + 1;
+  return `XRP-PROP-${year}-${String(nextNum).padStart(4, "0")}`;
+}
+
+function formatProposalDisplayId(id: string): string {
+  if (id.startsWith("XRP-PROP-")) return id;
+  const match = id.match(/P-(\d+)/);
+  if (match) {
+    const ts = Number(match[1]);
+    const date = new Date(ts);
+    const yy = String(date.getFullYear()).slice(2);
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const seq = match[1].slice(-4);
+    return `PROP-${yy}${mm}-${seq}`;
+  }
+  return id;
+}
 const emailTemplatesLocalKey = "xrp-crm-proposal-email-templates";
 
 const defaultEmailTemplates: ProposalEmailTemplate[] = [
@@ -446,6 +475,8 @@ export default function ProposalsPage() {
   const [offlineSignerName, setOfflineSignerName] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [typedSignature, setTypedSignature] = useState("");
+  const [showDigitalSignModal, setShowDigitalSignModal] = useState(false);
+  const [showJobPhotoSelector, setShowJobPhotoSelector] = useState<number | null>(null);
   const [sendForm, setSendForm] = useState({
     toName: "",
     toEmail: "info@xrproofing.com",
@@ -787,7 +818,7 @@ export default function ProposalsPage() {
     if (proposalMode === "new" && (!customerName || !address)) return;
 
     const newProposal: Proposal = {
-      id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: generateProposalNumber(proposals),
       job: proposalMode === "job" ? selectedJob : undefined,
       customerName: proposalMode === "job" && selectedJob ? selectedJob.name : customerName,
       customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : "",
@@ -832,7 +863,7 @@ export default function ProposalsPage() {
   // future clicks open this same estimate instead of creating another.
   function createEstimateFromLead(job: Lead) {
     const newProposal: Proposal = {
-      id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: generateProposalNumber(proposals),
       job,
       customerName: job.name,
       customerEmail: job.email,
@@ -943,6 +974,34 @@ export default function ProposalsPage() {
 
     const updatedProposal = saveActiveProposal();
     setActiveProposal(updatedProposal);
+    showToast("Proposal saved successfully");
+  }
+
+  function handleDigitalSign(signatureDataUrl: string) {
+    if (!activeProposal) return;
+
+    const acceptedOption = activeProposal.selectedOption || "best";
+    const acceptedPrice = Number(editorForm.total) || activeProposal.total || 0;
+    const signedAt = new Date().toISOString();
+    const signedProposal = saveActiveProposal({
+      status: "Signed" as Proposal["status"],
+      signedAt,
+      signedBy: activeProposal.customerName,
+      signatureDataUrl,
+      selectedOption: acceptedOption,
+      acceptedPackage: acceptedOption,
+      acceptedPackageName: acceptedOption.charAt(0).toUpperCase() + acceptedOption.slice(1),
+      acceptedPrice,
+      total: acceptedPrice,
+      proposalVersion: activeProposal.proposalVersion ?? 1,
+      locked: true,
+    });
+
+    if (signedProposal) {
+      setActiveProposal(signedProposal);
+    }
+    setShowDigitalSignModal(false);
+    showToast("Proposal signed digitally");
   }
 
   function saveActiveProposal(extraFields?: Partial<Proposal>) {
@@ -1240,7 +1299,10 @@ export default function ProposalsPage() {
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send</button>
             {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
+              <>
+              <button type="button" onClick={() => setShowDigitalSignModal(true)} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Sign Digitally</button>
               <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 active:scale-95">Mark as Signed Offline</button>
+              </>
             )}
             {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
               <label className="shrink-0 cursor-pointer rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">
@@ -1460,10 +1522,13 @@ export default function ProposalsPage() {
                             photo.note && <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">{photo.note}</p>
                           ) : (
                             <>
-                              <label className="mt-3 block rounded-lg bg-blue-50 px-4 py-3 text-center text-sm font-bold text-blue-700">
-                                Upload photo
-                                <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
-                              </label>
+                              <div className="mt-3 flex gap-2">
+                                <label className="flex-1 rounded-lg bg-blue-50 px-4 py-3 text-center text-sm font-bold text-blue-700 cursor-pointer hover:bg-blue-100 transition">
+                                  Upload photo
+                                  <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
+                                </label>
+                                <button type="button" onClick={() => setShowJobPhotoSelector(index)} className="flex-1 rounded-lg bg-orange-50 px-4 py-3 text-center text-sm font-bold text-orange-700 hover:bg-orange-100 transition">From Job Folder</button>
+                              </div>
                               <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-24 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-600 outline-none" placeholder={`${photo.label} notes`} />
                             </>
                           )}
@@ -1662,6 +1727,26 @@ export default function ProposalsPage() {
             </div>
           </main>
         </div>
+        {showJobPhotoSelector !== null && (
+          <JobPhotoSelector
+            jobId={activeProposal.job?.id}
+            onSelect={(dataUrl) => {
+              const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos);
+              inspectionPhotos[showJobPhotoSelector] = { ...inspectionPhotos[showJobPhotoSelector], image: dataUrl };
+              setEditorForm({ ...editorForm, inspectionPhotos });
+              setShowJobPhotoSelector(null);
+              showToast("Photo added from job folder");
+            }}
+            onClose={() => setShowJobPhotoSelector(null)}
+          />
+        )}
+        {showDigitalSignModal && (
+          <SignaturePad
+            customerName={activeProposal.customerName}
+            onSave={handleDigitalSign}
+            onCancel={() => setShowDigitalSignModal(false)}
+          />
+        )}
         {showOfflineSignModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50">
             <div className="w-full max-w-md rounded-lg bg-white p-7 shadow-2xl">
@@ -2125,6 +2210,7 @@ export default function ProposalsPage() {
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-bold leading-4 text-blue-700 shadow-sm">XRP<br />ROOF</div>
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
+                <p className="mt-0.5 text-[11px] font-bold text-gray-400">{formatProposalDisplayId(proposal.id)}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
                 <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
               </div>
