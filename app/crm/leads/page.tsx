@@ -586,14 +586,14 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="sticky top-14 z-20 -mx-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+    <div className="space-y-2 sm:space-y-4">
+      <div className="sticky top-14 z-20 -mx-3 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end sm:gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Jobs Board</h1>
+            <h1 className="text-lg font-bold text-gray-900 sm:text-2xl">Jobs Board</h1>
             <p className="crm-board-subtitle mt-1 hidden max-w-3xl text-sm text-gray-500 sm:block">Production tracking: urgency, value, rep, next action, and due date at a glance.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <button onClick={() => { setSearch(""); setSourceFilter(null); }} className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:border-blue-200 hover:text-blue-700"><Filter className="mr-2 h-4 w-4" />Clear filters</button>
             <button onClick={() => setShowForm(true)} className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-blue-700"><Plus className="mr-2 h-4 w-4" />Add job</button>
           </div>

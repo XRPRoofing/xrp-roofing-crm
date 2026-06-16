@@ -1823,21 +1823,21 @@ export default function ProposalsPage() {
   return (
     <div className="space-y-5 font-sans">
       <BackToJobsLink />
-      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-3 text-white shadow-2xl shadow-blue-950/20 sm:rounded-[2rem] sm:p-6">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="relative flex flex-col justify-between gap-2 sm:gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-orange-300">Proposal Center</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Proposals</h1>
-            <p className="crm-board-subtitle mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-orange-300 sm:text-xs">Proposal Center</p>
+            <h1 className="text-xl font-bold tracking-tight sm:text-3xl">Proposals</h1>
+            <p className="crm-board-subtitle mt-1 hidden max-w-2xl text-sm font-medium leading-6 text-blue-100 sm:mt-2 sm:block">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
           </div>
-          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-orange-600">⊕ Proposal</button>
+          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 sm:px-5 sm:py-3 sm:text-sm">⊕ Proposal</button>
         </div>
       </div>
 
-      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="rounded-lg border border-white/70 bg-white/95 px-5 pt-4 shadow-sm">
-          <div className="flex gap-8 text-sm font-bold">
+      <div className="sticky top-14 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 backdrop-blur-sm sm:-mx-6 sm:px-6">
+        <div className="rounded-lg border border-white/70 bg-white/95 px-3 pt-2 shadow-sm sm:px-5 sm:pt-4">
+          <div className="flex gap-4 text-xs font-bold sm:gap-8 sm:text-sm">
             <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
             <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
             <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
