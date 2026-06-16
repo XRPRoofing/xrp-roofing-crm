@@ -48,12 +48,12 @@ type MetricDef = {
   count: number;
 };
 
-function urgencyStyles(u: MetricDef["urgency"]) {
-  if (u === "red")    return { card: "border-orange-100 bg-orange-50 hover:border-orange-300",    num: "text-orange-700",    icon: "bg-orange-100 text-orange-600",    dot: "bg-orange-500" };
-  if (u === "orange") return { card: "border-orange-100 bg-orange-50 hover:border-orange-300", num: "text-orange-700", icon: "bg-orange-100 text-orange-600", dot: "bg-orange-500" };
-  if (u === "yellow") return { card: "border-orange-100 bg-orange-50 hover:border-orange-300", num: "text-orange-700", icon: "bg-orange-100 text-orange-600", dot: "bg-orange-500" };
-  if (u === "blue")   return { card: "border-blue-100 bg-blue-50 hover:border-blue-300",   num: "text-blue-700",   icon: "bg-blue-100 text-blue-600",   dot: "bg-blue-500" };
-  return { card: "border-slate-200 bg-white hover:border-slate-300", num: "text-slate-800", icon: "bg-slate-100 text-slate-600", dot: "bg-slate-400" };
+function urgencyColor(u: MetricDef["urgency"]) {
+  if (u === "red")    return { bg: "bg-red-50", border: "border-red-100", text: "text-red-700", icon: "bg-red-100 text-red-600" };
+  if (u === "orange") return { bg: "bg-orange-50", border: "border-orange-100", text: "text-orange-700", icon: "bg-orange-100 text-orange-600" };
+  if (u === "yellow") return { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-700", icon: "bg-amber-100 text-amber-600" };
+  if (u === "blue")   return { bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-700", icon: "bg-blue-100 text-blue-600" };
+  return { bg: "bg-gray-50", border: "border-gray-100", text: "text-gray-700", icon: "bg-gray-100 text-gray-600" };
 }
 
 export default function CrmDashboardPage() {
@@ -64,24 +64,17 @@ export default function CrmDashboardPage() {
   const [invoices,  setInvoices]  = useState<InvoiceSnap[]>([]);
   const [syncDot,   setSyncDot]   = useState(false);
 
-  // Load from Supabase on mount (not localStorage)
   useEffect(() => {
     let mounted = true;
     
-    // Load jobs
     void loadCrewDataset().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {});
-    
-    // Load invoices from Supabase
     void loadAllInvoices<InvoiceSnap>().then((data) => { 
       if (mounted) setInvoices(data); 
     }).catch(() => {});
-    
-    // Load proposals from Supabase
     void loadProposalRecords<ProposalSnap>().then((data) => { 
       if (mounted) setProposals(data.filter((p) => !p.deletedAt)); 
     }).catch(() => {});
 
-    // Real-time subscriptions
     const unsubCrew = subscribeToCrewData(() => {
       setSyncDot(true);
       void loadCrewDataset().then((d) => { if (mounted) { setJobs(d.jobs); setSyncDot(false); } }).catch(() => {});
@@ -209,81 +202,67 @@ export default function CrmDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
-        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
-        <div className="absolute bottom-0 right-10 h-40 w-40 rounded-full bg-blue-300/20 blur-2xl" />
-        <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-          <div className="relative">
-            <p className="text-sm font-bold uppercase tracking-[0.25em] text-orange-300">Operations Command Center</p>
-            <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">Good morning, XRP Roofing team.</h1>
-            <p className="mt-4 max-w-2xl text-blue-100">Track leads, proposals, invoices, and job progress — all actionable items in one view.</p>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-wider ring-1 ${attentionCount > 0 ? "bg-orange-500/20 text-orange-200 ring-orange-400/30" : "bg-blue-500/20 text-blue-200 ring-blue-400/30"}`}>
-                <span className={`h-2 w-2 rounded-full ${attentionCount > 0 ? "bg-orange-400 animate-pulse" : "bg-blue-400"}`} />
-                {attentionCount > 0 ? `${attentionCount} items need attention` : "All clear"}
-              </span>
-              <span className={`flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-blue-50 ring-1 ring-white/15`}>
-                <span className={`h-2 w-2 rounded-full ${syncDot ? "bg-orange-400 animate-pulse" : "bg-blue-400"}`} />
-                {syncDot ? "Syncing…" : "Live"}
-              </span>
-            </div>
+      {/* Welcome Header */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Good morning, XRP Roofing team</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {attentionCount > 0 ? `${attentionCount} items need your attention` : "All caught up — no urgent items"}
+              {syncDot && <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-600"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />Syncing</span>}
+            </p>
           </div>
           <DashboardHeroActions />
         </div>
       </section>
 
-      {/* 7 Actionable Metric Cards */}
+      {/* Action Items Grid */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black text-[#0A3D91]">Action Items</h2>
-          <p className="text-xs font-semibold text-slate-400">Click a card to open the filtered list</p>
+          <h2 className="text-base font-semibold text-gray-900">Action Items</h2>
+          <p className="text-xs text-gray-400">Click a card to view details</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {metrics.map((m) => {
             const Icon = m.icon;
-            const s = urgencyStyles(m.urgency);
+            const c = urgencyColor(m.urgency);
             return (
               <button
                 key={m.id}
                 type="button"
                 onClick={() => router.push(m.href)}
-                className={`group flex flex-col items-start rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:scale-95 ${s.card}`}
+                className={`flex items-start gap-3 rounded-lg border p-4 text-left transition hover:shadow-sm active:scale-[0.98] ${c.border} ${c.bg}`}
               >
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.icon}`}>
-                  <Icon className="h-5 w-5" />
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icon}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
-                <p className={`mt-3 text-3xl font-black leading-none ${s.num}`}>{m.count}</p>
-                <p className="mt-1.5 text-xs font-black uppercase leading-tight tracking-wide text-slate-700">{m.label}</p>
-                <p className="mt-1 text-[10px] leading-tight text-slate-400">{m.description}</p>
-                {m.count > 0 && (
-                  <span className={`mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${s.num} bg-white/60 ring-1 ring-current/20`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                    View →
-                  </span>
-                )}
+                <div className="min-w-0 flex-1">
+                  <p className={`text-2xl font-bold ${c.text}`}>{m.count}</p>
+                  <p className="mt-0.5 text-sm font-medium text-gray-700">{m.label}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{m.description}</p>
+                </div>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* Summary strip */}
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Jobs in CRM</p>
-          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{jobs.length}</p>
-          <p className="mt-1 text-xs text-slate-400">All stages including completed</p>
+      {/* Summary Stats */}
+      <section className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Total Jobs</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{jobs.length}</p>
+          <p className="mt-0.5 text-xs text-gray-400">All stages including completed</p>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Proposals</p>
-          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{proposals.length}</p>
-          <p className="mt-1 text-xs text-slate-400">{proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length} signed / approved</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Total Proposals</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{proposals.length}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length} signed / approved</p>
         </div>
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-400">Total Invoices</p>
-          <p className="mt-2 text-4xl font-black text-[#0A3D91]">{invoices.length}</p>
-          <p className="mt-1 text-xs text-slate-400">{invoices.filter(invoicePaid).length} paid</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <p className="text-xs font-medium text-gray-500">Total Invoices</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{invoices.length}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{invoices.filter(invoicePaid).length} paid</p>
         </div>
       </section>
     </div>
