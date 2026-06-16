@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { AlignLeft, Bell, Briefcase, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Loader2, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
+import { AlignLeft, Briefcase, ChevronDown, ChevronLeft, ChevronRight, Clock, ExternalLink, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { AddressLink } from "@/components/ContactLinks";
 
 type GoogleCalendarEvent = {
   id: string;
@@ -37,22 +36,9 @@ type GoogleCalendarEvent = {
 // Arizona Mountain Time - consistent timezone across all devices
 const ARIZONA_TIMEZONE = "America/Phoenix";
 
-function formatEventDate(event: GoogleCalendarEvent) {
-  const dateValue = event.start?.dateTime || event.start?.date;
-  if (!dateValue) return "Date pending";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: event.start?.dateTime ? "numeric" : undefined,
-    minute: event.start?.dateTime ? "2-digit" : undefined,
-    timeZone: ARIZONA_TIMEZONE,
-  }).format(new Date(dateValue));
-}
-
 function formatEventTime(event: GoogleCalendarEvent) {
   const dateValue = event.start?.dateTime;
-  if (!dateValue) return "All day";
+  if (!dateValue) return "";
 
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -94,7 +80,7 @@ function telHref(phone: string) {
   return cleaned ? `tel:${cleaned}` : "";
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 function dateKey(year: number, month: number, day: number) {
   return `${year}-${month}-${day}`;
@@ -104,14 +90,11 @@ function eventDateKey(event: GoogleCalendarEvent) {
   const value = event.start?.dateTime || event.start?.date;
   if (!value) return null;
 
-  // All-day events have a plain date string "YYYY-MM-DD" with no time/timezone.
-  // Parse directly so they always land on the correct calendar day regardless of device timezone.
   if (event.start?.date && !event.start?.dateTime) {
     const [y, m, d] = event.start.date.split("-").map(Number);
     return dateKey(y, m - 1, d);
   }
 
-  // Timed events: convert to Arizona time using formatToParts (reliable across all environments).
   const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: ARIZONA_TIMEZONE,
     year: "numeric",
@@ -134,6 +117,42 @@ function getGoogleCalendarStatusMessage(status: string | null) {
   return "";
 }
 
+/* ── Event type classification & colors ─────────────────────────────────── */
+
+type EventCategory = "sales" | "dropoffs" | "production" | "post-production" | "general" | "unavailable";
+
+const EVENT_TYPE_CONFIG: { id: EventCategory; label: string; color: string; dot: string }[] = [
+  { id: "sales", label: "Sales", color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
+  { id: "dropoffs", label: "Dropoffs and pickups", color: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  { id: "production", label: "Production", color: "bg-yellow-50 text-yellow-800 border-yellow-200", dot: "bg-yellow-500" },
+  { id: "post-production", label: "Post-production", color: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
+  { id: "general", label: "General", color: "bg-gray-50 text-gray-700 border-gray-200", dot: "bg-gray-400" },
+  { id: "unavailable", label: "Unavailable", color: "bg-rose-50 text-rose-600 border-rose-200", dot: "bg-rose-400" },
+];
+
+function classifyEvent(event: GoogleCalendarEvent): EventCategory {
+  const summary = (event.summary || "").toLowerCase();
+  const jobKind = (event.extendedProperties?.private?.crmJobKind || "").toLowerCase();
+
+  if (summary.includes("material") || summary.includes("pickup") || summary.includes("drop")) return "dropoffs";
+  if (summary.includes("inspection") || summary.includes("estimate") || summary.includes("proposal") || summary.includes("lead") || summary.includes("sales")) return "sales";
+  if (jobKind === "repair" || jobKind === "replacement" || jobKind === "installation" || summary.includes("install") || summary.includes("roof")) return "production";
+  if (summary.includes("invoice") || summary.includes("review") || summary.includes("post")) return "post-production";
+  if (summary.includes("unavailable") || summary.includes("off") || summary.includes("vacation") || summary.includes("pto")) return "unavailable";
+  return "general";
+}
+
+function getEventColor(category: EventCategory) {
+  return EVENT_TYPE_CONFIG.find((c) => c.id === category) || EVENT_TYPE_CONFIG[4];
+}
+
+/* ── Team members (derived from event attendees) ───────────────────────── */
+
+const TEAM_MEMBERS = [
+  { id: "jonathan", name: "Jonathan Gonzalez" },
+  { id: "darwin", name: "Darwin Rodas Garcia" },
+];
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
   const [connected, setConnected] = useState(false);
@@ -145,7 +164,6 @@ export default function CalendarPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
-    // Get Arizona timezone date parts correctly
     const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: ARIZONA_TIMEZONE,
       year: "numeric",
@@ -154,11 +172,9 @@ export default function CalendarPage() {
     });
     const parts = arizonaFormatter.formatToParts(now);
     const year = Number(parts.find((p) => p.type === "year")?.value);
-    const month = Number(parts.find((p) => p.type === "month")?.value) - 1; // 0-indexed
+    const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
     return new Date(year, month, 1);
   });
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
-  const agendaRef = useRef<HTMLDivElement>(null);
   const [newScheduleOpen, setNewScheduleOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -184,16 +200,28 @@ export default function CalendarPage() {
     notes: "",
     guestEmails: "",
   });
+  const [enabledTypes, setEnabledTypes] = useState<Set<EventCategory>>(new Set(EVENT_TYPE_CONFIG.map((t) => t.id)));
+  const [enabledTeam, setEnabledTeam] = useState<Set<string>>(new Set(TEAM_MEMBERS.map((m) => m.id)));
 
   const calendarCells = useMemo(() => {
     const year = monthCursor.getFullYear();
     const month = monthCursor.getMonth();
     const startWeekday = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: Array<Date | null> = [];
-    for (let i = 0; i < startWeekday; i += 1) cells.push(null);
-    for (let day = 1; day <= daysInMonth; day += 1) cells.push(new Date(year, month, day));
-    while (cells.length % 7 !== 0) cells.push(null);
+
+    // Include trailing days from previous month
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    const cells: Array<{ date: Date; isCurrentMonth: boolean }> = [];
+    for (let i = startWeekday - 1; i >= 0; i--) {
+      cells.push({ date: new Date(year, month - 1, prevMonthDays - i), isCurrentMonth: false });
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      cells.push({ date: new Date(year, month, day), isCurrentMonth: true });
+    }
+    while (cells.length % 7 !== 0) {
+      const nextDay = cells.length - startWeekday - daysInMonth + 1;
+      cells.push({ date: new Date(year, month + 1, nextDay), isCurrentMonth: false });
+    }
     return cells;
   }, [monthCursor]);
 
@@ -209,7 +237,6 @@ export default function CalendarPage() {
   const monthLabel = useMemo(() => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1)), [monthCursor]);
   const todayKey = useMemo(() => {
     const now = new Date();
-    // Get Arizona timezone date parts correctly
     const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: ARIZONA_TIMEZONE,
       year: "numeric",
@@ -223,28 +250,43 @@ export default function CalendarPage() {
     return dateKey(year, month, day);
   }, []);
 
-  const activeDayKey = selectedDayKey || todayKey;
-  const agendaEvents = eventsByDate[activeDayKey] || [];
-  const activeDayLabel = useMemo(() => {
-    const [year, month, day] = activeDayKey.split("-").map(Number);
-    // year/month/day already represent Arizona date values — format without timezone
-    // conversion to avoid a rollback on devices ahead of UTC (e.g. UTC+8).
-    return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(year, month, day));
-  }, [activeDayKey]);
+  /* ── Mini calendar for sidebar ─────────────────────────────────────── */
+  const miniCalCells = useMemo(() => {
+    const year = monthCursor.getFullYear();
+    const month = monthCursor.getMonth();
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    const cells: Array<{ day: number; isCurrentMonth: boolean; key: string }> = [];
+    for (let i = startWeekday - 1; i >= 0; i--) {
+      const d = prevMonthDays - i;
+      cells.push({ day: d, isCurrentMonth: false, key: dateKey(year, month - 1, d) });
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      cells.push({ day, isCurrentMonth: true, key: dateKey(year, month, day) });
+    }
+    while (cells.length % 7 !== 0) {
+      const d = cells.length - startWeekday - daysInMonth + 1;
+      cells.push({ day: d, isCurrentMonth: false, key: dateKey(year, month + 1, d) });
+    }
+    return cells;
+  }, [monthCursor]);
 
   function shiftMonth(delta: number) {
-    setSelectedDayKey(null);
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
-  // Select a day (and optionally open one event). Scrolls the openable day strip
-  // into view so every event on that day is reachable without hunting.
-  function openDay(key: string, event?: GoogleCalendarEvent) {
-    setSelectedDayKey(key);
-    if (event) setSelectedEvent(event);
-    window.requestAnimationFrame(() => {
-      agendaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  function goToToday() {
+    const now = new Date();
+    const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: ARIZONA_TIMEZONE,
+      year: "numeric",
+      month: "numeric",
     });
+    const parts = arizonaFormatter.formatToParts(now);
+    const year = Number(parts.find((p) => p.type === "year")?.value);
+    const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
+    setMonthCursor(new Date(year, month, 1));
   }
 
   async function loadEvents() {
@@ -254,18 +296,7 @@ export default function CalendarPage() {
     try {
       const year = monthCursor.getFullYear();
       const month = monthCursor.getMonth();
-      // timeMin = start of today in Arizona so upcoming list never shows past events
-      const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: ARIZONA_TIMEZONE,
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-      });
-      const todayParts = arizonaFormatter.formatToParts(new Date());
-      const todayYear = Number(todayParts.find((p) => p.type === "year")?.value);
-      const todayMonth = Number(todayParts.find((p) => p.type === "month")?.value) - 1;
-      const todayDay = Number(todayParts.find((p) => p.type === "day")?.value);
-      const timeMin = new Date(todayYear, todayMonth, todayDay).toISOString();
+      const timeMin = new Date(year, month, 1).toISOString();
       const timeMax = new Date(year, month + 2, 1).toISOString();
       const response = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&timeZone=${encodeURIComponent(ARIZONA_TIMEZONE)}`);
       const data = await response.json() as { connected?: boolean; events?: GoogleCalendarEvent[]; error?: string };
@@ -282,11 +313,11 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get("google_calendar");
-    setStatusMessage(getGoogleCalendarStatusMessage(status));
+    setStatusMessage(getGoogleCalendarStatusMessage(status)); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   useEffect(() => {
-    void loadEvents();
+    void loadEvents(); // eslint-disable-line react-hooks/set-state-in-effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthCursor]);
 
@@ -297,7 +328,7 @@ export default function CalendarPage() {
 
     const details = getEventDetails(selectedEvent);
 
-    setEventForm({
+    setEventForm({ // eslint-disable-line react-hooks/set-state-in-effect
       title: selectedEvent.summary || "",
       name: details.name === "Not provided" ? "" : details.name,
       phone: details.phone,
@@ -372,173 +403,238 @@ export default function CalendarPage() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="sticky top-16 z-30 rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:rounded-[2rem] sm:p-8 lg:top-20">
-        <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Scheduling</p>
-              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">Arizona MT</span>
-            </div>
-            <h1 className="mt-0.5 text-lg font-bold text-blue-700 sm:mt-2 sm:text-3xl">Calendar & Appointments</h1>
-            <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-3 sm:block">Connect Google Calendar to view upcoming inspections, estimates, and team appointments. All times shown in Arizona Mountain Time.</p>
-            <p className="mt-1 text-xs text-gray-500 sm:hidden">All times in Arizona MT</p>
-          </div>
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button type="button" onClick={() => setNewScheduleOpen(true)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white sm:rounded-lg sm:px-4 sm:py-3">
-              <Plus className="mr-1.5 inline h-4 w-4" />New appointment
-            </button>
-            <button onClick={loadEvents} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 sm:rounded-lg sm:px-4 sm:py-3">
-              <RefreshCw className="mr-1.5 inline h-4 w-4" />Refresh
-            </button>
-            <a href="/api/google-calendar/connect" className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white shadow-sm sm:rounded-lg sm:px-4 sm:py-3">
-              <CalendarDays className="mr-1.5 inline h-4 w-4" />{connected ? "Reconnect" : "Connect Google"}
-            </a>
-          </div>
-        </div>
+  function toggleType(type: EventCategory) {
+    setEnabledTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }
 
-        <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm sm:mt-6 sm:p-4 sm:text-base">
-          {loading && (
-            <p className="flex items-center font-semibold text-gray-600"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking Google Calendar...</p>
-          )}
-          {!loading && connected && (
-            <p className="font-bold text-blue-700">Google Calendar connected. Showing your next {events.length} upcoming events.</p>
-          )}
+  function toggleTeam(id: string) {
+    setEnabledTeam((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function isEventVisible(event: GoogleCalendarEvent) {
+    return enabledTypes.has(classifyEvent(event));
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* ── Status Messages ─────────────────────────────────────────── */}
+      {(error || statusMessage || (!loading && !connected)) && (
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
           {!loading && !connected && (
-            <p className="font-bold text-gray-700">Google Calendar is not connected yet. Click Connect Google to authorize access.</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-700">Google Calendar is not connected.</p>
+              <a href="/api/google-calendar/connect" className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white">Connect Google</a>
+            </div>
           )}
-          {error && <p className="mt-2 font-semibold text-orange-600">{error}</p>}
-          {statusMessage && <p className="mt-2 font-semibold text-orange-700">{statusMessage}</p>}
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+          {statusMessage && <p className="text-sm font-medium text-blue-700">{statusMessage}</p>}
+        </div>
+      )}
+
+      {/* ── Top Toolbar ─────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={goToToday} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Today
+          </button>
+          <button type="button" onClick={() => shiftMonth(-1)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Previous month">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={() => shiftMonth(1)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100" aria-label="Next month">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+          <h1 className="text-xl font-bold text-gray-900">{monthLabel}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={loadEvents} className="rounded-full p-2 text-gray-500 hover:bg-gray-100" aria-label="Refresh">
+            <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button type="button" className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">
+            Monthly <ChevronDown className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+            <Plus className="h-4 w-4" /> Event
+          </button>
         </div>
       </div>
 
-      <div className="rounded-[2rem] border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-blue-700 sm:text-2xl">{monthLabel}</h2>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 hover:text-orange-600">
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button type="button" onClick={() => {
-              const now = new Date();
-              const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
-                timeZone: ARIZONA_TIMEZONE,
-                year: "numeric",
-                month: "numeric",
-              });
-              const parts = arizonaFormatter.formatToParts(now);
-              const year = Number(parts.find((p) => p.type === "year")?.value);
-              const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
-              setMonthCursor(new Date(year, month, 1));
-            }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-700 hover:text-orange-600">
-              Today
-            </button>
-            <button type="button" onClick={() => shiftMonth(1)} aria-label="Next month" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 hover:text-orange-600">
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-gray-400 sm:text-xs">
-          {WEEKDAYS.map((weekday) => (
-            <div key={weekday} className="py-1">
-              <span className="sm:hidden">{weekday.charAt(0)}</span>
-              <span className="hidden sm:inline">{weekday}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-2">
-          {calendarCells.map((cellDate, index) => {
-            if (!cellDate) return <div key={`empty-${index}`} className="min-h-16 rounded-lg bg-gray-50/40 sm:min-h-28" />;
-            const key = dateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
-            const dayEvents = eventsByDate[key] || [];
-            const isToday = key === todayKey;
-            const isSelected = key === activeDayKey;
-            return (
-              <div key={key} onClick={() => openDay(key)} className={`min-h-16 cursor-pointer rounded-lg border p-1.5 text-left transition sm:min-h-28 sm:p-2 ${isSelected ? "border-orange-400 ring-2 ring-orange-300" : isToday ? "border-orange-300 bg-orange-50/60" : "border-gray-100 bg-gray-50 hover:border-orange-200"}`}>
-                <div className={`text-right text-[11px] font-bold sm:text-sm ${isToday ? "text-orange-600" : "text-gray-500"}`}>
-                  {isToday ? <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white sm:h-6 sm:w-6">{cellDate.getDate()}</span> : cellDate.getDate()}
-                </div>
-                <div className="mt-1 space-y-1">
-                  {/* Desktop: show up to 2 readable chips. Tapping the day opens
-                      the full openable strip below so nothing is ever hidden. */}
-                  {dayEvents.slice(0, 2).map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={(clickEvent) => { clickEvent.stopPropagation(); openDay(key, event); }}
-                      className="hidden w-full truncate rounded-lg bg-orange-50 px-1.5 py-1 text-left text-[11px] font-bold leading-tight text-orange-700 ring-1 ring-orange-100 sm:block"
-                    >
-                      {formatEventTime(event)} · {event.summary || "Untitled event"}
-                    </button>
-                  ))}
-                  {/* A single readable "N events" pill works on every screen size
-                      (replaces the cramped chips + hidden "+N more"). */}
-                  {dayEvents.length > 0 && (
-                    <span
-                      className={`block rounded-lg bg-orange-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white sm:hidden`}
-                    >
-                      {dayEvents.length}
-                    </span>
-                  )}
-                  {dayEvents.length > 2 && (
-                    <span className="hidden text-[11px] font-bold text-orange-600 sm:block">{dayEvents.length} events →</span>
-                  )}
-                </div>
+      {/* ── Main Layout: Calendar + Sidebar ─────────────────────────── */}
+      <div className="flex gap-4">
+        {/* Calendar Grid */}
+        <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white">
+          {/* Weekday Headers */}
+          <div className="grid grid-cols-7 border-b border-gray-200">
+            {WEEKDAYS.map((day) => (
+              <div key={day} className="border-r border-gray-100 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 last:border-r-0">
+                {day}
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Calendar Cells */}
+          <div className="grid grid-cols-7">
+            {calendarCells.map((cell, index) => {
+              const key = dateKey(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate());
+              const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
+              const isToday = key === todayKey;
+              const maxVisible = 4;
+
+              return (
+                <div
+                  key={`${key}-${index}`}
+                  className={`min-h-[120px] border-b border-r border-gray-100 p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                >
+                  {/* Day number */}
+                  <div className="mb-1 text-right">
+                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}>
+                      {cell.date.getDate()}
+                    </span>
+                  </div>
+
+                  {/* Events */}
+                  <div className="space-y-0.5">
+                    {dayEvents.slice(0, maxVisible).map((event) => {
+                      const category = classifyEvent(event);
+                      const config = getEventColor(category);
+                      const time = formatEventTime(event);
+                      return (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={() => setSelectedEvent(event)}
+                          className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium leading-tight border ${config.color} hover:opacity-80 transition`}
+                          title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
+                        >
+                          {event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}
+                        </button>
+                      );
+                    })}
+                    {dayEvents.length > maxVisible && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (dayEvents[maxVisible]) setSelectedEvent(dayEvents[maxVisible]);
+                        }}
+                        className="block w-full px-1.5 text-left text-[11px] font-semibold text-blue-600 hover:underline"
+                      >
+                        +{dayEvents.length - maxVisible} more
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <div ref={agendaRef} className="mt-4 scroll-mt-20 border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-orange-600">{activeDayLabel}</h3>
-            <span className="text-xs font-bold text-gray-400">{agendaEvents.length} event{agendaEvents.length === 1 ? "" : "s"} · swipe →</span>
-          </div>
-          {agendaEvents.length === 0 ? (
-            <p className="mt-3 rounded-lg bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-500">No events on this day. Tap any date above to see its appointments.</p>
-          ) : (
-            // Horizontal, swipeable strip: every event on the day is its own card
-            // you can scroll to and open — nothing is hidden behind "+N more".
-            <div className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
-              {agendaEvents.map((event) => {
-                const details = getEventDetails(event);
-                const tel = telHref(details.phone);
+        {/* Sidebar */}
+        <aside className="hidden w-64 shrink-0 space-y-4 lg:block">
+          {/* Mini Calendar */}
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900">{monthLabel}</h3>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => shiftMonth(-1)} className="rounded p-0.5 text-gray-400 hover:text-gray-600" aria-label="Previous month">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => shiftMonth(1)} className="rounded p-0.5 text-gray-400 hover:text-gray-600" aria-label="Next month">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold text-gray-400">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-0.5 text-center">
+              {miniCalCells.map((cell, idx) => {
+                const isToday2 = cell.key === todayKey;
                 return (
-                  <div key={event.id} className="flex w-[80%] max-w-[20rem] shrink-0 snap-start flex-col rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:w-72">
-                    <button type="button" onClick={() => setSelectedEvent(event)} className="flex flex-1 items-start gap-3 text-left">
-                      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-lg bg-orange-50 px-1.5 py-2 text-center text-orange-700">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span className="mt-0.5 text-[11px] font-bold leading-tight">{formatEventTime(event)}</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-blue-700">{event.summary || "Untitled event"}</p>
-                        {details.name !== "Not provided" && (
-                          <p className="mt-1 flex items-center gap-1 truncate text-xs font-semibold text-gray-600"><User className="h-3 w-3 shrink-0 text-gray-400" />{details.name}</p>
-                        )}
-                        {details.address !== "Not provided" && (
-                          <p className="mt-0.5 flex items-start gap-1 text-xs font-semibold text-gray-500"><MapPin className="mt-0.5 h-3 w-3 shrink-0 text-gray-400" /><AddressLink value={details.address} /></p>
-                        )}
-                      </div>
-                    </button>
-                    <div className="mt-3 flex items-center gap-2">
-                      <button type="button" onClick={() => setSelectedEvent(event)} className="flex-1 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-orange-600">Open</button>
-                      {tel && (
-                        <a href={tel} aria-label={`Call ${details.phone}`} title={`Call ${details.phone}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600">
-                          <Phone className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
+                  <div
+                    key={`mini-${idx}`}
+                    className={`rounded-full py-0.5 text-xs ${isToday2 ? "bg-blue-600 font-bold text-white" : cell.isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}
+                  >
+                    {cell.day}
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
+          </div>
+
+          {/* Team */}
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <h3 className="mb-2 text-sm font-bold text-gray-900">Team</h3>
+            <label className="flex cursor-pointer items-center gap-2 py-1">
+              <input
+                type="checkbox"
+                checked={enabledTeam.size === TEAM_MEMBERS.length}
+                onChange={() => {
+                  if (enabledTeam.size === TEAM_MEMBERS.length) setEnabledTeam(new Set());
+                  else setEnabledTeam(new Set(TEAM_MEMBERS.map((m) => m.id)));
+                }}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <span className="text-xs font-medium text-gray-700">Select all</span>
+              <span className="ml-auto text-xs text-gray-400">{TEAM_MEMBERS.length}</span>
+            </label>
+            {TEAM_MEMBERS.map((member) => (
+              <label key={member.id} className="flex cursor-pointer items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  checked={enabledTeam.has(member.id)}
+                  onChange={() => toggleTeam(member.id)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <span className="text-xs font-medium text-gray-700">{member.name}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* Event Types */}
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <h3 className="mb-2 text-sm font-bold text-gray-900">Event types</h3>
+            <p className="mb-2 text-[11px] text-gray-400">
+              {enabledTypes.size === EVENT_TYPE_CONFIG.length ? "Showing all events" : `${enabledTypes.size} of ${EVENT_TYPE_CONFIG.length} types shown`}
+            </p>
+            <div className="space-y-1">
+              {EVENT_TYPE_CONFIG.map((type) => (
+                <label key={type.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 hover:bg-gray-50">
+                  <span className={`h-3 w-3 rounded-sm ${type.dot}`} />
+                  <span className="flex-1 text-xs font-medium text-gray-700">{type.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={enabledTypes.has(type.id)}
+                    onChange={() => toggleType(type.id)}
+                    className="h-3.5 w-3.5 rounded border-gray-300"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Colors Legend */}
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <h3 className="mb-2 text-sm font-bold text-gray-900">Colors</h3>
+            <div className="flex gap-2">
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">Event types</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">People</span>
+            </div>
+          </div>
+        </aside>
       </div>
 
+      {/* ── New Appointment Modal ───────────────────────────────────── */}
       {newScheduleOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4" onClick={() => setNewScheduleOpen(false)}>
           <form
@@ -589,7 +685,7 @@ export default function CalendarPage() {
               <button type="button" onClick={() => setNewScheduleOpen(false)} className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
-              <button disabled={!connected || saving} className="rounded-lg bg-orange-500 px-5 py-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
+              <button disabled={!connected || saving} className="rounded-lg bg-blue-600 px-5 py-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
                 {saving ? "Saving..." : "Save to Calendar"}
               </button>
             </div>
@@ -597,43 +693,11 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-bold text-blue-700">Upcoming Google Calendar events</h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {events.map((event) => {
-            const phone = getEventDetails(event).phone;
-            const tel = telHref(phone);
-            return (
-            <article key={event.id} onClick={() => setSelectedEvent(event)} className="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-bold text-blue-700">{event.summary || "Untitled event"}</p>
-                  <p className="mt-1 text-sm font-semibold text-orange-600">{formatEventDate(event)}</p>
-                </div>
-                {event.htmlLink && (
-                  <a href={event.htmlLink} target="_blank" rel="noreferrer" onClick={(clickEvent) => clickEvent.stopPropagation()} className="rounded-lg bg-white p-2 text-gray-500 hover:text-orange-600">
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                )}
-              </div>
-              {tel && (
-                <a href={tel} onClick={(clickEvent) => clickEvent.stopPropagation()} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-500 px-3 py-2 text-sm font-bold text-white hover:bg-blue-600">
-                  <Phone className="h-4 w-4" />{phone}
-                </a>
-              )}
-              {event.description && <p className="mt-3 line-clamp-2 text-sm text-gray-600">{event.description}</p>}
-            </article>
-            );
-          })}
-          {!loading && connected && events.length === 0 && (
-            <p className="rounded-lg bg-gray-50 p-4 font-semibold text-gray-600">No upcoming events found.</p>
-          )}
-        </div>
-      </div>
+      {/* ── Event Detail / Edit Modal ──────────────────────────────── */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4">
           <form onSubmit={handleUpdateEvent} className="mx-auto my-6 grid max-w-6xl gap-6 lg:grid-cols-[1fr_260px]">
-            <div className="rounded-[2rem] bg-white p-6 shadow-2xl">
+            <div className="rounded-2xl bg-white p-6 shadow-2xl">
               <div className="flex items-center justify-between border-b border-gray-200 pb-4">
                 <input required value={eventForm.title} onChange={(event) => setEventForm({ ...eventForm, title: event.target.value })} className="w-full border-0 text-3xl font-normal text-blue-700 outline-none" placeholder="Add title" />
                 <button type="button" onClick={() => setSelectedEvent(null)} className="rounded-full p-2 text-gray-500 hover:bg-gray-100">
@@ -649,20 +713,8 @@ export default function CalendarPage() {
                 <span className="font-semibold text-gray-700">(GMT-07:00) Mountain Standard Time - Phoenix</span>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 font-semibold text-gray-700">
-                  <input type="checkbox" className="h-4 w-4" /> All day
-                </label>
-                <button type="button" className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">Does not repeat</button>
-              </div>
-
-              <div className="mt-8 rounded-[1.5rem] border border-gray-100 bg-white p-5 shadow-sm">
-                <div className="flex gap-8 border-b border-gray-200">
-                  <button type="button" className="border-b-2 border-blue-600 px-2 pb-3 font-bold text-blue-600">Event details</button>
-                  <button type="button" className="px-2 pb-3 font-bold text-gray-500">Find a time</button>
-                </div>
-
-                <div className="mt-6 grid gap-4">
+              <div className="mt-8 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div className="mt-4 grid gap-4">
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
                     <User className="h-5 w-5 text-gray-500" />
                     <input required value={eventForm.name} onChange={(event) => setEventForm({ ...eventForm, name: event.target.value })} className="rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Customer name" />
@@ -698,14 +750,6 @@ export default function CalendarPage() {
                       <option>Maintenance</option>
                     </select>
                   </label>
-                  <div className="grid grid-cols-[28px_1fr] items-center gap-4">
-                    <Bell className="h-5 w-5 text-gray-500" />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">Notification</span>
-                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">10</span>
-                      <span className="rounded-lg bg-gray-100 px-4 py-3 font-semibold text-gray-700">minutes</span>
-                    </div>
-                  </div>
                   <div className="grid grid-cols-[28px_1fr] items-start gap-4">
                     <AlignLeft className="mt-3 h-5 w-5 text-gray-500" />
                     <textarea value={eventForm.notes} onChange={(event) => setEventForm({ ...eventForm, notes: event.target.value })} className="min-h-48 rounded-lg bg-gray-100 px-4 py-3 outline-none" placeholder="Add description / notes" />
@@ -725,7 +769,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            <aside className="rounded-[2rem] bg-white p-5 shadow-2xl">
+            <aside className="rounded-2xl bg-white p-5 shadow-2xl">
               <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
                 <Clock className="h-5 w-5 text-gray-500" />
                 <h3 className="font-bold text-blue-700">Guests</h3>
