@@ -1485,15 +1485,15 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2 sm:space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-14 z-20 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
-          <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95">+ New Invoice</button>
+      <div className="sticky top-14 z-20 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-base font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
+          <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-4 sm:py-2.5 sm:text-sm">+ New Invoice</button>
         </div>
         {/* Mobile: horizontal scroll stats / Desktop: 6-column grid */}
-        <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:gap-2 scrollbar-hide">
+        <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5 sm:mt-2.5 sm:grid sm:grid-cols-6 sm:gap-2 sm:pb-1 scrollbar-hide">
           {[
             ["Paid", String(boardTotals.paidCount), "text-blue-700", "bg-blue-50/50"],
             ["Unpaid", String(boardTotals.unpaid), "text-gray-950", ""],
@@ -1502,15 +1502,15 @@ export default function InvoicesPage() {
             ["Outstanding", currency(boardTotals.balance), "text-gray-950", ""],
             ["Collection", `${boardTotals.collectionRate}%`, "text-gray-950", ""],
           ].map(([label, value, valueClass, bgClass]) => (
-            <div key={label} className={`shrink-0 rounded-lg border border-gray-200 px-3 py-2 min-w-[85px] sm:min-w-0 ${bgClass || "bg-gray-50/70"}`}>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap">{label}</p>
-              <p className={`mt-1 text-base font-bold tracking-tight ${valueClass}`}>{value}</p>
+            <div key={label} className={`shrink-0 rounded-md border border-gray-200 px-2 py-1.5 min-w-[70px] sm:min-w-0 sm:px-3 sm:py-2 ${bgClass || "bg-gray-50/70"}`}>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap sm:text-[10px]">{label}</p>
+              <p className={`mt-0.5 text-sm font-bold tracking-tight sm:mt-1 sm:text-base ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <div className="mt-2 flex flex-col items-stretch gap-2 sm:mt-3 sm:flex-row sm:items-center sm:gap-3">
           <div className="w-full sm:flex-1">
-            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search by client, invoice #, or property..." />
+            <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50 sm:px-4 sm:py-2.5" placeholder="Search by client, invoice #, or property..." />
           </div>
           <div className="hidden gap-1.5 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-1 scrollbar-hide md:flex">
             {filterOptions.map((option) => (

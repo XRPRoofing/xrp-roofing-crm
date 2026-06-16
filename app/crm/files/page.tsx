@@ -67,27 +67,27 @@ export default function FilesPage() {
   useAutoRefresh(() => { void refreshFolders().catch(() => {}); });
 
   return (
-    <div className="space-y-5">
-      <section className="sticky top-14 z-20 rounded-[2rem] border border-gray-200 bg-white/95 p-6 shadow-sm backdrop-blur-sm">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+    <div className="space-y-3 sm:space-y-5">
+      <section className="sticky top-14 z-20 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
+        <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Storage</p>
-            <h1 className="mt-2 text-3xl font-bold text-blue-700">Files & Photo Uploads</h1>
-            <p className="crm-board-subtitle mt-2 text-gray-600">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Storage</p>
+            <h1 className="text-xl font-bold text-blue-700 sm:text-3xl">Files & Photo Uploads</h1>
+            <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-2 sm:block">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="rounded-lg bg-blue-50 px-5 py-3"><p className="text-2xl font-bold text-blue-700">{folders.length}</p><p className="text-xs font-bold uppercase text-blue-600">Folders</p></div>
-            <div className="rounded-lg bg-orange-50 px-5 py-3"><p className="text-2xl font-bold text-orange-700">{totalPhotos}</p><p className="text-xs font-bold uppercase text-orange-600">Photos</p></div>
+          <div className="grid grid-cols-2 gap-2 text-center sm:gap-3">
+            <div className="rounded-lg bg-blue-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-blue-700 sm:text-2xl">{folders.length}</p><p className="text-[10px] font-bold uppercase text-blue-600 sm:text-xs">Folders</p></div>
+            <div className="rounded-lg bg-orange-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-orange-700 sm:text-2xl">{totalPhotos}</p><p className="text-[10px] font-bold uppercase text-orange-600 sm:text-xs">Photos</p></div>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mt-2 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:items-center sm:gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="Search address, customer, repair, maintenance..." />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 sm:left-4" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm font-bold outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50 sm:py-3 sm:pl-11 sm:pr-4" placeholder="Search address, customer, repair, maintenance..." />
           </div>
-          <button type="button" onClick={() => setShowNewFolder(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">
-            <FolderPlus className="h-5 w-5" /> New Folder
+          <button type="button" onClick={() => setShowNewFolder(true)} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 sm:gap-2 sm:px-5 sm:py-3 sm:text-sm">
+            <FolderPlus className="h-4 w-4 sm:h-5 sm:w-5" /> New Folder
           </button>
         </div>
       </section>

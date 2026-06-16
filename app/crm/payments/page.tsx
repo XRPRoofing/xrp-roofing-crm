@@ -154,13 +154,13 @@ export default function PaymentsPage() {
   const sortLabel = tab === "paid" ? "paid date" : "due date";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 px-4 pb-8 sm:px-6">
+    <div className="mx-auto max-w-2xl space-y-2 px-0 pb-8 sm:space-y-4 sm:px-6">
       {/* Sticky Header */}
-      <div className="sticky top-14 z-20 -mx-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-2 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <div className="sticky top-14 z-20 -mx-3 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-2">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">CRM Module</p>
-            <h1 className="mt-1 text-2xl font-bold text-blue-700">Payments</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Module</p>
+            <h1 className="text-xl font-bold text-blue-700 sm:text-2xl">Payments</h1>
           </div>
           <button
             onClick={() => setShowSearch((v) => !v)}
@@ -184,10 +184,10 @@ export default function PaymentsPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setTab("unpaid")}
-            className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
+            className={`flex-1 rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition sm:px-6 sm:py-2.5 sm:text-sm ${
               tab === "unpaid"
                 ? "border-blue-600 bg-blue-600 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
@@ -197,7 +197,7 @@ export default function PaymentsPage() {
           </button>
           <button
             onClick={() => setTab("paid")}
-            className={`flex-1 rounded-full border-2 px-6 py-2.5 text-sm font-bold uppercase tracking-wide transition ${
+            className={`flex-1 rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition sm:px-6 sm:py-2.5 sm:text-sm ${
               tab === "paid"
                 ? "border-blue-600 bg-blue-600 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
@@ -208,11 +208,11 @@ export default function PaymentsPage() {
         </div>
 
         {/* Total banner */}
-        <div className={`rounded-lg p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
-          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+        <div className={`rounded-md p-2.5 text-center sm:rounded-lg sm:p-4 ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 sm:text-xs">
             {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
           </p>
-          <p className={`mt-1 text-3xl font-bold ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
+          <p className={`mt-0.5 text-2xl font-bold sm:mt-1 sm:text-3xl ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
             {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
           </p>
         </div>

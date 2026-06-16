@@ -596,15 +596,15 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="sticky top-14 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+    <div className="space-y-2 sm:space-y-6">
+      <div className="sticky top-14 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6 sm:pb-3">
+        <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange-600">Customer Records</p>
-            <h1 className="mt-2 text-3xl font-bold text-blue-700">Customers ({customerList.length})</h1>
-            <p className="crm-board-subtitle mt-2 text-gray-600">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Customer Records</p>
+            <h1 className="text-xl font-bold text-blue-700 sm:text-3xl">Customers ({customerList.length})</h1>
+            <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-2 sm:block">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-orange-500 px-4 py-3 font-bold text-white shadow-sm"><Plus className="mr-2 inline h-4 w-4" />Add customer</button>
+          <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white shadow-sm sm:px-4 sm:py-3"><Plus className="mr-1.5 inline h-4 w-4" />Add customer</button>
         </div>
       </div>
 

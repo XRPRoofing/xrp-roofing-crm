@@ -27,9 +27,9 @@ function fmt(iso: string) {
 
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
   return (
-    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-lg border p-2 sm:p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
-      <span className="text-lg sm:text-2xl font-bold text-blue-700">{value}</span>
-      <span className="mt-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
+    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-md border p-1.5 sm:p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
+      <span className="text-base sm:text-2xl font-bold text-blue-700">{value}</span>
+      <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
     </button>
   );
 }
@@ -229,14 +229,14 @@ export default function TasksPage() {
   }, [groupedTasks]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {/* Sticky Header */}
-      <div className="sticky top-14 z-20 -mx-4 -mt-4 space-y-3 border-b border-gray-200 bg-white/95 px-4 pb-3 pt-4 backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="sticky top-14 z-20 -mx-3 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Office Workflow</p>
-            <h1 className="mt-1 text-2xl font-bold text-blue-700 sm:text-3xl">Task Board</h1>
-            <div className="mt-1 flex items-center gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-xs">Office Workflow</p>
+            <h1 className="text-lg font-bold text-blue-700 sm:text-3xl">Task Board</h1>
+            <div className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
               <p className="text-xs font-semibold text-gray-500">
                 {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${lastSync.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
@@ -275,7 +275,7 @@ export default function TasksPage() {
       </div>
 
         {/* Metrics */}
-        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
+        <div className="grid grid-cols-5 gap-1 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
           <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
           <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
           <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
