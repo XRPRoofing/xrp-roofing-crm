@@ -11,6 +11,7 @@ type GoogleCalendarEvent = {
   description?: string;
   htmlLink?: string;
   location?: string;
+  colorId?: string;
   extendedProperties?: {
     private?: {
       crmName?: string;
@@ -117,36 +118,43 @@ function getGoogleCalendarStatusMessage(status: string | null) {
   return "";
 }
 
-/* ── Event type classification & colors ─────────────────────────────────── */
+/* ── Google Calendar color mapping ──────────────────────────────────────── */
+// Maps Google Calendar colorId values to their actual color names and CSS classes.
+// These match the official Google Calendar event color palette.
 
-type EventCategory = "sales" | "dropoffs" | "production" | "post-production" | "general" | "unavailable";
+type ColorConfig = { id: string; label: string; color: string; dot: string };
 
-const EVENT_TYPE_CONFIG: { id: EventCategory; label: string; color: string; dot: string }[] = [
-  { id: "sales", label: "Sales", color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
-  { id: "dropoffs", label: "Dropoffs and pickups", color: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
-  { id: "production", label: "Production", color: "bg-yellow-50 text-yellow-800 border-yellow-200", dot: "bg-yellow-500" },
-  { id: "post-production", label: "Post-production", color: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-400" },
-  { id: "general", label: "General", color: "bg-gray-50 text-gray-700 border-gray-200", dot: "bg-gray-400" },
-  { id: "unavailable", label: "Unavailable", color: "bg-rose-50 text-rose-600 border-rose-200", dot: "bg-rose-400" },
+const GOOGLE_CALENDAR_COLORS: Record<string, ColorConfig> = {
+  "1":  { id: "1",  label: "Lavender",   color: "bg-indigo-50 text-indigo-700 border-indigo-200",  dot: "bg-indigo-400" },
+  "2":  { id: "2",  label: "Sage",       color: "bg-green-50 text-green-700 border-green-200",    dot: "bg-green-400" },
+  "3":  { id: "3",  label: "Grape",      color: "bg-purple-50 text-purple-700 border-purple-200",  dot: "bg-purple-500" },
+  "4":  { id: "4",  label: "Flamingo",   color: "bg-pink-50 text-pink-700 border-pink-200",      dot: "bg-pink-400" },
+  "5":  { id: "5",  label: "Banana",     color: "bg-yellow-50 text-yellow-800 border-yellow-200",  dot: "bg-yellow-400" },
+  "6":  { id: "6",  label: "Tangerine",  color: "bg-orange-50 text-orange-700 border-orange-200",  dot: "bg-orange-500" },
+  "7":  { id: "7",  label: "Peacock",    color: "bg-cyan-50 text-cyan-700 border-cyan-200",      dot: "bg-cyan-500" },
+  "8":  { id: "8",  label: "Graphite",   color: "bg-gray-100 text-gray-700 border-gray-300",      dot: "bg-gray-500" },
+  "9":  { id: "9",  label: "Blueberry",  color: "bg-blue-50 text-blue-700 border-blue-200",      dot: "bg-blue-600" },
+  "10": { id: "10", label: "Basil",      color: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-600" },
+  "11": { id: "11", label: "Tomato",     color: "bg-red-50 text-red-700 border-red-200",          dot: "bg-red-500" },
+};
+
+const DEFAULT_COLOR: ColorConfig = { id: "default", label: "Default", color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" };
+
+function getEventColorConfig(event: GoogleCalendarEvent): ColorConfig {
+  if (event.colorId && GOOGLE_CALENDAR_COLORS[event.colorId]) {
+    return GOOGLE_CALENDAR_COLORS[event.colorId];
+  }
+  return DEFAULT_COLOR;
+}
+
+/* ── Event type sidebar (based on actual colors used) ──────────────────── */
+
+const EVENT_TYPE_CONFIG: ColorConfig[] = [
+  DEFAULT_COLOR,
+  ...Object.values(GOOGLE_CALENDAR_COLORS),
 ];
 
-function classifyEvent(event: GoogleCalendarEvent): EventCategory {
-  const summary = (event.summary || "").toLowerCase();
-  const jobKind = (event.extendedProperties?.private?.crmJobKind || "").toLowerCase();
-
-  if (summary.includes("material") || summary.includes("pickup") || summary.includes("drop")) return "dropoffs";
-  if (summary.includes("inspection") || summary.includes("estimate") || summary.includes("proposal") || summary.includes("lead") || summary.includes("sales")) return "sales";
-  if (jobKind === "repair" || jobKind === "replacement" || jobKind === "installation" || summary.includes("install") || summary.includes("roof")) return "production";
-  if (summary.includes("invoice") || summary.includes("review") || summary.includes("post")) return "post-production";
-  if (summary.includes("unavailable") || summary.includes("off") || summary.includes("vacation") || summary.includes("pto")) return "unavailable";
-  return "general";
-}
-
-function getEventColor(category: EventCategory) {
-  return EVENT_TYPE_CONFIG.find((c) => c.id === category) || EVENT_TYPE_CONFIG[4];
-}
-
-/* ── Team members (derived from event attendees) ───────────────────────── */
+/* ── Team members ──────────────────────────────────────────────────────── */
 
 const TEAM_MEMBERS = [
   { id: "jonathan", name: "Jonathan Gonzalez" },
@@ -200,7 +208,7 @@ export default function CalendarPage() {
     notes: "",
     guestEmails: "",
   });
-  const [enabledTypes, setEnabledTypes] = useState<Set<EventCategory>>(new Set(EVENT_TYPE_CONFIG.map((t) => t.id)));
+  const [enabledTypes, setEnabledTypes] = useState<Set<string>>(new Set(EVENT_TYPE_CONFIG.map((t) => t.id)));
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(new Set(TEAM_MEMBERS.map((m) => m.id)));
 
   const calendarCells = useMemo(() => {
@@ -271,6 +279,16 @@ export default function CalendarPage() {
     }
     return cells;
   }, [monthCursor]);
+
+  // Dynamically compute which colors are actually used by current events
+  const usedColors = useMemo(() => {
+    const usedIds = new Set<string>();
+    for (const event of events) {
+      usedIds.add(getEventColorConfig(event).id);
+    }
+    // Always include default, plus any colors found in events
+    return EVENT_TYPE_CONFIG.filter((c) => usedIds.has(c.id));
+  }, [events]);
 
   function shiftMonth(delta: number) {
     setMonthCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
@@ -403,7 +421,7 @@ export default function CalendarPage() {
     }
   }
 
-  function toggleType(type: EventCategory) {
+  function toggleType(type: string) {
     setEnabledTypes((prev) => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
@@ -422,7 +440,8 @@ export default function CalendarPage() {
   }
 
   function isEventVisible(event: GoogleCalendarEvent) {
-    return enabledTypes.has(classifyEvent(event));
+    const colorConfig = getEventColorConfig(event);
+    return enabledTypes.has(colorConfig.id);
   }
 
   return (
@@ -504,8 +523,7 @@ export default function CalendarPage() {
                   {/* Events */}
                   <div className="space-y-0.5">
                     {dayEvents.slice(0, maxVisible).map((event) => {
-                      const category = classifyEvent(event);
-                      const config = getEventColor(category);
+                      const config = getEventColorConfig(event);
                       const time = formatEventTime(event);
                       return (
                         <button
@@ -601,14 +619,14 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          {/* Event Types */}
+          {/* Event Colors */}
           <div className="rounded-lg border border-gray-200 bg-white p-3">
-            <h3 className="mb-2 text-sm font-bold text-gray-900">Event types</h3>
+            <h3 className="mb-2 text-sm font-bold text-gray-900">Event colors</h3>
             <p className="mb-2 text-[11px] text-gray-400">
-              {enabledTypes.size === EVENT_TYPE_CONFIG.length ? "Showing all events" : `${enabledTypes.size} of ${EVENT_TYPE_CONFIG.length} types shown`}
+              {enabledTypes.size === EVENT_TYPE_CONFIG.length ? "Showing all events" : `${enabledTypes.size} of ${EVENT_TYPE_CONFIG.length} colors shown`}
             </p>
             <div className="space-y-1">
-              {EVENT_TYPE_CONFIG.map((type) => (
+              {usedColors.map((type) => (
                 <label key={type.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 hover:bg-gray-50">
                   <span className={`h-3 w-3 rounded-sm ${type.dot}`} />
                   <span className="flex-1 text-xs font-medium text-gray-700">{type.label}</span>
@@ -626,10 +644,7 @@ export default function CalendarPage() {
           {/* Colors Legend */}
           <div className="rounded-lg border border-gray-200 bg-white p-3">
             <h3 className="mb-2 text-sm font-bold text-gray-900">Colors</h3>
-            <div className="flex gap-2">
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-semibold text-blue-700">Event types</span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold text-gray-500">People</span>
-            </div>
+            <p className="text-[11px] text-gray-400">Colors match your Google Calendar event colors</p>
           </div>
         </aside>
       </div>
