@@ -1512,7 +1512,7 @@ export default function InvoicesPage() {
           <div className="w-full sm:flex-1">
             <input value={invoiceSearch} onChange={(event) => setInvoiceSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50" placeholder="Search by client, invoice #, or property..." />
           </div>
-          <div className="flex gap-1.5 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-1 scrollbar-hide">
+          <div className="hidden gap-1.5 overflow-x-auto rounded-lg border border-gray-200 bg-gray-100 p-1 scrollbar-hide md:flex">
             {filterOptions.map((option) => (
               <button key={option} type="button" onClick={() => setInvoiceFilter(option)} className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition active:scale-95 ${invoiceFilter === option ? "bg-white text-gray-950 shadow-sm" : "text-gray-500 hover:text-gray-800"}`}>{option.replace(" clients", "").replace(" accounts", "")}</button>
             ))}
