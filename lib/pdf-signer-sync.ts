@@ -21,6 +21,7 @@ export interface PdfDocument {
   createdBy: string;
   status: PdfDocStatus;
   pdfDataUrl?: string;
+  pdfFileName?: string;
   signatureDataUrl?: string;
   signedBy?: string;
   signedAt?: string;
