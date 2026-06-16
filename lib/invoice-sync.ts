@@ -233,39 +233,52 @@ export async function loadInvoiceShares(): Promise<InvoiceSharePayload[]> {
     .filter((payload): payload is InvoiceSharePayload => Boolean(payload));
 }
 
+const invoiceListeners = new Set<(payload: InvoiceSharePayload) => void>();
+let invoiceChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on invoices table.
  * The callback fires whenever any device creates/updates/deletes an invoice.
+ * Uses a shared channel so multiple callers don't create duplicate connections.
  */
 export function subscribeToInvoiceShares(onChange: (payload: InvoiceSharePayload) => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
 
-  const supabase = createClient();
-  const channel = supabase.channel(`invoices-realtime-${Math.random().toString(36).slice(2)}`);
-  
-  channel.on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: invoicesTable },
-    (message) => {
-      const row = message.new as Record<string, unknown> | undefined;
-      if (row) {
-        onChange({
-          id: row.id as string,
-          status: row.status as string,
-          payments: safeJsonParse(row.payments, []) as InvoiceSharePayment[],
-          activity: safeJsonParse(row.activity, []) as string[],
-          viewedAt: row.viewed_at as string | undefined,
-          paidAt: row.paid_at as string | undefined,
-          sentAt: row.sent_at as string | undefined,
-          sentBy: row.sent_by as string | undefined,
-        });
-      }
-    },
-  );
-  
-  channel.subscribe();
+  invoiceListeners.add(onChange);
+
+  if (!invoiceChannel) {
+    const supabase = createClient();
+    invoiceChannel = supabase.channel("invoices-realtime-shared");
+
+    invoiceChannel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: invoicesTable },
+      (message) => {
+        const row = message.new as Record<string, unknown> | undefined;
+        if (row) {
+          const payload: InvoiceSharePayload = {
+            id: row.id as string,
+            status: row.status as string,
+            payments: safeJsonParse(row.payments, []) as InvoiceSharePayment[],
+            activity: safeJsonParse(row.activity, []) as string[],
+            viewedAt: row.viewed_at as string | undefined,
+            paidAt: row.paid_at as string | undefined,
+            sentAt: row.sent_at as string | undefined,
+            sentBy: row.sent_by as string | undefined,
+          };
+          invoiceListeners.forEach((cb) => cb(payload));
+        }
+      },
+    );
+
+    invoiceChannel.subscribe();
+  }
 
   return () => {
-    supabase.removeChannel(channel);
+    invoiceListeners.delete(onChange);
+    if (invoiceListeners.size === 0 && invoiceChannel) {
+      createClient().removeChannel(invoiceChannel);
+      invoiceChannel = null;
+    }
   };
 }

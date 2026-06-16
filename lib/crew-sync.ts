@@ -626,10 +626,15 @@ export type CrewPresenceState = {
   jobId: string | null;
 };
 
+const crewDataListeners = new Set<() => void>();
+let crewDataChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on all crew tables. The callback
  * fires whenever any client changes the shared data. Returns an unsubscribe
- * function. In localStorage fallback mode it listens for same-browser events.
+ * function. Uses a shared channel so multiple callers don't create duplicate
+ * Supabase connections. In localStorage fallback mode it listens for
+ * same-browser events.
  */
 export function subscribeToCrewData(onChange: () => void): () => void {
   if (!hasSupabaseConfig()) {
@@ -645,14 +650,25 @@ export function subscribeToCrewData(onChange: () => void): () => void {
     };
   }
 
-  const supabase = createClient();
-  const channel = supabase.channel(`crew-workflow-data-${Math.random().toString(36).slice(2)}`);
-  [jobsTable, jobPhotosTable, jobNotesTable, jobChecklistTable].forEach((table) => {
-    channel.on("postgres_changes", { event: "*", schema: "public", table }, () => onChange());
-  });
-  channel.subscribe();
+  crewDataListeners.add(onChange);
+
+  if (!crewDataChannel) {
+    const supabase = createClient();
+    crewDataChannel = supabase.channel("crew-workflow-data-shared");
+    [jobsTable, jobPhotosTable, jobNotesTable, jobChecklistTable].forEach((table) => {
+      crewDataChannel!.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+        crewDataListeners.forEach((cb) => cb());
+      });
+    });
+    crewDataChannel.subscribe();
+  }
+
   return () => {
-    supabase.removeChannel(channel);
+    crewDataListeners.delete(onChange);
+    if (crewDataListeners.size === 0 && crewDataChannel) {
+      createClient().removeChannel(crewDataChannel);
+      crewDataChannel = null;
+    }
   };
 }
 

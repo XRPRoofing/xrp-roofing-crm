@@ -188,21 +188,35 @@ export async function findOrCreateCustomer(input: CustomerLeadInput): Promise<Cu
   return merged;
 }
 
+const customerListeners = new Set<() => void>();
+let customerChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on `customer_records`. The callback
  * fires whenever any device changes a customer. Returns an unsubscribe fn.
+ * Uses a shared channel so multiple callers don't create duplicate connections.
  */
 export function subscribeToCustomerRecords(onChange: () => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
-  const supabase = createClient();
-  const channel = supabase.channel(`customer-records-sync-${Math.random().toString(36).slice(2)}`);
-  channel.on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: customersTable },
-    () => onChange(),
-  );
-  channel.subscribe();
+
+  customerListeners.add(onChange);
+
+  if (!customerChannel) {
+    const supabase = createClient();
+    customerChannel = supabase.channel("customer-records-sync-shared");
+    customerChannel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: customersTable },
+      () => { customerListeners.forEach((cb) => cb()); },
+    );
+    customerChannel.subscribe();
+  }
+
   return () => {
-    supabase.removeChannel(channel);
+    customerListeners.delete(onChange);
+    if (customerListeners.size === 0 && customerChannel) {
+      createClient().removeChannel(customerChannel);
+      customerChannel = null;
+    }
   };
 }

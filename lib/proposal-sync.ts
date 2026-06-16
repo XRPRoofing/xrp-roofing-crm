@@ -84,21 +84,35 @@ export async function saveTemplateRecords(templates: Record<string, unknown>[]):
   }
 }
 
+const proposalListeners = new Set<() => void>();
+let proposalChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on `proposal_shares`. The callback
  * fires whenever any device changes a proposal. Returns an unsubscribe fn.
+ * Uses a shared channel so multiple callers don't create duplicate connections.
  */
 export function subscribeToProposalRecords(onChange: () => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
-  const supabase = createClient();
-  const channel = supabase.channel(`proposal-records-sync-${Math.random().toString(36).slice(2)}`);
-  channel.on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: proposalsTable },
-    () => onChange(),
-  );
-  channel.subscribe();
+
+  proposalListeners.add(onChange);
+
+  if (!proposalChannel) {
+    const supabase = createClient();
+    proposalChannel = supabase.channel("proposal-records-sync-shared");
+    proposalChannel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: proposalsTable },
+      () => { proposalListeners.forEach((cb) => cb()); },
+    );
+    proposalChannel.subscribe();
+  }
+
   return () => {
-    supabase.removeChannel(channel);
+    proposalListeners.delete(onChange);
+    if (proposalListeners.size === 0 && proposalChannel) {
+      createClient().removeChannel(proposalChannel);
+      proposalChannel = null;
+    }
   };
 }

@@ -110,19 +110,39 @@ export async function deleteTaskFromSupabase(taskId: string): Promise<void> {
   }
 }
 
+const taskListeners = new Set<(tasks: OfficeTask[]) => void>();
+let taskChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
+/**
+ * Subscribe to realtime INSERT/UPDATE/DELETE on `office_tasks`. Uses a shared
+ * channel so multiple callers don't create duplicate Supabase connections.
+ */
 export function subscribeToTaskUpdates(onUpdate: (tasks: OfficeTask[]) => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
-  try {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`office-tasks-realtime-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
-        const tasks = await loadTasksFromSupabase();
-        onUpdate(tasks);
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  } catch {
-    return () => {};
+
+  taskListeners.add(onUpdate);
+
+  if (!taskChannel) {
+    try {
+      const supabase = createClient();
+      taskChannel = supabase
+        .channel("office-tasks-realtime-shared")
+        .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
+          const tasks = await loadTasksFromSupabase();
+          taskListeners.forEach((cb) => cb(tasks));
+        })
+        .subscribe();
+    } catch {
+      taskChannel = null;
+      return () => {};
+    }
   }
+
+  return () => {
+    taskListeners.delete(onUpdate);
+    if (taskListeners.size === 0 && taskChannel) {
+      try { createClient().removeChannel(taskChannel); } catch { /* ignore */ }
+      taskChannel = null;
+    }
+  };
 }
