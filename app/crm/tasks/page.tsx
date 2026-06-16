@@ -27,9 +27,9 @@ function fmt(iso: string) {
 
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
   return (
-    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-lg border p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
-      <span className="text-2xl font-bold text-blue-700">{value}</span>
-      <span className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">{label}</span>
+    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-lg border p-2 sm:p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
+      <span className="text-lg sm:text-2xl font-bold text-blue-700">{value}</span>
+      <span className="mt-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
     </button>
   );
 }
@@ -38,7 +38,7 @@ type TaskTypeFilter = "all" | "job" | "manual";
 
 function TaskBadge({ isManual }: { isManual?: boolean }) {
   if (isManual) {
-    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Manual</span>;
+    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Daily</span>;
   }
   return <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 px-1.5 py-0.5 text-[9px] font-bold text-cyan-700"><Briefcase className="h-2.5 w-2.5" />Job</span>;
 }
@@ -55,7 +55,7 @@ export default function TasksPage() {
   const [satNotes, setSatNotes] = useState("");
   const [timelineOpen, setTimelineOpen] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [expandedCol, setExpandedCol] = useState<OfficeTaskStatus | null>(null);
+  const [expandedCols, setExpandedCols] = useState<Set<OfficeTaskStatus>>(new Set());
   const dragOverCol = useRef<OfficeTaskStatus | null>(null);
 
   // Manual task modal
@@ -74,7 +74,7 @@ export default function TasksPage() {
   }, []);
 
   // Initial load from Supabase
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]); // eslint-disable-line react-hooks/set-state-in-effect
 
   // Real-time subscription — fires on any device change
   useEffect(() => {
@@ -127,7 +127,7 @@ export default function TasksPage() {
 
   function deleteTask(task: OfficeTask) {
     const label = task.isManual ? task.title : task.customerName;
-    if (!window.confirm(`Delete task "${label}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete ${task.isManual ? "daily" : ""} task "${label}"? This cannot be undone.`)) return;
     deleteOfficeTask(task.id);
     void deleteTaskFromSupabase(task.id);
     setSelectedTask(null);
@@ -191,7 +191,7 @@ export default function TasksPage() {
       createdAt: now,
       updatedAt: now,
       isManual: true,
-      timeline: [{ id: `${Date.now()}`, event: "Manual task created", at: now, by: "Office" }],
+      timeline: [{ id: `${Date.now()}`, event: "Daily task created", at: now, by: "Office" }],
     };
     const existing = readOfficeTasks();
     saveOfficeTasks([task, ...existing]);
@@ -209,6 +209,15 @@ export default function TasksPage() {
 
   const manualCount = tasks.filter((t) => t.isManual).length;
   const jobCount = tasks.filter((t) => !t.isManual).length;
+
+  // Auto-expand sections that have tasks, collapse empty ones
+  useEffect(() => {
+    const withTasks = new Set<OfficeTaskStatus>();
+    for (const { status, tasks: colTasks } of groupedTasks) {
+      if (colTasks.length > 0) withTasks.add(status);
+    }
+    setExpandedCols(withTasks); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [groupedTasks]);
 
   return (
     <div className="space-y-4">
@@ -244,9 +253,9 @@ export default function TasksPage() {
         <Filter className="h-4 w-4 text-gray-400" />
         <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
           {([
-            { key: "all" as TaskTypeFilter, label: "All", count: tasks.length },
+            { key: "all" as TaskTypeFilter, label: "All Tasks", count: tasks.length },
             { key: "job" as TaskTypeFilter, label: "Job Tasks", count: jobCount },
-            { key: "manual" as TaskTypeFilter, label: "Manual Tasks", count: manualCount },
+            { key: "manual" as TaskTypeFilter, label: "Daily Tasks", count: manualCount },
           ]).map(({ key, label, count }) => (
             <button key={key} type="button" onClick={() => setFilterType(key)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition ${filterType === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}>
               {label} <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${filterType === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
@@ -256,7 +265,7 @@ export default function TasksPage() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11">
+      <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
         <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
         <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
         <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
@@ -274,30 +283,35 @@ export default function TasksPage() {
       <div className="space-y-2 lg:hidden">
         {groupedTasks.map(({ status, tasks: colTasks }) => {
           const c = colors[status];
-          const isOpen = expandedCol === status;
+          const isOpen = expandedCols.has(status);
           const hasAlert = (status === "Customer Satisfaction" && colTasks.some((t) => !t.satisfactionChecked))
             || (status === "Review Request" && colTasks.some((t) => !t.reviewRequestSentAt));
           return (
             <div key={status} className={`overflow-hidden rounded-lg border ${c.border} bg-white shadow-sm`}>
               <button
                 type="button"
-                onClick={() => setExpandedCol(isOpen ? null : status)}
-                className={`flex w-full items-center justify-between px-4 py-3.5 ${c.bg} active:opacity-80`}
+                onClick={() => setExpandedCols((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(status)) next.delete(status);
+                  else next.add(status);
+                  return next;
+                })}
+                className={`flex w-full items-center justify-between px-3 py-2.5 ${c.bg} active:opacity-80`}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
-                  <span className={`text-sm font-bold ${c.text}`}>{status}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${c.dot}`} />
+                  <span className={`text-xs font-bold ${c.text}`}>{status}</span>
                   {hasAlert && <span className="h-2 w-2 rounded-full bg-orange-500" />}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${c.text} ${isOpen ? "rotate-180" : ""}`} />
                 </div>
               </button>
               {isOpen && (
                 <div className="max-h-[60vh] space-y-2 overflow-y-auto p-2">
                   {colTasks.length === 0 && (
-                    <p className="rounded-lg border border-dashed border-gray-200 py-6 text-center text-xs font-semibold text-gray-400">No tasks in this column</p>
+                    <p className="rounded-lg border border-dashed border-gray-200 py-4 text-center text-xs font-semibold text-gray-400">No tasks</p>
                   )}
                   {colTasks.map((task) => (
                     <button
@@ -581,7 +595,7 @@ export default function TasksPage() {
           <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Manual Task</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Daily Task</p>
                 <h2 className="mt-1 text-lg font-bold text-blue-700">Create Task</h2>
               </div>
               <button onClick={() => setShowNewTask(false)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-5 w-5" /></button>
