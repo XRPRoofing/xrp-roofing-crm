@@ -620,6 +620,8 @@ export default function InvoicesPage() {
   const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
+  const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
   const [createForm, setCreateForm] = useState<Invoice>({
     id: "",
     invoiceNumber: createInvoiceNumber(invoices.length),
@@ -1083,7 +1085,7 @@ export default function InvoicesPage() {
     const totals = calculateTotals(selectedInvoice);
     const balance = Math.max(totals.finalTotal - getPaidAmount(selectedInvoice), 0);
 
-    setSendForm((currentForm) => ({ ...currentForm, message: "Sending invoice email..." }));
+    setSendingInvoice(true);
 
     const sentAt = new Date().toISOString();
     const sentBy = currentUserEmail || "CRM user";
@@ -1121,10 +1123,27 @@ export default function InvoicesPage() {
       }
 
       updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
+
+      // Log send activity
+      const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
+      sendLog.unshift({
+        type: "Invoice",
+        sentBy,
+        sentAt,
+        customerName: selectedInvoice.clientName,
+        documentNumber: selectedInvoice.invoiceNumber,
+        deliveryMethod: "Email",
+        recipient: selectedInvoice.email,
+      });
+      window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
+
       setShowSendModal(false);
+      setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent to ${selectedInvoice.email}.` });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
-      setSendForm((currentForm) => ({ ...currentForm, message: `${sendForm.message}\n\n${message}` }));
+      setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message });
+    } finally {
+      setSendingInvoice(false);
     }
   }
 
@@ -1993,7 +2012,32 @@ export default function InvoicesPage() {
             </div>
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={handleSendInvoice} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Send Invoice</button>
+              <button onClick={handleSendInvoice} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50">{sendingInvoice ? "Sending\u2026" : "Send Invoice"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invoice Send Confirmation Modal ── */}
+      {invoiceSendConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
+            {invoiceSendConfirmation.type === "success" ? (
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+              </div>
+            ) : (
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                <svg className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </div>
+            )}
+            <h3 className="mt-5 text-xl font-bold text-gray-900">{invoiceSendConfirmation.type === "success" ? "Invoice Sent Successfully" : "Failed to Send Invoice"}</h3>
+            <p className="mt-2 text-sm text-gray-600">{invoiceSendConfirmation.type === "success" ? `Your invoice was successfully sent to ${invoiceSendConfirmation.customerName}.` : invoiceSendConfirmation.message}</p>
+            <div className="mt-6 flex justify-center gap-3">
+              {invoiceSendConfirmation.type === "success" && selectedInvoice && (
+                <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">View Invoice</button>
+              )}
+              <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Close</button>
             </div>
           </div>
         </div>
@@ -2001,8 +2045,5 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
-
-
 
 
