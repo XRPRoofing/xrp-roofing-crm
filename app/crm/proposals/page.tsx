@@ -439,6 +439,8 @@ export default function ProposalsPage() {
     };
   }, [closeProposalCard]);
   const [deletedProposal, setDeletedProposal] = useState<Proposal | null>(null);
+  const [showPermDeleteConfirm, setShowPermDeleteConfirm] = useState(false);
+  const [permDeleteTarget, setPermDeleteTarget] = useState<Proposal | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [activeSection, setActiveSection] = useState("Estimate");
   const [showSendModal, setShowSendModal] = useState(false);
@@ -1235,7 +1237,7 @@ export default function ProposalsPage() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Save</button>
-            <button type="button" onClick={() => { if (window.confirm(`Permanently delete this proposal for ${activeProposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(activeProposal); } }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
+            <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send</button>
@@ -2138,7 +2140,7 @@ export default function ProposalsPage() {
                 <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
-              <button type="button" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Permanently delete proposal for ${proposal.customerName}? This cannot be undone.`)) { handlePermanentDeleteProposal(proposal); } }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
               <span className="text-xl font-bold text-gray-500">⋯</span>
             </div>
           </div>
@@ -2150,6 +2152,31 @@ export default function ProposalsPage() {
           <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">No proposals match your search.</div>
         )}
       </div>
+      )}
+
+      {/* ── Permanent Delete Confirmation Modal ── */}
+      {showPermDeleteConfirm && permDeleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }}>
+          <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Proposal</h2>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-900">{permDeleteTarget.customerName}</p>
+              <p className="text-xs text-red-700 mt-1">{permDeleteTarget.address}</p>
+              <p className="text-xs text-red-700">${permDeleteTarget.total.toLocaleString()}</p>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">This will permanently remove the proposal from all devices. It will not reappear after refresh or synchronization.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button onClick={() => { handlePermanentDeleteProposal(permDeleteTarget); setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
