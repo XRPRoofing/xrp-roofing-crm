@@ -273,21 +273,21 @@ export default function TasksPage() {
           ))}
         </div>
       </div>
-      </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
-        <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
-        <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
-        <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
-        <MetricCard label="For Invoice" value={metrics.forInvoice}  active={filterStatus === "For Invoice"}           onClick={() => setFilterStatus(filterStatus === "For Invoice" ? null : "For Invoice")}           color="bg-orange-50 border-orange-300" />
-        <MetricCard label="Inv. Sent"   value={metrics.invoiceSent} active={filterStatus === "Invoice Sent"}          onClick={() => setFilterStatus(filterStatus === "Invoice Sent" ? null : "Invoice Sent")}          color="bg-sky-50 border-sky-300" />
-        <MetricCard label="Follow Up"   value={metrics.followUp}    active={filterStatus === "Invoice Follow Up"}     onClick={() => setFilterStatus(filterStatus === "Invoice Follow Up" ? null : "Invoice Follow Up")}     color="bg-orange-50 border-orange-300" />
-        <MetricCard label="Paid"         value={metrics.paid}        active={filterStatus === "Paid"}                  onClick={() => setFilterStatus(filterStatus === "Paid" ? null : "Paid")}                  color="bg-blue-50 border-blue-300" />
-        <MetricCard label="Rev. Reqs"   value={metrics.reviewReqs}  active={filterStatus === "Review Request"}        onClick={() => setFilterStatus(filterStatus === "Review Request" ? null : "Review Request")}        color="bg-blue-50 border-blue-300" />
-        <MetricCard label="Reviews"     value={metrics.reviewRcvd}  active={filterStatus === "Review Received"}       onClick={() => setFilterStatus(filterStatus === "Review Received" ? null : "Review Received")}       color="bg-blue-50 border-blue-300" />
-        <MetricCard label="Unsatisfied" value={metrics.unsatisfied} active={false}                                    onClick={() => {}}                                                                                  color="bg-orange-50 border-orange-300" />
-        <MetricCard label="Closed"      value={metrics.closed}      active={filterStatus === "Closed"}                onClick={() => setFilterStatus(filterStatus === "Closed" ? null : "Closed")}                color="bg-gray-100 border-gray-300" />
+        {/* Metrics */}
+        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
+          <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
+          <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
+          <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
+          <MetricCard label="For Invoice" value={metrics.forInvoice}  active={filterStatus === "For Invoice"}           onClick={() => setFilterStatus(filterStatus === "For Invoice" ? null : "For Invoice")}           color="bg-orange-50 border-orange-300" />
+          <MetricCard label="Inv. Sent"   value={metrics.invoiceSent} active={filterStatus === "Invoice Sent"}          onClick={() => setFilterStatus(filterStatus === "Invoice Sent" ? null : "Invoice Sent")}          color="bg-sky-50 border-sky-300" />
+          <MetricCard label="Follow Up"   value={metrics.followUp}    active={filterStatus === "Invoice Follow Up"}     onClick={() => setFilterStatus(filterStatus === "Invoice Follow Up" ? null : "Invoice Follow Up")}     color="bg-orange-50 border-orange-300" />
+          <MetricCard label="Paid"         value={metrics.paid}        active={filterStatus === "Paid"}                  onClick={() => setFilterStatus(filterStatus === "Paid" ? null : "Paid")}                  color="bg-blue-50 border-blue-300" />
+          <MetricCard label="Rev. Reqs"   value={metrics.reviewReqs}  active={filterStatus === "Review Request"}        onClick={() => setFilterStatus(filterStatus === "Review Request" ? null : "Review Request")}        color="bg-blue-50 border-blue-300" />
+          <MetricCard label="Reviews"     value={metrics.reviewRcvd}  active={filterStatus === "Review Received"}       onClick={() => setFilterStatus(filterStatus === "Review Received" ? null : "Review Received")}       color="bg-blue-50 border-blue-300" />
+          <MetricCard label="Unsatisfied" value={metrics.unsatisfied} active={false}                                    onClick={() => {}}                                                                                  color="bg-orange-50 border-orange-300" />
+          <MetricCard label="Closed"      value={metrics.closed}      active={filterStatus === "Closed"}                onClick={() => setFilterStatus(filterStatus === "Closed" ? null : "Closed")}                color="bg-gray-100 border-gray-300" />
+        </div>
       </div>
 
       {/* Mobile Accordion (sm and below) */}

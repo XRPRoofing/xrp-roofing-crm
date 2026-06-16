@@ -206,16 +206,16 @@ export default function PaymentsPage() {
             Paid
           </button>
         </div>
-      </div>
 
-      {/* Total banner */}
-      <div className={`rounded-lg p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
-        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
-          {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
-        </p>
-        <p className={`mt-1 text-3xl font-bold ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
-          {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
-        </p>
+        {/* Total banner */}
+        <div className={`rounded-lg p-4 text-center ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+            {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
+          </p>
+          <p className={`mt-1 text-3xl font-bold ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
+            {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
+          </p>
+        </div>
       </div>
 
       {/* Sort controls */}
