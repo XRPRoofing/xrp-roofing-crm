@@ -124,3 +124,69 @@ export function syncCrewPhotosToFiles(input: {
 
   saveCrmFileFolders(nextFolders);
 }
+
+/**
+ * Save payment documents to a customer's file folder under a "Payment Documents" subfolder.
+ * Automatically creates the folder if it doesn't exist.
+ */
+export function savePaymentDocumentsToCustomerFiles(input: {
+  customerName: string;
+  address: string;
+  jobId: string;
+  invoiceNumber: string;
+  uploadedBy: string;
+  documents: { name: string; dataUrl: string }[];
+  checkImage?: string | null;
+}) {
+  if (typeof window === "undefined") return;
+  if (!input.checkImage && input.documents.length === 0) return;
+
+  const now = new Date().toISOString();
+  const folderId = createFolderId(input.address) || `payment-${Date.now()}`;
+  const folders = readCrmFileFolders();
+
+  const allFiles: CrmFileRecord[] = [];
+
+  if (input.checkImage) {
+    allFiles.push({
+      id: `${folderId}-check-${Date.now()}`,
+      name: `Check - ${input.invoiceNumber}`,
+      dataUrl: input.checkImage,
+      uploadedAt: now,
+      uploadedBy: input.uploadedBy,
+      photoType: "Job Photo",
+      jobId: input.jobId,
+      jobName: `Payment Doc - ${input.customerName}`,
+    });
+  }
+
+  input.documents.forEach((doc, index) => {
+    allFiles.push({
+      id: `${folderId}-doc-${Date.now()}-${index}`,
+      name: `${doc.name} - ${input.invoiceNumber}`,
+      dataUrl: doc.dataUrl,
+      uploadedAt: now,
+      uploadedBy: input.uploadedBy,
+      photoType: "Job Photo",
+      jobId: input.jobId,
+      jobName: `Payment Doc - ${input.customerName}`,
+    });
+  });
+
+  const existingFolder = folders.find((folder) => folder.id === folderId);
+  const nextFolder: CrmFileFolder = {
+    id: folderId,
+    name: input.address || `${input.customerName} - Payments`,
+    address: input.address,
+    workType: "Payment Documents",
+    jobId: input.jobId,
+    customerName: input.customerName,
+    updatedAt: now,
+    files: [...(existingFolder?.files || []), ...allFiles],
+  };
+  const nextFolders = existingFolder
+    ? folders.map((folder) => folder.id === folderId ? nextFolder : folder)
+    : [nextFolder, ...folders];
+
+  saveCrmFileFolders(nextFolders);
+}

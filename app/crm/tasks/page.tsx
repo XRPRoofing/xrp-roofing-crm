@@ -125,13 +125,22 @@ export default function TasksPage() {
     closed:       tasks.filter((t) => t.status === "Closed").length,
   }), [tasks]);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<OfficeTask | null>(null);
+
   function deleteTask(task: OfficeTask) {
-    const label = task.isManual ? task.title : task.customerName;
-    if (!window.confirm(`Delete ${task.isManual ? "daily" : ""} task "${label}"? This cannot be undone.`)) return;
-    deleteOfficeTask(task.id);
-    void deleteTaskFromSupabase(task.id);
+    setDeleteTaskTarget(task);
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmDeleteTask() {
+    if (!deleteTaskTarget) return;
+    deleteOfficeTask(deleteTaskTarget.id);
+    void deleteTaskFromSupabase(deleteTaskTarget.id);
     setSelectedTask(null);
-    setTasks((current) => current.filter((t) => t.id !== task.id));
+    setTasks((current) => current.filter((t) => t.id !== deleteTaskTarget.id));
+    setShowDeleteConfirm(false);
+    setDeleteTaskTarget(null);
   }
 
   function archiveTask(task: OfficeTask) {
@@ -684,6 +693,30 @@ export default function TasksPage() {
               <button type="button" disabled={!satResult} onClick={submitSatisfaction} className="flex-1 rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
                 Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {showDeleteConfirm && deleteTaskTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }}>
+          <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Task</h2>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-900">{deleteTaskTarget.isManual ? deleteTaskTarget.title : deleteTaskTarget.customerName}</p>
+              <p className="text-xs text-red-700 mt-1">{deleteTaskTarget.isManual ? "Daily Task" : "Job Task"} · {deleteTaskTarget.status}</p>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">This will permanently remove the task from all devices. It will not reappear after refresh or synchronization.</p>
+            <div className="mt-5 flex gap-3">
+              <button onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
+              <button onClick={confirmDeleteTask} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
             </div>
           </div>
         </div>
