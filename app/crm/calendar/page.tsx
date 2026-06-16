@@ -508,12 +508,12 @@ export default function CalendarPage() {
               const key = dateKey(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate());
               const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
               const isToday = key === todayKey;
-              const maxVisible = 4;
+              const maxVisible = 6;
 
               return (
                 <div
                   key={`${key}-${index}`}
-                  className={`min-h-[60px] border-b border-r border-gray-100 p-0.5 sm:min-h-[120px] sm:p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                  className={`min-h-[80px] border-b border-r border-gray-100 p-0.5 sm:min-h-[160px] sm:p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
                 >
                   {/* Day number */}
                   <div className="mb-0.5 text-right sm:mb-1">
@@ -532,7 +532,7 @@ export default function CalendarPage() {
                           key={event.id}
                           type="button"
                           onClick={() => setSelectedEvent(event)}
-                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-medium leading-tight border sm:px-1.5 sm:text-[11px] ${config.color} hover:opacity-80 transition`}
+                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-medium leading-tight border sm:px-1.5 sm:py-[3px] sm:text-xs ${config.color} hover:opacity-80 transition`}
                           title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
                         >
                           <span className="hidden sm:inline">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}</span>
