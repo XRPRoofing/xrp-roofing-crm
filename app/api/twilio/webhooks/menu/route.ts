@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { buildIvrMenuTwiml, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 
@@ -16,17 +16,19 @@ export async function POST(req: NextRequest) {
   const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl);
 
   if (department) {
-    try {
-      const event = normalizeTwilioWebhookEvent("call_status", formData);
-      await publishConversationEvent({
-        ...event,
-        id: `${event.callSid}-ivr-${department}`,
-        type: "call_status",
-        status: "ivr-routed",
-        body: `IVR: caller selected ${department}`,
-        payload: { ...event.payload, ivrSelection: digit, ivrDepartment: department },
-      });
-    } catch {}
+    after(async () => {
+      try {
+        const event = normalizeTwilioWebhookEvent("call_status", formData);
+        await publishConversationEvent({
+          ...event,
+          id: `${event.callSid}-ivr-${department}`,
+          type: "call_status",
+          status: "ivr-routed",
+          body: `IVR: caller selected ${department}`,
+          payload: { ...event.payload, ivrSelection: digit, ivrDepartment: department },
+        });
+      } catch {}
+    });
   }
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
