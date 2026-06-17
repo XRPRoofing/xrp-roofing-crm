@@ -206,7 +206,7 @@ export default function TeamChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-11.5rem)] flex-col gap-3 overflow-hidden lg:h-auto lg:min-h-0 lg:flex-1 lg:gap-5 lg:overflow-hidden">
+    <div className="flex h-[calc(100dvh-12rem)] flex-col gap-4 overflow-hidden lg:h-auto lg:min-h-0 lg:flex-1 lg:gap-5 lg:overflow-hidden">
       <section className="shrink-0 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:rounded-[2rem] sm:p-6">
         <div className="flex items-center justify-between gap-3 lg:gap-4">
           <div className="min-w-0">

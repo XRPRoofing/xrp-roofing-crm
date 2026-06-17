@@ -67,8 +67,8 @@ export default function FilesPage() {
   useAutoRefresh(() => { void refreshFolders().catch(() => {}); });
 
   return (
-    <div className="space-y-3 sm:space-y-5">
-      <section className="sticky top-14 z-20 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-6">
+      <section className="sticky top-16 z-20 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Storage</p>

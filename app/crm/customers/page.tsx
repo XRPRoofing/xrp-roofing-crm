@@ -596,8 +596,8 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-6">
-      <div className="sticky top-14 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6 sm:pb-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-6">
+      <div className="sticky top-16 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 pb-2 pt-1 backdrop-blur-sm sm:-mx-8 sm:px-8 sm:pb-3">
         <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Customer Records</p>

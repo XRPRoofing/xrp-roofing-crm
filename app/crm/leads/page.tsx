@@ -586,8 +586,8 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
-      <div className="sticky top-14 z-20 -mx-3 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-5">
+      <div className="sticky top-16 z-20 -mx-4 space-y-1.5 border-b border-gray-200 bg-white/95 px-4 pb-2 pt-1 backdrop-blur-sm sm:-mx-8 sm:space-y-3 sm:px-8 sm:pb-3">
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end sm:gap-3">
           <div>
             <h1 className="text-lg font-bold text-gray-900 sm:text-2xl">Jobs Board</h1>
@@ -816,12 +816,12 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 gap-2 overflow-x-auto pb-4">
+      <div className="mt-3 flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4">
         {leadStages.map((stage) => {
           const stageJobs = filteredJobs.filter((job) => job.stage === stage.id);
           const stageValue = stageJobs.reduce((total, job) => total + job.value, 0);
           return (
-            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[16.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
+            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[17.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-2 shadow-sm">
               <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
                 <div className="flex items-center justify-between gap-1">
                   <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
@@ -830,12 +830,12 @@ export default function LeadsPage() {
                 <p className="mt-0.5 text-xs text-gray-500">{formatMoney(stageValue)}</p>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-0.5 pb-1">
+              <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-0.5 pb-1">
                 {stageJobs.map((job) => {
                   const urgency = getUrgency(job);
                   const pStatus = proposalStatusMap[job.id];
                   return (
-                    <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
+                    <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2.5 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
                       <div className="flex items-center justify-between gap-1">
                         <p className="min-w-0 truncate text-xs font-bold leading-tight text-gray-900">{job.name}</p>
                         <div className="flex shrink-0 items-center gap-0.5">

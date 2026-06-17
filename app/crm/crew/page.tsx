@@ -412,7 +412,7 @@ export default function CrewWorkflowPage() {
   const viewersForSelectedJob = presence.filter((entry) => entry.jobId === selectedJobId);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
       {error && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
           <span>{error}</span>
@@ -420,7 +420,7 @@ export default function CrewWorkflowPage() {
         </div>
       )}
 
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Production Workflow</p>
@@ -463,12 +463,12 @@ export default function CrewWorkflowPage() {
           <table className="min-w-[1080px] w-full text-left">
             <thead className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-4 py-3">Customer Name</th>
-                <th className="px-4 py-3">Property Address</th>
-                <th className="px-4 py-3">Assigned Team</th>
-                <th className="px-4 py-3">Schedule Date</th>
-                <th className="px-4 py-3">Job Scope</th>
-                <th className="px-4 py-3">Job Status</th>
+                <th className="px-5 py-3.5">Customer Name</th>
+                <th className="px-5 py-3.5">Property Address</th>
+                <th className="px-5 py-3.5">Assigned Team</th>
+                <th className="px-5 py-3.5">Schedule Date</th>
+                <th className="px-5 py-3.5">Job Scope</th>
+                <th className="px-5 py-3.5">Job Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -476,14 +476,14 @@ export default function CrewWorkflowPage() {
                 const jobViewers = presence.filter((entry) => entry.jobId === job.id);
                 return (
                   <tr key={job.id} onClick={() => setSelectedJobId(job.id)} className="cursor-pointer bg-white transition hover:bg-blue-50/60">
-                    <td className="px-4 py-3 font-bold text-blue-700">
+                    <td className="px-5 py-3.5 font-bold text-blue-700">
                       <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
                     </td>
-                    <td className="max-w-xs truncate px-4 py-3 font-semibold text-gray-600"><AddressLink value={formatAddress(job)} /></td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">{member}</span>)}</div></td>
+                    <td className="max-w-xs truncate px-5 py-3.5 font-semibold text-gray-600"><AddressLink value={formatAddress(job)} /></td>
+                    <td className="px-5 py-3.5"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">{member}</span>)}</div></td>
                     <td className="px-4 py-3 font-bold text-gray-700">{job.scheduleDate}</td>
-                    <td className="max-w-[180px] truncate px-4 py-3 font-semibold text-gray-600">{job.jobScope}</td>
-                    <td className="px-4 py-3"><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[job.status]}`}>{job.status}</span></td>
+                    <td className="max-w-[180px] truncate px-5 py-3.5 font-semibold text-gray-600">{job.jobScope}</td>
+                    <td className="px-5 py-3.5"><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[job.status]}`}>{job.status}</span></td>
                   </tr>
                 );
               })}

@@ -27,7 +27,7 @@ function fmt(iso: string) {
 
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
   return (
-    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-md border p-1.5 sm:p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
+    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-md border p-2 sm:p-3.5 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
       <span className="text-base sm:text-2xl font-bold text-blue-700">{value}</span>
       <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
     </button>
@@ -229,9 +229,9 @@ export default function TasksPage() {
   }, [groupedTasks]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-5">
       {/* Sticky Header */}
-      <div className="sticky top-14 z-20 -mx-3 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-4">
+      <div className="sticky top-16 z-20 -mx-4 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-4 pb-2 pt-2 backdrop-blur-sm sm:-mx-8 sm:space-y-3 sm:px-8 sm:pb-3 sm:pt-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-xs">Office Workflow</p>
@@ -275,7 +275,7 @@ export default function TasksPage() {
       </div>
 
         {/* Metrics */}
-        <div className="grid grid-cols-5 gap-1 sm:grid-cols-4 sm:gap-2 lg:grid-cols-6 xl:grid-cols-11">
+        <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-6 xl:grid-cols-11">
           <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
           <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
           <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
@@ -329,7 +329,7 @@ export default function TasksPage() {
                       key={task.id}
                       type="button"
                       onClick={() => setSelectedTask(task)}
-                      className={`group w-full rounded-lg border bg-white p-3 text-left shadow-sm active:scale-[0.98] ${c.border}`}
+                      className={`group w-full rounded-lg border bg-white p-3.5 text-left shadow-sm active:scale-[0.98] ${c.border}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -370,13 +370,13 @@ export default function TasksPage() {
       </div>
 
       {/* Desktop Kanban Board (lg and above) */}
-      <div className="hidden min-h-0 flex-1 gap-3 overflow-x-auto pb-4 lg:flex">
+      <div className="hidden min-h-0 flex-1 gap-3.5 overflow-x-auto pb-4 lg:flex">
         {groupedTasks.map(({ status, tasks: colTasks }) => {
           const c = colors[status];
           return (
             <section
               key={status}
-              className="flex w-56 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
+              className="flex w-60 shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm"
               style={{ maxHeight: "calc(100vh - 260px)" }}
               onDragOver={(e) => { e.preventDefault(); dragOverCol.current = status; }}
               onDrop={() => handleDrop(status)}
