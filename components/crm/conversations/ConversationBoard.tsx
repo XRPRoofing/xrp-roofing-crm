@@ -1363,7 +1363,7 @@ export default function ConversationBoard() {
   }
 
   return (
-    <div className="-mx-4 -my-6 flex min-h-[calc(100vh-5rem)] flex-1 flex-col overflow-x-clip bg-gray-100 px-4 py-6 font-sans sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:overflow-hidden">
+    <div className="-mx-3 -my-4 flex min-h-[calc(100vh-5rem)] flex-1 flex-col overflow-x-clip bg-gray-100 px-3 py-4 font-sans sm:-mx-5 sm:px-5 xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:overflow-hidden">
       {incomingCall && (
         <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>

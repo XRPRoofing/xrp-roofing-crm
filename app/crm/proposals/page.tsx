@@ -1835,7 +1835,7 @@ export default function ProposalsPage() {
         </div>
       </div>
 
-      <div className="sticky top-16 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm sm:-mx-8 sm:px-8">
+      <div className="sticky top-16 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 backdrop-blur-sm sm:-mx-5 sm:px-5">
         <div className="rounded-lg border border-white/70 bg-white/95 px-3 pt-2 shadow-sm sm:px-5 sm:pt-4">
           <div className="flex gap-4 text-xs font-bold sm:gap-8 sm:text-sm">
             <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>

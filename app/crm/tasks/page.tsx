@@ -231,7 +231,7 @@ export default function TasksPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-5">
       {/* Sticky Header */}
-      <div className="sticky top-16 z-20 -mx-4 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-4 pb-2 pt-2 backdrop-blur-sm sm:-mx-8 sm:space-y-3 sm:px-8 sm:pb-3 sm:pt-4">
+      <div className="sticky top-16 z-20 -mx-3 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-5 sm:space-y-3 sm:px-5 sm:pb-3 sm:pt-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-xs">Office Workflow</p>
