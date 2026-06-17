@@ -1,4 +1,4 @@
-const CACHE_NAME = "xrp-crm-pwa-v8"; // Bumped to force push notification fix
+const CACHE_NAME = "xrp-crm-pwa-v9"; // Bumped for ringtone vibration pattern
 const APP_SHELL = ["/", "/crm", "/crew", "/login", "/manifest.webmanifest"];
 
 // API routes that should NEVER be cached - always fetch fresh
@@ -104,8 +104,10 @@ self.addEventListener("message", (event) => {
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: "incoming-call",
+      renotify: true,
       requireInteraction: true,
-      vibrate: [300, 120, 300, 120, 300],
+      vibrate: [400, 200, 400, 200, 400, 1000, 400, 200, 400, 200, 400, 1000, 400, 200, 400, 200, 400],
+      silent: false,
       data: { url: "/crm/conversations" },
       actions: [
         { action: "open", title: "Open CRM" },
@@ -130,7 +132,7 @@ self.addEventListener("push", (event) => {
     tag: data.tag || "incoming-call",
     renotify: true,
     requireInteraction: true,
-    vibrate: [300, 120, 300, 120, 300],
+    vibrate: [400, 200, 400, 200, 400, 1000, 400, 200, 400, 200, 400, 1000, 400, 200, 400, 200, 400],
     silent: false,
     data: { url: data.url || "/crm/conversations" },
     actions: [
