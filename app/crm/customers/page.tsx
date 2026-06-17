@@ -7,7 +7,7 @@ import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Imag
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import { leadStages } from "@/lib/crm-data";
-import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCustomerRecordsResult, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
@@ -16,6 +16,7 @@ import type { ConversationChannel, ConversationMessage } from "@/types/conversat
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
+import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -251,10 +252,7 @@ export default function CustomersPage() {
     if (typeof window === "undefined") return [];
     return readRawLocalCustomers();
   });
-  const [jobList, setJobList] = useState<Lead[]>(() => {
-    if (typeof window === "undefined") return [];
-    return getSavedJobs();
-  });
+  const [jobList, setJobList] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? getSavedJobs());
   // Customer board shows ONLY live Supabase customer records (newest first from
   // /api/customers) — never seeded/demo customers derived from jobs.
   const customerList = savedCustomers;
@@ -431,7 +429,7 @@ export default function CustomersPage() {
   useEffect(() => {
     let mounted = true;
     function refreshFromStore() {
-      void loadCrewDataset().then((data) => { if (mounted) setJobList(data.jobs); }).catch(() => {});
+      void refreshCrewData().then((data) => { if (mounted) setJobList(data.jobs); }).catch(() => {});
     }
     refreshFromStore();
 
@@ -491,7 +489,7 @@ export default function CustomersPage() {
   }, []);
 
   useAutoRefresh(() => {
-    void loadCrewDataset().then((data) => setJobList(data.jobs)).catch(() => {});
+    void refreshCrewData().then((data) => setJobList(data.jobs)).catch(() => {});
     void loadCustomerRecordsResult().then((result) => {
       setSavedCustomers(result.customers);
       setCustomersError(result.error ?? null);

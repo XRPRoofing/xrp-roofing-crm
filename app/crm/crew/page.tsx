@@ -19,7 +19,6 @@ import {
   deleteJobRecord,
   ensureSeedJobs,
   joinCrewPresence,
-  loadCrewDataset,
   loadJobPhotos,
   setChecklistItemDone,
   subscribeToCrewData,
@@ -33,6 +32,7 @@ import {
   type JobRecord,
 } from "@/lib/crew-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
   { label: "All Jobs", value: "all" },
@@ -60,13 +60,14 @@ function formatAddress(job: CrewJob) {
 }
 
 export default function CrewWorkflowPage() {
-  const [jobs, setJobs] = useState<JobRecord[]>([]);
-  const [photos, setPhotos] = useState<JobPhoto[]>([]);
+  const cachedCrew = getCachedCrewData();
+  const [jobs, setJobs] = useState<JobRecord[]>(() => (cachedCrew?.jobs as JobRecord[]) ?? []);
+  const [photos, setPhotos] = useState<JobPhoto[]>(() => cachedCrew?.photos ?? []);
   const [selectedPhotos, setSelectedPhotos] = useState<JobPhoto[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
-  const [notes, setNotes] = useState<JobNote[]>([]);
-  const [checklist, setChecklist] = useState<JobChecklistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notes, setNotes] = useState<JobNote[]>(() => cachedCrew?.notes ?? []);
+  const [checklist, setChecklist] = useState<JobChecklistItem[]>(() => cachedCrew?.checklist ?? []);
+  const [loading, setLoading] = useState(() => cachedCrew === null);
   const [error, setError] = useState("");
   const [presence, setPresence] = useState<CrewPresenceState[]>([]);
   const [activeFilter, setActiveFilter] = useState<"all" | CrewJobStatus>("all");
@@ -103,7 +104,7 @@ export default function CrewWorkflowPage() {
   const selectedChecklist = useMemo(() => checklist.filter((item) => item.jobId === selectedJobId), [checklist, selectedJobId]);
 
   const refresh = useCallback(async () => {
-    const data = await loadCrewDataset();
+    const data = await refreshCrewData();
     setJobs(data.jobs);
     setPhotos(data.photos);
     setNotes(data.notes);
@@ -123,7 +124,7 @@ export default function CrewWorkflowPage() {
     let mounted = true;
     async function init() {
       try {
-        const data = await loadCrewDataset();
+        const data = await refreshCrewData();
         const seededJobs = await ensureSeedJobs(data.jobs);
         if (!mounted) return;
         setJobs(seededJobs);

@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToCrewData } from "@/lib/crew-sync";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { getCachedCrewData, refreshCrewData, refreshProposals } from "@/lib/data-cache";
 import type { Lead } from "@/types/crm";
 
 type Proposal = {
@@ -390,7 +391,7 @@ const initialProposalTemplates: ProposalTemplate[] = [
 
 export default function ProposalsPage() {
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
-  const [jobs, setJobs] = useState<Lead[]>([]);
+  const [jobs, setJobs] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
   const [selectedJobId, setSelectedJobId] = useState("");
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const prevProposalsRef = useRef<Proposal[]>([]);
@@ -636,11 +637,11 @@ export default function ProposalsPage() {
 
     void init();
 
-    void loadCrewDataset().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
+    void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
 
     const unsubscribe = subscribeToProposalRecords(() => void reloadFromServer());
     const unsubscribeJobs = subscribeToCrewData(() => {
-      void loadCrewDataset().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
+      void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
     });
     return () => {
       mounted = false;
@@ -650,9 +651,9 @@ export default function ProposalsPage() {
   }, []);
 
   useAutoRefresh(() => {
-    void loadCrewDataset().then((data) => setJobs(data.jobs)).catch(() => {});
+    void refreshCrewData().then((data) => setJobs(data.jobs)).catch(() => {});
     if (!proposalSyncEnabled()) return;
-    void loadProposalRecords<Proposal>().then((server) => {
+    void refreshProposals<Proposal>().then((server) => {
       const deletedIds = permanentlyDeletedIdsRef.current;
       const filtered = server.filter((p) => !deletedIds.has(p.id));
       setProposals((current) => {

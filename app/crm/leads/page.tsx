@@ -16,7 +16,8 @@ import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
-import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { getCachedCrewData, refreshCrewData, refreshProposals } from "@/lib/data-cache";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
 
@@ -167,7 +168,7 @@ function syncCustomerFromJob(contact: { name: string; email?: string; phone?: st
 }
 
 export default function LeadsPage() {
-  const [jobs, setJobs] = useState<Lead[]>([]);
+  const [jobs, setJobs] = useState<Lead[]>(() => (getCachedCrewData()?.jobs ?? []).map(normalizeJob));
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -435,7 +436,7 @@ export default function LeadsPage() {
     let mounted = true;
     async function loadJobs() {
       try {
-        const data = await loadCrewDataset();
+        const data = await refreshCrewData();
         const seededJobs = await ensureSeedJobs(data.jobs);
         if (mounted) {
           setJobs(seededJobs.map(normalizeJob));
@@ -448,7 +449,7 @@ export default function LeadsPage() {
     loadJobs();
 
     const unsubscribe = subscribeToCrewData(() => {
-      void loadCrewDataset().then((data) => {
+      void refreshCrewData().then((data) => {
         if (mounted) {
           setJobs(data.jobs.map(normalizeJob));
           setJobNotes(data.notes);
@@ -461,13 +462,12 @@ export default function LeadsPage() {
     };
   }, []);
 
-  // No manual refresh: reload jobs when returning to this tab/device.
   useAutoRefresh(() => {
-    void loadCrewDataset().then((data) => {
+    void refreshCrewData().then((data) => {
       setJobs(data.jobs.map(normalizeJob));
       setJobNotes(data.notes);
     }).catch(() => {});
-    void loadProposalRecords<ProposalSnap>().then((proposals) => {
+    void refreshProposals<ProposalSnap>().then((proposals) => {
       const map: Record<string, string> = {};
       for (const p of proposals) {
         if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
@@ -485,9 +485,9 @@ export default function LeadsPage() {
       }
       if (mounted) setProposalStatusMap(map);
     }
-    void loadProposalRecords<ProposalSnap>().then(buildMap).catch(() => {});
+    void refreshProposals<ProposalSnap>().then(buildMap).catch(() => {});
     const unsub = subscribeToProposalRecords(() => {
-      void loadProposalRecords<ProposalSnap>().then(buildMap).catch(() => {});
+      void refreshProposals<ProposalSnap>().then(buildMap).catch(() => {});
     });
     return () => { mounted = false; unsub(); };
   }, []);

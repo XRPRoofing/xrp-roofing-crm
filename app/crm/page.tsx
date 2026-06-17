@@ -17,9 +17,10 @@ import {
 
 const DashboardCalendar = dynamic(() => import("@/components/crm/dashboard/DashboardCalendar"), { ssr: false });
 const DashboardHeroActions = dynamic(() => import("@/components/crm/dashboard/DashboardHeroActions"), { ssr: false });
-import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
-import { loadAllInvoices, subscribeToInvoiceShares } from "@/lib/invoice-sync";
-import { loadProposalRecords, subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
+import { subscribeToProposalRecords } from "@/lib/proposal-sync";
+import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshInvoices, refreshProposals } from "@/lib/data-cache";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
 
@@ -74,37 +75,37 @@ function formatUsd(v: number) {
 export default function CrmDashboardPage() {
   const router = useRouter();
 
-  const [jobs,      setJobs]      = useState<Lead[]>([]);
-  const [proposals, setProposals] = useState<ProposalSnap[]>([]);
-  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>([]);
+  const [jobs,      setJobs]      = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
+  const [proposals, setProposals] = useState<ProposalSnap[]>(() => (getCachedProposals<ProposalSnap>() ?? []).filter((p) => !p.deletedAt));
+  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>(() => getCachedInvoices<InvoiceSnap>() ?? []);
   const [syncDot,   setSyncDot]   = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    void loadCrewDataset().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {});
-    void loadAllInvoices<InvoiceSnap>().then((data) => {
+    void refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {});
+    void refreshInvoices<InvoiceSnap>().then((data) => {
       if (mounted) setInvoices(data);
     }).catch(() => {});
-    void loadProposalRecords<ProposalSnap>().then((data) => {
+    void refreshProposals<ProposalSnap>().then((data) => {
       if (mounted) setProposals(data.filter((p) => !p.deletedAt));
     }).catch(() => {});
 
     const unsubCrew = subscribeToCrewData(() => {
       setSyncDot(true);
-      void loadCrewDataset().then((d) => { if (mounted) { setJobs(d.jobs); setSyncDot(false); } }).catch(() => {});
+      void refreshCrewData().then((d) => { if (mounted) { setJobs(d.jobs); setSyncDot(false); } }).catch(() => {});
     });
 
     const unsubInvoices = subscribeToInvoiceShares(() => {
       setSyncDot(true);
-      void loadAllInvoices<InvoiceSnap>().then((data) => {
+      void refreshInvoices<InvoiceSnap>().then((data) => {
         if (mounted) { setInvoices(data); setSyncDot(false); }
       }).catch(() => {});
     });
 
     const unsubProposals = subscribeToProposalRecords(() => {
       setSyncDot(true);
-      void loadProposalRecords<ProposalSnap>().then((data) => {
+      void refreshProposals<ProposalSnap>().then((data) => {
         if (mounted) { setProposals(data.filter((p) => !p.deletedAt)); setSyncDot(false); }
       }).catch(() => {});
     });
@@ -118,9 +119,9 @@ export default function CrmDashboardPage() {
   }, []);
 
   useAutoRefresh(() => {
-    void loadCrewDataset().then((d) => setJobs(d.jobs)).catch(() => {});
-    void loadAllInvoices<InvoiceSnap>().then((data) => setInvoices(data)).catch(() => {});
-    void loadProposalRecords<ProposalSnap>().then((data) => setProposals(data.filter((p) => !p.deletedAt))).catch(() => {});
+    void refreshCrewData().then((d) => setJobs(d.jobs)).catch(() => {});
+    void refreshInvoices<InvoiceSnap>().then((data) => setInvoices(data)).catch(() => {});
+    void refreshProposals<ProposalSnap>().then((data) => setProposals(data.filter((p) => !p.deletedAt))).catch(() => {});
   });
 
   /* ── Computed metrics ────────────────────────────────────────────── */

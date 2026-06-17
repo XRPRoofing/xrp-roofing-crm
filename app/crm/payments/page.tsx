@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Check } from "lucide-react";
-import { loadAllInvoices } from "@/lib/invoice-sync";
 import { requestOpenInvoice } from "@/lib/crm-board-nav";
+import { getCachedInvoices, refreshInvoices } from "@/lib/data-cache";
 
 type PaymentRecord = {
   amount: number;
@@ -65,8 +65,8 @@ function formatDate(dateStr: string | undefined): string {
 
 export default function PaymentsPage() {
   const router = useRouter();
-  const [invoices, setInvoices] = useState<LoadedInvoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices, setInvoices] = useState<LoadedInvoice[]>(() => getCachedInvoices<LoadedInvoice>() ?? []);
+  const [loading, setLoading] = useState(() => getCachedInvoices<LoadedInvoice>() === null);
   const [tab, setTab] = useState<Tab>("unpaid");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
@@ -80,7 +80,7 @@ export default function PaymentsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const invs = await loadAllInvoices<LoadedInvoice>();
+        const invs = await refreshInvoices<LoadedInvoice>();
         setInvoices(invs);
       } catch {
         /* leave empty */

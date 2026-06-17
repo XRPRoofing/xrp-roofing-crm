@@ -8,6 +8,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
+import { refreshInvoices } from "@/lib/data-cache";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -878,7 +879,7 @@ export default function InvoicesPage() {
     let mounted = true;
     async function init() {
       if (hasSupabaseConfig()) {
-        const remoteInvoices = await loadAllInvoices<Invoice>();
+        const remoteInvoices = await refreshInvoices<Invoice>();
         if (mounted && remoteInvoices.length > 0) {
           setInvoices(remoteInvoices);
         }
@@ -895,7 +896,7 @@ export default function InvoicesPage() {
   // Auto-refresh: when user returns to tab, sync from Supabase (primary source)
   useAutoRefresh(() => {
     if (hasSupabaseConfig()) {
-      void loadAllInvoices<Invoice>()
+      void refreshInvoices<Invoice>()
         .then((remoteInvoices) => {
           if (remoteInvoices.length === 0) return;
           setInvoices((current) => {
