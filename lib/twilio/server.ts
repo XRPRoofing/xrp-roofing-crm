@@ -1,6 +1,6 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
-import { getOnlineAgentIdentities } from "@/lib/agent-status-server";
+import { getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 export function getTwilioClient() {
@@ -110,19 +110,27 @@ function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, on
 }
 
 /** Fetch online agent identities for ring group routing */
-export async function fetchOnlineAgents(): Promise<string[]> {
+export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
   try {
     return await getOnlineAgentIdentities();
   } catch {
-    return [];
+    return { configured: false, agents: [] };
   }
 }
 
-/** Check if any agents are available to take calls (online or ring group configured) */
-export function hasAvailableAgents(onlineAgents: string[]): boolean {
-  if (onlineAgents.length > 0) return true;
+/** Check if any agents are available to take calls.
+ *  Returns true when:
+ *  - online agents exist, OR
+ *  - TWILIO_RING_GROUP env var is set, OR
+ *  - the agent-status system is NOT configured (fallback to crm-agent)
+ */
+export function hasAvailableAgents(status: AgentStatusResult): boolean {
+  if (status.agents.length > 0) return true;
   const config = getTwilioConfig();
-  return config.ringGroup.length > 0;
+  if (config.ringGroup.length > 0) return true;
+  // If the availability system is not configured, assume agents are available
+  // so we dial crm-agent directly instead of entering the queue
+  return !status.configured;
 }
 
 /**
@@ -130,7 +138,7 @@ export function hasAvailableAgents(onlineAgents: string[]): boolean {
  * Otherwise plays hold message and redirects back to self for periodic retry.
  */
 export function buildQueueHoldTwiml(
-  onlineAgents: string[],
+  agentStatus: AgentStatusResult,
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   queueHoldUrl: string,
@@ -138,18 +146,19 @@ export function buildQueueHoldTwiml(
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
-  if (onlineAgents.length > 0 || config.ringGroup.length > 0) {
+  if (hasAvailableAgents(agentStatus)) {
     response.say("An agent is now available. Connecting you.");
     const dial = response.dial({
       answerOnBridge: true,
       record: "record-from-answer-dual",
+      timeout: 45,
       action: actionCallbackUrl,
       method: "POST",
       recordingStatusCallback: statusCallbackUrl,
       recordingStatusCallbackEvent: ["completed"],
       recordingStatusCallbackMethod: "POST",
     });
-    dialRingGroup(dial, config, onlineAgents);
+    dialRingGroup(dial, config, agentStatus.agents);
     const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
     if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
       dial.number(inboundForwardNumber);
@@ -169,6 +178,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
+    timeout: 45,
     action: actionCallbackUrl,
     method: "POST",
     recordingStatusCallback: statusCallbackUrl,
@@ -274,7 +284,7 @@ export function buildIvrMenuTwiml(
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   greetingRedirectUrl: string,
-  onlineAgents?: string[],
+  agentStatus?: AgentStatusResult,
   queueHoldUrl?: string,
 ) {
   const config = getTwilioConfig();
@@ -302,8 +312,10 @@ export function buildIvrMenuTwiml(
     else response.say("Connecting you now.");
   };
 
-  // If no agents available and queue URL provided, enter queue hold loop
-  if (queueHoldUrl && !hasAvailableAgents(onlineAgents || [])) {
+  const status = agentStatus || { configured: false, agents: [] };
+
+  // Only enter queue when agent-status system is configured but no agents are online
+  if (queueHoldUrl && !hasAvailableAgents(status)) {
     sayDepartment();
     response.say("Please wait, all agents are busy. Your call is important to us.");
     const priority = DEPARTMENT_PRIORITY[dept.label];
@@ -315,12 +327,13 @@ export function buildIvrMenuTwiml(
     return { twiml: response.toString(), department: dept.label };
   }
 
-  // Agents available — connect immediately (never returns empty <Dial>)
+  // Agents available (or system not configured — fall through to crm-agent)
   sayDepartment();
 
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
+    timeout: 45,
     action: actionCallbackUrl,
     method: "POST",
     recordingStatusCallback: statusCallbackUrl,
@@ -329,7 +342,7 @@ export function buildIvrMenuTwiml(
   });
 
   // dialRingGroup guarantees at least crm-agent as ultimate fallback
-  dialRingGroup(dial, config, onlineAgents);
+  dialRingGroup(dial, config, status.agents);
   const forwardTo = normalizePhoneForTwiml(dept.number);
   if (forwardTo && forwardTo !== config.phoneNumber) {
     dial.number(forwardTo);
