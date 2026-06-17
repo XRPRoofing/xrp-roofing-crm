@@ -1947,7 +1947,7 @@ export default function InvoicesPage() {
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/30 p-3 sm:items-center sm:p-4" onClick={() => setShowCreateModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4" onClick={() => setShowCreateModal(false)}>
           <div className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 p-4 sm:p-5">
               <div>
@@ -2366,7 +2366,7 @@ export default function InvoicesPage() {
 
       {/* ── Mark as Paid Confirmation Modal ── */}
       {showMarkPaidModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 backdrop-blur-sm p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setShowMarkPaidModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowMarkPaidModal(false)}>
           <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-gray-900">Confirm Payment</h2>
             <p className="mt-1 text-sm text-gray-600">Mark invoice <span className="font-bold">{selectedInvoice.invoiceNumber}</span> for <span className="font-bold">{selectedInvoice.clientName}</span> as paid.</p>
@@ -2460,7 +2460,7 @@ export default function InvoicesPage() {
 
       {/* ── Delete Confirmation Modal ── */}
       {showDeleteModal && deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 backdrop-blur-sm p-4 pt-8 sm:items-center sm:pt-4" onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}>
           <div className="w-full max-w-md rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
