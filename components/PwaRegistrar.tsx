@@ -16,14 +16,16 @@ async function subscribeToPush(registration: ServiceWorkerRegistration) {
   if (!publicKey) return;
 
   try {
-    const existing = await registration.pushManager.getSubscription();
-    if (existing) return;
+    let subscription = await registration.pushManager.getSubscription();
 
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
 
+    // Always re-register with backend to associate user_id with this device
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

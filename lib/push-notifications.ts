@@ -30,17 +30,20 @@ function configureWebPush() {
   return true;
 }
 
-export async function savePushSubscription(subscription: StoredPushSubscription, userAgent?: string) {
+export async function savePushSubscription(subscription: StoredPushSubscription, userAgent?: string, userId?: string) {
   const supabase = getAdminClient();
 
   if (!supabase) return { ok: false, reason: "Supabase is not configured" };
 
-  const { error } = await supabase.from("push_subscriptions").upsert({
+  const record: Record<string, unknown> = {
     endpoint: subscription.endpoint,
     subscription,
     user_agent: userAgent,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "endpoint" });
+  };
+  if (userId) record.user_id = userId;
+
+  const { error } = await supabase.from("push_subscriptions").upsert(record, { onConflict: "endpoint" });
 
   if (error) return { ok: false, reason: error.message };
 
