@@ -190,11 +190,13 @@ export function buildIvrMenuTwiml(
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
-  const departmentMap: Record<string, { label: string; number: string }> = {
+  const DIRECT_FORWARD_NUMBER = "+16233008097";
+
+  const departmentMap: Record<string, { label: string; number: string; directOnly?: boolean }> = {
     "1": { label: "billing", number: config.ivrBillingNumber },
     "2": { label: "sales", number: config.ivrSalesNumber },
-    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
-    "4": { label: "other", number: config.ivrOtherNumber },
+    "3": { label: "scheduling", number: DIRECT_FORWARD_NUMBER, directOnly: true },
+    "4": { label: "other", number: DIRECT_FORWARD_NUMBER, directOnly: true },
   };
 
   const dept = departmentMap[digit];
@@ -226,11 +228,15 @@ export function buildIvrMenuTwiml(
   }
 
   const dial = response.dial(dialOpts);
-  dial.client("crm-agent");
 
-  const forwardTo = normalizePhoneForTwiml(dept.number);
-  if (forwardTo && forwardTo !== config.phoneNumber) {
-    dial.number(forwardTo);
+  if (dept.directOnly) {
+    dial.number(dept.number);
+  } else {
+    dial.client("crm-agent");
+    const forwardTo = normalizePhoneForTwiml(dept.number);
+    if (forwardTo && forwardTo !== config.phoneNumber) {
+      dial.number(forwardTo);
+    }
   }
 
   return { twiml: response.toString(), department: dept.label as IvrDepartment };
