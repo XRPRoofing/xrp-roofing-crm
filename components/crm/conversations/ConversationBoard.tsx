@@ -107,7 +107,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
   }, [conversations, filter, search]);
 
   return (
-    <Card className="flex min-h-0 flex-col overflow-hidden xl:h-full">
+    <Card className="flex max-h-[calc(100dvh-12rem)] min-h-0 flex-col overflow-hidden xl:max-h-none xl:h-full">
       <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -1363,7 +1363,7 @@ export default function ConversationBoard() {
   }
 
   return (
-    <div className="-mx-3 -my-4 flex min-h-[calc(100vh-5rem)] flex-1 flex-col overflow-x-clip bg-gray-100 px-3 py-4 font-sans sm:-mx-5 sm:px-5 xl:h-[calc(100vh-8.25rem)] xl:min-h-0 xl:overflow-hidden">
+    <div className="-mx-3 -my-4 flex min-h-[calc(100vh-5rem)] flex-1 flex-col overflow-x-clip bg-gray-100 px-3 py-4 font-sans sm:-mx-5 sm:px-5 xl:h-[calc(100vh-8.25rem)] xl:max-h-[calc(100vh-8.25rem)] xl:min-h-0 xl:overflow-hidden">
       {incomingCall && (
         <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
@@ -1389,8 +1389,8 @@ export default function ConversationBoard() {
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
-        <div className={`${showMobileThread ? "hidden xl:block" : "block"} min-w-0 xl:h-full xl:min-h-0`}>
+      <div className={`grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:auto-rows-[minmax(0,1fr)] xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
+        <div className={`${showMobileThread ? "hidden xl:block" : "block"} min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden`}>
           <div className={inboxCollapsed ? "xl:hidden" : "xl:h-full xl:min-h-0"}>
             <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
           </div>
@@ -1421,7 +1421,7 @@ export default function ConversationBoard() {
             <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>
         </main>
-        {active && <div className="hidden xl:block xl:min-h-0"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
+        {active && <div className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
         {active && showMobileContact && (
           <div className="fixed inset-0 z-[60] flex flex-col bg-gray-100 xl:hidden">
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
