@@ -412,7 +412,7 @@ export default function CrewWorkflowPage() {
   const viewersForSelectedJob = presence.filter((entry) => entry.jobId === selectedJobId);
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {error && (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
           <span>{error}</span>
@@ -458,8 +458,8 @@ export default function CrewWorkflowPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      <section className="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="h-full overflow-x-auto overflow-y-auto">
           <table className="min-w-[1080px] w-full text-left">
             <thead className="border-b border-gray-200 bg-gray-50 text-xs font-bold uppercase tracking-wide text-gray-500">
               <tr>

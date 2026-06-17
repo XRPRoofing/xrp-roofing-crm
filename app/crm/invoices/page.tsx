@@ -556,7 +556,7 @@ function MobileInvoiceList({
   const tabs: MobileInvoiceTab[] = ["All", "Paid", "Unpaid", "Overdue"];
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
         {tabs.map((t) => (

@@ -222,7 +222,7 @@ export default function CrmDashboardPage() {
   const sentProposalCount = proposals.filter((p) => p.status !== "Draft").length;
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-5">
       {/* ── Welcome Header ──────────────────────────────────────────── */}
       <section className="rounded-xl border border-gray-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-6 sm:py-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

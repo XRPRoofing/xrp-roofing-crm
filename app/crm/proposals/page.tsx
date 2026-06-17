@@ -1821,7 +1821,7 @@ export default function ProposalsPage() {
   }
 
   return (
-    <div className="space-y-5 font-sans">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 font-sans">
       <BackToJobsLink />
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-3 text-white shadow-2xl shadow-blue-950/20 sm:rounded-[2rem] sm:p-6">
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />

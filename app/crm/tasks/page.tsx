@@ -229,7 +229,7 @@ export default function TasksPage() {
   }, [groupedTasks]);
 
   return (
-    <div className="space-y-2 sm:space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 sm:gap-4">
       {/* Sticky Header */}
       <div className="sticky top-14 z-20 -mx-3 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -370,7 +370,7 @@ export default function TasksPage() {
       </div>
 
       {/* Desktop Kanban Board (lg and above) */}
-      <div className="hidden gap-3 overflow-x-auto pb-4 lg:flex">
+      <div className="hidden min-h-0 flex-1 gap-3 overflow-x-auto pb-4 lg:flex">
         {groupedTasks.map(({ status, tasks: colTasks }) => {
           const c = colors[status];
           return (
