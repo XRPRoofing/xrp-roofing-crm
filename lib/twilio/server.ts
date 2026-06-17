@@ -257,6 +257,16 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
 
 export type IvrDepartment = "billing" | "sales" | "scheduling" | "other";
 
+/** Priority levels for queue ordering (lower number = higher priority) */
+export type QueuePriority = "high" | "medium" | "low";
+
+const DEPARTMENT_PRIORITY: Record<IvrDepartment, QueuePriority> = {
+  billing: "high",
+  sales: "high",
+  scheduling: "medium",
+  other: "low",
+};
+
 export function buildIvrMenuTwiml(
   digit: string,
   statusCallbackUrl: string,
@@ -268,13 +278,11 @@ export function buildIvrMenuTwiml(
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
-  const DIRECT_FORWARD_NUMBER = "+16233008097";
-
-  const departmentMap: Record<string, { label: string; number: string; directOnly?: boolean }> = {
+  const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
     "1": { label: "billing", number: config.ivrBillingNumber },
     "2": { label: "sales", number: config.ivrSalesNumber },
-    "3": { label: "scheduling", number: DIRECT_FORWARD_NUMBER, directOnly: true },
-    "4": { label: "other", number: DIRECT_FORWARD_NUMBER, directOnly: true },
+    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
+    "4": { label: "other", number: config.ivrOtherNumber },
   };
 
   const dept = departmentMap[digit];
@@ -285,22 +293,30 @@ export function buildIvrMenuTwiml(
     return { twiml: response.toString(), department: null };
   }
 
-  // For CRM-routed departments, redirect to queue if no agents available
-  if (!dept.directOnly && queueHoldUrl && !hasAvailableAgents(onlineAgents || [])) {
-    if (dept.label === "billing") {
-      response.say("Connecting you to our billing department.");
-    } else if (dept.label === "sales") {
-      response.say("Connecting you to our sales team.");
-    } else {
-      response.say("Connecting you now.");
-    }
+  const sayDepartment = () => {
+    if (dept.label === "billing") response.say("Connecting you to our billing department.");
+    else if (dept.label === "sales") response.say("Connecting you to our sales team.");
+    else if (dept.label === "scheduling") response.say("Connecting you to scheduling.");
+    else response.say("Connecting you now.");
+  };
+
+  // If no agents are available, enter queue with hold message
+  if (queueHoldUrl && !hasAvailableAgents(onlineAgents || [])) {
+    sayDepartment();
     response.say("Please wait, all agents are busy. Your call is important to us.");
+    const priority = DEPARTMENT_PRIORITY[dept.label];
+    const holdUrl = new URL(queueHoldUrl);
+    holdUrl.searchParams.set("priority", priority);
+    holdUrl.searchParams.set("dept", dept.label);
     response.pause({ length: 15 });
-    response.redirect({ method: "POST" }, queueHoldUrl);
-    return { twiml: response.toString(), department: dept.label as IvrDepartment };
+    response.redirect({ method: "POST" }, holdUrl.toString());
+    return { twiml: response.toString(), department: dept.label };
   }
 
-  const dialOpts: Parameters<typeof response.dial>[0] = {
+  // Agents available — connect immediately
+  sayDepartment();
+
+  const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
     action: actionCallbackUrl,
@@ -308,31 +324,15 @@ export function buildIvrMenuTwiml(
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
-  };
+  });
 
-  if (dept.label === "billing") {
-    response.say("Connecting you to our billing department.");
-  } else if (dept.label === "sales") {
-    response.say("Connecting you to our sales team.");
-  } else if (dept.label === "scheduling") {
-    response.say("Connecting you to scheduling.");
-  } else {
-    response.say("Connecting you now.");
+  dialRingGroup(dial, config, onlineAgents);
+  const forwardTo = normalizePhoneForTwiml(dept.number);
+  if (forwardTo && forwardTo !== config.phoneNumber) {
+    dial.number(forwardTo);
   }
 
-  const dial = response.dial(dialOpts);
-
-  if (dept.directOnly) {
-    dial.number(dept.number);
-  } else {
-    dialRingGroup(dial, config, onlineAgents);
-    const forwardTo = normalizePhoneForTwiml(dept.number);
-    if (forwardTo && forwardTo !== config.phoneNumber) {
-      dial.number(forwardTo);
-    }
-  }
-
-  return { twiml: response.toString(), department: dept.label as IvrDepartment };
+  return { twiml: response.toString(), department: dept.label };
 }
 
 export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConversationEvent {
