@@ -170,15 +170,16 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
   });
   gather.say(
     "Thank you for calling X R P Roofing. " +
-    "Press 1 for a free estimate. " +
-    "Press 2 for support. " +
-    "Press 0 for an emergency."
+    "Press 1 for Billing or Invoice. " +
+    "Press 2 for Sales. " +
+    "Press 3 for Scheduling. " +
+    "Press 4 for all other inquiries."
   );
   response.redirect(selfUrl);
   return response.toString();
 }
 
-export type IvrDepartment = "estimates" | "support" | "emergency";
+export type IvrDepartment = "billing" | "sales" | "scheduling" | "other";
 
 export function buildIvrMenuTwiml(
   digit: string,
@@ -190,9 +191,10 @@ export function buildIvrMenuTwiml(
   const response = new twilio.twiml.VoiceResponse();
 
   const departmentMap: Record<string, { label: string; number: string }> = {
-    "1": { label: "estimates", number: config.ivrEstimatesNumber },
-    "2": { label: "support", number: config.ivrSupportNumber },
-    "0": { label: "emergency", number: config.ivrEmergencyNumber },
+    "1": { label: "billing", number: config.ivrBillingNumber },
+    "2": { label: "sales", number: config.ivrSalesNumber },
+    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
+    "4": { label: "other", number: config.ivrOtherNumber },
   };
 
   const dept = departmentMap[digit];
@@ -213,12 +215,14 @@ export function buildIvrMenuTwiml(
     recordingStatusCallbackMethod: "POST",
   };
 
-  if (dept.label === "emergency") {
-    response.say("Please hold. Connecting you to our emergency line.");
-  } else if (dept.label === "estimates") {
-    response.say("Connecting you to our estimates team.");
+  if (dept.label === "billing") {
+    response.say("Connecting you to our billing department.");
+  } else if (dept.label === "sales") {
+    response.say("Connecting you to our sales team.");
+  } else if (dept.label === "scheduling") {
+    response.say("Connecting you to scheduling.");
   } else {
-    response.say("Connecting you to support.");
+    response.say("Connecting you now.");
   }
 
   const dial = response.dial(dialOpts);

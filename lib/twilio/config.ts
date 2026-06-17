@@ -22,9 +22,10 @@ export function getTwilioConfig() {
     twimlAppSid: process.env.TWILIO_TWIML_APP_SID || "",
     phoneNumber: toE164(process.env.TWILIO_PHONE_NUMBER || ""),
     inboundForwardNumber,
-    ivrEstimatesNumber: toE164(process.env.TWILIO_IVR_ESTIMATES_NUMBER || "") || inboundForwardNumber,
-    ivrSupportNumber: toE164(process.env.TWILIO_IVR_SUPPORT_NUMBER || "") || inboundForwardNumber,
-    ivrEmergencyNumber: toE164(process.env.TWILIO_IVR_EMERGENCY_NUMBER || "") || inboundForwardNumber,
+    ivrBillingNumber: toE164(process.env.TWILIO_IVR_BILLING_NUMBER || "") || inboundForwardNumber,
+    ivrSalesNumber: toE164(process.env.TWILIO_IVR_SALES_NUMBER || "") || inboundForwardNumber,
+    ivrSchedulingNumber: toE164(process.env.TWILIO_IVR_SCHEDULING_NUMBER || "") || inboundForwardNumber,
+    ivrOtherNumber: toE164(process.env.TWILIO_IVR_OTHER_NUMBER || "") || inboundForwardNumber,
   };
 }
 
