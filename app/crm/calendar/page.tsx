@@ -462,7 +462,7 @@ export default function CalendarPage() {
 
       {/* ── Top Toolbar (sticky) ──────────────────────────────────── */}
       <div className="sticky top-16 z-20 -mx-4 border-b border-gray-200 bg-white/95 px-4 py-1.5 backdrop-blur-sm sm:-mx-8 sm:px-8 sm:py-3">
-        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
           <div className="flex items-center gap-1.5 sm:gap-3">
             <button type="button" onClick={goToToday} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm">
               Today
@@ -479,7 +479,7 @@ export default function CalendarPage() {
             <button type="button" onClick={loadEvents} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 sm:p-2" aria-label="Refresh">
               <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button type="button" className="flex items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 sm:px-3 sm:py-2 sm:text-sm">
+            <button type="button" className="hidden items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 sm:flex sm:px-3 sm:py-2 sm:text-sm">
               Monthly <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
             </button>
             <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm">
@@ -535,8 +535,7 @@ export default function CalendarPage() {
                           className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[10px] font-semibold leading-snug border sm:px-1.5 sm:py-[3px] sm:text-sm ${config.color} hover:opacity-80 transition`}
                           title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
                         >
-                          <span className="hidden sm:inline">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}</span>
-                          <span className="sm:hidden">{(event.summary || "Untitled").slice(0, 3)}...</span>
+                          <span className="truncate">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70 hidden sm:inline">{time}</span>}</span>
                         </button>
                       );
                     })}
