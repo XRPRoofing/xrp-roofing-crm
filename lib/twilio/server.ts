@@ -1,5 +1,6 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
+import { getOnlineAgentIdentities } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 export function getTwilioClient() {
@@ -85,7 +86,37 @@ function normalizePhoneForTwiml(value?: string) {
   return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
 }
 
-export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
+/**
+ * Dial all available agents simultaneously.
+ * Priority: onlineAgents (from availability system) > TWILIO_RING_GROUP env var > "crm-agent".
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]) {
+  if (onlineAgents && onlineAgents.length > 0) {
+    for (const agentId of onlineAgents) {
+      dial.client(agentId);
+    }
+    return;
+  }
+  if (config.ringGroup.length > 0) {
+    for (const agentId of config.ringGroup) {
+      dial.client(agentId);
+    }
+  } else {
+    dial.client("crm-agent");
+  }
+}
+
+/** Fetch online agent identities for ring group routing */
+export async function fetchOnlineAgents(): Promise<string[]> {
+  try {
+    return await getOnlineAgentIdentities();
+  } catch {
+    return [];
+  }
+}
+
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[]) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
   const dial = response.dial({
@@ -98,7 +129,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
     recordingStatusCallbackMethod: "POST",
   });
 
-  dial.client("crm-agent");
+  dialRingGroup(dial, config, onlineAgents);
 
   // Forwarding to the Twilio number itself would loop the call back into this
   // webhook, so only forward to a different (real) phone.
@@ -186,6 +217,7 @@ export function buildIvrMenuTwiml(
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   greetingRedirectUrl: string,
+  onlineAgents?: string[],
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -232,7 +264,7 @@ export function buildIvrMenuTwiml(
   if (dept.directOnly) {
     dial.number(dept.number);
   } else {
-    dial.client("crm-agent");
+    dialRingGroup(dial, config, onlineAgents);
     const forwardTo = normalizePhoneForTwiml(dept.number);
     if (forwardTo && forwardTo !== config.phoneNumber) {
       dial.number(forwardTo);
