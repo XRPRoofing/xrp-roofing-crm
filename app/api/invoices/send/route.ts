@@ -10,6 +10,8 @@ const schema = z.object({
   invoiceId: z.string().min(1).optional(),
   invoiceLink: z.string().url(),
   balance: z.string().min(1),
+  hideInvoiceCard: z.boolean().optional(),
+  attachments: z.array(z.object({ filename: z.string(), content: z.string() })).optional(),
 });
 
 function escapeHtml(value: string) {
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
                 <tr>
                   <td style="background:#ffffff;padding:32px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:16px;line-height:1.7;">
                     <div>${safeMessage}</div>
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:16px;margin-top:28px;">
+                    ${data.hideInvoiceCard ? "" : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:16px;margin-top:28px;">
                       <tr>
                         <td style="padding:18px;">
                           <div style="font-size:13px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.12em;">Invoice</div>
@@ -89,7 +91,7 @@ export async function POST(req: NextRequest) {
                     </table>
                     <div style="margin-top:30px;">${button(data.invoiceLink, "View Invoice", "#0A3D91")}</div>
                     <div style="margin-top:14px;">${button(payLink, "Pay Invoice", "#1768c9")}</div>
-                    <p style="font-size:12px;color:#64748b;margin-top:26px;text-align:center;">Payment options include ACH bank transfer and credit card.</p>
+                    <p style="font-size:12px;color:#64748b;margin-top:26px;text-align:center;">Payment options include ACH bank transfer and credit card.</p>`}
                   </td>
                 </tr>
               </table>
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
         // Tag with the invoice id so the Resend webhook can map
         // email.delivered / email.opened events back to the invoice.
         ...(data.invoiceId ? { tags: [{ name: "invoice_id", value: data.invoiceId }] } : {}),
+        ...(data.attachments?.length ? { attachments: data.attachments } : {}),
       }),
     });
 
