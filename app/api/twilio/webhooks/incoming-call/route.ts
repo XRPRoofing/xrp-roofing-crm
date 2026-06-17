@@ -6,20 +6,32 @@ import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
 
-async function handleIncomingCall(formData: FormData, origin: string) {
-  const event = normalizeTwilioWebhookEvent("incoming_call", formData);
-
-  await publishConversationEvent(event);
-  await sendIncomingCallPushNotification(event.from);
-
-  try {
-    await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" });
-  } catch {}
-
+function buildFallbackTwiml(origin: string) {
   const menuActionUrl = new URL("/api/twilio/webhooks/menu", origin).toString();
   const selfUrl = new URL("/api/twilio/webhooks/incoming-call", origin).toString();
+  return buildIvrGreetingTwiml(menuActionUrl, selfUrl);
+}
 
-  return new NextResponse(buildIvrGreetingTwiml(menuActionUrl, selfUrl), { headers: XML_HEADERS });
+async function handleIncomingCall(formData: FormData, origin: string) {
+  try {
+    const event = normalizeTwilioWebhookEvent("incoming_call", formData);
+
+    try {
+      await publishConversationEvent(event);
+    } catch {}
+
+    try {
+      await sendIncomingCallPushNotification(event.from);
+    } catch {}
+
+    try {
+      await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" });
+    } catch {}
+  } catch {
+    // Side-effects failed — still return the IVR greeting
+  }
+
+  return new NextResponse(buildFallbackTwiml(origin), { headers: XML_HEADERS });
 }
 
 export async function POST(req: NextRequest) {

@@ -8,22 +8,25 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const digit = formData.get("Digits")?.toString() || "";
 
-  const event = normalizeTwilioWebhookEvent("call_status", formData);
-  const statusCallbackUrl = resolveCallStatusCallbackUrl(req.nextUrl.origin);
-  const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", req.nextUrl.origin).toString();
-  const greetingRedirectUrl = new URL("/api/twilio/webhooks/incoming-call", req.nextUrl.origin).toString();
+  const origin = req.nextUrl.origin;
+  const statusCallbackUrl = resolveCallStatusCallbackUrl(origin);
+  const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
+  const greetingRedirectUrl = new URL("/api/twilio/webhooks/incoming-call", origin).toString();
 
   const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl);
 
   if (department) {
-    await publishConversationEvent({
-      ...event,
-      id: `${event.callSid}-ivr-${department}`,
-      type: "call_status",
-      status: "ivr-routed",
-      body: `IVR: caller selected ${department}`,
-      payload: { ...event.payload, ivrSelection: digit, ivrDepartment: department },
-    });
+    try {
+      const event = normalizeTwilioWebhookEvent("call_status", formData);
+      await publishConversationEvent({
+        ...event,
+        id: `${event.callSid}-ivr-${department}`,
+        type: "call_status",
+        status: "ivr-routed",
+        body: `IVR: caller selected ${department}`,
+        payload: { ...event.payload, ivrSelection: digit, ivrDepartment: department },
+      });
+    } catch {}
   }
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
