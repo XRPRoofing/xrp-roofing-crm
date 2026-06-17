@@ -189,10 +189,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           incoming.on("cancel", () => {
             incomingCallRef.current = null;
             setGlobalIncomingCall(null);
-          });
-          incoming.on("disconnect", () => {
-            incomingCallRef.current = null;
-            setGlobalIncomingCall(null);
+            setGlobalActiveIncomingCall(false);
           });
         });
         device.on("unregistered", () => {
@@ -450,16 +447,20 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   function handleAnswerGlobalIncomingCall() {
     const incoming = incomingCallRef.current;
-    setGlobalIncomingCall(null);
-
     if (!incoming) return;
 
     try {
+      // Accept FIRST while audio context is still active (ringtone playing).
+      // Clearing globalIncomingCall stops the ringtone which can suspend the
+      // browser audio context and cause the WebRTC stream to fail.
       incoming.accept();
+
+      // Now safe to clear ringing state and transition to active card
+      setGlobalIncomingCall(null);
       setGlobalActiveIncomingCall(true);
       setGlobalIncomingMuted(false);
       setGlobalIncomingCaller({ name: incoming.parameters?.From || "Unknown", phone: incoming.parameters?.From || "" });
-      // Listen for remote disconnect
+
       incoming.on("disconnect", () => {
         setGlobalActiveIncomingCall(false);
         setGlobalIncomingMuted(false);
@@ -469,6 +470,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       callChannelRef.current?.postMessage({ type: "answered" });
     } catch {
       incomingCallRef.current = null;
+      setGlobalIncomingCall(null);
     }
   }
 
