@@ -13,8 +13,10 @@ export async function POST(req: NextRequest) {
   const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
   const greetingRedirectUrl = new URL("/api/twilio/webhooks/incoming-call", origin).toString();
 
+  const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
+
   const onlineAgents = await fetchOnlineAgents();
-  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents);
+  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl);
 
   if (department) {
     after(async () => {
