@@ -16,6 +16,7 @@ import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
 import { subscribeToTaskUpdates } from "@/lib/task-sync";
 import { deleteNotificationFromSupabase, loadNotificationsFromSupabase, markNotificationsReadInSupabase, subscribeToNotifications } from "@/lib/notification-sync";
+import { refreshCrewData, refreshInvoices, refreshProposals, refreshCustomers } from "@/lib/data-cache";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
@@ -84,6 +85,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
+    // Warm the data cache in parallel with the auth check so pages render
+    // instantly once auth completes. Errors are swallowed — pages will retry.
+    void refreshCrewData().catch(() => {});
+    void refreshInvoices().catch(() => {});
+    void refreshProposals().catch(() => {});
+    void refreshCustomers().catch(() => {});
 
     if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
       setUserRole("admin");
@@ -503,10 +511,42 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   if (checkingAuth) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4 text-sm font-medium text-gray-600 shadow-sm">
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          Loading...
+      <div className="flex min-h-screen min-h-[100dvh] bg-gray-50">
+        {/* Skeleton sidebar — desktop only */}
+        <aside className="hidden w-[220px] shrink-0 border-r border-gray-200 bg-white lg:block">
+          <div className="flex h-16 items-center gap-3 border-b border-gray-100 px-5">
+            <div className="h-8 w-8 animate-pulse rounded-lg bg-gray-200" />
+            <div className="h-4 w-24 animate-pulse rounded bg-gray-200" />
+          </div>
+          <div className="mt-4 space-y-2 px-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+                <div className="h-4 w-4 animate-pulse rounded bg-gray-200" />
+                <div className="h-3.5 animate-pulse rounded bg-gray-100" style={{ width: `${60 + (i * 13) % 40}%` }} />
+              </div>
+            ))}
+          </div>
+        </aside>
+        {/* Skeleton content area */}
+        <div className="flex flex-1 flex-col">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
+            <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+              <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+            </div>
+          </header>
+          <main className="flex-1 p-4 lg:p-6">
+            <div className="space-y-4">
+              <div className="h-24 animate-pulse rounded-xl bg-white shadow-sm" />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-20 animate-pulse rounded-lg bg-white shadow-sm" />
+                ))}
+              </div>
+              <div className="h-48 animate-pulse rounded-xl bg-white shadow-sm" />
+            </div>
+          </main>
         </div>
       </div>
     );

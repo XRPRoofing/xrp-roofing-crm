@@ -6,9 +6,10 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Camera, Check, ClipboardList, Copy, FileText, FolderOpen, Lock, Share2, UploadCloud, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
-import { addJobPhotos, loadCrewDataset, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
+import { addJobPhotos, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
 import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { refreshCrewData } from "@/lib/data-cache";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
 import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
@@ -52,7 +53,7 @@ export default function FolderGalleryPage() {
   }, []);
 
   const refresh = useCallback(async () => {
-    const [data, manual] = await Promise.all([loadCrewDataset(), loadManualFolders()]);
+    const [data, manual] = await Promise.all([refreshCrewData(), loadManualFolders()]);
     const crewMatch = buildFoldersFromCrew(data.jobs, data.photos).find((item) => item.id === folderId) || null;
     const meta = manual.find((item) => item.id === folderId) || null;
     // Manual folder metadata (nice name/address) wins; fall back to the

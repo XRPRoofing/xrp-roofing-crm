@@ -308,7 +308,7 @@ export default function CalendarPage() {
   }
 
   async function loadEvents() {
-    setLoading(true);
+    if (events.length === 0) setLoading(true);
     setError("");
 
     try {

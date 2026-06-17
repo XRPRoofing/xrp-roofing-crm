@@ -45,7 +45,7 @@ function TaskBadge({ isManual }: { isManual?: boolean }) {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<OfficeTask[]>(() => readOfficeTasks());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => readOfficeTasks().length === 0);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<OfficeTaskStatus | null>(null);
   const [filterType, setFilterType] = useState<TaskTypeFilter>("all");

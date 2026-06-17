@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, FolderOpen, FolderPlus, Search, UploadCloud, X } from "lucide-react";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
-import { loadCrewDataset, subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToCrewData } from "@/lib/crew-sync";
 import { createManualFolder, loadManualFolders, manualFoldersUpdatedEvent, type ManualFolder } from "@/lib/manual-folders";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { refreshCrewData } from "@/lib/data-cache";
 
 /** Merge manually-created folders with the auto folders derived from crew jobs.
  *  Manual metadata wins for matching ids (manual photos share the folder id). */
@@ -46,7 +47,7 @@ export default function FilesPage() {
   const totalPhotos = folders.reduce((total, folder) => total + folder.files.length, 0);
 
   const refreshFolders = useCallback(async () => {
-    const [data, manual] = await Promise.all([loadCrewDataset(), loadManualFolders()]);
+    const [data, manual] = await Promise.all([refreshCrewData(), loadManualFolders()]);
     setFolders(mergeFolders(buildFoldersFromCrew(data.jobs, data.photos), manual));
   }, []);
 
