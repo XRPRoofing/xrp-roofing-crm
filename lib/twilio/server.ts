@@ -1,5 +1,6 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
+import { getOnlineAgentIdentities } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 export function getTwilioClient() {
@@ -85,7 +86,82 @@ function normalizePhoneForTwiml(value?: string) {
   return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
 }
 
-export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
+/**
+ * Dial all available agents simultaneously.
+ * Priority: onlineAgents (from availability system) > TWILIO_RING_GROUP env var > "crm-agent".
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]) {
+  if (onlineAgents && onlineAgents.length > 0) {
+    for (const agentId of onlineAgents) {
+      dial.client(agentId);
+    }
+    return;
+  }
+  if (config.ringGroup.length > 0) {
+    for (const agentId of config.ringGroup) {
+      dial.client(agentId);
+    }
+  } else {
+    dial.client("crm-agent");
+  }
+}
+
+/** Fetch online agent identities for ring group routing */
+export async function fetchOnlineAgents(): Promise<string[]> {
+  try {
+    return await getOnlineAgentIdentities();
+  } catch {
+    return [];
+  }
+}
+
+/** Check if any agents are available to take calls (online or ring group configured) */
+export function hasAvailableAgents(onlineAgents: string[]): boolean {
+  if (onlineAgents.length > 0) return true;
+  const config = getTwilioConfig();
+  return config.ringGroup.length > 0;
+}
+
+/**
+ * Build TwiML for queue hold state. If agents are now available, dials them.
+ * Otherwise plays hold message and redirects back to self for periodic retry.
+ */
+export function buildQueueHoldTwiml(
+  onlineAgents: string[],
+  statusCallbackUrl: string,
+  actionCallbackUrl: string,
+  queueHoldUrl: string,
+): string {
+  const config = getTwilioConfig();
+  const response = new twilio.twiml.VoiceResponse();
+
+  if (onlineAgents.length > 0 || config.ringGroup.length > 0) {
+    response.say("An agent is now available. Connecting you.");
+    const dial = response.dial({
+      answerOnBridge: true,
+      record: "record-from-answer-dual",
+      action: actionCallbackUrl,
+      method: "POST",
+      recordingStatusCallback: statusCallbackUrl,
+      recordingStatusCallbackEvent: ["completed"],
+      recordingStatusCallbackMethod: "POST",
+    });
+    dialRingGroup(dial, config, onlineAgents);
+    const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
+    if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
+      dial.number(inboundForwardNumber);
+    }
+  } else {
+    response.say("Please wait, all agents are busy. Your call is important to us.");
+    response.pause({ length: 15 });
+    response.redirect({ method: "POST" }, queueHoldUrl);
+  }
+
+  return response.toString();
+}
+
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[]) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
   const dial = response.dial({
@@ -98,7 +174,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
     recordingStatusCallbackMethod: "POST",
   });
 
-  dial.client("crm-agent");
+  dialRingGroup(dial, config, onlineAgents);
 
   // Forwarding to the Twilio number itself would loop the call back into this
   // webhook, so only forward to a different (real) phone.
@@ -181,22 +257,32 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
 
 export type IvrDepartment = "billing" | "sales" | "scheduling" | "other";
 
+/** Priority levels for queue ordering (lower number = higher priority) */
+export type QueuePriority = "high" | "medium" | "low";
+
+const DEPARTMENT_PRIORITY: Record<IvrDepartment, QueuePriority> = {
+  billing: "high",
+  sales: "high",
+  scheduling: "medium",
+  other: "low",
+};
+
 export function buildIvrMenuTwiml(
   digit: string,
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   greetingRedirectUrl: string,
+  onlineAgents?: string[],
+  queueHoldUrl?: string,
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
-  const DIRECT_FORWARD_NUMBER = "+16233008097";
-
-  const departmentMap: Record<string, { label: string; number: string; directOnly?: boolean }> = {
+  const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
     "1": { label: "billing", number: config.ivrBillingNumber },
     "2": { label: "sales", number: config.ivrSalesNumber },
-    "3": { label: "scheduling", number: DIRECT_FORWARD_NUMBER, directOnly: true },
-    "4": { label: "other", number: DIRECT_FORWARD_NUMBER, directOnly: true },
+    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
+    "4": { label: "other", number: config.ivrOtherNumber },
   };
 
   const dept = departmentMap[digit];
@@ -207,7 +293,30 @@ export function buildIvrMenuTwiml(
     return { twiml: response.toString(), department: null };
   }
 
-  const dialOpts: Parameters<typeof response.dial>[0] = {
+  const sayDepartment = () => {
+    if (dept.label === "billing") response.say("Connecting you to our billing department.");
+    else if (dept.label === "sales") response.say("Connecting you to our sales team.");
+    else if (dept.label === "scheduling") response.say("Connecting you to scheduling.");
+    else response.say("Connecting you now.");
+  };
+
+  // If no agents are available, enter queue with hold message
+  if (queueHoldUrl && !hasAvailableAgents(onlineAgents || [])) {
+    sayDepartment();
+    response.say("Please wait, all agents are busy. Your call is important to us.");
+    const priority = DEPARTMENT_PRIORITY[dept.label];
+    const holdUrl = new URL(queueHoldUrl);
+    holdUrl.searchParams.set("priority", priority);
+    holdUrl.searchParams.set("dept", dept.label);
+    response.pause({ length: 15 });
+    response.redirect({ method: "POST" }, holdUrl.toString());
+    return { twiml: response.toString(), department: dept.label };
+  }
+
+  // Agents available — connect immediately
+  sayDepartment();
+
+  const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
     action: actionCallbackUrl,
@@ -215,31 +324,15 @@ export function buildIvrMenuTwiml(
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
-  };
+  });
 
-  if (dept.label === "billing") {
-    response.say("Connecting you to our billing department.");
-  } else if (dept.label === "sales") {
-    response.say("Connecting you to our sales team.");
-  } else if (dept.label === "scheduling") {
-    response.say("Connecting you to scheduling.");
-  } else {
-    response.say("Connecting you now.");
+  dialRingGroup(dial, config, onlineAgents);
+  const forwardTo = normalizePhoneForTwiml(dept.number);
+  if (forwardTo && forwardTo !== config.phoneNumber) {
+    dial.number(forwardTo);
   }
 
-  const dial = response.dial(dialOpts);
-
-  if (dept.directOnly) {
-    dial.number(dept.number);
-  } else {
-    dial.client("crm-agent");
-    const forwardTo = normalizePhoneForTwiml(dept.number);
-    if (forwardTo && forwardTo !== config.phoneNumber) {
-      dial.number(forwardTo);
-    }
-  }
-
-  return { twiml: response.toString(), department: dept.label as IvrDepartment };
+  return { twiml: response.toString(), department: dept.label };
 }
 
 export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConversationEvent {

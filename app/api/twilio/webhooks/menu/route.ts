@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { buildIvrMenuTwiml, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
+import { buildIvrMenuTwiml, fetchOnlineAgents, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
   const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
   const greetingRedirectUrl = new URL("/api/twilio/webhooks/incoming-call", origin).toString();
 
-  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl);
+  const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
+
+  const onlineAgents = await fetchOnlineAgents();
+  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl);
 
   if (department) {
     after(async () => {

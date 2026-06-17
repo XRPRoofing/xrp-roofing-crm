@@ -11,6 +11,7 @@ import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVo
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
+import AgentStatusToggle from "@/components/crm/AgentStatusToggle";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
@@ -164,12 +165,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
 
   useEffect(() => {
-    if (isCrewUser) return;
+    if (isCrewUser || !currentUserId) return;
     let mounted = true;
 
     async function registerGlobalVoiceDevice() {
       try {
-        const device = await createBrowserVoiceDevice("crm-agent");
+        const identity = `agent-${currentUserId}`;
+        const device = await createBrowserVoiceDevice(identity);
         if (!mounted) {
           device.destroy();
           return;
@@ -207,7 +209,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
     };
-  }, [isCrewUser]);
+  }, [isCrewUser, currentUserId]);
 
   useEffect(() => {
     function refreshUnreadTeamChatCount() {
@@ -419,7 +421,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const destination = globalDialNumber.trim();
     if (!destination) return;
     try {
-      const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
+      const identity = currentUserId ? `agent-${currentUserId}` : "crm-agent";
+      const device = voiceDeviceRef.current || await createBrowserVoiceDevice(identity);
       voiceDeviceRef.current = device;
       const call = await device.connect({ params: { To: destination } });
       globalBrowserCallRef.current = call as unknown as BrowserVoiceCall;
@@ -678,6 +681,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2">
+              {/* Agent Availability Status */}
+              {!isCrewUser && currentUserId && (
+                <AgentStatusToggle userId={currentUserId} />
+              )}
+
               {/* Sync indicator */}
               <div className="hidden items-center gap-1.5 rounded-md border border-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-500 sm:flex">
                 <span className={`inline-block h-2 w-2 rounded-full ${syncActive ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
