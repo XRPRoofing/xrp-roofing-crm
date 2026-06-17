@@ -62,9 +62,11 @@ export async function sendIncomingCallPushNotification(from?: string) {
 
   await Promise.all(subscriptions.map(async ({ endpoint, subscription }) => {
     try {
+      const now = new Date();
+      const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Phoenix" });
       await webPush.sendNotification(subscription, JSON.stringify({
         title: "Incoming call",
-        body: `Call from ${from || "Unknown caller"}`,
+        body: `Call from ${from || "Unknown caller"} at ${time}`,
         url: "/crm/conversations",
         tag: "incoming-call",
       }));

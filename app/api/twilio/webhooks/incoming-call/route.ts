@@ -15,9 +15,14 @@ function handleIncomingCall(formData: FormData, origin: string) {
     try {
       const event = normalizeTwilioWebhookEvent("incoming_call", formData);
       await publishConversationEvent(event);
-      await sendIncomingCallPushNotification(event.from);
+      const pushResult = await sendIncomingCallPushNotification(event.from);
+      if (pushResult.sent === 0 && pushResult.reason) {
+        console.warn("[incoming-call] push notification skipped:", pushResult.reason);
+      }
       await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" });
-    } catch {}
+    } catch (err) {
+      console.error("[incoming-call] after() side-effect error:", err);
+    }
   });
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
