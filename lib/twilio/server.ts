@@ -160,6 +160,82 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   };
 }
 
+export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
+  const response = new twilio.twiml.VoiceResponse();
+  const gather = response.gather({
+    numDigits: 1,
+    action: menuActionUrl,
+    method: "POST",
+    input: ["dtmf"],
+  });
+  gather.say(
+    "Thank you for calling X R P Roofing. " +
+    "Press 1 for Billing or Invoice. " +
+    "Press 2 for Sales. " +
+    "Press 3 for Scheduling. " +
+    "Press 4 for all other inquiries."
+  );
+  response.redirect(selfUrl);
+  return response.toString();
+}
+
+export type IvrDepartment = "billing" | "sales" | "scheduling" | "other";
+
+export function buildIvrMenuTwiml(
+  digit: string,
+  statusCallbackUrl: string,
+  actionCallbackUrl: string,
+  greetingRedirectUrl: string,
+) {
+  const config = getTwilioConfig();
+  const response = new twilio.twiml.VoiceResponse();
+
+  const departmentMap: Record<string, { label: string; number: string }> = {
+    "1": { label: "billing", number: config.ivrBillingNumber },
+    "2": { label: "sales", number: config.ivrSalesNumber },
+    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
+    "4": { label: "other", number: config.ivrOtherNumber },
+  };
+
+  const dept = departmentMap[digit];
+
+  if (!dept) {
+    response.say("Sorry, that is not a valid option.");
+    response.redirect(greetingRedirectUrl);
+    return { twiml: response.toString(), department: null };
+  }
+
+  const dialOpts: Parameters<typeof response.dial>[0] = {
+    answerOnBridge: true,
+    record: "record-from-answer-dual",
+    action: actionCallbackUrl,
+    method: "POST",
+    recordingStatusCallback: statusCallbackUrl,
+    recordingStatusCallbackEvent: ["completed"],
+    recordingStatusCallbackMethod: "POST",
+  };
+
+  if (dept.label === "billing") {
+    response.say("Connecting you to our billing department.");
+  } else if (dept.label === "sales") {
+    response.say("Connecting you to our sales team.");
+  } else if (dept.label === "scheduling") {
+    response.say("Connecting you to scheduling.");
+  } else {
+    response.say("Connecting you now.");
+  }
+
+  const dial = response.dial(dialOpts);
+  dial.client("crm-agent");
+
+  const forwardTo = normalizePhoneForTwiml(dept.number);
+  if (forwardTo && forwardTo !== config.phoneNumber) {
+    dial.number(forwardTo);
+  }
+
+  return { twiml: response.toString(), department: dept.label as IvrDepartment };
+}
+
 export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConversationEvent {
   return {
     id: crypto.randomUUID(),

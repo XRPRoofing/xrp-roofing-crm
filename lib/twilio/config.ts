@@ -13,6 +13,7 @@ export function toE164(value: string): string {
 }
 
 export function getTwilioConfig() {
+  const inboundForwardNumber = toE164(process.env.TWILIO_INBOUND_FORWARD_NUMBER || "");
   return {
     accountSid: process.env.TWILIO_ACCOUNT_SID || "",
     authToken: process.env.TWILIO_AUTH_TOKEN || "",
@@ -20,7 +21,11 @@ export function getTwilioConfig() {
     apiKeySecret: process.env.TWILIO_API_KEY_SECRET || "",
     twimlAppSid: process.env.TWILIO_TWIML_APP_SID || "",
     phoneNumber: toE164(process.env.TWILIO_PHONE_NUMBER || ""),
-    inboundForwardNumber: toE164(process.env.TWILIO_INBOUND_FORWARD_NUMBER || ""),
+    inboundForwardNumber,
+    ivrBillingNumber: toE164(process.env.TWILIO_IVR_BILLING_NUMBER || "") || inboundForwardNumber,
+    ivrSalesNumber: toE164(process.env.TWILIO_IVR_SALES_NUMBER || "") || inboundForwardNumber,
+    ivrSchedulingNumber: toE164(process.env.TWILIO_IVR_SCHEDULING_NUMBER || "") || inboundForwardNumber,
+    ivrOtherNumber: toE164(process.env.TWILIO_IVR_OTHER_NUMBER || "") || inboundForwardNumber,
   };
 }
 
