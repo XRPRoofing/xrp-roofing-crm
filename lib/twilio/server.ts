@@ -256,6 +256,8 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
     method: "POST",
     input: ["dtmf"],
   });
+  // Brief pause so the caller's audio stream is established before the greeting
+  gather.pause({ length: 1 });
   gather.say(
     "Thank you for calling X R P Roofing. " +
     "Press 1 for Billing or Invoice. " +
