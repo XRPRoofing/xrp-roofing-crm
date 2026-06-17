@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Mic, Pause, Phone, PhoneOff, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
 import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
+import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
@@ -509,6 +510,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     { href: "/crm/files", label: "Files", icon: UploadCloud },
   ];
 
+  const voiceDeviceCtx = useMemo(() => ({ deviceRef: voiceDeviceRef }), []);
+
   if (checkingAuth) {
     return (
       <div className="flex min-h-screen min-h-[100dvh] bg-gray-50">
@@ -787,7 +790,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
         {/* Main Content */}
         <main className={`crm-main flex flex-1 flex-col px-3 py-3 sm:px-5 sm:py-4 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-4" : ""}`}>
-          <div className="flex min-h-0 max-w-full flex-1 flex-col">{children}</div>
+          <VoiceDeviceProvider value={voiceDeviceCtx}><div className="flex min-h-0 max-w-full flex-1 flex-col">{children}</div></VoiceDeviceProvider>
         </main>
       </div>
 

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
+import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
@@ -691,7 +692,7 @@ function playRingtone(): RingtoneController | null {
 }
 
 export default function ConversationBoard() {
-  const voiceDeviceRef = useRef<Awaited<ReturnType<typeof createBrowserVoiceDevice>> | null>(null);
+  const sharedDevice = useVoiceDevice();
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
   const ringtoneRef = useRef<RingtoneController | null>(null);
   const messageBoardRef = useRef<HTMLDivElement | null>(null);
@@ -1052,80 +1053,14 @@ export default function ConversationBoard() {
     });
   }, []);
 
+  // Device is now owned by CrmShell and shared via VoiceDeviceContext.
+  // Mark inbound as ready if the shared device exists.
   useEffect(() => {
-    let mounted = true;
-
-    async function registerVoiceDevice() {
-      try {
-        const device = await createBrowserVoiceDevice("crm-agent");
-        if (!mounted) return;
-
-        voiceDeviceRef.current = device;
-        device.on("registered", () => {
-          setInboundReady(true);
-          setTwilioNotice("Ready for inbound calls");
-        });
-        device.on("unregistered", () => {
-          setInboundReady(false);
-          setTwilioNotice("Inbound calling disconnected. Reconnecting...");
-          void device.register().catch(() => setTwilioNotice("Inbound calling needs page refresh"));
-        });
-        device.on("tokenWillExpire", () => {
-          setTwilioNotice("Refreshing inbound call token...");
-          getVoiceToken("crm-agent").then(({ token }) => {
-            device.updateToken?.(token);
-            return device.register();
-          }).catch(() => setTwilioNotice("Inbound token refresh failed. Reload the CRM."));
-        });
-        device.on("error", (error) => {
-          setInboundReady(false);
-          setTwilioNotice(error?.message || "Twilio inbound device error");
-        });
-        device.on("incoming", (call) => {
-          const incoming = call as BrowserVoiceCall;
-          const from = incoming.parameters?.From || "Unknown caller";
-          setIncomingCall(incoming);
-          setIncomingFrom(from);
-          setTwilioNotice("Incoming call ringing in CRM");
-          startIncomingAlert(from);
-          incoming.on("cancel", () => {
-            stopIncomingAlert();
-            setIncomingCall(null);
-            setIncomingFrom("");
-            setTwilioNotice("Incoming call canceled");
-          });
-          incoming.on("disconnect", () => {
-            stopIncomingAlert();
-            setIncomingCall(null);
-            setIncomingFrom("");
-            setIsActiveCall(false);
-            setIsMuted(false);
-            setCallSid(undefined);
-            browserCallRef.current = null;
-            setTwilioNotice("Call ended");
-          });
-          incoming.on("error", (error) => {
-            setTwilioNotice(error?.message || "Incoming call error");
-          });
-        });
-        await device.register();
-      } catch (error) {
-        setInboundReady(false);
-        setTwilioNotice(error instanceof Error ? error.message : "Inbound calling is not configured");
-      }
+    if (sharedDevice?.deviceRef.current) {
+      setInboundReady(true);
+      setTwilioNotice("Ready for inbound calls");
     }
-
-    registerVoiceDevice();
-
-    return () => {
-      mounted = false;
-      setInboundReady(false);
-      voiceDeviceRef.current?.destroy();
-      voiceDeviceRef.current = null;
-      ringtoneRef.current?.stop();
-      ringtoneRef.current = null;
-    };
-  }, [startIncomingAlert]);
+  }, [sharedDevice]);
 
   async function handleStartCall() {
     const destination = dialNumber.trim();
@@ -1137,8 +1072,7 @@ export default function ConversationBoard() {
     setTwilioNotice("Starting Twilio call...");
     applyLocalEvent(createLocalCommunicationEvent("call_status", destination, `Dialed ${destination}`));
     try {
-      const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
-      voiceDeviceRef.current = device;
+      const device = sharedDevice?.deviceRef.current || await createBrowserVoiceDevice("crm-agent");
       const call = await device.connect({ params: { To: destination } });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
       setIsActiveCall(true);
