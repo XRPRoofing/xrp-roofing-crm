@@ -85,6 +85,22 @@ function normalizePhoneForTwiml(value?: string) {
   return trimmed.startsWith("+") ? `+${trimmed.slice(1).replace(/\D/g, "")}` : trimmed.replace(/\D/g, "");
 }
 
+/**
+ * Dial all agents in the ring group simultaneously.
+ * If TWILIO_RING_GROUP is configured, rings each agent identity.
+ * Falls back to the legacy "crm-agent" shared identity.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>) {
+  if (config.ringGroup.length > 0) {
+    for (const agentId of config.ringGroup) {
+      dial.client(agentId);
+    }
+  } else {
+    dial.client("crm-agent");
+  }
+}
+
 export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
@@ -98,7 +114,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
     recordingStatusCallbackMethod: "POST",
   });
 
-  dial.client("crm-agent");
+  dialRingGroup(dial, config);
 
   // Forwarding to the Twilio number itself would loop the call back into this
   // webhook, so only forward to a different (real) phone.
@@ -232,7 +248,7 @@ export function buildIvrMenuTwiml(
   if (dept.directOnly) {
     dial.number(dept.number);
   } else {
-    dial.client("crm-agent");
+    dialRingGroup(dial, config);
     const forwardTo = normalizePhoneForTwiml(dept.number);
     if (forwardTo && forwardTo !== config.phoneNumber) {
       dial.number(forwardTo);

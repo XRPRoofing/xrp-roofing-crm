@@ -164,12 +164,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
 
   useEffect(() => {
-    if (isCrewUser) return;
+    if (isCrewUser || !currentUserId) return;
     let mounted = true;
 
     async function registerGlobalVoiceDevice() {
       try {
-        const device = await createBrowserVoiceDevice("crm-agent");
+        const identity = `agent-${currentUserId}`;
+        const device = await createBrowserVoiceDevice(identity);
         if (!mounted) {
           device.destroy();
           return;
@@ -207,7 +208,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
     };
-  }, [isCrewUser]);
+  }, [isCrewUser, currentUserId]);
 
   useEffect(() => {
     function refreshUnreadTeamChatCount() {
@@ -419,7 +420,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const destination = globalDialNumber.trim();
     if (!destination) return;
     try {
-      const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
+      const identity = currentUserId ? `agent-${currentUserId}` : "crm-agent";
+      const device = voiceDeviceRef.current || await createBrowserVoiceDevice(identity);
       voiceDeviceRef.current = device;
       const call = await device.connect({ params: { To: destination } });
       globalBrowserCallRef.current = call as unknown as BrowserVoiceCall;
