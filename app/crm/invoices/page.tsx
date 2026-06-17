@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, deleteInvoiceRecord, loadAllInvoices, type InvoiceSharePayload } from "@/lib/invoice-sync";
@@ -1148,7 +1150,7 @@ export default function InvoicesPage() {
       }
 
       const receiptAttachments = isPaidReceipt
-        ? [{ filename: `Receipt - ${selectedInvoice.invoiceNumber}.html`, content: btoa(unescape(encodeURIComponent(generatePaidReceiptHtml(selectedInvoice)))) }]
+        ? [{ filename: `Receipt - ${selectedInvoice.invoiceNumber}.pdf`, content: await generatePaidReceiptPdfBase64(selectedInvoice) }]
         : undefined;
 
       const response = await fetch("/api/invoices/send", {
@@ -1282,6 +1284,54 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 <p>XRP Roofing &middot; ROC #350898</p>
 </div>
 </body></html>`;
+  }
+
+  async function generatePaidReceiptPdfBase64(invoice: Invoice): Promise<string> {
+    const receiptHtml = generatePaidReceiptHtml(invoice)
+      .replace("position:fixed", "position:absolute");
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;left:-9999px;top:0;width:800px;height:1200px;border:none;";
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      document.body.removeChild(iframe);
+      throw new Error("Could not access iframe document");
+    }
+
+    iframeDoc.open();
+    iframeDoc.write(receiptHtml);
+    iframeDoc.close();
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    try {
+      const canvas = await html2canvas(iframeDoc.body, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 800,
+        windowWidth: 800,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "letter");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      if (imgHeight <= pageHeight) {
+        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, imgHeight);
+      } else {
+        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, imgHeight);
+      }
+
+      const pdfBase64 = pdf.output("datauristring").split(",")[1];
+      return pdfBase64;
+    } finally {
+      document.body.removeChild(iframe);
+    }
   }
 
   function savePaidReceiptToCustomerFiles(invoice: Invoice, sentBy: string) {
