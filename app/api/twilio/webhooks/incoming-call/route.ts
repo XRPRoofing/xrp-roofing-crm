@@ -12,17 +12,21 @@ function handleIncomingCall(formData: FormData, origin: string) {
   const twiml = buildIvrGreetingTwiml(menuActionUrl, selfUrl);
 
   after(async () => {
-    try {
-      const event = normalizeTwilioWebhookEvent("incoming_call", formData);
-      await publishConversationEvent(event);
-      const pushResult = await sendIncomingCallPushNotification(event.from);
-      if (pushResult.sent === 0 && pushResult.reason) {
-        console.warn("[incoming-call] push notification skipped:", pushResult.reason);
-      }
-      await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" });
-    } catch (err) {
-      console.error("[incoming-call] after() side-effect error:", err);
+    const event = normalizeTwilioWebhookEvent("incoming_call", formData);
+
+    const results = await Promise.allSettled([
+      sendIncomingCallPushNotification(event.from),
+      publishConversationEvent(event),
+      ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" }),
+    ]);
+
+    const [pushResult, convResult, customerResult] = results;
+    if (pushResult.status === "fulfilled" && pushResult.value.sent === 0 && pushResult.value.reason) {
+      console.warn("[incoming-call] push notification skipped:", pushResult.value.reason);
     }
+    if (pushResult.status === "rejected") console.error("[incoming-call] push failed:", pushResult.reason);
+    if (convResult.status === "rejected") console.error("[incoming-call] publishConversationEvent failed:", convResult.reason);
+    if (customerResult.status === "rejected") console.error("[incoming-call] ensureCustomer failed:", customerResult.reason);
   });
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
