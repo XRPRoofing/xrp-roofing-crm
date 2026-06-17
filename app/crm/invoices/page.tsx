@@ -1210,7 +1210,8 @@ export default function InvoicesPage() {
 
   function generatePaidReceiptEmailBody(invoice: Invoice): string {
     const totals = calculateTotals(invoice);
-    const paid = getPaidAmount(invoice);
+    const rawPaid = getPaidAmount(invoice);
+    const paid = rawPaid > 0 ? rawPaid : totals.finalTotal;
     const lastPayment = invoice.payments[invoice.payments.length - 1];
     const paymentDate = invoice.paidAt || lastPayment?.date || today;
     const paymentMethod = lastPayment?.method || "Payment";
@@ -1220,7 +1221,8 @@ export default function InvoicesPage() {
 
   function generatePaidReceiptHtml(invoice: Invoice): string {
     const totals = calculateTotals(invoice);
-    const paid = getPaidAmount(invoice);
+    const rawPaid = getPaidAmount(invoice);
+    const paid = rawPaid > 0 ? rawPaid : totals.finalTotal;
     const lastPayment = invoice.payments[invoice.payments.length - 1];
     const paymentDate = invoice.paidAt || lastPayment?.date || today;
     const paymentMethod = lastPayment?.method || "Payment";
@@ -1350,7 +1352,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
   function handleDownloadPaidReceiptPdf(invoice: Invoice) {
     const totals = calculateTotals(invoice);
-    const paid = getPaidAmount(invoice);
+    const rawPaid = getPaidAmount(invoice);
+    const paid = rawPaid > 0 ? rawPaid : totals.finalTotal;
     const lastPayment = invoice.payments[invoice.payments.length - 1];
     const paymentDate = invoice.paidAt || lastPayment?.date || today;
     const paymentMethod = lastPayment?.method || "Payment";
