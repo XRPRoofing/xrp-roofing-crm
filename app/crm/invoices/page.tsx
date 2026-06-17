@@ -624,6 +624,7 @@ export default function InvoicesPage() {
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
   const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
+  const [paidReceiptConfirmation, setPaidReceiptConfirmation] = useState<{ customerName: string; invoiceNumber: string; sentAt: string } | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [createForm, setCreateForm] = useState<Invoice>({
     id: "",
@@ -1117,12 +1118,22 @@ export default function InvoicesPage() {
     const invoiceLink = `${window.location.origin}/invoice/${encodeURIComponent(selectedInvoice.id)}`;
     const totals = calculateTotals(selectedInvoice);
     const balance = Math.max(totals.finalTotal - getPaidAmount(selectedInvoice), 0);
+    const isPaidReceipt = sendForm.template === "Paid receipt";
+
+    // Block sending Paid Receipt if invoice is not paid
+    if (isPaidReceipt) {
+      const status = getComputedStatus(selectedInvoice);
+      if (status !== "Paid" && status !== "Paid Mail Check") {
+        setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: "Cannot send a Paid Receipt — this invoice has not been marked as Paid yet. Please mark the invoice as paid before sending the receipt." });
+        return;
+      }
+    }
 
     setSendingInvoice(true);
 
     const sentAt = new Date().toISOString();
     const sentBy = currentUserEmail || "CRM user";
-    const sentInvoice: Invoice = { ...selectedInvoice, status: "Sent", sentAt, sentBy };
+    const sentInvoice: Invoice = isPaidReceipt ? selectedInvoice : { ...selectedInvoice, status: "Sent", sentAt, sentBy };
 
     try {
       const shareResponse = await fetch("/api/invoices/share", {
@@ -1141,12 +1152,12 @@ export default function InvoicesPage() {
         body: JSON.stringify({
           toName: selectedInvoice.clientName,
           toEmail: selectedInvoice.email,
-          subject: sendForm.subject,
-          message: sendForm.message,
+          subject: isPaidReceipt ? `Payment Receipt - ${selectedInvoice.invoiceNumber}` : sendForm.subject,
+          message: isPaidReceipt ? generatePaidReceiptEmailBody(selectedInvoice) : sendForm.message,
           invoiceNumber: selectedInvoice.invoiceNumber,
           invoiceId: selectedInvoice.id,
           invoiceLink,
-          balance: currency(balance),
+          balance: isPaidReceipt ? currency(0) : currency(balance),
         }),
       });
 
@@ -1155,12 +1166,19 @@ export default function InvoicesPage() {
         throw new Error(data.error || "Unable to send invoice email");
       }
 
-      updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
+      if (isPaidReceipt) {
+        // Don't change invoice status for paid receipts, just log it
+        updateInvoice({ ...selectedInvoice, activity: [`[AUDIT] Paid Receipt sent to ${selectedInvoice.email} | By: ${sentBy} | ${sentAt}`, ...selectedInvoice.activity] }, `Paid Receipt sent to ${selectedInvoice.email || selectedInvoice.clientName}`);
+        // Save receipt to customer files
+        savePaidReceiptToCustomerFiles(selectedInvoice, sentBy);
+      } else {
+        updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
+      }
 
       // Log send activity
       const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
       sendLog.unshift({
-        type: "Invoice",
+        type: isPaidReceipt ? "Paid Receipt" : "Invoice",
         sentBy,
         sentAt,
         customerName: selectedInvoice.clientName,
@@ -1171,13 +1189,38 @@ export default function InvoicesPage() {
       window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
 
       setShowSendModal(false);
-      setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent to ${selectedInvoice.email}.` });
+      if (isPaidReceipt) {
+        setPaidReceiptConfirmation({ customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, sentAt });
+      } else {
+        setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent to ${selectedInvoice.email}.` });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
       setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message });
     } finally {
       setSendingInvoice(false);
     }
+  }
+
+  function generatePaidReceiptEmailBody(invoice: Invoice): string {
+    const totals = calculateTotals(invoice);
+    const paid = getPaidAmount(invoice);
+    const lastPayment = invoice.payments[invoice.payments.length - 1];
+    const paymentDate = invoice.paidAt || lastPayment?.date || today;
+    const paymentMethod = lastPayment?.method || "Payment";
+    const reference = lastPayment?.reference || "";
+    return `✅ PAID IN FULL — Payment Received\n\nDear ${invoice.clientName},\n\nThis is your official payment receipt confirming that your invoice has been paid in full.\n\nInvoice Number: ${invoice.invoiceNumber}\nAmount Paid: ${currency(paid)}\nDate Paid: ${paymentDate}\nPayment Method: ${paymentMethod}${reference ? `\nReference: ${reference}` : ""}\n\nTotal: ${currency(totals.finalTotal)}\nBalance Due: $0.00\n\nThank you for choosing XRP Roofing. This receipt serves as proof of payment for your records.\n\nXRP Roofing\nROC #350898`;
+  }
+
+  function savePaidReceiptToCustomerFiles(invoice: Invoice, sentBy: string) {
+    savePaymentDocumentsToCustomerFiles({
+      customerName: invoice.clientName,
+      address: invoice.propertyAddress,
+      jobId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      uploadedBy: sentBy,
+      documents: [{ name: `Paid Receipt - ${invoice.invoiceNumber} - ${today}`, dataUrl: `data:text/plain;base64,${btoa(generatePaidReceiptEmailBody(invoice))}` }],
+    });
   }
 
   function handleDownloadPdf(invoice: Invoice) {
@@ -1233,6 +1276,89 @@ export default function InvoicesPage() {
     `);
     printWindow.document.close();
     updateInvoice(invoice, "PDF downloaded");
+  }
+
+  function handleDownloadPaidReceiptPdf(invoice: Invoice) {
+    const totals = calculateTotals(invoice);
+    const paid = getPaidAmount(invoice);
+    const lastPayment = invoice.payments[invoice.payments.length - 1];
+    const paymentDate = invoice.paidAt || lastPayment?.date || today;
+    const paymentMethod = lastPayment?.method || "Payment";
+    const reference = lastPayment?.reference || "";
+    const logoUrl = `${window.location.origin}/images/logo.jpeg`;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Receipt - ${invoice.invoiceNumber}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <style>
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { font-family: Georgia, serif; color: #0f172a; padding: 40px; position: relative; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 4px solid #16a34a; padding-bottom: 20px; }
+            .logo { height: 84px; width: auto; display: block; }
+            .roc { margin-top: 8px; font-weight: 700; color: #475569; }
+            .doc-title { text-align: right; }
+            .doc-title h1 { margin: 0; color: #16a34a; }
+            .stamp { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%) rotate(-22deg); color: #16a34a; border: 10px solid #16a34a; border-radius: 18px; padding: 6px 56px; font-size: 120px; font-weight: 900; letter-spacing: 10px; opacity: .15; text-transform: uppercase; pointer-events: none; z-index: 999; }
+            .stamp small { display: block; text-align: center; font-size: 22px; letter-spacing: 3px; margin-top: 6px; }
+            .paid-badge { display: inline-flex; align-items: center; gap: 8px; background: #dcfce7; border: 3px solid #16a34a; border-radius: 12px; padding: 12px 24px; margin-top: 24px; }
+            .paid-badge .check { width: 32px; height: 32px; background: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; }
+            .paid-badge .text { font-size: 24px; font-weight: 900; color: #16a34a; letter-spacing: 2px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+            .box { background: #f0fdf4; border-radius: 18px; padding: 18px; border: 1px solid #bbf7d0; }
+            .box h3 { color: #16a34a; margin-top: 0; }
+            .details-table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+            .details-table td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+            .details-table td:first-child { font-weight: 700; color: #475569; width: 40%; }
+            .details-table td:last-child { font-weight: 700; color: #0f172a; }
+            .total-section { text-align: right; margin-top: 28px; font-size: 22px; font-weight: 900; color: #16a34a; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #64748b; font-size: 14px; }
+            .print-btn { margin-bottom: 20px; padding: 12px 20px; font-size: 16px; font-weight: 700; background: #16a34a; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+            @media print { .print-btn { display: none; } body { padding: 24px; } }
+            @media (max-width: 640px) {
+              body { padding: 20px; }
+              .logo { height: 60px; }
+              .stamp { font-size: 64px; padding: 6px 30px; border-width: 6px; letter-spacing: 6px; }
+              .stamp small { font-size: 16px; }
+              .grid { grid-template-columns: 1fr; }
+              .paid-badge .text { font-size: 18px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="stamp">PAID<small>Payment Received</small></div>
+          <button class="print-btn" onclick="window.print()">Download / Save PDF</button>
+          <div class="header">
+            <div><img class="logo" src="${logoUrl}" alt="XRP Roofing" /><p class="roc">ROC #350898</p></div>
+            <div class="doc-title"><h1>PAYMENT RECEIPT</h1><p>${invoice.invoiceNumber}</p></div>
+          </div>
+          <div class="paid-badge"><div class="check">✓</div><div class="text">PAID IN FULL</div></div>
+          <table class="details-table">
+            <tr><td>Customer Name</td><td>${invoice.clientName}</td></tr>
+            <tr><td>Invoice Number</td><td>${invoice.invoiceNumber}</td></tr>
+            <tr><td>Amount Paid</td><td>${currency(paid)}</td></tr>
+            <tr><td>Date Paid</td><td>${paymentDate}</td></tr>
+            <tr><td>Payment Method</td><td>${paymentMethod}</td></tr>
+            ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
+            <tr><td>Property Address</td><td>${invoice.propertyAddress}</td></tr>
+            <tr><td>Job</td><td>${invoice.jobName}</td></tr>
+          </table>
+          <div class="total-section">
+            <p>Total Invoice: ${currency(totals.finalTotal)}</p>
+            <p>Amount Paid: ${currency(paid)}</p>
+            <p>Balance Due: $0.00</p>
+          </div>
+          <div class="footer">
+            <p><strong>Thank you for choosing XRP Roofing!</strong></p>
+            <p>This receipt serves as official proof of payment.</p>
+            <p>XRP Roofing · ROC #350898</p>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   function handleMarkPaidOffline() {
@@ -2123,30 +2249,74 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      {showSendModal && selectedInvoice && (
+      {showSendModal && selectedInvoice && (() => {
+        const isPaidReceiptSelected = sendForm.template === "Paid receipt";
+        const invoiceIsPaid = getComputedStatus(selectedInvoice) === "Paid" || getComputedStatus(selectedInvoice) === "Paid Mail Check";
+        const lastPayment = selectedInvoice.payments[selectedInvoice.payments.length - 1];
+        return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
-          <div className="w-full max-w-2xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
-            <h2 className="text-xl sm:text-2xl font-bold text-blue-700">Send Invoice</h2>
+          <div className="w-full max-w-2xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-blue-700">{isPaidReceiptSelected ? "Send Paid Receipt" : "Send Invoice"}</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
               <select value={sendForm.template} onChange={(event) => setSendForm({ ...sendForm, template: event.target.value, message: emailTemplates[event.target.value as keyof typeof emailTemplates] })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base">
                 {Object.keys(emailTemplates).map((template) => <option key={template}>{template}</option>)}
               </select>
-              <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Subject" />
-              <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-32 rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" />
+              {!isPaidReceiptSelected && (
+                <>
+                  <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Subject" />
+                  <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-32 rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" />
+                </>
+              )}
             </div>
-            <div className="mt-4 sm:mt-6 rounded-lg bg-gray-50 p-3 sm:p-4 text-xs sm:text-sm leading-5 sm:leading-6 text-gray-600">
-              <p className="font-bold text-blue-700">{selectedInvoice.invoiceNumber}</p>
-              <p>To: {selectedInvoice.clientName} · <EmailLink value={selectedInvoice.email} /></p>
-              <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
-              <p className="mt-1">{sendForm.message}</p>
-            </div>
+
+            {/* Paid Receipt Preview */}
+            {isPaidReceiptSelected && (
+              <div className="mt-4 rounded-xl border-2 border-green-200 bg-green-50 p-4 sm:p-5">
+                {!invoiceIsPaid && (
+                  <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                    This invoice has not been marked as Paid. You cannot send a Paid Receipt until the invoice is fully paid.
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-200 text-2xl">✓</div>
+                  <div>
+                    <p className="text-lg font-black text-green-800">PAID IN FULL</p>
+                    <p className="text-sm font-bold text-green-700">Payment Received</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 text-sm">
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Customer</span><span className="font-bold text-gray-900">{selectedInvoice.clientName}</span></div>
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Invoice #</span><span className="font-bold text-gray-900">{selectedInvoice.invoiceNumber}</span></div>
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Amount Paid</span><span className="font-bold text-green-700">{currency(getPaidAmount(selectedInvoice))}</span></div>
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Date Paid</span><span className="font-bold text-gray-900">{selectedInvoice.paidAt ? new Date(selectedInvoice.paidAt).toLocaleDateString() : lastPayment?.date || today}</span></div>
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Payment Method</span><span className="font-bold text-gray-900">{lastPayment?.method || "Payment"}</span></div>
+                  {lastPayment?.reference && <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Reference</span><span className="font-bold text-gray-900">{lastPayment.reference}</span></div>}
+                </div>
+                <p className="mt-3 text-xs font-semibold text-green-700">A receipt with PAID stamp will be sent to the customer as proof of payment.</p>
+              </div>
+            )}
+
+            {/* Standard Invoice Preview */}
+            {!isPaidReceiptSelected && (
+              <div className="mt-4 sm:mt-6 rounded-lg bg-gray-50 p-3 sm:p-4 text-xs sm:text-sm leading-5 sm:leading-6 text-gray-600">
+                <p className="font-bold text-blue-700">{selectedInvoice.invoiceNumber}</p>
+                <p>To: {selectedInvoice.clientName} · <EmailLink value={selectedInvoice.email} /></p>
+                <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
+                <p className="mt-1">{sendForm.message}</p>
+              </div>
+            )}
+
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={handleSendInvoice} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50">{sendingInvoice ? "Sending\u2026" : "Send Invoice"}</button>
+              {isPaidReceiptSelected && invoiceIsPaid && (
+                <button onClick={() => handleDownloadPaidReceiptPdf(selectedInvoice)} className="w-full sm:w-auto rounded-lg border border-green-300 bg-green-50 px-5 py-3 font-bold text-green-700 active:scale-95 transition order-2 sm:order-1">Download PDF</button>
+              )}
+              <button onClick={handleSendInvoice} disabled={sendingInvoice || (isPaidReceiptSelected && !invoiceIsPaid)} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50">{sendingInvoice ? "Sending\u2026" : isPaidReceiptSelected ? "Send Paid Receipt" : "Send Invoice"}</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Invoice Send Confirmation Modal ── */}
       {invoiceSendConfirmation && (
@@ -2168,6 +2338,27 @@ export default function InvoicesPage() {
                 <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">View Invoice</button>
               )}
               <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Paid Receipt Success Confirmation ── */}
+      {paidReceiptConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+              <svg className="h-12 w-12 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3 className="mt-5 text-xl font-bold text-green-800">Paid Receipt Sent Successfully</h3>
+            <div className="mt-4 space-y-2 text-sm">
+              <p className="font-semibold text-gray-700">Customer: <span className="font-bold text-gray-900">{paidReceiptConfirmation.customerName}</span></p>
+              <p className="font-semibold text-gray-700">Invoice: <span className="font-bold text-gray-900">{paidReceiptConfirmation.invoiceNumber}</span></p>
+              <p className="font-semibold text-gray-700">Sent: <span className="font-bold text-gray-900">{new Date(paidReceiptConfirmation.sentAt).toLocaleString()}</span></p>
+            </div>
+            <p className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-xs font-semibold text-green-700">A copy has been saved to the customer&apos;s Payment Documents folder.</p>
+            <div className="mt-6">
+              <button type="button" onClick={() => setPaidReceiptConfirmation(null)} className="rounded-lg bg-green-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-green-700 active:scale-95">Done</button>
             </div>
           </div>
         </div>
