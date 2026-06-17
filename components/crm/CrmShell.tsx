@@ -11,6 +11,7 @@ import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVo
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
+import IncomingCallOverlay from "@/components/crm/IncomingCallOverlay";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
@@ -554,17 +555,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] overflow-x-hidden bg-gray-50">
-      {/* Incoming Call Banner */}
+      {/* Full-screen Incoming Call Overlay */}
       {globalIncomingCall && !isCrewUser && (
-        <div className="fixed right-4 top-4 z-[80] w-[min(92vw,360px)] rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Incoming Call</p>
-          <p className="mt-1 text-lg font-bold text-gray-900">{globalIncomingCall.name}</p>
-          <p className="mt-0.5 text-sm text-gray-500"><PhoneLink value={globalIncomingCall.phone} /></p>
-          <div className="mt-3 flex gap-2">
-            <button onClick={handleAnswerGlobalIncomingCall} className="flex-1 rounded-lg bg-green-600 px-3 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-green-700">Answer</button>
-            <button onClick={handleDeclineGlobalIncomingCall} className="flex-1 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">Decline</button>
-          </div>
-        </div>
+        <IncomingCallOverlay
+          caller={globalIncomingCall}
+          onAnswer={handleAnswerGlobalIncomingCall}
+          onDecline={handleDeclineGlobalIncomingCall}
+        />
       )}
 
       {/* Sidebar */}
