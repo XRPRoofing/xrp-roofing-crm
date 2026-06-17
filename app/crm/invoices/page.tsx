@@ -1147,6 +1147,10 @@ export default function InvoicesPage() {
         throw new Error("Invoice sharing is not configured. Please set up the invoice_shares table before sending customer payment links.");
       }
 
+      const receiptAttachments = isPaidReceipt
+        ? [{ filename: `Receipt - ${selectedInvoice.invoiceNumber}.html`, content: btoa(unescape(encodeURIComponent(generatePaidReceiptHtml(selectedInvoice)))) }]
+        : undefined;
+
       const response = await fetch("/api/invoices/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1159,6 +1163,7 @@ export default function InvoicesPage() {
           invoiceId: selectedInvoice.id,
           invoiceLink,
           balance: isPaidReceipt ? currency(0) : currency(balance),
+          ...(isPaidReceipt ? { hideInvoiceCard: true, attachments: receiptAttachments } : {}),
         }),
       });
 
@@ -1211,6 +1216,70 @@ export default function InvoicesPage() {
     const paymentMethod = lastPayment?.method || "Payment";
     const reference = lastPayment?.reference || "";
     return `✅ PAID IN FULL — Payment Received\n\nDear ${invoice.clientName},\n\nThis is your official payment receipt confirming that your invoice has been paid in full.\n\nInvoice Number: ${invoice.invoiceNumber}\nAmount Paid: ${currency(paid)}\nDate Paid: ${paymentDate}\nPayment Method: ${paymentMethod}${reference ? `\nReference: ${reference}` : ""}\n\nTotal: ${currency(totals.finalTotal)}\nBalance Due: $0.00\n\nThank you for choosing XRP Roofing. This receipt serves as proof of payment for your records.\n\nXRP Roofing\nROC #350898`;
+  }
+
+  function generatePaidReceiptHtml(invoice: Invoice): string {
+    const totals = calculateTotals(invoice);
+    const paid = getPaidAmount(invoice);
+    const lastPayment = invoice.payments[invoice.payments.length - 1];
+    const paymentDate = invoice.paidAt || lastPayment?.date || today;
+    const paymentMethod = lastPayment?.method || "Payment";
+    const reference = lastPayment?.reference || "";
+    const logoUrl = `${window.location.origin}/images/logo.jpeg`;
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>Receipt - ${invoice.invoiceNumber}</title>
+<style>
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:Georgia,serif;color:#0f172a;padding:40px;position:relative;margin:0}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:4px solid #16a34a;padding-bottom:20px}
+.logo{height:84px;width:auto;display:block}
+.roc{margin-top:8px;font-weight:700;color:#475569}
+.doc-title{text-align:right}
+.doc-title h1{margin:0;color:#16a34a}
+.stamp{position:fixed;top:42%;left:50%;transform:translate(-50%,-50%) rotate(-22deg);color:#16a34a;border:10px solid #16a34a;border-radius:18px;padding:6px 56px;font-size:120px;font-weight:900;letter-spacing:10px;opacity:.15;text-transform:uppercase;pointer-events:none;z-index:999}
+.stamp small{display:block;text-align:center;font-size:22px;letter-spacing:3px;margin-top:6px}
+.paid-badge{display:inline-flex;align-items:center;gap:8px;background:#dcfce7;border:3px solid #16a34a;border-radius:12px;padding:12px 24px;margin-top:24px}
+.paid-badge .check{width:32px;height:32px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:20px;font-weight:bold}
+.paid-badge .text{font-size:24px;font-weight:900;color:#16a34a;letter-spacing:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
+.box{background:#f0fdf4;border-radius:18px;padding:18px;border:1px solid #bbf7d0}
+.box h3{color:#16a34a;margin-top:0}
+.details-table{width:100%;border-collapse:collapse;margin-top:24px}
+.details-table td{padding:12px 16px;border-bottom:1px solid #e2e8f0}
+.details-table td:first-child{font-weight:700;color:#475569;width:40%}
+.details-table td:last-child{font-weight:700;color:#0f172a}
+.total-section{text-align:right;margin-top:28px;font-size:22px;font-weight:900;color:#16a34a}
+.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e2e8f0;text-align:center;color:#64748b;font-size:14px}
+@media print{body{padding:24px}}
+</style></head>
+<body>
+<div class="stamp">PAID<small>Payment Received</small></div>
+<div class="header">
+<div><img class="logo" src="${logoUrl}" alt="XRP Roofing"/><p class="roc">ROC #350898</p></div>
+<div class="doc-title"><h1>PAYMENT RECEIPT</h1><p>${invoice.invoiceNumber}</p></div>
+</div>
+<div class="paid-badge"><div class="check">&#10003;</div><div class="text">PAID IN FULL</div></div>
+<table class="details-table">
+<tr><td>Customer Name</td><td>${invoice.clientName}</td></tr>
+<tr><td>Invoice Number</td><td>${invoice.invoiceNumber}</td></tr>
+<tr><td>Amount Paid</td><td>${currency(paid)}</td></tr>
+<tr><td>Date Paid</td><td>${paymentDate}</td></tr>
+<tr><td>Payment Method</td><td>${paymentMethod}</td></tr>
+${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
+<tr><td>Property Address</td><td>${invoice.propertyAddress}</td></tr>
+<tr><td>Job</td><td>${invoice.jobName}</td></tr>
+</table>
+<div class="total-section">
+<p>Total Invoice: ${currency(totals.finalTotal)}</p>
+<p>Amount Paid: ${currency(paid)}</p>
+<p>Balance Due: $0.00</p>
+</div>
+<div class="footer">
+<p><strong>Thank you for choosing XRP Roofing!</strong></p>
+<p>This receipt serves as official proof of payment.</p>
+<p>XRP Roofing &middot; ROC #350898</p>
+</div>
+</body></html>`;
   }
 
   function savePaidReceiptToCustomerFiles(invoice: Invoice, sentBy: string) {
