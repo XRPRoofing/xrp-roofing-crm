@@ -445,7 +445,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex max-w-full flex-col overflow-x-hidden">
+    <div className="flex min-h-0 max-w-full flex-1 flex-col overflow-x-hidden">
       {/* ── Status Messages ─────────────────────────────────────────── */}
       {(error || statusMessage || (!loading && !connected)) && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
@@ -490,7 +490,7 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Main Layout: Calendar + Sidebar ─────────────────────────── */}
-      <div className="mt-1 flex flex-1 gap-2 sm:mt-2 sm:gap-4">
+      <div className="mt-1 flex min-h-0 flex-1 gap-2 sm:mt-2 sm:gap-4">
         {/* Calendar Grid */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
           {/* Weekday Headers */}
@@ -503,7 +503,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Calendar Cells */}
-          <div className="grid flex-1 grid-cols-7">
+          <div className="grid min-h-0 flex-1 grid-cols-7" style={{ gridAutoRows: "1fr" }}>
             {calendarCells.map((cell, index) => {
               const key = dateKey(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate());
               const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
