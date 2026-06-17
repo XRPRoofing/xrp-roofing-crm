@@ -700,7 +700,7 @@ export default function TasksPage() {
 
       {/* ── Delete Confirmation Modal ── */}
       {showDeleteConfirm && deleteTaskTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 backdrop-blur-sm p-4 pt-8 sm:items-center sm:pt-4" onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }}>
           <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>

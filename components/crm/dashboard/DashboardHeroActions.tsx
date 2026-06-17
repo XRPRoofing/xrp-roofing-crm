@@ -379,8 +379,8 @@ export default function DashboardHeroActions() {
 
       {/* ── Contact modal ──────────────────────────────────────────── */}
       {leadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setLeadOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveLead} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setLeadOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveLead} className="flex max-h-[85vh] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl sm:max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><UserPlus className="mr-2 inline h-4 w-4 text-blue-600" />New Contact</p>
               <button type="button" onClick={() => setLeadOpen(false)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
@@ -407,8 +407,8 @@ export default function DashboardHeroActions() {
 
       {/* ── Schedule modal ─────────────────────────────────────────── */}
       {scheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setScheduleOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setScheduleOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[85vh] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl sm:max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><CalendarPlus className="mr-2 inline h-4 w-4 text-blue-600" />Schedule Inspection</p>
               <button type="button" onClick={() => setScheduleOpen(false)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
@@ -441,8 +441,8 @@ export default function DashboardHeroActions() {
 
       {/* ── Job modal ──────────────────────────────────────────────── */}
       {jobOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setJobOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveJob} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setJobOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveJob} className="flex max-h-[85vh] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl sm:max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><Briefcase className="mr-2 inline h-4 w-4 text-blue-600" />New Job</p>
               <button type="button" onClick={() => setJobOpen(false)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
@@ -480,8 +480,8 @@ export default function DashboardHeroActions() {
 
       {/* ── Proposal modal ─────────────────────────────────────────── */}
       {proposalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setProposalOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveProposal} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setProposalOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveProposal} className="flex max-h-[85vh] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl sm:max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><FileText className="mr-2 inline h-4 w-4 text-blue-600" />New Proposal</p>
               <button type="button" onClick={() => setProposalOpen(false)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
@@ -510,8 +510,8 @@ export default function DashboardHeroActions() {
 
       {/* ── Task modal ─────────────────────────────────────────────── */}
       {taskOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setTaskOpen(false)}>
-          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveTask} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setTaskOpen(false)}>
+          <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveTask} className="flex max-h-[85vh] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl sm:max-h-[88vh]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><ClipboardList className="mr-2 inline h-4 w-4 text-blue-600" />New Task</p>
               <button type="button" onClick={() => setTaskOpen(false)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>

@@ -1457,7 +1457,7 @@ export default function ConversationBoard() {
       )}
 
       {scheduleOpen && active && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setScheduleOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setScheduleOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
               <p className="text-base font-bold text-gray-950">Schedule appointment</p>
