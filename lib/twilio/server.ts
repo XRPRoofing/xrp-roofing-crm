@@ -116,6 +116,51 @@ export async function fetchOnlineAgents(): Promise<string[]> {
   }
 }
 
+/** Check if any agents are available to take calls (online or ring group configured) */
+export function hasAvailableAgents(onlineAgents: string[]): boolean {
+  if (onlineAgents.length > 0) return true;
+  const config = getTwilioConfig();
+  return config.ringGroup.length > 0;
+}
+
+/**
+ * Build TwiML for queue hold state. If agents are now available, dials them.
+ * Otherwise plays hold message and redirects back to self for periodic retry.
+ */
+export function buildQueueHoldTwiml(
+  onlineAgents: string[],
+  statusCallbackUrl: string,
+  actionCallbackUrl: string,
+  queueHoldUrl: string,
+): string {
+  const config = getTwilioConfig();
+  const response = new twilio.twiml.VoiceResponse();
+
+  if (onlineAgents.length > 0 || config.ringGroup.length > 0) {
+    response.say("An agent is now available. Connecting you.");
+    const dial = response.dial({
+      answerOnBridge: true,
+      record: "record-from-answer-dual",
+      action: actionCallbackUrl,
+      method: "POST",
+      recordingStatusCallback: statusCallbackUrl,
+      recordingStatusCallbackEvent: ["completed"],
+      recordingStatusCallbackMethod: "POST",
+    });
+    dialRingGroup(dial, config, onlineAgents);
+    const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
+    if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
+      dial.number(inboundForwardNumber);
+    }
+  } else {
+    response.say("Please wait, all agents are busy. Your call is important to us.");
+    response.pause({ length: 15 });
+    response.redirect({ method: "POST" }, queueHoldUrl);
+  }
+
+  return response.toString();
+}
+
 export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[]) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
@@ -218,6 +263,7 @@ export function buildIvrMenuTwiml(
   actionCallbackUrl: string,
   greetingRedirectUrl: string,
   onlineAgents?: string[],
+  queueHoldUrl?: string,
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -237,6 +283,21 @@ export function buildIvrMenuTwiml(
     response.say("Sorry, that is not a valid option.");
     response.redirect(greetingRedirectUrl);
     return { twiml: response.toString(), department: null };
+  }
+
+  // For CRM-routed departments, redirect to queue if no agents available
+  if (!dept.directOnly && queueHoldUrl && !hasAvailableAgents(onlineAgents || [])) {
+    if (dept.label === "billing") {
+      response.say("Connecting you to our billing department.");
+    } else if (dept.label === "sales") {
+      response.say("Connecting you to our sales team.");
+    } else {
+      response.say("Connecting you now.");
+    }
+    response.say("Please wait, all agents are busy. Your call is important to us.");
+    response.pause({ length: 15 });
+    response.redirect({ method: "POST" }, queueHoldUrl);
+    return { twiml: response.toString(), department: dept.label as IvrDepartment };
   }
 
   const dialOpts: Parameters<typeof response.dial>[0] = {
