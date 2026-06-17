@@ -532,7 +532,7 @@ export default function CalendarPage() {
                           key={event.id}
                           type="button"
                           onClick={() => setSelectedEvent(event)}
-                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-medium leading-tight border sm:px-1.5 sm:py-[3px] sm:text-xs ${config.color} hover:opacity-80 transition`}
+                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-semibold leading-snug border sm:px-1.5 sm:py-[3px] sm:text-xs ${config.color} hover:opacity-80 transition`}
                           title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
                         >
                           <span className="hidden sm:inline">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}</span>
