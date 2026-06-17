@@ -155,7 +155,7 @@ function NewFolderModal({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" onClick={onClose}>
       <form onClick={(event) => event.stopPropagation()} onSubmit={submit} className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl">
         <div className="flex items-start justify-between">
           <div>

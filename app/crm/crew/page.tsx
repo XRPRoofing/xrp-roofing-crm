@@ -495,7 +495,7 @@ export default function CrewWorkflowPage() {
       </section>
 
       {showCreateJob && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/40 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowCreateJob(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4 backdrop-blur-sm" onClick={() => setShowCreateJob(false)}>
         <section className="my-auto w-full max-w-2xl rounded-lg border border-blue-100 bg-blue-50 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-start justify-between gap-4">
             <div>

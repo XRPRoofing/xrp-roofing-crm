@@ -633,7 +633,7 @@ export default function LeadsPage() {
         )}
 
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/20 p-3 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setShowForm(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-3 backdrop-blur-sm sm:p-4" onClick={() => setShowForm(false)}>
           <form onSubmit={handleAddJob} className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-gray-200 bg-white shadow-lg" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 p-4">
               <h2 className="text-lg font-bold text-gray-900">Add new job</h2>

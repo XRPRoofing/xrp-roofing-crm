@@ -654,7 +654,7 @@ export default function CalendarPage() {
 
       {/* ── New Appointment Modal ───────────────────────────────────── */}
       {newScheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-950/30 p-3 pt-8 sm:items-center sm:p-4 sm:pt-4" onClick={() => setNewScheduleOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4" onClick={() => setNewScheduleOpen(false)}>
           <form
             id="new-appointment"
             onSubmit={handleCreateEvent}

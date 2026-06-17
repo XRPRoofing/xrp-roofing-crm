@@ -746,7 +746,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className={`crm-main flex flex-1 flex-col overflow-x-clip px-3 py-3 sm:px-5 sm:py-4 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-4" : ""}`}>
+        <main className={`crm-main flex flex-1 flex-col px-3 py-3 sm:px-5 sm:py-4 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-4" : ""}`}>
           <div className="flex min-h-0 max-w-full flex-1 flex-col">{children}</div>
         </main>
       </div>
