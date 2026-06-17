@@ -581,7 +581,7 @@ function MobileInvoiceList({
               key={invoice.id}
               type="button"
               onClick={() => openInvoice(invoice)}
-              className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:bg-gray-50"
+              className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-gray-900">{invoice.clientName}</p>
@@ -1487,7 +1487,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-2 sm:space-y-6">
       <BackToJobsLink />
-      <div className="sticky top-14 z-20 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
+      <div className="sticky top-16 z-20 rounded-lg border border-gray-200 bg-white/95 p-2 shadow-sm backdrop-blur-sm sm:px-4 sm:py-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-base font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
           <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-4 sm:py-2.5 sm:text-sm">+ New Invoice</button>

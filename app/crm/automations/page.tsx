@@ -207,7 +207,7 @@ export default function AutomationsPage() {
     s === "sent" ? "text-blue-700 bg-blue-50" : s === "failed" ? "text-orange-700 bg-orange-50" : "text-gray-600 bg-gray-100";
 
   return (
-    <div className="space-y-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
       {/* Header */}
       <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-6 text-white shadow-2xl shadow-blue-950/20 sm:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />

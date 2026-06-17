@@ -541,8 +541,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="space-y-0.5">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="space-y-1">
             {visibleNavigation.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
@@ -552,7 +552,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
+                  className={`group flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
                 >
                   <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`} />
                   <span className="flex-1">{item.label}</span>
@@ -568,7 +568,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
         {/* Sidebar Footer */}
         <div className="border-t border-gray-100 px-3 py-3">
-          <button onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
+          <button onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
             <LogOut className="h-[18px] w-[18px] text-gray-400" />
             <span>Log out</span>
           </button>
@@ -582,7 +582,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col overflow-x-clip lg:pl-64">
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-          <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+          <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             {/* Hamburger (mobile) */}
             <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
               <Menu className="h-5 w-5" />
@@ -746,7 +746,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <main className={`crm-main flex flex-1 flex-col overflow-x-clip px-3 py-2 sm:px-6 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
+        <main className={`crm-main flex flex-1 flex-col overflow-x-clip px-4 py-3 sm:px-8 sm:py-6 ${mobileBottomNav.length > 0 ? "pb-20 lg:pb-6" : ""}`}>
           <div className="mx-auto flex min-h-0 max-w-full flex-1 flex-col lg:max-w-[1400px]">{children}</div>
         </main>
       </div>

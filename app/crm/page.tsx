@@ -222,9 +222,9 @@ export default function CrmDashboardPage() {
   const sentProposalCount = proposals.filter((p) => p.status !== "Draft").length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 sm:gap-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 sm:gap-6">
       {/* ── Welcome Header ──────────────────────────────────────────── */}
-      <section className="rounded-xl border border-gray-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-6 sm:py-5">
+      <section className="rounded-xl border border-gray-200 bg-white/95 px-5 py-5 shadow-sm backdrop-blur-sm sm:px-7 sm:py-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-gray-900 sm:text-xl">
@@ -244,8 +244,8 @@ export default function CrmDashboardPage() {
       </section>
 
       {/* ── Summary Stats Row ───────────────────────────────────────── */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+      <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Briefcase className="h-4 w-4" /></span>
             <span className="text-xs font-medium text-gray-500">Total Jobs</span>
@@ -253,7 +253,7 @@ export default function CrmDashboardPage() {
           <p className="mt-2 text-2xl font-bold text-gray-900">{jobs.length}</p>
           <p className="text-xs text-gray-400">{activeJobs} active</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600"><PenLine className="h-4 w-4" /></span>
             <span className="text-xs font-medium text-gray-500">Proposals</span>
@@ -261,7 +261,7 @@ export default function CrmDashboardPage() {
           <p className="mt-2 text-2xl font-bold text-gray-900">{proposals.length}</p>
           <p className="text-xs text-gray-400">{signedProposals} signed &middot; {sentProposalCount} sent</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600"><DollarSign className="h-4 w-4" /></span>
             <span className="text-xs font-medium text-gray-500">Invoices</span>
@@ -269,7 +269,7 @@ export default function CrmDashboardPage() {
           <p className="mt-2 text-2xl font-bold text-gray-900">{invoices.length}</p>
           <p className="text-xs text-gray-400">{paidInvoiceCount} paid</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><TrendingUp className="h-4 w-4" /></span>
             <span className="text-xs font-medium text-gray-500">Revenue</span>
@@ -288,7 +288,7 @@ export default function CrmDashboardPage() {
           <h2 className="text-sm font-semibold text-gray-900">Action Items</h2>
           <p className="text-xs text-gray-400">Click to view</p>
         </div>
-        <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m) => {
             const Icon = m.icon;
             const c = urgencyColor(m.urgency);
@@ -297,7 +297,7 @@ export default function CrmDashboardPage() {
                 key={m.id}
                 type="button"
                 onClick={() => router.push(m.href)}
-                className={`group flex items-start gap-3 rounded-lg border p-3.5 text-left transition hover:shadow-md active:scale-[0.98] ${c.border} ${c.bg}`}
+                className={`group flex items-start gap-4 rounded-lg border p-4 text-left transition hover:shadow-md active:scale-[0.98] ${c.border} ${c.bg}`}
               >
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icon}`}>
                   <Icon className="h-4 w-4" />
