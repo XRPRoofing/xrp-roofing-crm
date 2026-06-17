@@ -652,7 +652,7 @@ export default function PdfSignerBoardPage() {
 
       {/* ── Create Document modal ───────────────────────────────── */}
       {createDocOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCreateDocOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setCreateDocOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Create Document</h2>
@@ -711,7 +711,7 @@ export default function PdfSignerBoardPage() {
 
       {/* ── Create Template modal ───────────────────────────────── */}
       {createTplOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCreateTplOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setCreateTplOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Create Template</h2>
@@ -741,7 +741,7 @@ export default function PdfSignerBoardPage() {
 
       {/* ── Preview modal ───────────────────────────────────────── */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPreviewDoc(null)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setPreviewDoc(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">{previewDoc.documentName}</h2>
@@ -812,7 +812,7 @@ export default function PdfSignerBoardPage() {
 
       {/* ── Signing modal ───────────────────────────────────────── */}
       {signingDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSigningDoc(null)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-8 sm:items-center sm:pt-4" onClick={() => setSigningDoc(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Sign: {signingDoc.documentName}</h2>
