@@ -423,7 +423,7 @@ export default function CrewWorkflowPage() {
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-orange-600">Production Workflow</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Production Workflow</p>
             <h1 className="mt-0.5 text-xl font-bold tracking-tight text-blue-700 sm:text-3xl">Roofing Crew Workflow</h1>
             <p className="crm-board-subtitle mt-1 hidden text-sm font-semibold text-gray-600 sm:block">Compact daily operations view for assignments, job status, completion review, and approvals.</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -477,7 +477,7 @@ export default function CrewWorkflowPage() {
                 return (
                   <tr key={job.id} onClick={() => setSelectedJobId(job.id)} className="cursor-pointer bg-white transition hover:bg-blue-50/60">
                     <td className="px-4 py-3 font-bold text-blue-700">
-                      <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
+                      <span className="flex items-center gap-2">{job.name}{jobViewers.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700"><UsersRound className="h-3 w-3" />{jobViewers.length}</span>}</span>
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 font-semibold text-gray-600"><AddressLink value={formatAddress(job)} /></td>
                     <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">{member}</span>)}</div></td>
@@ -575,8 +575,8 @@ export default function CrewWorkflowPage() {
                     return (
                       <div key={type} className="rounded-lg border border-gray-200 bg-gray-50 p-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{type}</p>
-                          <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">{count}</span>
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{type}</p>
+                          <span className="rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold text-gray-500 ring-1 ring-gray-200">{count}</span>
                         </div>
                         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                           <button

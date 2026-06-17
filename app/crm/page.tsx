@@ -286,7 +286,7 @@ export default function CrmDashboardPage() {
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900">Action Items</h2>
-          <p className="text-[11px] text-gray-400">Click to view</p>
+          <p className="text-xs text-gray-400">Click to view</p>
         </div>
         <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {metrics.map((m) => {

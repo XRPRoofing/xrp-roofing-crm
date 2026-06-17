@@ -464,7 +464,7 @@ export default function CalendarPage() {
       <div className="sticky top-14 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:-mx-6 sm:px-6 sm:py-3">
         <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
           <div className="flex items-center gap-1.5 sm:gap-3">
-            <button type="button" onClick={goToToday} className="rounded-md border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm">
+            <button type="button" onClick={goToToday} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm">
               Today
             </button>
             <button type="button" onClick={() => shiftMonth(-1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Previous month">
@@ -496,7 +496,7 @@ export default function CalendarPage() {
           {/* Weekday Headers */}
           <div className="grid grid-cols-7 border-b border-gray-200">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="border-r border-gray-100 px-0.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500 last:border-r-0 sm:px-2 sm:py-3 sm:text-xs">
+              <div key={day} className="border-r border-gray-100 px-0.5 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500 last:border-r-0 sm:px-2 sm:py-3 sm:text-sm">
                 {day}
               </div>
             ))}
@@ -517,7 +517,7 @@ export default function CalendarPage() {
                 >
                   {/* Day number */}
                   <div className="mb-0.5 text-right sm:mb-1">
-                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}>
+                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}>
                       {cell.date.getDate()}
                     </span>
                   </div>
@@ -532,7 +532,7 @@ export default function CalendarPage() {
                           key={event.id}
                           type="button"
                           onClick={() => setSelectedEvent(event)}
-                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[9px] font-semibold leading-snug border sm:px-1.5 sm:py-[3px] sm:text-xs ${config.color} hover:opacity-80 transition`}
+                          className={`block w-full truncate rounded px-0.5 py-0.5 text-left text-[10px] font-semibold leading-snug border sm:px-1.5 sm:py-[3px] sm:text-sm ${config.color} hover:opacity-80 transition`}
                           title={`${event.summary || "Untitled"}${time ? ` ${time}` : ""}`}
                         >
                           <span className="hidden sm:inline">{event.summary || "Untitled"}{time && <span className="ml-1 opacity-70">{time}</span>}</span>
@@ -546,7 +546,7 @@ export default function CalendarPage() {
                         onClick={() => {
                           if (dayEvents[maxVisible]) setSelectedEvent(dayEvents[maxVisible]);
                         }}
-                        className="block w-full px-0.5 text-left text-[9px] font-semibold text-blue-600 hover:underline sm:px-1.5 sm:text-[11px]"
+                        className="block w-full px-0.5 text-left text-[10px] font-semibold text-blue-600 hover:underline sm:px-1.5 sm:text-xs"
                       >
                         +{dayEvents.length - maxVisible}
                         <span className="hidden sm:inline"> more</span>
@@ -574,7 +574,7 @@ export default function CalendarPage() {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold text-gray-400">
+            <div className="grid grid-cols-7 gap-0.5 text-center text-[11px] font-semibold text-gray-400">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div key={d}>{d}</div>
               ))}
@@ -626,7 +626,7 @@ export default function CalendarPage() {
           {/* Event Colors */}
           <div className="rounded-lg border border-gray-200 bg-white p-3">
             <h3 className="mb-2 text-sm font-bold text-gray-900">Event colors</h3>
-            <p className="mb-2 text-[11px] text-gray-400">
+            <p className="mb-2 text-xs text-gray-400">
               {enabledTypes.size === EVENT_TYPE_CONFIG.length ? "Showing all events" : `${enabledTypes.size} of ${EVENT_TYPE_CONFIG.length} colors shown`}
             </p>
             <div className="space-y-1">
@@ -648,7 +648,7 @@ export default function CalendarPage() {
           {/* Colors Legend */}
           <div className="rounded-lg border border-gray-200 bg-white p-3">
             <h3 className="mb-2 text-sm font-bold text-gray-900">Colors</h3>
-            <p className="text-[11px] text-gray-400">Colors match your Google Calendar event colors</p>
+            <p className="text-xs text-gray-400">Colors match your Google Calendar event colors</p>
           </div>
         </aside>
       </div>
@@ -664,7 +664,7 @@ export default function CalendarPage() {
           >
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-600">New schedule</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">New schedule</p>
                 <h2 className="mt-0.5 text-lg font-bold text-blue-700 sm:text-2xl">Create appointment</h2>
               </div>
               <button type="button" onClick={() => setNewScheduleOpen(false)} aria-label="Close" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">

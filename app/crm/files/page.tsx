@@ -71,13 +71,13 @@ export default function FilesPage() {
       <section className="sticky top-14 z-20 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur-sm sm:rounded-[2rem] sm:p-6">
         <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Storage</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Storage</p>
             <h1 className="text-xl font-bold text-blue-700 sm:text-3xl">Files & Photo Uploads</h1>
             <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-2 sm:block">Crew uploaded photos sync here automatically into folders by property address and work type.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center sm:gap-3">
-            <div className="rounded-lg bg-blue-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-blue-700 sm:text-2xl">{folders.length}</p><p className="text-[10px] font-bold uppercase text-blue-600 sm:text-xs">Folders</p></div>
-            <div className="rounded-lg bg-orange-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-orange-700 sm:text-2xl">{totalPhotos}</p><p className="text-[10px] font-bold uppercase text-orange-600 sm:text-xs">Photos</p></div>
+            <div className="rounded-lg bg-blue-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-blue-700 sm:text-2xl">{folders.length}</p><p className="text-xs font-bold uppercase text-blue-600 sm:text-sm">Folders</p></div>
+            <div className="rounded-lg bg-orange-50 px-3 py-2 sm:px-5 sm:py-3"><p className="text-lg font-bold text-orange-700 sm:text-2xl">{totalPhotos}</p><p className="text-xs font-bold uppercase text-orange-600 sm:text-sm">Photos</p></div>
           </div>
         </div>
 

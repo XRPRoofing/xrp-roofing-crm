@@ -600,7 +600,7 @@ export default function CustomersPage() {
       <div className="sticky top-14 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6 sm:pb-3">
         <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Customer Records</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Customer Records</p>
             <h1 className="text-xl font-bold text-blue-700 sm:text-3xl">Customers ({customerList.length})</h1>
             <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-2 sm:block">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
           </div>

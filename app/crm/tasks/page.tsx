@@ -29,7 +29,7 @@ function MetricCard({ label, value, active, onClick, color }: { label: string; v
   return (
     <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-md border p-1.5 sm:p-3 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
       <span className="text-base sm:text-2xl font-bold text-blue-700">{value}</span>
-      <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
+      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
     </button>
   );
 }
@@ -38,9 +38,9 @@ type TaskTypeFilter = "all" | "job" | "manual";
 
 function TaskBadge({ isManual }: { isManual?: boolean }) {
   if (isManual) {
-    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Daily</span>;
+    return <span className="inline-flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[11px] font-bold text-violet-700"><ClipboardList className="h-2.5 w-2.5" />Daily</span>;
   }
-  return <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 px-1.5 py-0.5 text-[9px] font-bold text-cyan-700"><Briefcase className="h-2.5 w-2.5" />Job</span>;
+  return <span className="inline-flex items-center gap-0.5 rounded-full bg-cyan-100 px-1.5 py-0.5 text-[11px] font-bold text-cyan-700"><Briefcase className="h-2.5 w-2.5" />Job</span>;
 }
 
 export default function TasksPage() {
@@ -234,7 +234,7 @@ export default function TasksPage() {
       <div className="sticky top-14 z-20 -mx-3 -mt-2 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-xs">Office Workflow</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-xs">Office Workflow</p>
             <h1 className="text-lg font-bold text-blue-700 sm:text-3xl">Task Board</h1>
             <div className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
@@ -268,7 +268,7 @@ export default function TasksPage() {
             { key: "manual" as TaskTypeFilter, label: "Daily Tasks", count: manualCount },
           ]).map(({ key, label, count }) => (
             <button key={key} type="button" onClick={() => setFilterType(key)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition ${filterType === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}>
-              {label} <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${filterType === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+              {label} <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${filterType === key ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
             </button>
           ))}
         </div>
@@ -315,7 +315,7 @@ export default function TasksPage() {
                   {hasAlert && <span className="h-2 w-2 rounded-full bg-orange-500" />}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${c.text} ${isOpen ? "rotate-180" : ""}`} />
                 </div>
               </button>
@@ -385,9 +385,9 @@ export default function TasksPage() {
               <div className={`flex items-center justify-between rounded-t-2xl border-b px-3 py-2.5 ${c.bg} ${c.border}`}>
                 <div className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${c.dot}`} />
-                  <h2 className={`text-[11px] font-bold uppercase tracking-wide ${c.text}`}>{status}</h2>
+                  <h2 className={`text-xs font-bold uppercase tracking-wide ${c.text}`}>{status}</h2>
                 </div>
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
+                <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold ${c.bg} ${c.text}`}>{colTasks.length}</span>
               </div>
 
               {/* Cards — fully scrollable */}
@@ -405,7 +405,7 @@ export default function TasksPage() {
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-gray-900">{task.isManual ? task.title : task.customerName}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Daily Task" && task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-gray-500">{task.isManual ? (task.jobAddress !== "Daily Task" && task.jobAddress !== "Manual Task" ? task.jobAddress : "") : task.jobAddress}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-0.5">
                         {!task.isManual && (
@@ -415,31 +415,31 @@ export default function TasksPage() {
                       </div>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between gap-1">
-                      {!task.isManual && <span className="text-[10px] font-bold text-blue-700">{task.invoiceAmount}</span>}
-                      {task.isManual && task.dueDate && task.dueDate !== "No due date" && <span className="text-[10px] font-bold text-violet-600">{task.dueDate}</span>}
+                      {!task.isManual && <span className="text-[11px] font-bold text-blue-700">{task.invoiceAmount}</span>}
+                      {task.isManual && task.dueDate && task.dueDate !== "No due date" && <span className="text-[11px] font-bold text-violet-600">{task.dueDate}</span>}
                       {task.satisfactionResult === "yes" && <ThumbsUp className="h-3 w-3 text-blue-500" />}
                       {task.satisfactionResult === "no" && <ThumbsDown className="h-3 w-3 text-orange-500" />}
                       {task.reviewSubmitted && <Star className="h-3 w-3 text-orange-500" />}
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-1">
-                      <span className="truncate text-[10px] text-gray-400">{task.assignedUser}</span>
-                      {task.invoiceNumber && <span className="text-[9px] font-bold text-gray-400">#{task.invoiceNumber}</span>}
+                      <span className="truncate text-[11px] text-gray-400">{task.assignedUser}</span>
+                      {task.invoiceNumber && <span className="text-[11px] font-bold text-gray-400">#{task.invoiceNumber}</span>}
                     </div>
                     {/* Quick actions */}
                     {status === "Customer Satisfaction" && !task.satisfactionChecked && !task.isManual && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); openSatModal(task); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); openSatModal(task); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
                         <CheckSquare className="mr-1 inline h-3 w-3" />Satisfaction Check
                       </button>
                     )}
                     {status === "Review Request" && !task.reviewRequestSentAt && !task.isManual && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
                         <Zap className="mr-1 inline h-3 w-3" />Send Review Request
                       </button>
                     )}
                   </article>
                 ))}
                 {colTasks.length === 0 && (
-                  <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-200 py-6 text-[10px] font-semibold text-gray-400">Empty</div>
+                  <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-gray-200 py-6 text-xs font-semibold text-gray-400">Empty</div>
                 )}
               </div>
             </section>
@@ -455,7 +455,7 @@ export default function TasksPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="mb-1.5 flex items-center gap-2">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${officeTaskStatusColors[selectedTask.status].text}`}>{selectedTask.status}</p>
+                  <p className={`text-xs font-bold uppercase tracking-widest ${officeTaskStatusColors[selectedTask.status].text}`}>{selectedTask.status}</p>
                   <TaskBadge isManual={selectedTask.isManual} />
                 </div>
                 <h2 className="mt-1 text-lg font-bold text-blue-700">{selectedTask.isManual ? selectedTask.title : selectedTask.customerName}</h2>
@@ -509,8 +509,8 @@ export default function TasksPage() {
             {selectedTask.reviewRequestSentAt && !selectedTask.isManual && (
               <div className="mt-4 rounded-lg bg-blue-50 p-3">
                 <p className="text-xs font-bold text-blue-700">Review Request Sent</p>
-                <p className="mt-0.5 text-[11px] text-blue-600">{fmt(selectedTask.reviewRequestSentAt)}</p>
-                <div className="mt-1 flex gap-2 text-[10px] font-bold">
+                <p className="mt-0.5 text-xs text-blue-600">{fmt(selectedTask.reviewRequestSentAt)}</p>
+                <div className="mt-1 flex gap-2 text-[11px] font-bold">
                   {selectedTask.reviewSmsSent && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">SMS ✓</span>}
                   {selectedTask.reviewEmailSent && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Email ✓</span>}
                   {selectedTask.reviewSubmitted && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">Review Received ✓</span>}
@@ -520,12 +520,12 @@ export default function TasksPage() {
 
             {/* Move to column */}
             <div className="mt-4">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Move to</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Move to</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {officeTaskStatuses.filter((s) => s !== selectedTask.status).map((s) => {
                   const c = officeTaskStatusColors[s];
                   return (
-                    <button key={s} type="button" onClick={() => { moveTask(selectedTask.id, s); setSelectedTask((prev) => prev ? { ...prev, status: s } : null); }} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition hover:opacity-80 ${c.bg} ${c.text}`}>{s}</button>
+                    <button key={s} type="button" onClick={() => { moveTask(selectedTask.id, s); setSelectedTask((prev) => prev ? { ...prev, status: s } : null); }} className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition hover:opacity-80 ${c.bg} ${c.text}`}>{s}</button>
                   );
                 })}
               </div>
@@ -587,9 +587,9 @@ export default function TasksPage() {
                   {[...selectedTask.timeline].reverse().map((entry) => (
                     <li key={entry.id} className="relative">
                       <span className="absolute -left-[1.35rem] top-1 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white" />
-                      <p className="text-[11px] font-bold text-gray-800">{entry.event}</p>
-                      {entry.note && <p className="text-[10px] text-gray-500">{entry.note}</p>}
-                      <p className="flex items-center gap-1 text-[10px] text-gray-400"><Clock className="h-3 w-3" />{fmt(entry.at)}{entry.by ? ` · ${entry.by}` : ""}</p>
+                      <p className="text-xs font-bold text-gray-800">{entry.event}</p>
+                      {entry.note && <p className="text-[11px] text-gray-500">{entry.note}</p>}
+                      <p className="flex items-center gap-1 text-[11px] text-gray-400"><Clock className="h-3 w-3" />{fmt(entry.at)}{entry.by ? ` · ${entry.by}` : ""}</p>
                     </li>
                   ))}
                 </ol>
@@ -606,7 +606,7 @@ export default function TasksPage() {
           <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">New Daily Task</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-violet-600">New Daily Task</p>
                 <h2 className="mt-1 text-lg font-bold text-blue-700">Create Task</h2>
               </div>
               <button onClick={() => setShowNewTask(false)} className="rounded-lg p-2 hover:bg-gray-100"><X className="h-5 w-5" /></button>
@@ -657,7 +657,7 @@ export default function TasksPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setSatModal(null)}>
           <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-sm rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Customer Satisfaction Check</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Customer Satisfaction Check</p>
             <h2 className="mt-2 text-lg font-bold text-blue-700">Was the customer satisfied?</h2>
             <p className="mt-1 text-sm font-semibold text-gray-500">{satModal.customerName} — {satModal.jobAddress}</p>
 

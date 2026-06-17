@@ -253,7 +253,7 @@ export default function AutomationsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-100 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <tr className="border-b border-gray-100 text-left text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <th className="pb-2 pr-4">Automation</th>
                     <th className="pb-2 pr-4">Recipient</th>
                     <th className="pb-2 pr-4">Channels</th>
@@ -269,12 +269,12 @@ export default function AutomationsPage() {
                       <td className="py-2 pr-4">
                         <div className="flex gap-1">
                           {entry.channels.map((c) => (
-                            <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">{c}</span>
+                            <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">{c}</span>
                           ))}
                         </div>
                       </td>
                       <td className="py-2 pr-4">
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${logStatusColor(entry.status)}`}>{entry.status}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold capitalize ${logStatusColor(entry.status)}`}>{entry.status}</span>
                       </td>
                       <td className="py-2 text-gray-400">{fmt(entry.triggeredAt)}</td>
                     </tr>
@@ -310,8 +310,8 @@ export default function AutomationsPage() {
                 {isExpanded ? <ChevronUp className="ml-2 h-4 w-4 text-gray-400" /> : <ChevronDown className="ml-2 h-4 w-4 text-gray-400" />}
               </button>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => enableAllInGroup(group, true)} className="rounded-lg px-3 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-50">Enable All</button>
-                <button type="button" onClick={() => enableAllInGroup(group, false)} className="rounded-lg px-3 py-1.5 text-[10px] font-bold text-gray-500 hover:bg-gray-100">Disable All</button>
+                <button type="button" onClick={() => enableAllInGroup(group, true)} className="rounded-lg px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50">Enable All</button>
+                <button type="button" onClick={() => enableAllInGroup(group, false)} className="rounded-lg px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100">Disable All</button>
               </div>
             </div>
 
@@ -333,7 +333,7 @@ export default function AutomationsPage() {
                             <p className="text-sm font-bold text-blue-700">{meta.label}</p>
                             <p className="mt-0.5 text-xs font-semibold text-gray-500">{meta.description}</p>
                             {rec.lastTriggered && (
-                              <p className="mt-1 text-[10px] text-gray-400">Last triggered: {fmt(rec.lastTriggered)}</p>
+                              <p className="mt-1 text-[11px] text-gray-400">Last triggered: {fmt(rec.lastTriggered)}</p>
                             )}
                           </div>
                         </div>
@@ -344,14 +344,14 @@ export default function AutomationsPage() {
                           <button
                             type="button"
                             onClick={() => toggleChannel(id, "email", !rec.channels.email)}
-                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${rec.channels.email ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-400"}`}
+                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${rec.channels.email ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-400"}`}
                           >
                             <Mail className="h-3.5 w-3.5" /> Email
                           </button>
                           <button
                             type="button"
                             onClick={() => toggleChannel(id, "sms", !rec.channels.sms)}
-                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${rec.channels.sms ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-400"}`}
+                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition ${rec.channels.sms ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-400"}`}
                           >
                             <Smartphone className="h-3.5 w-3.5" /> SMS
                           </button>
@@ -360,7 +360,7 @@ export default function AutomationsPage() {
                           <select
                             value={rec.timing}
                             onChange={(e) => setTiming(id, e.target.value as AutomationTiming)}
-                            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-700 outline-none focus:border-blue-400"
+                            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-bold text-gray-700 outline-none focus:border-blue-400"
                           >
                             {(Object.entries(TIMING_LABELS) as [AutomationTiming, string][]).map(([val, label]) => (
                               <option key={val} value={val}>{label}</option>
@@ -371,7 +371,7 @@ export default function AutomationsPage() {
                           <button
                             type="button"
                             onClick={() => isEditing ? setEditingId(null) : openEditor(id)}
-                            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-600 hover:bg-gray-50"
+                            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50"
                           >
                             <MessageSquare className="h-3.5 w-3.5" /> {isEditing ? "Close" : "Template"}
                           </button>
@@ -381,7 +381,7 @@ export default function AutomationsPage() {
                             type="button"
                             onClick={() => void sendTestMessage(id)}
                             disabled={testingId === id}
-                            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
                           >
                             {testingId === id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                             {testingId === id ? "Sending…" : "Test"}
@@ -404,7 +404,7 @@ export default function AutomationsPage() {
                         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                           <div className="mb-2 flex items-center justify-between">
                             <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Message Template</p>
-                            <button type="button" onClick={() => resetTemplate(id)} className="text-[10px] font-bold text-orange-600 hover:underline">Reset to default</button>
+                            <button type="button" onClick={() => resetTemplate(id)} className="text-[11px] font-bold text-orange-600 hover:underline">Reset to default</button>
                           </div>
                           <textarea
                             value={draftTemplate}
@@ -412,7 +412,7 @@ export default function AutomationsPage() {
                             rows={4}
                             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 outline-none focus:border-blue-400"
                           />
-                          <p className="mt-2 text-[10px] font-semibold text-gray-400">
+                          <p className="mt-2 text-[11px] font-semibold text-gray-400">
                             Variables: {"{customerName}"} {"{date}"} {"{time}"} {"{address}"} {"{invoiceNumber}"} {"{amount}"} {"{paymentLink}"} {"{proposalId}"} {"{reviewLink}"} {"{status}"} {"{assignedTo}"}
                           </p>
                           <div className="mt-3 flex gap-2">
