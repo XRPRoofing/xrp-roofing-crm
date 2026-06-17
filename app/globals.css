@@ -137,6 +137,15 @@
   }
 }
 
+/* Floating call card entrance animation */
+@keyframes callCardSlideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-call-card-in {
+  animation: callCardSlideUp 0.3s ease-out;
+}
+
 /* Mobile: keep board headers compact so content is reachable without dragging. */
 @media (max-width: 639px) {
   .crm-main h1 {

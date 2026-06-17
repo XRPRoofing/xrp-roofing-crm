@@ -1030,28 +1030,7 @@ export default function ConversationBoard() {
     return () => window.clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    const transferredCall = (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall;
-    if (!transferredCall || browserCallRef.current) return;
-
-    browserCallRef.current = transferredCall;
-    setCallSid(transferredCall.parameters?.CallSid);
-    setDialNumber(transferredCall.parameters?.From || "");
-    setIsActiveCall(true);
-    setIsHeld(false);
-    setIsMuted(false);
-    setIsDialerOpen(true);
-    setIsDialerMinimized(false);
-    setTwilioNotice("Incoming call connected from global popup");
-    transferredCall.on("disconnect", () => {
-      setIsActiveCall(false);
-      setIsMuted(false);
-      setCallSid(undefined);
-      browserCallRef.current = null;
-      (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = undefined;
-      setTwilioNotice("Call ended");
-    });
-  }, []);
+  // Incoming call transfer removed — CrmShell FloatingCallCard owns active incoming call state.
 
   // Device is now owned by CrmShell and shared via VoiceDeviceContext.
   // Mark inbound as ready if the shared device exists.
@@ -1298,12 +1277,7 @@ export default function ConversationBoard() {
 
   return (
     <div className="-mx-3 -my-4 flex min-h-[calc(100vh-5rem)] flex-1 flex-col overflow-x-clip bg-gray-100 px-3 py-4 font-sans sm:-mx-5 sm:px-5 xl:h-[calc(100vh-8.25rem)] xl:max-h-[calc(100vh-8.25rem)] xl:min-h-0 xl:overflow-hidden">
-      {incomingCall && (
-        <div className="sticky top-20 z-50 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-200 bg-orange-500 px-4 py-3 text-white shadow-sm">
-          <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" /><span className="text-sm font-semibold">Incoming call from {incomingFrom}</span></div>
-          <div className="flex gap-2"><button onClick={handleAnswerIncomingCall} className="inline-flex items-center rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-50"><Phone className="mr-1.5 h-4 w-4" />Answer</button><button onClick={handleDeclineIncomingCall} className="inline-flex items-center rounded-lg bg-gray-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"><PhoneOff className="mr-1.5 h-4 w-4" />Decline</button></div>
-        </div>
-      )}
+      {/* Incoming call UI removed — handled globally by CrmShell FloatingCallCard */}
       {isActiveCall && (
         <div className="sticky top-20 z-40 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-600 px-4 py-3 text-white shadow-sm">
           <div className="flex items-center gap-3"><span className="h-2.5 w-2.5 rounded-full bg-blue-300" /><span className="text-sm font-semibold">Active call with {matchedDialContact?.name || dialNumber}</span><Badge tone="green"><Clock className="mr-1 h-3 w-3" />{isHeld ? "Held" : "Live"}</Badge></div>

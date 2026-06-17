@@ -12,7 +12,7 @@ import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/noti
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
-import IncomingCallOverlay from "@/components/crm/IncomingCallOverlay";
+import FloatingCallCard from "@/components/crm/FloatingCallCard";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
@@ -63,6 +63,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const voiceDeviceRef = useRef<BrowserVoiceDevice | null>(null);
   const incomingCallRef = useRef<BrowserVoiceCall | null>(null);
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
+  const [globalActiveIncomingCall, setGlobalActiveIncomingCall] = useState(false);
+  const [globalIncomingMuted, setGlobalIncomingMuted] = useState(false);
+  const [globalIncomingCaller, setGlobalIncomingCaller] = useState<{ name: string; phone: string }>({ name: "", phone: "" });
   const [globalDialerOpen, setGlobalDialerOpen] = useState(false);
   const [globalDialNumber, setGlobalDialNumber] = useState("");
   const [globalCallActive, setGlobalCallActive] = useState(false);
@@ -398,34 +401,102 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     void deleteNotificationFromSupabase(notificationId);
   }
 
+  // --- Ringtone + vibration when ringing ---
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+  const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (globalIncomingCall) {
+      const audio = new Audio("/sounds/ringtone.mp3");
+      audio.loop = true;
+      audio.volume = 0.8;
+      audio.play().catch(() => undefined);
+      ringtoneAudioRef.current = audio;
+      if ("vibrate" in navigator) {
+        navigator.vibrate([300, 200, 300, 200, 300]);
+        vibrateTimerRef.current = setInterval(() => navigator.vibrate([300, 200, 300, 200, 300]), 2000);
+      }
+    } else {
+      ringtoneAudioRef.current?.pause();
+      ringtoneAudioRef.current = null;
+      if (vibrateTimerRef.current) { clearInterval(vibrateTimerRef.current); vibrateTimerRef.current = null; }
+      navigator.vibrate?.(0);
+    }
+    return () => {
+      ringtoneAudioRef.current?.pause();
+      ringtoneAudioRef.current = null;
+      if (vibrateTimerRef.current) { clearInterval(vibrateTimerRef.current); vibrateTimerRef.current = null; }
+      navigator.vibrate?.(0);
+    };
+  }, [globalIncomingCall]);
+
+  // --- BroadcastChannel for cross-tab call state sync ---
+  const callChannelRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    const ch = new BroadcastChannel("xrp-call-state");
+    callChannelRef.current = ch;
+    ch.onmessage = (ev) => {
+      const msg = ev.data as { type: string };
+      if (msg.type === "answered") {
+        // Another tab answered — clear ringing state
+        setGlobalIncomingCall(null);
+      } else if (msg.type === "declined" || msg.type === "ended") {
+        setGlobalIncomingCall(null);
+        setGlobalActiveIncomingCall(false);
+        setGlobalIncomingMuted(false);
+      }
+    };
+    return () => { ch.close(); };
+  }, []);
+
   function handleAnswerGlobalIncomingCall() {
     const incoming = incomingCallRef.current;
-    // Always clear the overlay first so the UI is responsive
     setGlobalIncomingCall(null);
 
-    if (!incoming) {
-      router.push("/crm/conversations");
-      return;
-    }
+    if (!incoming) return;
 
     try {
       incoming.accept();
-      (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = incoming;
+      setGlobalActiveIncomingCall(true);
+      setGlobalIncomingMuted(false);
+      setGlobalIncomingCaller({ name: incoming.parameters?.From || "Unknown", phone: incoming.parameters?.From || "" });
+      // Listen for remote disconnect
+      incoming.on("disconnect", () => {
+        setGlobalActiveIncomingCall(false);
+        setGlobalIncomingMuted(false);
+        incomingCallRef.current = null;
+        callChannelRef.current?.postMessage({ type: "ended" });
+      });
+      callChannelRef.current?.postMessage({ type: "answered" });
     } catch {
-      // Call may have already been cancelled/disconnected by Twilio
       incomingCallRef.current = null;
     }
-    router.push("/crm/conversations?activeCall=1");
   }
 
   function handleDeclineGlobalIncomingCall() {
     try {
       incomingCallRef.current?.reject();
-    } catch {
-      // Call may have already been cancelled/disconnected
-    }
+    } catch {}
     incomingCallRef.current = null;
     setGlobalIncomingCall(null);
+    callChannelRef.current?.postMessage({ type: "declined" });
+  }
+
+  function handleEndGlobalIncomingCall() {
+    try {
+      incomingCallRef.current?.disconnect();
+    } catch {}
+    incomingCallRef.current = null;
+    setGlobalActiveIncomingCall(false);
+    setGlobalIncomingMuted(false);
+    callChannelRef.current?.postMessage({ type: "ended" });
+  }
+
+  function handleMuteGlobalIncomingCall() {
+    const call = incomingCallRef.current;
+    if (!call) return;
+    const next = !globalIncomingMuted;
+    try { call.mute?.(next); } catch {}
+    setGlobalIncomingMuted(next);
   }
 
   async function handleGlobalStartCall() {
@@ -569,12 +640,29 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] overflow-x-hidden bg-gray-50">
-      {/* Full-screen Incoming Call Overlay */}
+      {/* Floating Call Card — ringing */}
       {globalIncomingCall && !isCrewUser && (
-        <IncomingCallOverlay
+        <FloatingCallCard
+          state="ringing"
           caller={globalIncomingCall}
+          muted={false}
           onAnswer={handleAnswerGlobalIncomingCall}
           onDecline={handleDeclineGlobalIncomingCall}
+          onEnd={handleDeclineGlobalIncomingCall}
+          onMute={() => {}}
+        />
+      )}
+
+      {/* Floating Call Card — active incoming call */}
+      {globalActiveIncomingCall && !globalIncomingCall && !isCrewUser && (
+        <FloatingCallCard
+          state="active"
+          caller={globalIncomingCaller}
+          muted={globalIncomingMuted}
+          onAnswer={() => {}}
+          onDecline={() => {}}
+          onEnd={handleEndGlobalIncomingCall}
+          onMute={handleMuteGlobalIncomingCall}
         />
       )}
 
