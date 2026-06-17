@@ -1219,7 +1219,7 @@ export default function InvoicesPage() {
       jobId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       uploadedBy: sentBy,
-      documents: [{ name: `Paid Receipt - ${invoice.invoiceNumber} - ${today}`, dataUrl: `data:text/plain;base64,${btoa(generatePaidReceiptEmailBody(invoice))}` }],
+      documents: [{ name: `Paid Receipt - ${invoice.invoiceNumber} - ${today}`, dataUrl: `data:text/plain;base64,${btoa(unescape(encodeURIComponent(generatePaidReceiptEmailBody(invoice))))}` }],
     });
   }
 
