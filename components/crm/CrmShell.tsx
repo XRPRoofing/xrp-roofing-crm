@@ -400,19 +400,30 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   function handleAnswerGlobalIncomingCall() {
     const incoming = incomingCallRef.current;
+    // Always clear the overlay first so the UI is responsive
+    setGlobalIncomingCall(null);
+
     if (!incoming) {
       router.push("/crm/conversations");
       return;
     }
 
-    incoming.accept();
-    (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = incoming;
-    setGlobalIncomingCall(null);
+    try {
+      incoming.accept();
+      (window as unknown as { __xrpActiveIncomingCall?: BrowserVoiceCall }).__xrpActiveIncomingCall = incoming;
+    } catch {
+      // Call may have already been cancelled/disconnected by Twilio
+      incomingCallRef.current = null;
+    }
     router.push("/crm/conversations?activeCall=1");
   }
 
   function handleDeclineGlobalIncomingCall() {
-    incomingCallRef.current?.reject();
+    try {
+      incomingCallRef.current?.reject();
+    } catch {
+      // Call may have already been cancelled/disconnected
+    }
     incomingCallRef.current = null;
     setGlobalIncomingCall(null);
   }
