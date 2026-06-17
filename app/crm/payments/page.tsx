@@ -154,7 +154,7 @@ export default function PaymentsPage() {
   const sortLabel = tab === "paid" ? "paid date" : "due date";
 
   return (
-    <div className="mx-auto flex max-w-2xl min-h-0 flex-1 flex-col gap-3 px-0 pb-8 sm:gap-5 sm:px-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-0 pb-8 sm:gap-5">
       {/* Sticky Header */}
       <div className="sticky top-16 z-20 -mx-4 space-y-1.5 border-b border-gray-200 bg-white/95 px-4 pb-2 pt-1 backdrop-blur-sm sm:-mx-8 sm:space-y-3 sm:px-8 sm:pb-3 sm:pt-2">
         <div className="flex items-center justify-between">
