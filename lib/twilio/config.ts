@@ -26,7 +26,14 @@ export function getTwilioConfig() {
     ivrSalesNumber: toE164(process.env.TWILIO_IVR_SALES_NUMBER || "") || inboundForwardNumber,
     ivrSchedulingNumber: toE164(process.env.TWILIO_IVR_SCHEDULING_NUMBER || "") || inboundForwardNumber,
     ivrOtherNumber: toE164(process.env.TWILIO_IVR_OTHER_NUMBER || "") || inboundForwardNumber,
+    ringGroup: parseRingGroup(process.env.TWILIO_RING_GROUP || ""),
   };
+}
+
+/** Parse comma-separated agent identities (e.g. "agent-1,agent-2,agent-3") */
+export function parseRingGroup(value: string): string[] {
+  if (!value.trim()) return [];
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
 export function hasTwilioMessagingConfig() {

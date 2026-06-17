@@ -7,6 +7,7 @@ import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, getVoiceToken, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
+import { createClient } from "@/lib/supabase/client";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
@@ -1057,7 +1058,11 @@ export default function ConversationBoard() {
 
     async function registerVoiceDevice() {
       try {
-        const device = await createBrowserVoiceDevice("crm-agent");
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        const identity = data?.session?.user?.id ? `agent-${data.session.user.id}` : "crm-agent";
+
+        const device = await createBrowserVoiceDevice(identity);
         if (!mounted) return;
 
         voiceDeviceRef.current = device;
@@ -1072,7 +1077,7 @@ export default function ConversationBoard() {
         });
         device.on("tokenWillExpire", () => {
           setTwilioNotice("Refreshing inbound call token...");
-          getVoiceToken("crm-agent").then(({ token }) => {
+          getVoiceToken(identity).then(({ token }) => {
             device.updateToken?.(token);
             return device.register();
           }).catch(() => setTwilioNotice("Inbound token refresh failed. Reload the CRM."));
@@ -1137,8 +1142,13 @@ export default function ConversationBoard() {
     setTwilioNotice("Starting Twilio call...");
     applyLocalEvent(createLocalCommunicationEvent("call_status", destination, `Dialed ${destination}`));
     try {
-      const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
-      voiceDeviceRef.current = device;
+      if (!voiceDeviceRef.current) {
+        const supabase = createClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const identity = sessionData?.session?.user?.id ? `agent-${sessionData.session.user.id}` : "crm-agent";
+        voiceDeviceRef.current = await createBrowserVoiceDevice(identity);
+      }
+      const device = voiceDeviceRef.current;
       const call = await device.connect({ params: { To: destination } });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
       setIsActiveCall(true);
