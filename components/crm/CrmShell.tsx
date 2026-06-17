@@ -677,8 +677,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                             </div>
                             <p className="mt-0.5 text-xs text-gray-500">{notification.message}</p>
                             <div className="mt-2 flex items-center justify-between">
-                              <p className="text-[11px] text-gray-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
-                              <button onClick={() => handleDeleteNotification(notification.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">Delete</button>
+                              <p className="text-xs text-gray-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                              <button onClick={() => handleDeleteNotification(notification.id)} className="text-xs font-medium text-red-500 hover:text-red-700">Delete</button>
                             </div>
                           </div>
                         ))}
@@ -754,7 +754,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation — rendered at root level so no parent transform/flex can break fixed positioning */}
       {mobileBottomNav.length > 0 && (
         <nav className="fixed inset-x-0 bottom-0 z-[9999] border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" style={{ transform: "translateZ(0)", WebkitTransform: "translateZ(0)", willChange: "transform", touchAction: "none", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}>
-          <div className="flex items-center justify-around px-1 py-1">
+          <div className="flex items-center justify-around px-1 py-1.5">
             {mobileBottomNav.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
@@ -762,11 +762,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-colors ${
+                  className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-xs font-medium transition-colors ${
                     active ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  <Icon className={`h-5 w-5 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
+                  <Icon className={`h-6 w-6 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );

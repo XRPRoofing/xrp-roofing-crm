@@ -604,7 +604,7 @@ export default function LeadsPage() {
           {dashboardMetrics.map((metric) => (
             <div key={metric.label} className={`rounded-lg border px-2 py-1.5 sm:px-4 sm:py-3 ${metric.tone}`}>
               <p className="text-base font-bold leading-none sm:text-2xl">{metric.value}</p>
-              <p className="mt-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide sm:mt-1 sm:text-[11px]">{metric.label}</p>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase leading-tight tracking-wide sm:mt-1 sm:text-xs">{metric.label}</p>
             </div>
           ))}
         </div>
@@ -612,13 +612,13 @@ export default function LeadsPage() {
         {sourceMetrics.length > 0 && (
           <div className="overflow-x-auto">
             <div className="flex min-w-max items-stretch gap-2">
-              <div className="flex shrink-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500"><Tag className="h-3 w-3" />By Source</div>
+              <div className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500"><Tag className="h-3.5 w-3.5" />By Source</div>
               {sourceMetrics.map(({ src, total, closed, revenue, conversion }) => (
                 <button
                   key={src}
                   type="button"
                   onClick={() => setSourceFilter(sourceFilter === src ? null : src)}
-                  className={`flex shrink-0 items-center gap-2 rounded-md border px-2.5 py-1 text-[10px] font-medium transition hover:opacity-80 ${
+                  className={`flex shrink-0 items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition hover:opacity-80 ${
                     sourceFilter === src ? "bg-blue-600 text-white border-blue-600" : `${getSourceColor(src)} border-transparent`
                   }`}
                 >
@@ -792,7 +792,7 @@ export default function LeadsPage() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-11 pr-4 text-sm font-semibold text-gray-700 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50 sm:py-3" placeholder="Search customer, city, rep, source, next action..." />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-500"><Tag className="h-3 w-3" />Source:</span>
+          <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-gray-500"><Tag className="h-3.5 w-3.5" />Source:</span>
           {LEAD_SOURCES.map((src) => {
             const count = jobs.filter((j) => j.source === src).length;
             if (count === 0) return null;
@@ -802,14 +802,14 @@ export default function LeadsPage() {
                 key={src}
                 type="button"
                 onClick={() => setSourceFilter(active ? null : src)}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${active ? "bg-blue-600 text-white" : getSourceColor(src)} hover:opacity-80`}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${active ? "bg-blue-600 text-white" : getSourceColor(src)} hover:opacity-80`}
               >
                 {src} <span className="opacity-70">({count})</span>
               </button>
             );
           })}
           {sourceFilter && (
-            <button type="button" onClick={() => setSourceFilter(null)} className="flex items-center gap-1 rounded-full bg-gray-200 px-2 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-300">
+            <button type="button" onClick={() => setSourceFilter(null)} className="flex items-center gap-1 rounded-full bg-gray-200 px-2.5 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-300">
               <X className="h-3 w-3" /> Clear
             </button>
           )}
@@ -824,10 +824,10 @@ export default function LeadsPage() {
             <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[16.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-1.5 shadow-sm">
               <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
                 <div className="flex items-center justify-between gap-1">
-                  <h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
-                  <span className="shrink-0 text-[11px] font-medium text-gray-400">{stageJobs.length}</span>
+                  <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
+                  <span className="shrink-0 text-xs font-medium text-gray-400">{stageJobs.length}</span>
                 </div>
-                <p className="mt-0.5 text-[10px] text-gray-500">{formatMoney(stageValue)}</p>
+                <p className="mt-0.5 text-xs text-gray-500">{formatMoney(stageValue)}</p>
               </div>
 
               <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-0.5 pb-1">
@@ -843,20 +843,20 @@ export default function LeadsPage() {
                           <GripVertical className="h-3.5 w-3.5 text-gray-300" />
                         </div>
                       </div>
-                      <p className="mt-0.5 truncate text-[11px] leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
+                      <p className="mt-0.5 truncate text-xs leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
                       <div className="mt-1 flex items-center justify-between gap-1">
                         <span className="text-sm font-bold leading-none text-blue-700">{formatMoney(job.value)}</span>
                         {pStatus ? (
-                          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-2.5 w-2.5" />{getProposalStatusLabel(pStatus)}</span>
+                          <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-3 w-3" />{getProposalStatusLabel(pStatus)}</span>
                         ) : urgency.label !== "On Track" ? (
-                          <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                          <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
                         ) : null}
                       </div>
                     </button>
                   );
                 })}
                 {stageJobs.length === 0 && (
-                  <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center text-[11px] font-bold text-gray-400">Drop jobs here</div>
+                  <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center text-xs font-bold text-gray-400">Drop jobs here</div>
                 )}
               </div>
             </section>
@@ -928,7 +928,7 @@ export default function LeadsPage() {
                   </button>
                   {checklistOpen && (
                     <div className="border-t border-gray-100 px-4 pb-4">
-                      <p className="pt-3 text-[11px] font-semibold text-gray-400">Tap each shot you&apos;ve taken on this job.</p>
+                      <p className="pt-3 text-xs font-semibold text-gray-400">Tap each shot you&apos;ve taken on this job.</p>
                       <ul className="mt-2 space-y-1">
                         {PHOTO_CHECKLIST_ITEMS.map((item) => (
                           <li key={item}>
@@ -954,8 +954,8 @@ export default function LeadsPage() {
                     ]).map(({ type, photos, color, badge }) => (
                       <div key={type} className="rounded-lg border border-gray-200 bg-gray-50 p-2">
                         <div className="flex items-center justify-between">
-                          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{type}</p>
-                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${badge}`}>{photos.length}</span>
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{type}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge}`}>{photos.length}</span>
                         </div>
                         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                           <button
@@ -1012,7 +1012,7 @@ export default function LeadsPage() {
                       ))}
                     </div>
                   )}
-                  <p className="mt-2 text-[11px] font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                  <p className="mt-2 text-xs font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">

@@ -1279,33 +1279,33 @@ export default function ProposalsPage() {
             <div className="mx-auto max-w-5xl rounded-lg bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Signed proposal copy</p>
-                <span className="rounded-full bg-blue-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">🔒 Locked</span>
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">🔒 Locked</span>
               </div>
               <p className="mt-2 text-sm font-bold text-gray-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-lg bg-gray-50 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Accepted package</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Accepted package</p>
                   <p className="mt-0.5 text-sm font-bold text-blue-700">{activeProposal.acceptedPackageName || (activeProposal.acceptedPackage || activeProposal.selectedOption || "best").replace(/^\w/, (character) => character.toUpperCase())}</p>
                 </div>
                 <div className="rounded-lg bg-gray-50 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Accepted price</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Accepted price</p>
                   <p className="mt-0.5 text-sm font-bold text-blue-700">${(activeProposal.acceptedPrice ?? activeProposal.total).toLocaleString()}</p>
                 </div>
                 <div className="rounded-lg bg-gray-50 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Version</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Version</p>
                   <p className="mt-0.5 text-sm font-bold text-blue-700">v{activeProposal.proposalVersion ?? 1}</p>
                 </div>
               </div>
               {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-gray-200 bg-white object-contain p-2" />}
               {activeProposal.status === "Signed Offline" && (
                 <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Signed In Person</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">Signed In Person</p>
                   <p className="mt-0.5 text-sm text-gray-700">This proposal was signed offline (in person) by {activeProposal.offlineSignedBy || activeProposal.customerName}.</p>
                 </div>
               )}
               {activeProposal.offlineSignatureFile && (
                 <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Uploaded Signed Document</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Uploaded Signed Document</p>
                   <div className="mt-2 flex items-center gap-3">
                     {activeProposal.offlineSignatureFile.startsWith("data:image") ? (
                       <Image src={activeProposal.offlineSignatureFile} alt="Signed proposal" width={200} height={140} className="max-h-36 w-auto rounded-lg border border-gray-200 object-contain" />
@@ -1377,7 +1377,7 @@ export default function ProposalsPage() {
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Total
                 <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
-                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[10px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
+                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
               </label>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Customer notes
@@ -1827,7 +1827,7 @@ export default function ProposalsPage() {
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col justify-between gap-2 sm:gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-orange-300 sm:text-xs">Proposal Center</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-orange-300 sm:text-sm">Proposal Center</p>
             <h1 className="text-xl font-bold tracking-tight sm:text-3xl">Proposals</h1>
             <p className="crm-board-subtitle mt-1 hidden max-w-2xl text-sm font-medium leading-6 text-blue-100 sm:mt-2 sm:block">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
           </div>

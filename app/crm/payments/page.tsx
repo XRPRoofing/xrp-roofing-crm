@@ -159,7 +159,7 @@ export default function PaymentsPage() {
       <div className="sticky top-14 z-20 -mx-3 space-y-1.5 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-6 sm:space-y-3 sm:px-6 sm:pb-3 sm:pt-2">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Module</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">CRM Module</p>
             <h1 className="text-xl font-bold text-blue-700 sm:text-2xl">Payments</h1>
           </div>
           <button
@@ -209,7 +209,7 @@ export default function PaymentsPage() {
 
         {/* Total banner */}
         <div className={`rounded-md p-2.5 text-center sm:rounded-lg sm:p-4 ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500 sm:text-xs">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500 sm:text-sm">
             {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
           </p>
           <p className={`mt-0.5 text-2xl font-bold sm:mt-1 sm:text-3xl ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
