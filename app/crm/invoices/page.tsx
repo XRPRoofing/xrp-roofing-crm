@@ -1170,8 +1170,14 @@ export default function InvoicesPage() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Unable to send invoice email");
+        let errorMsg = "Unable to send invoice email";
+        try {
+          const data = await response.json();
+          errorMsg = data.error || errorMsg;
+        } catch {
+          // Response was not valid JSON (e.g. plain-text proxy error)
+        }
+        throw new Error(errorMsg);
       }
 
       if (isPaidReceipt) {
@@ -1315,16 +1321,16 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         windowWidth: 800,
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.75);
       const pdf = new jsPDF("p", "mm", "letter");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const imgHeight = (canvas.height * pageWidth) / canvas.width;
 
       if (imgHeight <= pageHeight) {
-        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, imgHeight);
       } else {
-        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, imgHeight);
       }
 
       const pdfBase64 = pdf.output("datauristring").split(",")[1];
