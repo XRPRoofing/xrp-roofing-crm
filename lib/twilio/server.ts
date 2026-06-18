@@ -260,10 +260,10 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
   gather.pause({ length: 1 });
   gather.say(
     "Thank you for calling X R P Roofing. " +
-    "Press 1 for Billing or Invoice. " +
-    "Press 2 for Sales. " +
-    "Press 3 for Scheduling. " +
-    "Press 4 for all other inquiries."
+    "To schedule a free roof inspection, press 1. " +
+    "If you are a current customer, press 2. " +
+    "For billing questions, press 3. " +
+    "Or to reach the operator, press 0."
   );
   response.redirect(selfUrl);
   return response.toString();
@@ -275,9 +275,9 @@ export type IvrDepartment = "billing" | "sales" | "scheduling" | "other";
 export type QueuePriority = "high" | "medium" | "low";
 
 const DEPARTMENT_PRIORITY: Record<IvrDepartment, QueuePriority> = {
-  billing: "high",
+  scheduling: "high",
   sales: "high",
-  scheduling: "medium",
+  billing: "medium",
   other: "low",
 };
 
@@ -293,10 +293,10 @@ export function buildIvrMenuTwiml(
   const response = new twilio.twiml.VoiceResponse();
 
   const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
-    "1": { label: "billing", number: config.ivrBillingNumber },
+    "1": { label: "scheduling", number: config.ivrSchedulingNumber },
     "2": { label: "sales", number: config.ivrSalesNumber },
-    "3": { label: "scheduling", number: config.ivrSchedulingNumber },
-    "4": { label: "other", number: config.ivrOtherNumber },
+    "3": { label: "billing", number: config.ivrBillingNumber },
+    "0": { label: "other", number: config.ivrOtherNumber },
   };
 
   const dept = departmentMap[digit];
@@ -308,10 +308,10 @@ export function buildIvrMenuTwiml(
   }
 
   const sayDepartment = () => {
-    if (dept.label === "billing") response.say("Connecting you to our billing department.");
-    else if (dept.label === "sales") response.say("Connecting you to our sales team.");
-    else if (dept.label === "scheduling") response.say("Connecting you to scheduling.");
-    else response.say("Connecting you now.");
+    if (dept.label === "scheduling") response.say("Connecting you to schedule your free roof inspection.");
+    else if (dept.label === "sales") response.say("Connecting you to customer service.");
+    else if (dept.label === "billing") response.say("Connecting you to our billing department.");
+    else response.say("Connecting you to the operator.");
   };
 
   const status = agentStatus || { configured: false, agents: [] };
