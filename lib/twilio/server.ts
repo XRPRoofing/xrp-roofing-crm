@@ -292,11 +292,12 @@ export function buildIvrMenuTwiml(
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
+  const officeNumber = "+16233008097";
   const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
-    "1": { label: "scheduling", number: config.ivrSchedulingNumber },
-    "2": { label: "sales", number: config.ivrSalesNumber },
-    "3": { label: "billing", number: config.ivrBillingNumber },
-    "0": { label: "other", number: config.ivrOtherNumber },
+    "1": { label: "scheduling", number: officeNumber },
+    "2": { label: "sales", number: config.phoneNumber },
+    "3": { label: "billing", number: officeNumber },
+    "0": { label: "other", number: officeNumber },
   };
 
   const dept = departmentMap[digit];
