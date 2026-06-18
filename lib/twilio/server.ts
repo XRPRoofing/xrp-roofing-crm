@@ -248,10 +248,13 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   };
 }
 
-export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
+const IVR_MAX_RETRIES = 2;
+
+export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string, attempt = 0) {
   const response = new twilio.twiml.VoiceResponse();
   const gather = response.gather({
     numDigits: 1,
+    timeout: 7,
     action: menuActionUrl,
     method: "POST",
     input: ["dtmf"],
@@ -265,7 +268,16 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string) {
     "For billing questions, press 3. " +
     "Or to reach the operator, press 0."
   );
-  response.redirect(selfUrl);
+
+  if (attempt < IVR_MAX_RETRIES) {
+    const retryUrl = new URL(selfUrl);
+    retryUrl.searchParams.set("attempt", String(attempt + 1));
+    response.redirect(retryUrl.toString());
+  } else {
+    response.say("We did not receive a selection. Goodbye.");
+    response.hangup();
+  }
+
   return response.toString();
 }
 

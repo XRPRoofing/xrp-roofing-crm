@@ -12,7 +12,9 @@ export async function POST(req: NextRequest) {
   const origin = req.nextUrl.origin;
   const statusCallbackUrl = resolveCallStatusCallbackUrl(origin);
   const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
-  const greetingRedirectUrl = new URL("/api/twilio/webhooks/incoming-call", origin).toString();
+  const greetingRedirect = new URL("/api/twilio/webhooks/incoming-call", origin);
+  greetingRedirect.searchParams.set("attempt", "1");
+  const greetingRedirectUrl = greetingRedirect.toString();
   const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
 
   const onlineAgents = await fetchOnlineAgents();
