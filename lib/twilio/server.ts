@@ -198,8 +198,7 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
   return response.toString();
 }
 
-export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl) {
-  const config = getTwilioConfig();
+export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, confName?: string) {
   const response = new twilio.twiml.VoiceResponse();
 
   if (!to) {
@@ -207,6 +206,17 @@ export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallback
     return response.toString();
   }
 
+  // Use a conference so hold/transfer/resume work via the Conferences API.
+  if (confName) {
+    response.dial({ action: actionCallbackUrl, method: "POST" }).conference(
+      { beep: "false", endConferenceOnExit: true, startConferenceOnEnter: true, record: "record-from-start", recordingStatusCallback: statusCallbackUrl, recordingStatusCallbackEvent: ["completed"], recordingStatusCallbackMethod: "POST", participantLabel: "agent", statusCallback: statusCallbackUrl, statusCallbackEvent: ["join", "leave"] },
+      confName,
+    );
+    return response.toString();
+  }
+
+  // Legacy non-conference path (fallback)
+  const config = getTwilioConfig();
   response.dial({
     callerId: config.phoneNumber,
     record: "record-from-answer-dual",
@@ -217,6 +227,15 @@ export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallback
     recordingStatusCallbackMethod: "POST",
   }).number(to);
 
+  return response.toString();
+}
+
+export function buildConferenceCustomerTwiml(confName: string, statusCallbackUrl?: string) {
+  const response = new twilio.twiml.VoiceResponse();
+  response.dial().conference(
+    { beep: "false", endConferenceOnExit: false, startConferenceOnEnter: true, record: "do-not-record", participantLabel: "customer", statusCallback: statusCallbackUrl, statusCallbackEvent: ["join", "leave"], statusCallbackMethod: "POST" },
+    confName,
+  );
   return response.toString();
 }
 
