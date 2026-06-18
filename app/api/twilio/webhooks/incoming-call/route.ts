@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { sendIncomingCallPushNotification } from "@/lib/push-notifications";
 import { buildIvrGreetingTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
-import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
@@ -14,19 +12,17 @@ function handleIncomingCall(formData: FormData, origin: string) {
   after(async () => {
     const event = normalizeTwilioWebhookEvent("incoming_call", formData);
 
-    const results = await Promise.allSettled([
-      sendIncomingCallPushNotification(event.from),
-      publishConversationEvent(event),
-      ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source: "Inbound call" }),
-    ]);
-
-    const [pushResult, convResult, customerResult] = results;
-    if (pushResult.status === "fulfilled" && pushResult.value.sent === 0 && pushResult.value.reason) {
-      console.warn("[incoming-call] push notification skipped:", pushResult.value.reason);
-    }
-    if (pushResult.status === "rejected") console.error("[incoming-call] push failed:", pushResult.reason);
-    if (convResult.status === "rejected") console.error("[incoming-call] publishConversationEvent failed:", convResult.reason);
-    if (customerResult.status === "rejected") console.error("[incoming-call] ensureCustomer failed:", customerResult.reason);
+    // Only create/find the customer record here — push notifications and
+    // conversation events are deferred to the /menu handler so agents are
+    // not alerted until the caller completes the IVR selection.
+    await ensureCustomerFromLeadServer({
+      name: event.from,
+      phone: event.from,
+      status: "New lead",
+      source: "Inbound call",
+    }).catch((err) => {
+      console.error("[incoming-call] ensureCustomer failed:", err);
+    });
   });
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
