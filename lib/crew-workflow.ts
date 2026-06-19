@@ -43,7 +43,7 @@ export function createDefaultCrewAssignment(job: Lead, index = 0): CrewAssignmen
     jobId: job.id,
     assignedCrew: [crewMembers[index % crewMembers.length]],
     status: job.stage === "completed" ? "Completed" : job.stage === "in_progress" ? "In Progress" : "Assigned",
-    scheduleDate: "2026-06-05",
+    scheduleDate: job.dueDate || "",
     jobScope: job.roofType || "Roofing work",
     jobNotes: job.lastActivity || "Review job details before starting work.",
     completion: {
