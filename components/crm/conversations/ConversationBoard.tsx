@@ -565,7 +565,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   }
   const effectiveMessage = isFalsePositiveMissed ? null : message;
 
-  const nextMessages = effectiveMessage ? [effectiveMessage, ...nextConversation.messages.filter((item) => item.id !== effectiveMessage.id)].slice(0, 50) : nextConversation.messages;
+  const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => item.id !== effectiveMessage.id), effectiveMessage].slice(-50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
   const nextCallSids = event.callSid && !nextConversation.callSids?.includes(event.callSid)
@@ -1000,6 +1000,7 @@ export default function ConversationBoard() {
       setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
       setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
+      scrollMessageBoardToBottom();
     }).catch((error) => {
       if (mounted) setTwilioNotice(error instanceof Error ? `Call history sync issue: ${error.message}` : "Call history sync issue");
     });
@@ -1019,6 +1020,7 @@ export default function ConversationBoard() {
           if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
           return next;
         });
+        scrollMessageBoardToBottom();
         if (event.type === "call_recording") {
           setCallInsights((current: TwilioConversationEvent[]) => dedupeCallInsights([event, ...current]).slice(0, 5));
         }
@@ -1031,6 +1033,10 @@ export default function ConversationBoard() {
       queueMicrotask(() => setTwilioNotice("Call history syncs automatically after each call"));
     }
   }, [activeConversationId, notifyIncomingCall]);
+
+  useEffect(() => {
+    scrollMessageBoardToBottom();
+  }, [activeConversationId]);
 
   // When another device opens a conversation, mark it read here too (in real
   // time) so read/unread + missed status stays consistent across all devices.
@@ -1232,6 +1238,7 @@ export default function ConversationBoard() {
     if (!messageText.trim() || !destination) return;
     setTwilioNotice("Sending SMS...");
     applyLocalEvent(createLocalCommunicationEvent("message_status", destination, messageText.trim()));
+    scrollMessageBoardToBottom();
     try {
       const fromNumber = selectedFromNumber || active?.twilioNumber || undefined;
       const message = await sendSms({ to: destination, body: messageText.trim(), from: fromNumber, conversationId: matchedDialContact ? active?.id : undefined });
