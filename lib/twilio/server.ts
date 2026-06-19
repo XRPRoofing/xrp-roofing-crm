@@ -33,6 +33,7 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   if (!client) throw new Error("Twilio client could not be created");
 
   const fromNumber = resolveFromNumber(payload.from);
+  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
   return client.messages.create({
     to: payload.to,
@@ -68,6 +69,7 @@ export async function createOutboundCall(payload: TwilioCallPayload, callbackUrl
 
   const statusCallback = callbackUrl || process.env.TWILIO_CALL_STATUS_WEBHOOK_URL;
   const fromNumber = resolveFromNumber(payload.from);
+  console.log(`[twilio:call] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
   return client.calls.create({
     to: payload.to,

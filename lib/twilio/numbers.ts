@@ -81,14 +81,29 @@ export function getLineLabelForNumber(phone: string): string {
  * Resolve which Twilio number to use as the "from" for outbound messages/calls.
  * If the requested number matches a configured line, use it; otherwise default
  * to the first configured line (Main Line).
+ *
+ * Fallback to Main Line is intentional only when `requestedFrom` is `undefined`
+ * (no selection made). Empty strings, invalid formats, and non-matching numbers
+ * still fall back but produce a warning log so routing issues are visible.
  */
 export function resolveFromNumber(requestedFrom?: string): string {
   const lines = getTwilioLines();
   if (!lines.length) return "";
-  if (requestedFrom) {
-    const normalized = toE164(requestedFrom);
-    const match = lines.find((line) => line.number === normalized);
-    if (match) return match.number;
+  const fallback = lines[0];
+
+  if (requestedFrom === undefined) {
+    return fallback.number;
   }
-  return lines[0].number;
+
+  const normalized = toE164(requestedFrom);
+  if (!normalized) {
+    console.warn(`[twilio:resolveFromNumber] invalid/empty from value "${requestedFrom}", falling back to ${fallback.label} (${fallback.number})`);
+    return fallback.number;
+  }
+
+  const match = lines.find((line) => line.number === normalized);
+  if (match) return match.number;
+
+  console.warn(`[twilio:resolveFromNumber] "${requestedFrom}" (normalized: ${normalized}) does not match any configured line, falling back to ${fallback.label} (${fallback.number})`);
+  return fallback.number;
 }
