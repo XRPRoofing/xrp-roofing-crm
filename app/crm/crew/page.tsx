@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
+import { Calendar, Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import { addCrmNotification } from "@/lib/crm-notifications";
@@ -355,7 +355,7 @@ export default function CrewWorkflowPage() {
       dueDate: newJob.dueDate || new Date().toISOString().slice(0, 10),
       status: "Assigned",
       assignedCrew: [newJob.assignedCrew],
-      scheduleDate: newJob.dueDate || new Date().toISOString().slice(0, 10),
+      scheduleDate: newJob.dueDate || "",
       jobScope: newJob.jobScope || newJob.roofType || "Roofing",
       jobNotes: newJob.jobNotes || "Crew-created job.",
       completionNotes: "",
@@ -482,7 +482,7 @@ export default function CrewWorkflowPage() {
                     </td>
                     <td className="max-w-xs truncate px-5 py-3.5 font-semibold text-gray-600"><AddressLink value={formatAddress(job)} /></td>
                     <td className="px-5 py-3.5"><div className="flex flex-wrap gap-1">{job.assignedCrew.map((member) => <span key={member} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">{member}</span>)}</div></td>
-                    <td className="px-4 py-3 font-bold text-gray-700">{job.scheduleDate}</td>
+                    <td className="px-4 py-3 font-bold text-gray-700">{job.scheduleDate ? job.scheduleDate : <button type="button" onClick={(e) => { e.stopPropagation(); setSelectedJobId(job.id); }} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-400 transition hover:border-blue-400 hover:text-blue-600"><Calendar className="h-3.5 w-3.5" />Set date</button>}</td>
                     <td className="max-w-[180px] truncate px-5 py-3.5 font-semibold text-gray-600">{job.jobScope}</td>
                     <td className="px-5 py-3.5"><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[job.status]}`}>{job.status}</span></td>
                   </tr>
