@@ -508,13 +508,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   // Phone numbers available for caller ID selection
   const dialerPhoneNumbers = useMemo(() => {
-    // Primary Twilio number is always available; more can be added via env in the future
     const numbers: { label: string; number: string }[] = [];
     if (process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER) {
       numbers.push({ label: "Main Line", number: process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER });
     }
-    if (process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_2) {
-      numbers.push({ label: "Line 2", number: process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_2 });
+    if (process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER) {
+      numbers.push({ label: "Partner Referral", number: process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER });
     }
     if (process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_3) {
       numbers.push({ label: "Line 3", number: process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_3 });

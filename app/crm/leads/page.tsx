@@ -78,7 +78,7 @@ function formatDueDate(value?: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
+const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Partner Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
 
 const SOURCE_COLORS: Record<string, string> = {
   AZR:           "bg-orange-100 text-orange-700",
@@ -86,6 +86,7 @@ const SOURCE_COLORS: Record<string, string> = {
   Facebook:      "bg-blue-100 text-blue-700",
   Website:       "bg-sky-100 text-sky-700",
   Referral:      "bg-blue-100 text-blue-700",
+  "Partner Referral": "bg-purple-100 text-purple-700",
   "Door Knocking": "bg-orange-100 text-orange-700",
   Yelp:          "bg-orange-100 text-orange-700",
   Angi:          "bg-orange-100 text-orange-800",

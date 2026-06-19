@@ -47,7 +47,7 @@ const emptyTask = {
   title: "", customerName: "", jobAddress: "", assignedUser: "", dueDate: todayIso(), notes: "",
 };
 
-const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
+const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Partner Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
 
 /* ── Shared input class ────────────────────────────────────────────── */
 

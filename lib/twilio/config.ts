@@ -21,6 +21,7 @@ export function getTwilioConfig() {
     apiKeySecret: process.env.TWILIO_API_KEY_SECRET || "",
     twimlAppSid: process.env.TWILIO_TWIML_APP_SID || "",
     phoneNumber: toE164(process.env.TWILIO_PHONE_NUMBER || ""),
+    partnerReferralNumber: toE164(process.env.TWILIO_PARTNER_REFERRAL_NUMBER || ""),
     inboundForwardNumber,
     ivrBillingNumber: toE164(process.env.TWILIO_IVR_BILLING_NUMBER || "") || inboundForwardNumber,
     ivrSalesNumber: toE164(process.env.TWILIO_IVR_SALES_NUMBER || "") || inboundForwardNumber,
@@ -28,6 +29,16 @@ export function getTwilioConfig() {
     ivrOtherNumber: toE164(process.env.TWILIO_IVR_OTHER_NUMBER || "") || inboundForwardNumber,
     ringGroup: parseRingGroup(process.env.TWILIO_RING_GROUP || ""),
   };
+}
+
+/**
+ * Check whether the given number (the Twilio "To" on an inbound webhook)
+ * matches the Partner Referral line.
+ */
+export function isPartnerReferralNumber(toNumber: string): boolean {
+  const config = getTwilioConfig();
+  if (!config.partnerReferralNumber) return false;
+  return toE164(toNumber) === config.partnerReferralNumber;
 }
 
 /** Parse comma-separated agent identities */

@@ -3,6 +3,7 @@ export type TwilioConversationEventType = "incoming_call" | "incoming_sms" | "ca
 export interface TwilioSmsPayload {
   to: string;
   body: string;
+  from?: string;
   conversationId?: string;
   customerId?: string;
   jobId?: string;
