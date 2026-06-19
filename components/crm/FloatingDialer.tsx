@@ -265,6 +265,9 @@ export default function FloatingDialer({
       setCallState("active");
       setIsMuted(false);
       setCallerTag(null);
+      // Capture CallSid — may already be available or arrive via "accept"
+      const existingSid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
+      if (existingSid) setCallSid(existingSid);
       call.on("accept", () => {
         const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
         if (sid) setCallSid(sid);
@@ -301,21 +304,28 @@ export default function FloatingDialer({
     setIsMuted((v) => !v);
   }
 
-  function handleHold() {
+  async function handleHold() {
     if (!callSid) return;
     const action = callState === "held" ? "resume" : "hold";
-    controlCall({ callSid, action }).catch(() => {});
-    setCallState(callState === "held" ? "active" : "held");
+    try {
+      await controlCall({ callSid, action });
+      setCallState(callState === "held" ? "active" : "held");
+    } catch {
+      // Revert state if call fails
+    }
   }
 
-  function handleTransfer() {
+  async function handleTransfer() {
     if (!callSid || !transferNumber.trim()) return;
-    controlCall({ callSid, action: "forward", forwardTo: transferNumber.trim() }).catch(() => {});
-    setShowTransfer(false);
-    setTransferNumber("");
-    // Call will disconnect on our end after transfer
-    setCallState("idle");
-    browserCallRef.current = null;
+    try {
+      await controlCall({ callSid, action: "forward", forwardTo: transferNumber.trim() });
+      setShowTransfer(false);
+      setTransferNumber("");
+      setCallState("idle");
+      browserCallRef.current = null;
+    } catch {
+      // Keep UI state so user can retry
+    }
   }
 
   function handleSendDtmf(digit: string) {
