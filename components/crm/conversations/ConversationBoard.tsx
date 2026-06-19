@@ -185,7 +185,7 @@ function CallRow({ message }: { message: ConversationMessage }) {
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ${tone.text} ring-1 ${tone.ring}`}><Icon className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-semibold ${tone.text}`}>{message.body}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-500">{message.author} · {message.timestamp}</p>
+          <p className="mt-0.5 truncate text-xs text-gray-500">{message.author} · {message.timestamp}{message.line && <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? "bg-purple-50 text-purple-600" : "bg-gray-100 text-gray-500"}`}>{message.line}</span>}</p>
         </div>
         {message.recordingUrl && <audio controls src={proxyRecordingUrl(message.recordingUrl)} className="h-8 w-40 max-w-[40%]" />}
       </div>
@@ -213,7 +213,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   return (
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-lg px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-gray-200 bg-white text-gray-800 shadow-sm"}`}>
-        <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}</div>
+        <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}{message.line && <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? (outbound ? "bg-purple-500/20 text-purple-100" : "bg-purple-50 text-purple-600 ring-1 ring-purple-200") : (outbound ? "bg-white/10 text-blue-100" : "bg-gray-50 text-gray-500 ring-1 ring-gray-200")}`}>{message.line}</span>}</div>
         <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(message.body)}</p>
         {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
@@ -338,6 +338,33 @@ function EditableDetailRow({ label, value, onChange }: { label: string; value: s
 
 function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function toE164Client(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) return `+${trimmed.slice(1).replace(/\D/g, "")}`;
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return `+${digits}`;
+}
+
+const PARTNER_REFERRAL_E164 = toE164Client(process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER || "");
+const MAIN_LINE_E164 = toE164Client(process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER || "");
+
+function getLineLabel(twilioPhone: string): string {
+  if (!twilioPhone) return "";
+  const normalized = toE164Client(twilioPhone);
+  if (PARTNER_REFERRAL_E164 && normalized === PARTNER_REFERRAL_E164) return "Partner Referral";
+  if (MAIN_LINE_E164 && normalized === MAIN_LINE_E164) return "Main Line";
+  if (!/^\+?\d+$/.test(twilioPhone.replace(/[\s()-]/g, ""))) return "";
+  return "Main Line";
+}
+
+function getTwilioLinePhone(event: TwilioConversationEvent): string {
+  return event.direction === "inbound" ? (event.to || "") : (event.from || "");
 }
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -501,13 +528,15 @@ function eventMatchesConversation(event: TwilioConversationEvent, conversation: 
   return conversation.messages.some((message) => message.id.includes(event.callSid || ""));
 }
 
-function createMessageFromEvent(event: TwilioConversationEvent): ConversationMessage {
+function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: string): ConversationMessage {
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
   const direction = event.direction || "internal";
   const callLabel = direction === "outbound" ? "Outbound call" : isMissedCallEvent(event) ? "Missed call" : "Inbound call";
   const duration = getCallDurationLabel(event);
   const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
+  const twilioPhone = getTwilioLinePhone(event);
+  const line = getLineLabel(twilioPhone) || fallbackLine || "";
 
   return {
     id: getCallMessageId(event),
@@ -518,6 +547,7 @@ function createMessageFromEvent(event: TwilioConversationEvent): ConversationMes
     timestamp: new Date(event.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     status: isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read",
     recordingUrl: event.recordingUrl,
+    line,
   };
 }
 // Decide whether a missed call is still "outstanding" (i.e. should show the
@@ -539,8 +569,11 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const id = existing?.id || getConversationIdForPhone(phone);
   const channel: ConversationChannel = event.type.includes("call") ? "call" : event.type.includes("sms") || event.type.includes("message") ? "sms" : "note";
   const nextConversation = existing || createManualConversation(phone);
+  const inboundTwilioPhone = event.direction === "inbound" ? toE164Client(event.to || "") : "";
+  const twilioNumber = existing?.twilioNumber || (inboundTwilioPhone || undefined);
+  const conversationLine = twilioNumber ? getLineLabel(twilioNumber) : "";
   const shouldDisplayMessage = isVisibleCallTimelineEvent(event);
-  const message = shouldDisplayMessage ? createMessageFromEvent(event) : null;
+  const message = shouldDisplayMessage ? createMessageFromEvent(event, conversationLine) : null;
 
   // Twilio's parent call leg often reports completed/0-duration even when the
   // child leg (the actual conversation) was answered via <Dial>. That produces
@@ -581,6 +614,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     readAt,
     lastMissedAt,
     lastAnsweredAt,
+    twilioNumber,
     channels,
     messages: nextMessages,
     callSids: nextCallSids,
@@ -1202,7 +1236,7 @@ export default function ConversationBoard() {
     setTwilioNotice("Sending SMS...");
     applyLocalEvent(createLocalCommunicationEvent("message_status", destination, messageText.trim()));
     try {
-      const message = await sendSms({ to: destination, body: messageText.trim(), conversationId: matchedDialContact ? active?.id : undefined });
+      const message = await sendSms({ to: destination, body: messageText.trim(), from: active?.twilioNumber || undefined, conversationId: matchedDialContact ? active?.id : undefined });
       setMessageText("");
       setTwilioNotice(`SMS ${message.status}`);
     } catch (error) {

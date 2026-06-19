@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
+import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig, toE164 } from "@/lib/twilio/config";
 import { getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
@@ -32,8 +32,9 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
-  const fromNumber = payload.from
-    ? (config.partnerReferralNumber && payload.from === config.partnerReferralNumber ? config.partnerReferralNumber : config.phoneNumber)
+  const normalizedFrom = payload.from ? toE164(payload.from) : "";
+  const fromNumber = normalizedFrom && config.partnerReferralNumber && normalizedFrom === config.partnerReferralNumber
+    ? config.partnerReferralNumber
     : config.phoneNumber;
 
   return client.messages.create({
