@@ -14,6 +14,8 @@ import type { ConversationChannel, ConversationMessage, ConversationRecord } fro
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
 import { PhoneLink, AddressLink, linkifyContactInfo } from "@/components/ContactLinks";
+import { getTwilioLines, getLineLabelForNumber } from "@/lib/twilio/numbers";
+import { toE164 } from "@/lib/twilio/config";
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-lg border border-gray-200 bg-white shadow-sm ${className}`}>{children}</section>;
@@ -340,29 +342,6 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
-function toE164Client(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("+")) return `+${trimmed.slice(1).replace(/\D/g, "")}`;
-  const digits = trimmed.replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
-}
-
-const PARTNER_REFERRAL_E164 = toE164Client(process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER || "");
-const MAIN_LINE_E164 = toE164Client(process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER || "");
-
-function getLineLabel(twilioPhone: string): string {
-  if (!twilioPhone) return "";
-  const normalized = toE164Client(twilioPhone);
-  if (PARTNER_REFERRAL_E164 && normalized === PARTNER_REFERRAL_E164) return "Partner Referral";
-  if (MAIN_LINE_E164 && normalized === MAIN_LINE_E164) return "Main Line";
-  if (!/^\+?\d+$/.test(twilioPhone.replace(/[\s()-]/g, ""))) return "";
-  return "Main Line";
-}
-
 function getTwilioLinePhone(event: TwilioConversationEvent): string {
   return event.direction === "inbound" ? (event.to || "") : (event.from || "");
 }
@@ -536,7 +515,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
   const duration = getCallDurationLabel(event);
   const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
   const twilioPhone = getTwilioLinePhone(event);
-  const line = getLineLabel(twilioPhone) || fallbackLine || "";
+  const line = getLineLabelForNumber(twilioPhone) || fallbackLine || "";
 
   return {
     id: getCallMessageId(event),
@@ -569,9 +548,9 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const id = existing?.id || getConversationIdForPhone(phone);
   const channel: ConversationChannel = event.type.includes("call") ? "call" : event.type.includes("sms") || event.type.includes("message") ? "sms" : "note";
   const nextConversation = existing || createManualConversation(phone);
-  const inboundTwilioPhone = event.direction === "inbound" ? toE164Client(event.to || "") : "";
+  const inboundTwilioPhone = event.direction === "inbound" ? toE164(event.to || "") : "";
   const twilioNumber = existing?.twilioNumber || (inboundTwilioPhone || undefined);
-  const conversationLine = twilioNumber ? getLineLabel(twilioNumber) : "";
+  const conversationLine = twilioNumber ? getLineLabelForNumber(twilioNumber) : "";
   const shouldDisplayMessage = isVisibleCallTimelineEvent(event);
   const message = shouldDisplayMessage ? createMessageFromEvent(event, conversationLine) : null;
 
@@ -760,6 +739,9 @@ export default function ConversationBoard() {
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const [inboundReady, setInboundReady] = useState(false);
+  const twilioLines = useMemo(() => getTwilioLines(), []);
+  const [selectedFromNumber, setSelectedFromNumber] = useState(() => twilioLines[0]?.number || "");
+  const [fromDropdownOpen, setFromDropdownOpen] = useState(false);
   const [selectedCallInsight, setSelectedCallInsight] = useState<TwilioConversationEvent | null>(null);
   const router = useRouter();
   const [stageMenuOpen, setStageMenuOpen] = useState(false);
@@ -776,6 +758,12 @@ export default function ConversationBoard() {
     return Notification.permission;
   });
   const matchedDialContact = findCrmContactByPhone(dialNumber) || conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
+
+  // Auto-select the From number based on the active conversation's line
+  useEffect(() => {
+    if (active?.twilioNumber) setSelectedFromNumber(active.twilioNumber); // eslint-disable-line react-hooks/set-state-in-effect
+    else if (twilioLines.length > 0) setSelectedFromNumber(twilioLines[0].number);
+  }, [activeConversationId, active?.twilioNumber, twilioLines]);
 
   useEffect(() => {
     try { if (localStorage.getItem("xrp.conv.inboxCollapsed") === "1") setInboxCollapsed(true); } catch {}
@@ -1086,7 +1074,10 @@ export default function ConversationBoard() {
     applyLocalEvent(createLocalCommunicationEvent("call_status", destination, `Dialed ${destination}`));
     try {
       const device = sharedDevice?.deviceRef.current || await createBrowserVoiceDevice("crm-agent");
-      const call = await device.connect({ params: { To: destination } });
+      const connectParams: Record<string, string> = { To: destination };
+      const callerId = selectedFromNumber || active?.twilioNumber;
+      if (callerId) connectParams.CallerId = callerId;
+      const call = await device.connect({ params: connectParams });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
       setIsActiveCall(true);
       setIsHeld(false);
@@ -1111,7 +1102,7 @@ export default function ConversationBoard() {
       });
     } catch (error) {
       try {
-        const fallbackCall = await startOutboundCall({ to: destination, conversationId: matchedDialContact ? active.id : undefined });
+        const fallbackCall = await startOutboundCall({ to: destination, from: selectedFromNumber || active?.twilioNumber || undefined, conversationId: matchedDialContact ? active.id : undefined });
         setCallSid(fallbackCall.sid);
         setIsActiveCall(true);
         setIsHeld(false);
@@ -1236,7 +1227,8 @@ export default function ConversationBoard() {
     setTwilioNotice("Sending SMS...");
     applyLocalEvent(createLocalCommunicationEvent("message_status", destination, messageText.trim()));
     try {
-      const message = await sendSms({ to: destination, body: messageText.trim(), from: active?.twilioNumber || undefined, conversationId: matchedDialContact ? active?.id : undefined });
+      const fromNumber = selectedFromNumber || active?.twilioNumber || undefined;
+      const message = await sendSms({ to: destination, body: messageText.trim(), from: fromNumber, conversationId: matchedDialContact ? active?.id : undefined });
       setMessageText("");
       setTwilioNotice(`SMS ${message.status}`);
     } catch (error) {
@@ -1359,6 +1351,28 @@ export default function ConversationBoard() {
           <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white p-3">
             <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} onClick={() => setMessageText((prev: string) => prev ? `${prev} ${template}` : template)} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
             {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
+            {twilioLines.length > 1 && (
+              <div className="relative mb-2">
+                <button type="button" onClick={() => setFromDropdownOpen((v) => !v)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100">
+                  <Phone className="h-3 w-3 text-gray-400" />
+                  <span>From: {twilioLines.find((l) => l.number === selectedFromNumber)?.label || "Select"}</span>
+                  <ChevronDown className={`h-3 w-3 text-gray-400 transition ${fromDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+                {fromDropdownOpen && (
+                  <>
+                    <button type="button" className="fixed inset-0 z-10" onClick={() => setFromDropdownOpen(false)} />
+                    <div className="absolute bottom-full left-0 z-20 mb-1 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                      {twilioLines.map((line) => (
+                        <button key={line.number} type="button" onClick={() => { setSelectedFromNumber(line.number); setFromDropdownOpen(false); }} className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-xs transition hover:bg-blue-50 ${selectedFromNumber === line.number ? "bg-blue-50 font-semibold text-blue-700" : "text-gray-700"}`}>
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          <span>{line.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) setMessageText((prev: string) => prev ? `${prev} [${file.name}]` : `[${file.name}]`); event.target.value = ""; }} />
             <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
           </div>

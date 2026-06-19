@@ -1,5 +1,6 @@
 import twilio from "twilio";
-import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig, toE164 } from "@/lib/twilio/config";
+import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
+import { resolveFromNumber } from "@/lib/twilio/numbers";
 import { getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
@@ -28,14 +29,11 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   if (!hasTwilioMessagingConfig()) throw new Error("Twilio messaging is not configured");
 
   const client = getTwilioClient();
-  const config = getTwilioConfig();
 
   if (!client) throw new Error("Twilio client could not be created");
 
-  const normalizedFrom = payload.from ? toE164(payload.from) : "";
-  const fromNumber = normalizedFrom && config.partnerReferralNumber && normalizedFrom === config.partnerReferralNumber
-    ? config.partnerReferralNumber
-    : config.phoneNumber;
+  const fromNumber = resolveFromNumber(payload.from);
+  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
   return client.messages.create({
     to: payload.to,
@@ -66,15 +64,16 @@ export async function createOutboundCall(payload: TwilioCallPayload, callbackUrl
   if (!hasTwilioVoiceConfig()) throw new Error("Twilio voice is not configured");
 
   const client = getTwilioClient();
-  const config = getTwilioConfig();
 
   if (!client) throw new Error("Twilio client could not be created");
 
   const statusCallback = callbackUrl || process.env.TWILIO_CALL_STATUS_WEBHOOK_URL;
+  const fromNumber = resolveFromNumber(payload.from);
+  console.log(`[twilio:call] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
   return client.calls.create({
     to: payload.to,
-    from: config.phoneNumber,
+    from: fromNumber,
     url: process.env.TWILIO_OUTBOUND_VOICE_WEBHOOK_URL,
     statusCallback,
     statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],

@@ -5,6 +5,7 @@ import { publishConversationEvent } from "@/lib/twilio/realtime";
 
 const callSchema = z.object({
   to: z.string().min(7),
+  from: z.string().optional(),
   conversationId: z.string().optional(),
 });
 

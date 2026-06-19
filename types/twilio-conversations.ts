@@ -12,6 +12,7 @@ export interface TwilioSmsPayload {
 
 export interface TwilioCallPayload {
   to: string;
+  from?: string;
   conversationId?: string;
   customerId?: string;
   jobId?: string;
