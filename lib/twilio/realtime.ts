@@ -66,20 +66,22 @@ function mapConversationEventRow(row: Record<string, unknown>): TwilioConversati
   };
 }
 
-export async function listConversationEvents(limit = 250) {
+export async function listConversationEvents(limit = 1000) {
   const supabase = getAdminClient();
 
   if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured", events: [] };
 
+  // Fetch the newest N events (descending) then reverse to chronological order
+  // so conversation building works correctly.
   const { data, error } = await supabase
     .from("conversation_events")
     .select("*")
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), events: [] };
 
-  return { ok: true as const, events: ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow) };
+  return { ok: true as const, events: ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow).reverse() };
 }
 
 function getConversationEventsErrorMessage(message: string) {

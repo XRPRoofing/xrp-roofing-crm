@@ -128,7 +128,7 @@ function mapConversationEventRow(row: Record<string, unknown>): TwilioConversati
   };
 }
 
-export async function listConversationEvents(limit = 250) {
+export async function listConversationEvents(limit = 1000) {
   const response = await fetch(`/api/twilio/events?limit=${limit}`);
   const data = await response.json().catch(() => null) as { events?: TwilioConversationEvent[]; error?: string } | null;
 
