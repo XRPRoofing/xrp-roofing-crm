@@ -739,7 +739,13 @@ export default function ConversationBoard() {
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const [inboundReady, setInboundReady] = useState(false);
-  const twilioLines = useMemo(() => getTwilioLines(), []);
+  const twilioLines = useMemo(() => {
+    const lines = getTwilioLines();
+    if (typeof window !== "undefined") {
+      console.log("[twilio:ui] twilioLines loaded:", lines.length, lines.map((l) => `${l.label}=${l.number}`).join(", ") || "(none)");
+    }
+    return lines;
+  }, []);
   const [selectedFromNumber, setSelectedFromNumber] = useState(() => twilioLines[0]?.number || "");
   const [fromDropdownOpen, setFromDropdownOpen] = useState(false);
   const [selectedCallInsight, setSelectedCallInsight] = useState<TwilioConversationEvent | null>(null);
