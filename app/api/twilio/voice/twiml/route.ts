@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { buildOutboundBrowserCallTwiml, buildConferenceCustomerTwiml, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl, getTwilioClient } from "@/lib/twilio/server";
-import { getTwilioConfig } from "@/lib/twilio/config";
+import { resolveFromNumber } from "@/lib/twilio/numbers";
 
 async function handleTwiml(req: NextRequest, formData: FormData) {
   const to = formData.get("To")?.toString();
@@ -25,8 +25,7 @@ async function handleTwiml(req: NextRequest, formData: FormData) {
   if (to && callSid) {
     const client = getTwilioClient();
     if (client) {
-      const config = getTwilioConfig();
-      const callerId = callerIdParam || config.phoneNumber;
+      const callerId = resolveFromNumber(callerIdParam);
       const customerTwiml = buildConferenceCustomerTwiml(confName, callbackUrl);
       client.calls.create({
         to,

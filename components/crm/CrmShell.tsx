@@ -14,6 +14,7 @@ import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
 import FloatingCallCard from "@/components/crm/FloatingCallCard";
 import FloatingDialer from "@/components/crm/FloatingDialer";
+import { getTwilioLines } from "@/lib/twilio/numbers";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-sync";
@@ -506,19 +507,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     else refreshCustomers<Customer>().then(setDialerCustomers).catch(() => {});
   }, []);
 
-  // Phone numbers available for caller ID selection
+  // Phone numbers available for caller ID selection — driven by centralized registry
   const dialerPhoneNumbers = useMemo(() => {
-    const numbers: { label: string; number: string }[] = [];
-    if (process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER) {
-      numbers.push({ label: "Main Line", number: process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER });
-    }
-    if (process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER) {
-      numbers.push({ label: "Partner Referral", number: process.env.NEXT_PUBLIC_TWILIO_PARTNER_REFERRAL_NUMBER });
-    }
-    if (process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_3) {
-      numbers.push({ label: "Line 3", number: process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER_3 });
-    }
-    return numbers;
+    return getTwilioLines().map((line) => ({ label: line.label, number: line.number }));
   }, []);
 
   const [syncActive, setSyncActive] = useState(false);

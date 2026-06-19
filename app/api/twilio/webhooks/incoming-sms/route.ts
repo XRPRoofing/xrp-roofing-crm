@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
-import { isPartnerReferralNumber } from "@/lib/twilio/config";
+import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   await publishConversationEvent(event);
   // Inbound SMS = a lead. Auto-create/update the customer (best-effort).
   try {
-    const source = isPartnerReferralNumber(event.to || "") ? "Partner Referral" : "Inbound SMS";
+    const source = getLeadSourceForNumber(event.to || "", "Inbound SMS");
     await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source });
   } catch {}
 

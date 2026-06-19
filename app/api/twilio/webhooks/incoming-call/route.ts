@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { buildIvrGreetingTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
-import { isPartnerReferralNumber } from "@/lib/twilio/config";
+import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
 
@@ -20,7 +20,7 @@ function handleIncomingCall(formData: FormData, req: NextRequest) {
       // conversation events are deferred to the /menu handler so agents are
       // not alerted until the caller completes the IVR selection.
       const toNumber = String(formData.get("To") || "");
-      const source = isPartnerReferralNumber(toNumber) ? "Partner Referral" : "Inbound call";
+      const source = getLeadSourceForNumber(toNumber, "Inbound call");
       await ensureCustomerFromLeadServer({
         name: event.from,
         phone: event.from,
