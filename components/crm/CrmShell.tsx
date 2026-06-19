@@ -7,12 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { createBrowserVoiceDevice, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { createBrowserVoiceDevice, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
-import FloatingCallCard from "@/components/crm/FloatingCallCard";
+import FloatingCallCard, { type CallerInfo } from "@/components/crm/FloatingCallCard";
 import FloatingDialer from "@/components/crm/FloatingDialer";
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
@@ -69,6 +69,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [globalActiveIncomingCall, setGlobalActiveIncomingCall] = useState(false);
   const [globalIncomingMuted, setGlobalIncomingMuted] = useState(false);
   const [globalIncomingCaller, setGlobalIncomingCaller] = useState<{ name: string; phone: string }>({ name: "", phone: "" });
+  const [globalIncomingTwilioNumber, setGlobalIncomingTwilioNumber] = useState("");
   const [globalDialerOpen, setGlobalDialerOpen] = useState(false);
   const [globalCallActive, setGlobalCallActive] = useState(false);
   const [dialerCustomers, setDialerCustomers] = useState<Customer[]>([]);
@@ -459,6 +460,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setGlobalActiveIncomingCall(true);
       setGlobalIncomingMuted(false);
       setGlobalIncomingCaller({ name: incoming.parameters?.From || "Unknown", phone: incoming.parameters?.From || "" });
+      setGlobalIncomingTwilioNumber(incoming.parameters?.To || "");
 
       incoming.on("disconnect", () => {
         setGlobalActiveIncomingCall(false);
@@ -498,6 +500,30 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const next = !globalIncomingMuted;
     try { call.mute?.(next); } catch {}
     setGlobalIncomingMuted(next);
+  }
+
+  function handleIncomingCallSaveNotes(notes: string, disposition: string, _info: CallerInfo) {
+    const callSid = incomingCallRef.current?.parameters?.CallSid || "";
+    void saveCallNotes({ callSid, notes, disposition }).catch(() => {});
+  }
+
+  function handleIncomingCallCreateLead(info: CallerInfo) {
+    const params = new URLSearchParams();
+    params.set("name", info.name);
+    params.set("phone", info.phone);
+    params.set("address", info.address);
+    params.set("email", info.email);
+    params.set("source", info.leadSource);
+    params.set("notes", info.serviceNeeded);
+    router.push(`/crm/leads?newLead=1&${params.toString()}`);
+  }
+
+  function handleIncomingCallSchedule(type: string, info: CallerInfo) {
+    const params = new URLSearchParams();
+    params.set("type", type);
+    if (info.name) params.set("name", info.name);
+    if (info.phone) params.set("phone", info.phone);
+    router.push(`/crm/calendar?schedule=1&${params.toString()}`);
   }
 
   // Load customers for the floating dialer contacts tab
@@ -603,6 +629,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           state="ringing"
           caller={globalIncomingCall}
           muted={false}
+          customers={dialerCustomers}
           onAnswer={handleAnswerGlobalIncomingCall}
           onDecline={handleDeclineGlobalIncomingCall}
           onEnd={handleDeclineGlobalIncomingCall}
@@ -616,10 +643,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           state="active"
           caller={globalIncomingCaller}
           muted={globalIncomingMuted}
+          twilioNumber={globalIncomingTwilioNumber}
+          customers={dialerCustomers}
           onAnswer={() => {}}
           onDecline={() => {}}
           onEnd={handleEndGlobalIncomingCall}
           onMute={handleMuteGlobalIncomingCall}
+          onSaveNotes={handleIncomingCallSaveNotes}
+          onCreateLead={handleIncomingCallCreateLead}
+          onSchedule={handleIncomingCallSchedule}
         />
       )}
 
