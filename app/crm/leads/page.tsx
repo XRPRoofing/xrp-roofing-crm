@@ -8,7 +8,7 @@ import { AddressLink } from "@/components/ContactLinks";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
-import { addJobNote, addJobPhotos, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobNote, type JobPhoto } from "@/lib/crew-sync";
+import { addJobNote, addJobPhotos, deleteJobPhoto, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobNote, type JobPhoto } from "@/lib/crew-sync";
 import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
@@ -174,11 +174,12 @@ function syncCustomerFromJob(contact: { name: string; email?: string; phone?: st
 
 type DrawPath = { points: { x: number; y: number }[]; color: string; width: number };
 
-function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated }: {
+function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelete }: {
   photos: JobPhoto[];
   initialIndex: number;
   onClose: () => void;
   onSaveAnnotated: (dataUrl: string, name: string, photoType: JobPhoto["photoType"]) => void;
+  onDelete: (photoId: string) => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -311,32 +312,45 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated }: {
     canvas.height = container.clientHeight;
   }
 
+  function handleDelete() {
+    if (!window.confirm("Delete this photo?")) return;
+    const id = photo.id;
+    if (photos.length <= 1) { onDelete(id); onClose(); return; }
+    if (index >= photos.length - 1) setIndex((i) => i - 1);
+    onDelete(id);
+  }
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/80 p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/80 p-2 sm:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="relative flex max-h-[95vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl sm:max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{index + 1} / {photos.length}</span>
-            <span className="text-sm font-semibold text-gray-700 truncate max-w-[200px]">{photo.name}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${photo.photoType === "Before" ? "bg-blue-100 text-blue-700" : photo.photoType === "Progress" ? "bg-orange-100 text-orange-700" : photo.photoType === "After" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{photo.photoType}</span>
+        <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2 sm:px-4 sm:py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{index + 1} / {photos.length}</span>
+            <span className="text-sm font-semibold text-gray-700 truncate max-w-[120px] sm:max-w-[200px]">{photo.name}</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${photo.photoType === "Before" ? "bg-blue-100 text-blue-700" : photo.photoType === "Progress" ? "bg-orange-100 text-orange-700" : photo.photoType === "After" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{photo.photoType}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={() => setDrawMode((v) => !v)} className={`rounded-lg p-2 transition ${drawMode ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`} title="Draw / Annotate"><Pencil className="h-4 w-4" /></button>
             <a href={photo.dataUrl} download={photo.name} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100" title="Download"><Download className="h-4 w-4" /></a>
+            <button type="button" onClick={handleDelete} className="rounded-lg p-2 text-red-400 transition hover:bg-red-50 hover:text-red-600" title="Delete photo"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"><X className="h-5 w-5" /></button>
           </div>
         </div>
 
-        {/* Draw toolbar */}
+        {/* Draw toolbar — stacks vertically on mobile */}
         {drawMode && (
-          <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2">
-            <span className="text-xs font-bold text-gray-500">Color:</span>
-            {drawColors.map((c) => <button key={c} type="button" onClick={() => setDrawColor(c)} className={`h-6 w-6 rounded-full border-2 transition ${drawColor === c ? "border-gray-900 scale-110" : "border-gray-300"}`} style={{ backgroundColor: c }} />)}
-            <span className="ml-3 text-xs font-bold text-gray-500">Size:</span>
-            <input type="range" min={1} max={10} value={drawWidth} onChange={(e) => setDrawWidth(Number(e.target.value))} className="w-20" />
-            <button type="button" onClick={() => setPaths((prev) => prev.slice(0, -1))} disabled={paths.length === 0} className="ml-2 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"><RotateCcw className="mr-1 inline h-3 w-3" />Undo</button>
-            <button type="button" onClick={handleSave} disabled={paths.length === 0} className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-40"><Save className="mr-1 inline h-3 w-3" />Save annotated</button>
+          <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-gray-500">Color:</span>
+              {drawColors.map((c) => <button key={c} type="button" onClick={() => setDrawColor(c)} className={`h-6 w-6 rounded-full border-2 transition ${drawColor === c ? "border-gray-900 scale-110" : "border-gray-300"}`} style={{ backgroundColor: c }} />)}
+              <span className="text-xs font-bold text-gray-500 sm:ml-2">Size:</span>
+              <input type="range" min={1} max={10} value={drawWidth} onChange={(e) => setDrawWidth(Number(e.target.value))} className="w-16 sm:w-20" />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={() => setPaths((prev) => prev.slice(0, -1))} disabled={paths.length === 0} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"><RotateCcw className="mr-1 inline h-3 w-3" />Undo</button>
+              <button type="button" onClick={handleSave} disabled={paths.length === 0} className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-40 sm:flex-none"><Save className="mr-1 inline h-3 w-3" />Save annotated</button>
+            </div>
           </div>
         )}
 
@@ -1275,6 +1289,14 @@ export default function LeadsPage() {
             await addJobPhotos(selectedJobId, [{ photoType, name, dataUrl, uploadedBy: currentUserName }]);
             const refreshed = await loadJobPhotos(selectedJobId);
             setJobFiles(refreshed);
+          }}
+          onDelete={async (photoId) => {
+            await deleteJobPhoto(photoId);
+            if (selectedJobId) {
+              const refreshed = await loadJobPhotos(selectedJobId);
+              setJobFiles(refreshed);
+              setLightbox((prev) => prev && refreshed.length > 0 ? { ...prev, photos: refreshed, index: Math.min(prev.index, refreshed.length - 1) } : null);
+            }
           }}
         />
       )}

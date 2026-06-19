@@ -533,6 +533,16 @@ export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoT
   if (error) throw new Error(error.message);
 }
 
+export async function deleteJobPhoto(photoId: string): Promise<void> {
+  if (!hasSupabaseConfig()) {
+    writeLocal(crewSyncPhotosKey, readLocal<JobPhoto[]>(crewSyncPhotosKey, []).filter((p) => p.id !== photoId));
+    return;
+  }
+  const supabase = createClient();
+  const { error } = await supabase.from(jobPhotosTable).delete().eq("id", photoId);
+  if (error) throw new Error(error.message);
+}
+
 type StorageClient = Pick<ReturnType<typeof createClient>, "storage">;
 
 /**
