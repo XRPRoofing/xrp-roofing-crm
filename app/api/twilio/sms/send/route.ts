@@ -6,6 +6,7 @@ import { publishConversationEvent } from "@/lib/twilio/realtime";
 const smsSchema = z.object({
   to: z.string().min(7),
   body: z.string().min(1),
+  from: z.string().optional(),
   conversationId: z.string().optional(),
   mediaUrl: z.array(z.string().url()).optional(),
 });

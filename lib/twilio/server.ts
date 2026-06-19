@@ -32,9 +32,13 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
+  const fromNumber = payload.from
+    ? (config.partnerReferralNumber && payload.from === config.partnerReferralNumber ? config.partnerReferralNumber : config.phoneNumber)
+    : config.phoneNumber;
+
   return client.messages.create({
     to: payload.to,
-    from: config.phoneNumber,
+    from: fromNumber,
     body: payload.body,
     mediaUrl: payload.mediaUrl,
     statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
