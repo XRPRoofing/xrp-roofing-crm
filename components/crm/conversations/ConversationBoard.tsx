@@ -145,12 +145,14 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
           const unreadCount = conversation.isMissedCall ? 0 : conversation.unreadCount;
           const status = conversation.isMissedCall ? "Missed call" : unreadCount > 0 ? "Unread" : "Read";
           const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-blue-700" : "text-blue-600";
+          const lineLabel = conversation.twilioNumber ? getLineLabelForNumber(conversation.twilioNumber) : "";
           return (
             <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-lg border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-50"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                   {unreadCount > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden />}
                   <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-gray-950" : "font-semibold text-gray-800"}`}>{conversation.contact.name}</p>
+                  {lineLabel && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${lineLabel === "Partner Referral" ? "bg-purple-50 text-purple-600 ring-1 ring-purple-200" : "bg-gray-100 text-gray-500 ring-1 ring-gray-200"}`}>{lineLabel}</span>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {unreadCount > 0 && <Badge tone="blue">{unreadCount}</Badge>}
