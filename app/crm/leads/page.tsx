@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, Clock, DollarSign, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Phone, Plus, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -168,6 +168,203 @@ function syncCustomerFromJob(contact: { name: string; email?: string; phone?: st
   }).catch(() => {});
 }
 
+// ---------------------------------------------------------------------------
+// Photo Lightbox with draw/annotate
+// ---------------------------------------------------------------------------
+
+type DrawPath = { points: { x: number; y: number }[]; color: string; width: number };
+
+function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated }: {
+  photos: JobPhoto[];
+  initialIndex: number;
+  onClose: () => void;
+  onSaveAnnotated: (dataUrl: string, name: string, photoType: JobPhoto["photoType"]) => void;
+}) {
+  const [index, setIndex] = useState(initialIndex);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawColor, setDrawColor] = useState("#ef4444");
+  const [drawWidth, setDrawWidth] = useState(3);
+  const [paths, setPaths] = useState<DrawPath[]>([]);
+  const [currentPath, setCurrentPath] = useState<DrawPath | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const photo = photos[index];
+  const hasPrev = index > 0;
+  const hasNext = index < photos.length - 1;
+
+  const drawColors = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#ffffff", "#000000"];
+
+  useEffect(() => { setPaths([]); setCurrentPath(null); setDrawMode(false); }, [index]); // eslint-disable-line react-hooks/set-state-in-effect
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && hasPrev) setIndex((i) => i - 1);
+      if (e.key === "ArrowRight" && hasNext) setIndex((i) => i + 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hasPrev, hasNext, onClose]);
+
+  function redrawCanvas() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const path of paths) {
+      if (path.points.length < 2) continue;
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = path.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(path.points[0].x, path.points[0].y);
+      for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
+      ctx.stroke();
+    }
+  }
+
+  useEffect(() => { redrawCanvas(); });
+
+  function getCanvasPoint(e: React.MouseEvent | React.TouchEvent): { x: number; y: number } | null {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0]?.clientX ?? 0 : e.clientX;
+    const clientY = "touches" in e ? e.touches[0]?.clientY ?? 0 : e.clientY;
+    return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height };
+  }
+
+  function handlePointerDown(e: React.MouseEvent | React.TouchEvent) {
+    if (!drawMode) return;
+    const pt = getCanvasPoint(e);
+    if (!pt) return;
+    setIsDrawing(true);
+    setCurrentPath({ points: [pt], color: drawColor, width: drawWidth });
+  }
+
+  function handlePointerMove(e: React.MouseEvent | React.TouchEvent) {
+    if (!isDrawing || !currentPath) return;
+    const pt = getCanvasPoint(e);
+    if (!pt) return;
+    setCurrentPath({ ...currentPath, points: [...currentPath.points, pt] });
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas) return;
+    redrawCanvas();
+    ctx.strokeStyle = currentPath.color;
+    ctx.lineWidth = currentPath.width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(currentPath.points[0].x, currentPath.points[0].y);
+    for (const p of currentPath.points) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  }
+
+  function handlePointerUp() {
+    if (!isDrawing || !currentPath) return;
+    setIsDrawing(false);
+    if (currentPath.points.length > 1) setPaths((prev) => [...prev, currentPath]);
+    setCurrentPath(null);
+  }
+
+  function handleSave() {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = img.naturalWidth;
+    offscreen.height = img.naturalHeight;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0);
+    const scaleX = img.naturalWidth / canvas.width;
+    const scaleY = img.naturalHeight / canvas.height;
+    for (const path of paths) {
+      if (path.points.length < 2) continue;
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = path.width * Math.max(scaleX, scaleY);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(path.points[0].x * scaleX, path.points[0].y * scaleY);
+      for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x * scaleX, path.points[i].y * scaleY);
+      ctx.stroke();
+    }
+    const dataUrl = offscreen.toDataURL("image/jpeg", 0.92);
+    onSaveAnnotated(dataUrl, `annotated-${photo.name}`, photo.photoType);
+    setPaths([]);
+    setDrawMode(false);
+  }
+
+  function handleImageLoad() {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/80 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{index + 1} / {photos.length}</span>
+            <span className="text-sm font-semibold text-gray-700 truncate max-w-[200px]">{photo.name}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${photo.photoType === "Before" ? "bg-blue-100 text-blue-700" : photo.photoType === "Progress" ? "bg-orange-100 text-orange-700" : photo.photoType === "After" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{photo.photoType}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setDrawMode((v) => !v)} className={`rounded-lg p-2 transition ${drawMode ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`} title="Draw / Annotate"><Pencil className="h-4 w-4" /></button>
+            <a href={photo.dataUrl} download={photo.name} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100" title="Download"><Download className="h-4 w-4" /></a>
+            <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"><X className="h-5 w-5" /></button>
+          </div>
+        </div>
+
+        {/* Draw toolbar */}
+        {drawMode && (
+          <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2">
+            <span className="text-xs font-bold text-gray-500">Color:</span>
+            {drawColors.map((c) => <button key={c} type="button" onClick={() => setDrawColor(c)} className={`h-6 w-6 rounded-full border-2 transition ${drawColor === c ? "border-gray-900 scale-110" : "border-gray-300"}`} style={{ backgroundColor: c }} />)}
+            <span className="ml-3 text-xs font-bold text-gray-500">Size:</span>
+            <input type="range" min={1} max={10} value={drawWidth} onChange={(e) => setDrawWidth(Number(e.target.value))} className="w-20" />
+            <button type="button" onClick={() => setPaths((prev) => prev.slice(0, -1))} disabled={paths.length === 0} className="ml-2 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"><RotateCcw className="mr-1 inline h-3 w-3" />Undo</button>
+            <button type="button" onClick={handleSave} disabled={paths.length === 0} className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-40"><Save className="mr-1 inline h-3 w-3" />Save annotated</button>
+          </div>
+        )}
+
+        {/* Image + canvas */}
+        <div className="relative flex min-h-0 flex-1 items-center justify-center bg-gray-100 p-2">
+          {hasPrev && <button type="button" onClick={() => setIndex((i) => i - 1)} className="absolute left-2 z-10 rounded-full bg-white/90 p-2 text-gray-700 shadow transition hover:bg-white"><ChevronLeft className="h-5 w-5" /></button>}
+          {hasNext && <button type="button" onClick={() => setIndex((i) => i + 1)} className="absolute right-2 z-10 rounded-full bg-white/90 p-2 text-gray-700 shadow transition hover:bg-white"><ChevronRight className="h-5 w-5" /></button>}
+          <div className="relative max-h-[70vh] max-w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img ref={imgRef} src={photo.dataUrl} alt={photo.name} className="max-h-[70vh] max-w-full rounded-lg object-contain" onLoad={handleImageLoad} />
+            <canvas
+              ref={canvasRef}
+              className={`absolute inset-0 h-full w-full rounded-lg ${drawMode ? "cursor-crosshair" : "pointer-events-none"}`}
+              onMouseDown={handlePointerDown}
+              onMouseMove={handlePointerMove}
+              onMouseUp={handlePointerUp}
+              onMouseLeave={handlePointerUp}
+              onTouchStart={handlePointerDown}
+              onTouchMove={handlePointerMove}
+              onTouchEnd={handlePointerUp}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LeadsPage() {
   const [jobs, setJobs] = useState<Lead[]>(() => (getCachedCrewData()?.jobs ?? []).map(normalizeJob));
   const [search, setSearch] = useState("");
@@ -175,6 +372,7 @@ export default function LeadsPage() {
   const [showForm, setShowForm] = useState(false);
   const [draggedJobId, setDraggedJobId] = useState<string | null>(null);
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
+  const [lightbox, setLightbox] = useState<{ photos: JobPhoto[]; index: number } | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [proposalStatusMap, setProposalStatusMap] = useState<Record<string, string>>({});
 
@@ -974,9 +1172,9 @@ export default function LeadsPage() {
                         </div>
                         {photos.length > 0 && (
                           <div className="mt-1.5 flex gap-1 overflow-x-auto">
-                            {photos.map((photo) => (
+                            {photos.map((photo, photoIdx) => (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 rounded-md object-cover" />
+                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 cursor-pointer rounded-md object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos, index: photoIdx })} />
                             ))}
                           </div>
                         )}
@@ -1007,9 +1205,9 @@ export default function LeadsPage() {
                   </div>
                   {otherPhotos.length > 0 && (
                     <div className="mt-3 grid grid-cols-3 gap-2">
-                      {otherPhotos.map((photo) => (
+                      {otherPhotos.map((photo, photoIdx) => (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full rounded-lg border border-gray-100 object-cover" />
+                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full cursor-pointer rounded-lg border border-gray-100 object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos: otherPhotos, index: photoIdx })} />
                       ))}
                     </div>
                   )}
@@ -1064,6 +1262,21 @@ export default function LeadsPage() {
             </div>
           </aside>
         </div>
+      )}
+
+      {/* Photo Lightbox */}
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onSaveAnnotated={async (dataUrl, name, photoType) => {
+            if (!selectedJobId) return;
+            await addJobPhotos(selectedJobId, [{ photoType, name, dataUrl, uploadedBy: currentUserName }]);
+            const refreshed = await loadJobPhotos(selectedJobId);
+            setJobFiles(refreshed);
+          }}
+        />
       )}
 
       {/* Live Camera Overlay */}
