@@ -739,7 +739,13 @@ export default function ConversationBoard() {
   const [incomingFrom, setIncomingFrom] = useState("");
   const [callInsights, setCallInsights] = useState<TwilioConversationEvent[]>([]);
   const [inboundReady, setInboundReady] = useState(false);
-  const twilioLines = useMemo(() => getTwilioLines(), []);
+  const twilioLines = useMemo(() => {
+    const lines = getTwilioLines();
+    if (typeof window !== "undefined") {
+      console.log("[twilio:ui] twilioLines loaded:", lines.length, lines.map((l) => `${l.label}=${l.number}`).join(", ") || "(none)");
+    }
+    return lines;
+  }, []);
   const [selectedFromNumber, setSelectedFromNumber] = useState(() => twilioLines[0]?.number || "");
   const [fromDropdownOpen, setFromDropdownOpen] = useState(false);
   const [selectedCallInsight, setSelectedCallInsight] = useState<TwilioConversationEvent | null>(null);
@@ -1351,14 +1357,14 @@ export default function ConversationBoard() {
           <div className="sticky bottom-0 z-20 border-t border-gray-200 bg-white p-3">
             <div className="mb-2 flex gap-2 overflow-x-auto">{quickTemplates.map((template) => <button key={template} onClick={() => setMessageText((prev: string) => prev ? `${prev} ${template}` : template)} className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100">{template}</button>)}</div>
             {!active && <input value={dialNumber} onChange={(event) => setDialNumber(event.target.value)} className="mb-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" placeholder="To: enter any phone number or choose a customer" />}
-            {twilioLines.length > 1 && (
+            {twilioLines.length > 0 && (
               <div className="relative mb-2">
-                <button type="button" onClick={() => setFromDropdownOpen((v) => !v)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100">
+                <button type="button" onClick={() => { if (twilioLines.length > 1) setFromDropdownOpen((v) => !v); }} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100">
                   <Phone className="h-3 w-3 text-gray-400" />
-                  <span>From: {twilioLines.find((l) => l.number === selectedFromNumber)?.label || "Select"}</span>
-                  <ChevronDown className={`h-3 w-3 text-gray-400 transition ${fromDropdownOpen ? "rotate-180" : ""}`} />
+                  <span>From: {twilioLines.find((l) => l.number === selectedFromNumber)?.label || twilioLines[0]?.label || "Select"}</span>
+                  {twilioLines.length > 1 && <ChevronDown className={`h-3 w-3 text-gray-400 transition ${fromDropdownOpen ? "rotate-180" : ""}`} />}
                 </button>
-                {fromDropdownOpen && (
+                {fromDropdownOpen && twilioLines.length > 1 && (
                   <>
                     <button type="button" className="fixed inset-0 z-10" onClick={() => setFromDropdownOpen(false)} />
                     <div className="absolute bottom-full left-0 z-20 mb-1 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
