@@ -14,6 +14,7 @@ export interface ConversationMessage {
   customerId?: string;
   jobId?: string;
   recordingUrl?: string;
+  line?: string;
 }
 
 export interface ConversationContact {
@@ -53,4 +54,5 @@ export interface ConversationRecord {
   // used to decide whether a missed call is still outstanding (unreviewed).
   lastMissedAt?: string;
   lastAnsweredAt?: string;
+  twilioNumber?: string;
 }
