@@ -599,7 +599,10 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     callSids: nextCallSids,
   };
 
-  return [updated, ...current.filter((conversation) => conversation.id !== id)];
+  if (effectiveMessage) {
+    return [updated, ...current.filter((conversation) => conversation.id !== id)];
+  }
+  return current.map((conversation) => conversation.id === id ? updated : conversation);
 }
 
 function createLocalCommunicationEvent(type: TwilioConversationEvent["type"], phone: string, body: string, direction: "inbound" | "outbound" = "outbound"): TwilioConversationEvent {
@@ -1008,6 +1011,43 @@ export default function ConversationBoard() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  // Re-fetch events when the browser tab regains focus to catch anything
+  // missed while the tab was in the background (covers cross-device sync
+  // and dropped real-time connections).
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
+        const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
+        const sorted = [...rawConversations].sort((a, b) => {
+          const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
+          const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
+          return tb - ta;
+        });
+        const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
+        setConversations(sorted.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
+        setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
+      }).catch(() => {});
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  // Refresh relative timestamps ("3 min ago") every 60 seconds so they
+  // stay accurate without a page reload.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setConversations((current: ConversationRecord[]) =>
+        current.map((conversation) =>
+          conversation.lastActivityIso
+            ? { ...conversation, lastActivityAt: formatActivityTime(conversation.lastActivityIso) }
+            : conversation
+        )
+      );
+    }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
