@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { customers, leads } from "@/lib/crm-data";
+import { leads } from "@/lib/crm-data";
+import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone, loadContactEdits, saveContactEdit, subscribeToContactEdits, type ContactEdit } from "@/lib/conversation-contact-sync";
+import type { Customer } from "@/types/crm";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
 import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates, uploadMmsMedia } from "@/lib/twilio/client";
 import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
@@ -379,10 +381,10 @@ function formatPhoneIdentity(value: string) {
   return value.trim() || "Unknown number";
 }
 
-function findCrmContactByPhone(phone: string) {
+function findCrmContactByPhone(phone: string, liveCustomerLookup?: Map<string, Customer>) {
   const normalized = normalizePhone(phone);
   const lead = leads.find((item) => normalizePhone(item.phone) === normalized);
-  const customer = customers.find((item) => normalizePhone(item.phone) === normalized);
+  const customer = liveCustomerLookup ? matchCustomerByPhone(phone, liveCustomerLookup) : null;
 
   if (!lead && !customer) return null;
 
@@ -402,8 +404,8 @@ function findCrmContactByPhone(phone: string) {
   };
 }
 
-function createManualConversation(phone: string): ConversationRecord {
-  const contact = findCrmContactByPhone(phone);
+function createManualConversation(phone: string, liveCustomerLookup?: Map<string, Customer>): ConversationRecord {
+  const contact = findCrmContactByPhone(phone, liveCustomerLookup);
   const normalized = normalizePhone(phone) || crypto.randomUUID();
 
   return {
@@ -576,7 +578,7 @@ function isMissedCallOutstanding(lastMissedAt?: string, lastAnsweredAt?: string,
   return true;
 }
 
-function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent, readStates?: Record<string, string>) {
+function upsertConversationFromEvent(current: ConversationRecord[], event: TwilioConversationEvent, readStates?: Record<string, string>, liveCustomerLookup?: Map<string, Customer>) {
   const phone = getEventPhone(event);
   const existing = event.conversationId ? current.find((conversation) => conversation.id === event.conversationId) : current.find((conversation) => eventMatchesConversation(event, conversation));
   if (!phone && !existing) return current;
@@ -584,7 +586,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const normalized = normalizePhone(phone || existing?.contact.phone || "");
   const id = existing?.id || getConversationIdForPhone(phone);
   const channel: ConversationChannel = event.type.includes("call") ? "call" : event.type.includes("sms") || event.type.includes("message") ? "sms" : "note";
-  const nextConversation = existing || createManualConversation(phone);
+  const nextConversation = existing || createManualConversation(phone, liveCustomerLookup);
   const inboundTwilioPhone = event.direction === "inbound" ? toE164(event.to || "") : "";
   const twilioNumber = existing?.twilioNumber || (inboundTwilioPhone || undefined);
   const conversationLine = twilioNumber ? getLineLabelForNumber(twilioNumber) : "";
@@ -754,6 +756,8 @@ export default function ConversationBoard() {
   const [conversations, setConversations] = useState<ConversationRecord[]>(initialConversations);
   const [activeConversationId, setActiveConversationId] = useState("");
   const active = conversations.find((conversation) => conversation.id === activeConversationId) || conversations[0];
+  const liveCustomerLookupRef = useRef<Map<string, Customer>>(new Map());
+  const contactEditsRef = useRef<Record<string, ContactEdit>>({});
 
   function scrollMessageBoardToBottom() {
     requestAnimationFrame(() => {
@@ -909,17 +913,11 @@ export default function ConversationBoard() {
 
     setConversations((current) => current.map((conversation) => conversation.id === active.id ? { ...conversation, contact: { ...conversation.contact, [field]: value } } : conversation));
 
-    // Persist the edit so it survives a refresh/relaunch (loaded back in via
-    // "crm-conversation-contact-edits" on mount).
-    if (typeof window !== "undefined") {
-      try {
-        const edits = JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>>;
-        edits[active.id] = { ...(edits[active.id] || {}), [field]: value };
-        window.localStorage.setItem("crm-conversation-contact-edits", JSON.stringify(edits));
-      } catch {
-        /* ignore storage failures */
-      }
-    }
+    // Persist to Supabase (cross-device) + localStorage (fallback).
+    const phone = active.contact.phone;
+    const edit: ContactEdit = { ...(contactEditsRef.current[active.id] || {} as ContactEdit), phone, [field]: value };
+    contactEditsRef.current[active.id] = edit;
+    void saveContactEdit(active.id, edit);
   }
 
   function handleMoveStage(stage: string) {
@@ -1021,24 +1019,27 @@ export default function ConversationBoard() {
     const phone = getEventPhone(event);
     const conversationId = getConversationIdForPhone(phone);
     addTwilioCrmNotification(event);
-    setConversations((current: ConversationRecord[]) => upsertConversationFromEvent(current, event));
+    setConversations((current: ConversationRecord[]) => upsertConversationFromEvent(current, event, undefined, liveCustomerLookupRef.current));
     setActiveConversationId(conversationId);
   }
 
   useEffect(() => {
     let mounted = true;
 
-    Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
+    // Load live customers + saved contact edits + conversation events in parallel
+    Promise.all([listConversationEvents(), listConversationReadStates(), loadLiveCustomers(), loadContactEdits()]).then(([events, readStates, liveCustomers, savedEdits]) => {
       if (!mounted) return;
 
-      const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
+      liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
+      contactEditsRef.current = savedEdits;
+
+      const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
       const savedConversations = [...rawConversations].sort((a, b) => {
         const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
         const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
         return tb - ta;
       });
-      const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
-      setConversations(savedConversations.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
+      setConversations(savedConversations.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
       setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
       setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
@@ -1058,15 +1059,16 @@ export default function ConversationBoard() {
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState !== "visible") return;
-      Promise.all([listConversationEvents(), listConversationReadStates()]).then(([events, readStates]) => {
-        const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates), []);
+      Promise.all([listConversationEvents(), listConversationReadStates(), loadLiveCustomers(), loadContactEdits()]).then(([events, readStates, liveCustomers, savedEdits]) => {
+        liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
+        contactEditsRef.current = savedEdits;
+        const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
         const sorted = [...rawConversations].sort((a, b) => {
           const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
           const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
           return tb - ta;
         });
-        const storedContactEdits = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>> : {};
-        setConversations(sorted.map((conversation) => storedContactEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...storedContactEdits[conversation.id] } } : conversation));
+        setConversations(sorted.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
         setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
       }).catch(() => {});
     }
@@ -1095,7 +1097,7 @@ export default function ConversationBoard() {
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
         addTwilioCrmNotification(event);
         setConversations((current: ConversationRecord[]) => {
-          const next = upsertConversationFromEvent(current, event);
+          const next = upsertConversationFromEvent(current, event, undefined, liveCustomerLookupRef.current);
           if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
           return next;
         });
@@ -1112,6 +1114,22 @@ export default function ConversationBoard() {
       queueMicrotask(() => setTwilioNotice("Call history syncs automatically after each call"));
     }
   }, [activeConversationId, notifyIncomingCall]);
+
+  // Cross-device sync: when another device saves a contact name, re-apply edits
+  useEffect(() => {
+    return subscribeToContactEdits(() => {
+      loadContactEdits().then((savedEdits) => {
+        contactEditsRef.current = savedEdits;
+        setConversations((current) =>
+          current.map((conversation) =>
+            savedEdits[conversation.id]
+              ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } }
+              : conversation
+          )
+        );
+      }).catch(() => {});
+    });
+  }, []);
 
   useEffect(() => {
     scrollMessageBoardToBottom();
@@ -1367,7 +1385,7 @@ export default function ConversationBoard() {
       return;
     }
     const name = newConvoName.trim();
-    const base = createManualConversation(phone);
+    const base = createManualConversation(phone, liveCustomerLookupRef.current);
     const conversation = name ? { ...base, contact: { ...base.contact, name } } : base;
 
     setConversations((current) => current.some((item) => item.id === conversation.id)
@@ -1377,14 +1395,10 @@ export default function ConversationBoard() {
     setDialNumber(phone);
     setShowMobileThread(true);
 
-    if (name && typeof window !== "undefined") {
-      try {
-        const edits = JSON.parse(window.localStorage.getItem("crm-conversation-contact-edits") || "{}") as Record<string, Partial<ConversationRecord["contact"]>>;
-        edits[conversation.id] = { ...(edits[conversation.id] || {}), name };
-        window.localStorage.setItem("crm-conversation-contact-edits", JSON.stringify(edits));
-      } catch {
-        /* ignore storage failures */
-      }
+    if (name) {
+      const edit: ContactEdit = { phone, name };
+      contactEditsRef.current[conversation.id] = edit;
+      void saveContactEdit(conversation.id, edit);
     }
 
     setNewConvoOpen(false);
