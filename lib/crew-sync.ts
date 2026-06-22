@@ -2,6 +2,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import {
@@ -420,16 +421,19 @@ export async function upsertJobRecord(record: JobRecord): Promise<void> {
     const records = readLocalJobs();
     const exists = records.some((item) => item.id === record.id);
     writeLocalJobs(exists ? records.map((item) => (item.id === record.id ? record : item)) : [record, ...records]);
+    broadcastCrmUpdate();
     return;
   }
   const supabase = createClient();
   const { error } = await supabase.from(jobsTable).upsert(jobRecordToRow(record), { onConflict: "id" });
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 export async function updateJobRecord(jobId: string, patch: Partial<JobRecord>): Promise<void> {
   if (!hasSupabaseConfig()) {
     writeLocalJobs(readLocalJobs().map((item) => (item.id === jobId ? { ...item, ...patch } : item)));
+    broadcastCrmUpdate();
     return;
   }
   const supabase = createClient();
@@ -449,6 +453,7 @@ export async function updateJobRecord(jobId: string, patch: Partial<JobRecord>):
   });
   const { error } = await supabase.from(jobsTable).update(dbPatch).eq("id", jobId);
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 export async function deleteJobRecord(jobId: string): Promise<void> {
@@ -464,6 +469,7 @@ export async function deleteJobRecord(jobId: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from(jobsTable).delete().eq("id", jobId);
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 /**
@@ -531,16 +537,19 @@ export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoT
   );
   const { error } = await supabase.from(jobPhotosTable).insert(rows);
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 export async function deleteJobPhoto(photoId: string): Promise<void> {
   if (!hasSupabaseConfig()) {
     writeLocal(crewSyncPhotosKey, readLocal<JobPhoto[]>(crewSyncPhotosKey, []).filter((p) => p.id !== photoId));
+    broadcastCrmUpdate();
     return;
   }
   const supabase = createClient();
   const { error } = await supabase.from(jobPhotosTable).delete().eq("id", photoId);
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 type StorageClient = Pick<ReturnType<typeof createClient>, "storage">;
@@ -600,6 +609,7 @@ export async function addJobNote(jobId: string, author: string, body: string): P
   const supabase = createClient();
   const { error } = await supabase.from(jobNotesTable).insert({ job_id: jobId, author, body: trimmed });
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 export async function addChecklistItem(jobId: string, label: string, position: number): Promise<void> {
@@ -613,6 +623,7 @@ export async function addChecklistItem(jobId: string, label: string, position: n
   const supabase = createClient();
   const { error } = await supabase.from(jobChecklistTable).insert({ job_id: jobId, label: trimmed, position });
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 export async function setChecklistItemDone(itemId: string, done: boolean): Promise<void> {
@@ -623,6 +634,7 @@ export async function setChecklistItemDone(itemId: string, done: boolean): Promi
   const supabase = createClient();
   const { error } = await supabase.from(jobChecklistTable).update({ done }).eq("id", itemId);
   if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
 }
 
 // ---------------------------------------------------------------------------

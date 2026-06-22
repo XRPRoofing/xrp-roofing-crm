@@ -17,8 +17,9 @@ export async function POST(req: NextRequest) {
   const greetingRedirectUrl = greetingRedirect.toString();
   const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
 
+  const callerNumber = formData.get("From")?.toString() || "";
   const onlineAgents = await fetchOnlineAgents();
-  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl);
+  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl, callerNumber);
 
   if (department) {
     after(async () => {

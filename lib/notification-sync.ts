@@ -7,6 +7,7 @@
  */
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import type { CrmNotification } from "@/lib/crm-notifications";
 import { readCrmNotifications, readDeletedNotificationIds, saveCrmNotifications } from "@/lib/crm-notifications";
 
@@ -22,6 +23,7 @@ export async function pushNotificationToSupabase(notification: CrmNotification):
       payload: notification,
       created_at: notification.createdAt,
     });
+    broadcastCrmUpdate();
   } catch {
     // silently fall back to localStorage-only
   }

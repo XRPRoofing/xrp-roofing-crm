@@ -4,13 +4,15 @@ import { buildQueueHoldTwiml, fetchOnlineAgents, resolveCallStatusCallbackUrl } 
 const XML_HEADERS = { "Content-Type": "text/xml" };
 
 export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const callerNumber = formData.get("From")?.toString() || "";
   const origin = req.nextUrl.origin;
   const statusCallbackUrl = resolveCallStatusCallbackUrl(origin);
   const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
   const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
 
   const onlineAgents = await fetchOnlineAgents();
-  const twiml = buildQueueHoldTwiml(onlineAgents, statusCallbackUrl, actionCallbackUrl, queueHoldUrl);
+  const twiml = buildQueueHoldTwiml(onlineAgents, statusCallbackUrl, actionCallbackUrl, queueHoldUrl, callerNumber);
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
 }
