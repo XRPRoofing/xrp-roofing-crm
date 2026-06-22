@@ -146,6 +146,7 @@ export function buildQueueHoldTwiml(
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   queueHoldUrl: string,
+  callerNumber?: string,
 ): string {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -161,6 +162,8 @@ export function buildQueueHoldTwiml(
       recordingStatusCallback: statusCallbackUrl,
       recordingStatusCallbackEvent: ["completed"],
       recordingStatusCallbackMethod: "POST",
+      // Show customer's number to staff; customer only sees the Twilio number they called
+      ...(callerNumber ? { callerId: callerNumber } : {}),
     });
     dialRingGroup(dial, config, agentStatus.agents);
     const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
@@ -176,7 +179,7 @@ export function buildQueueHoldTwiml(
   return response.toString();
 }
 
-export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[]) {
+export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[], callerNumber?: string) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
   const dial = response.dial({
@@ -188,6 +191,8 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
+    // Show customer's number to staff; customer only sees the Twilio number they called
+    ...(callerNumber ? { callerId: callerNumber } : {}),
   });
 
   dialRingGroup(dial, config, onlineAgents);
@@ -323,6 +328,7 @@ export function buildIvrMenuTwiml(
   greetingRedirectUrl: string,
   agentStatus?: AgentStatusResult,
   queueHoldUrl?: string,
+  callerNumber?: string,
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -377,6 +383,8 @@ export function buildIvrMenuTwiml(
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
+    // Show customer's number to staff; customer only sees the Twilio number they called
+    ...(callerNumber ? { callerId: callerNumber } : {}),
   });
 
   // dialRingGroup guarantees at least crm-agent as ultimate fallback

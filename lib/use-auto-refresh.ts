@@ -8,7 +8,8 @@ import { useEffect, useRef } from "react";
  *  - window `focus` (switching back to the tab/window)
  *  - `visibilitychange` -> visible (returning from another app, esp. on mobile)
  *  - cross-tab `storage` writes on the same device
- *  - a safety-net polling interval (default 60s; callers can override)
+ *  - BroadcastChannel messages from other tabs on the same device
+ *  - a safety-net polling interval (default 30s; callers can override)
  *
  * Refreshes are debounced so rapid events (e.g. focus + visibilitychange firing
  * together) only trigger one callback.
@@ -39,17 +40,39 @@ export function useAutoRefresh(onRefresh: () => void, { intervalMs }: { interval
     window.addEventListener("storage", debouncedRun);
     document.addEventListener("visibilitychange", onVisible);
 
-    const finalInterval = intervalMs ?? 60_000;
+    // BroadcastChannel for instant cross-tab sync on the same device
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("xrp-crm-sync");
+      bc.onmessage = () => debouncedRun();
+    } catch {
+      // BroadcastChannel not supported — fall back to storage events only
+    }
+
+    const finalInterval = intervalMs ?? 30_000;
     const timer = finalInterval > 0 ? window.setInterval(debouncedRun, finalInterval) : undefined;
 
     return () => {
       window.removeEventListener("focus", debouncedRun);
       window.removeEventListener("storage", debouncedRun);
       document.removeEventListener("visibilitychange", onVisible);
+      if (bc) { try { bc.close(); } catch { /* ignore */ } }
       if (debounceTimer) clearTimeout(debounceTimer);
       if (timer) window.clearInterval(timer);
     };
   }, [intervalMs]);
+}
+
+/** Notify all other open tabs to refresh their data immediately. */
+export function broadcastCrmUpdate() {
+  if (typeof window === "undefined") return;
+  try {
+    const bc = new BroadcastChannel("xrp-crm-sync");
+    bc.postMessage("update");
+    bc.close();
+  } catch {
+    // BroadcastChannel not supported
+  }
 }
 
 /**
