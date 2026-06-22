@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customers, leads } from "@/lib/crm-data";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates, uploadMmsMedia } from "@/lib/twilio/client";
 import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
@@ -218,6 +218,18 @@ function MessageRow({ message }: { message: ConversationMessage }) {
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-lg px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-gray-200 bg-white text-gray-800 shadow-sm"}`}>
         <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}{message.line && <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? (outbound ? "bg-purple-500/20 text-purple-100" : "bg-purple-50 text-purple-600 ring-1 ring-purple-200") : (outbound ? "bg-white/10 text-blue-100" : "bg-gray-50 text-gray-500 ring-1 ring-gray-200")}`}>{message.line}</span>}</div>
+        {message.mediaUrls && message.mediaUrls.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {message.mediaUrls.map((url) => {
+              const isPdf = url.toLowerCase().endsWith(".pdf");
+              return isPdf ? (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${outbound ? "bg-white/20 text-white hover:bg-white/30" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}><FileText className="h-4 w-4" />PDF Document</a>
+              ) : (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="MMS" className="max-h-48 max-w-[240px] rounded-lg border border-white/20 object-cover" /></a>
+              );
+            })}
+          </div>
+        )}
         <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(message.body)}</p>
         {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
@@ -513,6 +525,23 @@ function eventMatchesConversation(event: TwilioConversationEvent, conversation: 
   return conversation.messages.some((message) => message.id.includes(event.callSid || ""));
 }
 
+function extractMediaUrls(payload: Record<string, unknown>): string[] {
+  const urls: string[] = [];
+  // Outbound MMS: stored as payload.mediaUrls
+  if (Array.isArray(payload.mediaUrls)) {
+    for (const url of payload.mediaUrls) {
+      if (typeof url === "string" && url.startsWith("http")) urls.push(url);
+    }
+  }
+  // Inbound MMS: Twilio sends MediaUrl0, MediaUrl1, …
+  const numMedia = Number(payload.NumMedia || 0);
+  for (let i = 0; i < numMedia; i++) {
+    const url = payload[`MediaUrl${i}`];
+    if (typeof url === "string" && url.startsWith("http")) urls.push(url);
+  }
+  return urls;
+}
+
 function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: string): ConversationMessage {
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
@@ -522,6 +551,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
   const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
   const twilioPhone = getTwilioLinePhone(event);
   const line = getLineLabelForNumber(twilioPhone) || fallbackLine || "";
+  const mediaUrls = extractMediaUrls(event.payload);
 
   return {
     id: getCallMessageId(event),
@@ -533,6 +563,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
     status: isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read",
     recordingUrl: event.recordingUrl,
     line,
+    ...(mediaUrls.length > 0 ? { mediaUrls } : {}),
   };
 }
 // Decide whether a missed call is still "outstanding" (i.e. should show the
@@ -736,6 +767,8 @@ export default function ConversationBoard() {
   const [isMuted, setIsMuted] = useState(false);
   const [callSid, setCallSid] = useState<string>();
   const [messageText, setMessageText] = useState("");
+  const [pendingMedia, setPendingMedia] = useState<File[]>([]);
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [twilioNotice, setTwilioNotice] = useState("Twilio realtime ready");
   const [dialNumber, setDialNumber] = useState("");
   const [forwardNumber, setForwardNumber] = useState("");
@@ -1281,16 +1314,32 @@ export default function ConversationBoard() {
 
   async function handleSendSms() {
     const destination = dialNumber.trim() || active?.contact.phone || "";
-    if (!messageText.trim() || !destination) return;
-    setTwilioNotice("Sending SMS...");
-    applyLocalEvent(createLocalCommunicationEvent("message_status", destination, messageText.trim()));
+    if ((!messageText.trim() && pendingMedia.length === 0) || !destination) return;
+    setTwilioNotice(pendingMedia.length > 0 ? "Uploading media..." : "Sending SMS...");
+    const bodyText = messageText.trim() || (pendingMedia.length > 0 ? "" : "");
+    applyLocalEvent(createLocalCommunicationEvent("message_status", destination, bodyText || `[${pendingMedia.map((f) => f.name).join(", ")}]`));
     scrollMessageBoardToBottom();
     try {
+      let mediaUrls: string[] | undefined;
+      if (pendingMedia.length > 0) {
+        setMediaUploading(true);
+        mediaUrls = await Promise.all(pendingMedia.map((file) => uploadMmsMedia(file)));
+        setMediaUploading(false);
+        setTwilioNotice("Sending MMS...");
+      }
       const fromNumber = selectedFromNumber || active?.twilioNumber || undefined;
-      const message = await sendSms({ to: destination, body: messageText.trim(), from: fromNumber, conversationId: matchedDialContact ? active?.id : undefined });
+      const message = await sendSms({
+        to: destination,
+        body: bodyText || " ",
+        from: fromNumber,
+        conversationId: matchedDialContact ? active?.id : undefined,
+        mediaUrl: mediaUrls,
+      });
       setMessageText("");
+      setPendingMedia([]);
       setTwilioNotice(`SMS ${message.status}`);
     } catch (error) {
+      setMediaUploading(false);
       setTwilioNotice(error instanceof Error ? error.message : "SMS could not be sent");
     }
   }
@@ -1432,8 +1481,22 @@ export default function ConversationBoard() {
                 )}
               </div>
             )}
-            <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) setMessageText((prev: string) => prev ? `${prev} [${file.name}]` : `[${file.name}]`); event.target.value = ""; }} />
-            <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder="Send SMS or add a note..." /><button onClick={handleSendSms} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700"><Send className="h-5 w-5" /></button></div>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" multiple className="hidden" onChange={(event: ChangeEvent<HTMLInputElement>) => { const files = event.target.files; if (files) setPendingMedia((prev) => [...prev, ...Array.from(files)]); event.target.value = ""; }} />
+            {pendingMedia.length > 0 && (
+              <div className="flex flex-wrap gap-2 rounded-t-lg border border-b-0 border-gray-200 bg-gray-50 p-2">
+                {pendingMedia.map((file, i) => (
+                  <div key={`${file.name}-${i}`} className="group relative">
+                    {file.type.startsWith("image/") ? (
+                      <img src={URL.createObjectURL(file)} alt={file.name} className="h-16 w-16 rounded-lg border border-gray-200 object-cover" />
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-gray-200 bg-white"><FileText className="h-6 w-6 text-gray-400" /><span className="absolute bottom-0.5 left-0.5 right-0.5 truncate text-center text-[9px] font-semibold text-gray-500">{file.name.split(".").pop()?.toUpperCase()}</span></div>
+                    )}
+                    <button type="button" onClick={() => setPendingMedia((prev) => prev.filter((_, idx) => idx !== i))} className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm opacity-0 transition group-hover:opacity-100"><X className="h-3 w-3" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={`flex items-end gap-2 ${pendingMedia.length > 0 ? "rounded-b-lg border border-t-0" : "rounded-lg border"} border-gray-200 bg-gray-50 p-2`}><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700" title="Attach image or PDF"><Upload className="h-5 w-5" /></button><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder={pendingMedia.length > 0 ? "Add a caption (optional)..." : "Send SMS or add a note..."} /><button onClick={handleSendSms} disabled={mediaUploading} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700 disabled:opacity-50">{mediaUploading ? <Clock className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}</button></div>
           </div>
         </main>
         {active && <div className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
