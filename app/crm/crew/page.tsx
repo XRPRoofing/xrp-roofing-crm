@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Calendar, Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
+import { Calendar, Camera, CheckCircle2, CircleDot, MessageSquare, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
+import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import { logCrewActivity, loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
@@ -80,6 +81,7 @@ export default function CrewWorkflowPage() {
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const [currentUserName, setCurrentUserName] = useState("CRM user");
   const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
@@ -584,7 +586,7 @@ export default function CrewWorkflowPage() {
 
             <div className="space-y-5 p-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Information</p><p className="mt-2 font-bold text-gray-900">{selectedJob.name}</p><p className="text-sm font-semibold text-gray-600"><PhoneLink value={selectedJob.phone} /></p><p className="text-sm font-semibold text-gray-600"><EmailLink value={selectedJob.email} /></p></div>
+                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Information</p><p className="mt-2 font-bold text-gray-900">{selectedJob.name}</p><p className="flex items-center gap-2 text-sm font-semibold text-gray-600"><PhoneLink value={selectedJob.phone} />{selectedJob.phone && <button onClick={() => setSmsTarget({ phone: selectedJob.phone, name: selectedJob.name })} className="inline-flex h-6 items-center gap-1 rounded bg-green-500 px-2 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" />SMS</button>}</p><p className="text-sm font-semibold text-gray-600"><EmailLink value={selectedJob.email} /></p></div>
                 <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => { updateAssignment(selectedJob.id, { scheduleDate: event.target.value }); if (event.target.value) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated schedule", details: `Schedule date set to ${event.target.value}`, module: "Crew Workflow" }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
                 <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated job scope", details: event.target.value.trim().slice(0, 120), module: "Crew Workflow" }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
                 <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated job notes", details: event.target.value.trim().slice(0, 120), module: "Crew Workflow" }); }} rows={3} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-gray-800 outline-none" /></label>
@@ -734,6 +736,7 @@ export default function CrewWorkflowPage() {
           />
         );
       })()}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }

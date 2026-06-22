@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { AlignLeft, Briefcase, ChevronDown, ChevronLeft, ChevronRight, Clock, ExternalLink, MapPin, Phone, Plus, RefreshCw, User, X } from "lucide-react";
+import { AlignLeft, Briefcase, ChevronDown, ChevronLeft, ChevronRight, Clock, ExternalLink, MapPin, MessageSquare, Phone, Plus, RefreshCw, User, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import QuickSmsModal from "@/components/crm/QuickSmsModal";
 
 type GoogleCalendarEvent = {
   id: string;
@@ -170,6 +171,7 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<GoogleCalendarEvent | null>(null);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     const arizonaFormatter = new Intl.DateTimeFormat("en-US", {
@@ -746,6 +748,11 @@ export default function CalendarPage() {
                           <Phone className="h-4 w-4" />Call
                         </a>
                       )}
+                      {telHref(eventForm.phone) && (
+                        <button type="button" onClick={() => setSmsTarget({ phone: eventForm.phone, name: eventForm.name })} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-green-500 px-4 py-3 font-bold text-white hover:bg-green-600">
+                          <MessageSquare className="h-4 w-4" />SMS
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-[28px_1fr] items-center gap-4">
@@ -804,6 +811,7 @@ export default function CalendarPage() {
           </form>
         </div>
       )}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }
