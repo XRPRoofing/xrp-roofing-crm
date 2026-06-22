@@ -2392,8 +2392,11 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               </select>
               {!isPaidReceiptSelected && (
                 <>
-                  <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Subject" />
-                  <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-32 rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" />
+                  <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Email subject line" />
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-gray-500">Message to customer (sent exactly as written)</label>
+                    <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-40 w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Type your custom message here…" />
+                  </div>
                 </>
               )}
             </div>
@@ -2431,7 +2434,10 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <p className="font-bold text-blue-700">{selectedInvoice.invoiceNumber}</p>
                 <p>To: {selectedInvoice.clientName} · <EmailLink value={selectedInvoice.email} /></p>
                 <p className="font-bold text-blue-700">Customer can pay online by ACH bank transfer or credit card.</p>
-                <p className="mt-1">{sendForm.message}</p>
+                <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-blue-500">Email message preview</p>
+                  <p className="whitespace-pre-wrap text-gray-700">{sendForm.message}</p>
+                </div>
               </div>
             )}
 

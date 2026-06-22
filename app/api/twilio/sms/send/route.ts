@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       status: message.status,
       messageSid: message.sid,
       conversationId: parsed.data.conversationId,
-      payload: { sid: message.sid, status: message.status },
+      payload: { sid: message.sid, status: message.status, ...(parsed.data.mediaUrl?.length ? { mediaUrls: parsed.data.mediaUrl } : {}) },
       createdAt: new Date().toISOString(),
     });
 

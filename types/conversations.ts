@@ -11,6 +11,7 @@ export interface ConversationMessage {
   timestamp: string;
   status?: "sent" | "delivered" | "read" | "missed";
   attachments?: string[];
+  mediaUrls?: string[];
   customerId?: string;
   jobId?: string;
   recordingUrl?: string;

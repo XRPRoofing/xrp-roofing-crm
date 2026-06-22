@@ -64,6 +64,18 @@ export async function sendSms(payload: TwilioSmsPayload) {
   return response.json() as Promise<{ sid: string; status: string }>;
 }
 
+export async function uploadMmsMedia(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/twilio/mms/upload", { method: "POST", body: formData });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.error || "Unable to upload media");
+  }
+  const data = await response.json() as { url: string };
+  return data.url;
+}
+
 export async function startOutboundCall(payload: TwilioCallPayload) {
   const response = await fetch("/api/twilio/voice/call", {
     method: "POST",
