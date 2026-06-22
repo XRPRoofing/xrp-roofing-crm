@@ -18,6 +18,7 @@ import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { getCachedCrewData, refreshCrewData, refreshProposals } from "@/lib/data-cache";
+import { loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
 
@@ -397,6 +398,7 @@ export default function LeadsPage() {
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const router = useRouter();
@@ -503,6 +505,7 @@ export default function LeadsPage() {
     if (!selectedJobId) {
       setJobFiles([]);
       setJobNotes([]);
+      setJobActivities([]);
       setNoteDraft("");
       setActivityOpen(false);
       setChecklistOpen(false);
@@ -512,7 +515,16 @@ export default function LeadsPage() {
     }
     let mounted = true;
     void loadJobPhotos(selectedJobId).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
+    void loadJobActivities(selectedJobId).then((acts) => { if (mounted) setJobActivities(acts); }).catch(() => {});
     return () => { mounted = false; };
+  }, [selectedJobId]);
+
+  // Subscribe to real-time crew activity updates
+  useEffect(() => {
+    const unsub = subscribeToCrewActivities(() => {
+      if (selectedJobId) void loadJobActivities(selectedJobId).then(setJobActivities).catch(() => {});
+    });
+    return unsub;
   }, [selectedJobId]);
 
   // Capture/upload saves instantly — no forced markup step. Drawings and notes
@@ -1243,15 +1255,40 @@ export default function LeadsPage() {
                 {activityOpen && (
                   <div className="rounded-lg border border-gray-200 bg-white p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Activity History</p>
-                    <ul className="mt-2 space-y-2">
-                      {jobFiles.length === 0 && <li className="text-sm font-semibold text-gray-500">No document or photo activity yet.</li>}
-                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
-                        <li key={file.id} className="flex items-center justify-between gap-2 text-sm">
-                          <span className="truncate font-bold text-gray-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Document · ") : `Photo · ${file.name}`}</span>
-                          <span className="shrink-0 text-xs font-semibold text-gray-400">{new Date(file.createdAt).toLocaleString()}</span>
-                        </li>
+                    <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+                      {jobActivities.length === 0 && jobFiles.length === 0 && <p className="text-sm font-semibold text-gray-400">No activity recorded yet.</p>}
+
+                      {/* Crew / admin activities */}
+                      {jobActivities.map((act) => (
+                        <div key={act.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-black text-blue-700">{act.actor.charAt(0).toUpperCase()}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-900">{act.actor}</span>
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{act.module}</span>
+                            </div>
+                            <p className="mt-0.5 text-sm font-semibold text-gray-700">{act.action}</p>
+                            {act.details && <p className="mt-0.5 text-xs text-gray-500">{act.details}</p>}
+                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+
+                      {/* File / photo activities */}
+                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
+                        <div key={file.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-black text-orange-700">{file.uploadedBy ? file.uploadedBy.charAt(0).toUpperCase() : "?"}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-900">{file.uploadedBy || "Unknown"}</span>
+                              <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-600">{file.photoType || "File"}</span>
+                            </div>
+                            <p className="mt-0.5 text-sm font-semibold text-gray-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Uploaded document: ") : `Uploaded photo: ${file.name}`}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(file.createdAt).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

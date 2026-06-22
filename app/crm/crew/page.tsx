@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Calendar, Camera, CheckCircle2, CircleDot, Plus, RotateCcw, Search, Trash2, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
-import { addCrmNotification } from "@/lib/crm-notifications";
+import { logCrewActivity, loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { createClient } from "@/lib/supabase/client";
 import { ensureInvoiceTaskForCompletedJob, syncCrewJobToTaskBoard } from "@/lib/office-tasks";
@@ -79,6 +79,7 @@ export default function CrewWorkflowPage() {
   const [newJob, setNewJob] = useState({ name: "", email: "", phone: "", address: "", city: "", roofType: "", value: "", dueDate: "", jobScope: "", jobNotes: "", assignedCrew: crewMembers[0] });
   const [liveCamera, setLiveCamera] = useState<{ jobId: string; type: "Before" | "Progress" | "After" } | null>(null);
   const [currentUserName, setCurrentUserName] = useState("CRM user");
+  const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
@@ -174,6 +175,7 @@ export default function CrewWorkflowPage() {
     async function loadSelected() {
       if (!selectedJobId) {
         setSelectedPhotos([]);
+        setJobActivities([]);
         return;
       }
       setPhotosLoading(true);
@@ -186,11 +188,20 @@ export default function CrewWorkflowPage() {
       } finally {
         if (active) setPhotosLoading(false);
       }
+      void loadJobActivities(selectedJobId).then((acts) => { if (active) setJobActivities(acts); }).catch(() => {});
     }
     void loadSelected();
     return () => {
       active = false;
     };
+  }, [selectedJobId]);
+
+  // Subscribe to real-time crew activity updates
+  useEffect(() => {
+    const unsub = subscribeToCrewActivities(() => {
+      if (selectedJobId) void loadJobActivities(selectedJobId).then(setJobActivities).catch(() => {});
+    });
+    return unsub;
   }, [selectedJobId]);
 
   const reportError = useCallback((message: string) => {
@@ -204,10 +215,12 @@ export default function CrewWorkflowPage() {
       ensureInvoiceTaskForCompletedJob({ ...job, ...updates, status: "Completed" });
     }
     if (job && updates.status && updates.status !== job.status) {
-      addCrmNotification({
-        title: "Crew job moved",
-        message: `${job.name} moved from ${job.status} to ${updates.status}.`,
-        actor: "CRM user",
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: job.name,
+        actor: currentUserName,
+        action: "Changed job status",
+        details: `Moved from ${job.status} to ${updates.status}`,
         module: "Crew Workflow",
       });
     }
@@ -238,8 +251,17 @@ export default function CrewWorkflowPage() {
   }
 
   function toggleCrew(job: CrewJob, member: string) {
-    const assignedCrew = job.assignedCrew.includes(member) ? job.assignedCrew.filter((crewMember) => crewMember !== member) : [...job.assignedCrew, member];
+    const removing = job.assignedCrew.includes(member);
+    const assignedCrew = removing ? job.assignedCrew.filter((crewMember) => crewMember !== member) : [...job.assignedCrew, member];
     updateAssignment(job.id, { assignedCrew });
+    void logCrewActivity({
+      jobId: job.id,
+      jobName: job.name,
+      actor: currentUserName,
+      action: removing ? "Removed crew member" : "Assigned crew member",
+      details: `${member} ${removing ? "removed from" : "assigned to"} job`,
+      module: "Crew Workflow",
+    });
   }
 
   // Capture/upload saves the photo instantly — no forced markup step. Drawings
@@ -272,10 +294,12 @@ export default function CrewWorkflowPage() {
       if (job.id === selectedJobId) {
         setSelectedPhotos(await loadJobPhotos(job.id));
       }
-      addCrmNotification({
-        title: "Crew photos uploaded",
-        message: `${items.length} ${type.toLowerCase()} photo(s) uploaded for ${job.name}.`,
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: job.name,
         actor: uploadedBy,
+        action: "Uploaded photos",
+        details: `Uploaded ${items.length} ${type.toLowerCase()} photo(s)`,
         module: "Crew Workflow",
       });
       // Sync photo counts to Task Board
@@ -305,7 +329,7 @@ export default function CrewWorkflowPage() {
     try {
       await addJobNote(job.id, currentUserName, body);
       await refresh();
-      addCrmNotification({ title: "Job note added", message: `New note on ${job.name}.`, actor: "CRM user", module: "Crew Workflow" });
+      void logCrewActivity({ jobId: job.id, jobName: job.name, actor: currentUserName, action: "Added note", details: body.slice(0, 120), module: "Crew Workflow" });
       syncCrewJobToTaskBoard({ id: job.id, name: job.name, address: job.address, city: job.city, assignedCrew: Array.isArray(job.assignedCrew) ? job.assignedCrew : [], status: job.status as string }, "Note added by crew");
     } catch (noteError) {
       setNoteDraft(body);
@@ -366,10 +390,12 @@ export default function CrewWorkflowPage() {
       await upsertJobRecord(record);
       await refresh();
       setSelectedJobId(record.id);
-      addCrmNotification({
-        title: "New crew job created",
-        message: `${record.name} was created and assigned to ${newJob.assignedCrew}.`,
-        actor: "CRM user",
+      void logCrewActivity({
+        jobId: record.id,
+        jobName: record.name,
+        actor: currentUserName,
+        action: "Created new job",
+        details: `Assigned to ${newJob.assignedCrew}`,
         module: "Crew Workflow",
       });
       // Auto-create task card on job creation
@@ -398,10 +424,12 @@ export default function CrewWorkflowPage() {
     setJobs((current) => current.filter((item) => item.id !== job.id));
     try {
       await deleteJobRecord(job.id);
-      addCrmNotification({
-        title: "Crew job deleted",
-        message: `${job.name} was deleted.`,
-        actor: "CRM user",
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: job.name,
+        actor: currentUserName,
+        action: "Deleted job",
+        details: `${job.name} permanently removed`,
         module: "Crew Workflow",
       });
     } catch (deleteError) {
@@ -557,9 +585,9 @@ export default function CrewWorkflowPage() {
             <div className="space-y-5 p-5">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Information</p><p className="mt-2 font-bold text-gray-900">{selectedJob.name}</p><p className="text-sm font-semibold text-gray-600"><PhoneLink value={selectedJob.phone} /></p><p className="text-sm font-semibold text-gray-600"><EmailLink value={selectedJob.email} /></p></div>
-                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => updateAssignment(selectedJob.id, { scheduleDate: event.target.value })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
-                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
-                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} rows={3} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500">Schedule Date<input type="date" value={selectedJob.scheduleDate} onChange={(event) => { updateAssignment(selectedJob.id, { scheduleDate: event.target.value }); if (event.target.value) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated schedule", details: `Schedule date set to ${event.target.value}`, module: "Crew Workflow" }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Scope<input value={selectedJob.jobScope} onChange={(event) => updateAssignment(selectedJob.id, { jobScope: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated job scope", details: event.target.value.trim().slice(0, 120), module: "Crew Workflow" }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none" /></label>
+                <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Notes<textarea value={selectedJob.jobNotes} onChange={(event) => updateAssignment(selectedJob.id, { jobNotes: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: currentUserName, action: "Updated job notes", details: event.target.value.trim().slice(0, 120), module: "Crew Workflow" }); }} rows={3} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case leading-6 text-gray-800 outline-none" /></label>
                 <label className="grid gap-2 rounded-lg bg-gray-50 p-4 text-xs font-bold uppercase text-gray-500 sm:col-span-2">Job Status<select value={selectedJob.status} onChange={(event) => updateAssignment(selectedJob.id, { status: event.target.value as CrewJobStatus })} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold normal-case text-gray-800 outline-none">{crewStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
               </div>
 
@@ -646,11 +674,27 @@ export default function CrewWorkflowPage() {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-white p-4">
-                <p className="text-sm font-bold text-blue-700">Status History</p>
+                <p className="text-sm font-bold text-blue-700">Activity History</p>
                 <div className="mt-3 space-y-2 text-sm font-semibold text-gray-600">
                   <p>Current status: <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[selectedJob.status]}`}>{selectedJob.status}</span></p>
                   {selectedJob.completion.submittedAt && <p>Marked done: {new Date(selectedJob.completion.submittedAt).toLocaleString()}</p>}
                   {selectedJob.adminNotification && <p>{selectedJob.adminNotification}</p>}
+                </div>
+                <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+                  {jobActivities.length === 0 && <p className="text-sm text-gray-400">No activity recorded yet.</p>}
+                  {jobActivities.map((act) => (
+                    <div key={act.id} className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-black text-blue-700">{act.actor.charAt(0).toUpperCase()}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{act.actor}</span>
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{act.module}</span>
+                        </div>
+                        <p className="text-sm text-gray-700">{act.action}{act.details ? ` — ${act.details}` : ""}</p>
+                        <p className="text-[11px] text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

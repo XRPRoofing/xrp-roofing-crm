@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, CheckCircle2, Hammer, UploadCloud, UsersRound, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
-import { addCrmNotification } from "@/lib/crm-notifications";
+import { logCrewActivity } from "@/lib/crew-activity";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { crewMembers, type CrewJob } from "@/lib/crew-workflow";
 import {
@@ -159,10 +159,12 @@ export default function CrewPortalPage() {
       if (job.id === activeJobId) {
         setSelectedPhotos(await loadJobPhotos(job.id));
       }
-      addCrmNotification({
-        title: "Crew photos uploaded",
-        message: `${selectedCrew} uploaded ${items.length} ${type.toLowerCase()} photo(s) for ${job.name}.`,
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: job.name,
         actor: selectedCrew,
+        action: "Uploaded photos",
+        details: `Uploaded ${items.length} ${type.toLowerCase()} photo(s)`,
         module: "Crew Portal",
       });
     } catch (uploadError) {
@@ -177,10 +179,12 @@ export default function CrewPortalPage() {
     if (!hasPhoto || !job.completion.notes.trim()) return;
 
     updateJobFields(job.id, { status: "Mark Done", submittedAt: new Date().toISOString() });
-    addCrmNotification({
-      title: "Crew job marked done",
-      message: `${selectedCrew} marked ${job.name} done and ready for review.`,
+    void logCrewActivity({
+      jobId: job.id,
+      jobName: job.name,
       actor: selectedCrew,
+      action: "Marked job done",
+      details: "Job marked done and ready for office review",
       module: "Crew Portal",
     });
   }
@@ -299,11 +303,11 @@ export default function CrewPortalPage() {
 
                 <label className="mt-4 grid gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
                   Completion Notes Required
-                  <textarea value={selectedJob.completion.notes} onChange={(event) => updateJobFields(selectedJob.id, { completionNotes: event.target.value })} rows={5} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold normal-case leading-6 tracking-normal text-slate-800 outline-none" placeholder="Removed damaged shingles, replaced underlayment, installed new Owens Corning shingles, cleaned job site, customer notified." />
+                  <textarea value={selectedJob.completion.notes} onChange={(event) => updateJobFields(selectedJob.id, { completionNotes: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: selectedCrew, action: "Updated completion notes", details: event.target.value.trim().slice(0, 120), module: "Crew Portal" }); }} rows={5} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold normal-case leading-6 tracking-normal text-slate-800 outline-none" placeholder="Removed damaged shingles, replaced underlayment, installed new Owens Corning shingles, cleaned job site, customer notified." />
                 </label>
                 <label className="mt-4 grid gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
                   Materials Used Optional
-                  <input value={selectedJob.completion.materialsUsed || ""} onChange={(event) => updateJobFields(selectedJob.id, { materialsUsed: event.target.value })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="Owens Corning shingles, underlayment, flashing..." />
+                  <input value={selectedJob.completion.materialsUsed || ""} onChange={(event) => updateJobFields(selectedJob.id, { materialsUsed: event.target.value })} onBlur={(event) => { if (event.target.value.trim()) void logCrewActivity({ jobId: selectedJob.id, jobName: selectedJob.name, actor: selectedCrew, action: "Updated materials used", details: event.target.value.trim().slice(0, 120), module: "Crew Portal" }); }} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none" placeholder="Owens Corning shingles, underlayment, flashing..." />
                 </label>
 
                 <button type="button" disabled={(selectedJob.completion.beforePhotos.length + selectedJob.completion.progressPhotos.length + selectedJob.completion.afterPhotos.length === 0) || !selectedJob.completion.notes.trim()} onClick={() => submitForApproval(selectedJob)} className="mt-5 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
