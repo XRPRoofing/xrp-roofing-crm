@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
+import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import { leadStages } from "@/lib/crm-data";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -274,6 +275,7 @@ export default function CustomersPage() {
   // Surfaced to the user when Supabase can't load/save (e.g. the customer_records
   // table hasn't been created yet) so saves never fail silently.
   const [customersError, setCustomersError] = useState<string | null>(null);
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -655,7 +657,7 @@ export default function CustomersPage() {
               </div>
               <div className="mt-3 space-y-2 text-sm">
                 <p className="flex items-start gap-2 text-gray-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><AddressLink value={customer.propertyAddress} fallback="Address pending" /></span></p>
-                <p className="flex items-center gap-2 text-gray-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><PhoneLink value={customer.phone} fallback="No phone on file" /></span></p>
+                <p className="flex items-center gap-2 text-gray-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><PhoneLink value={customer.phone} fallback="No phone on file" /></span>{customer.phone && <button onClick={(e) => { e.stopPropagation(); setSmsTarget({ phone: customer.phone, name: customer.name }); }} className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" /></button>}</p>
               </div>
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
                 <BriefcaseBusiness className="h-4 w-4 text-blue-700" />
@@ -729,7 +731,7 @@ export default function CustomersPage() {
                   ) : (
                     <>
                       <section className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Phone Number</p><p className="font-bold text-gray-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" /></p></div>
+                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Phone Number</p><p className="flex items-center gap-2 font-bold text-gray-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" />{selectedCustomer.phone && <button onClick={() => setSmsTarget({ phone: selectedCustomer.phone, name: selectedCustomer.name })} className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-green-500 px-2.5 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3.5 w-3.5" />SMS</button>}</p></div>
                         <div className="rounded-lg border border-gray-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Email Address</p><p className="font-bold text-gray-900"><EmailLink value={selectedCustomer.email} fallback="Not provided" /></p></div>
                         <div className="rounded-lg border border-gray-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Full Property Address</p><p className="font-bold text-gray-900"><AddressLink value={selectedCustomer.propertyAddress} fallback="Not provided" /></p></div>
                       </section>
@@ -884,6 +886,7 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }

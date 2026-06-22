@@ -16,8 +16,9 @@ import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { Phone, Mail, MapPin } from "lucide-react";
+import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
+import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
@@ -629,6 +630,7 @@ export default function InvoicesPage() {
   const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
   const [paidReceiptConfirmation, setPaidReceiptConfirmation] = useState<{ customerName: string; invoiceNumber: string; sentAt: string } | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const [createForm, setCreateForm] = useState<Invoice>({
     id: "",
     invoiceNumber: createInvoiceNumber(invoices.length),
@@ -1686,6 +1688,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           <div className="flex items-center gap-1 mt-1.5">
             <input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Phone" />
             {invoice.phone && <a href={`tel:${invoice.phone.replace(/[^\d+]/g, "")}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></a>}
+            {invoice.phone && <button type="button" onClick={() => setSmsTarget({ phone: invoice.phone, name: invoice.clientName })} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
           </div>
         </label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Property address
@@ -1930,7 +1933,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Name</p><p className="mt-1 text-sm font-bold text-blue-700">{selectedInvoice.clientName || "—"}</p></div>
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Email</p><p className="mt-1 text-sm font-bold text-blue-700 break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Phone</p><p className="mt-1 text-sm font-bold text-blue-700"><PhoneLink value={selectedInvoice.phone} fallback="—" /></p></div>
+                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Phone</p><p className="mt-1 flex items-center gap-2 text-sm font-bold text-blue-700"><PhoneLink value={selectedInvoice.phone} fallback="—" />{selectedInvoice.phone && <button onClick={() => setSmsTarget({ phone: selectedInvoice.phone, name: selectedInvoice.clientName })} className="inline-flex h-6 items-center gap-1 rounded bg-green-500 px-2 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" />SMS</button>}</p></div>
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Date Sent</p><p className="mt-1 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Sent By User</p><p className="mt-1 text-sm font-bold text-blue-700 break-all">{selectedInvoice.sentBy || "—"}</p></div>
               </div>
@@ -2172,7 +2175,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div><p className="text-[11px] font-bold uppercase text-gray-400">Email</p><p className="text-xs font-semibold text-gray-700 break-all"><EmailLink value={inv.email} fallback="—" /></p></div>
-                    <div><p className="text-[11px] font-bold uppercase text-gray-400">Phone</p><p className="text-xs font-semibold text-gray-700"><PhoneLink value={inv.phone} fallback="—" /></p></div>
+                    <div><p className="text-[11px] font-bold uppercase text-gray-400">Phone</p><p className="flex items-center gap-1 text-xs font-semibold text-gray-700"><PhoneLink value={inv.phone} fallback="—" />{inv.phone && <button onClick={(e) => { e.stopPropagation(); setSmsTarget({ phone: inv.phone, name: inv.clientName }); }} className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" /></button>}</p></div>
                     <div><p className="text-[11px] font-bold uppercase text-gray-400">Roof Type</p><p className="text-xs font-semibold text-gray-700">{inv.roofType || "—"}</p></div>
                     <div><p className="text-[11px] font-bold uppercase text-gray-400">Completion</p><p className="text-xs font-semibold text-gray-700">{inv.projectCompletionDate || "—"}</p></div>
                   </div>
@@ -2617,6 +2620,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           </div>
         </div>
       )}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }

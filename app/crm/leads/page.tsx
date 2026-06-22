@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, MessageSquare, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -405,6 +406,7 @@ export default function LeadsPage() {
   const searchParams = useSearchParams();
   const [showCallPaste, setShowCallPaste] = useState(false);
   const [callPasteText, setCallPasteText] = useState("");
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1114,6 +1116,7 @@ export default function LeadsPage() {
                   <div className="flex items-center gap-1">
                     <input value={selectedJob.phone} onChange={(event) => updateJob(selectedJob.id, { phone: event.target.value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
                     {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></a>}
+                    {selectedJob.phone && <button onClick={() => setSmsTarget({ phone: selectedJob.phone, name: selectedJob.name })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
                   </div>
                 </label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Email
@@ -1358,6 +1361,7 @@ export default function LeadsPage() {
           />
         );
       })()}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
     </div>
   );
 }
