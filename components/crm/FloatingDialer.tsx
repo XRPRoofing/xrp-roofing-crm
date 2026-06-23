@@ -10,6 +10,7 @@ import {
   Pause,
   Phone,
   PhoneForwarded,
+  PhoneMissed,
   PhoneOff,
   Play,
   Plus,
@@ -23,13 +24,14 @@ import {
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@/lib/twilio/client";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
+import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { Customer } from "@/types/crm";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "keypad" | "recents" | "contacts";
+type Tab = "keypad" | "recents" | "missed" | "contacts";
 type CallState = "idle" | "connecting" | "active" | "held";
 type ContactType = "client" | "lead" | "job";
 
@@ -45,6 +47,13 @@ interface RecentCall {
   direction: "inbound" | "outbound";
   time: string;
   type?: ContactType;
+}
+
+interface MissedCall {
+  id: string;
+  phone: string;
+  name?: string;
+  time: string;
 }
 
 interface FloatingDialerProps {
@@ -138,6 +147,10 @@ export default function FloatingDialer({
   const [recents, setRecents] = useState<RecentCall[]>([]);
   const [recentsLoading, setRecentsLoading] = useState(false);
 
+  // Missed calls
+  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
+  const [missedLoading, setMissedLoading] = useState(false);
+
   // Initialize position on first open
   useEffect(() => {
     if (open && position.x === -1) {
@@ -199,8 +212,33 @@ export default function FloatingDialer({
         .catch(() => {})
         .finally(() => setRecentsLoading(false));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, recents.length, findContactName]);
+
+  // Load missed calls when tab opens
+  useEffect(() => {
+    if (activeTab === "missed" && missedCalls.length === 0) {
+      setMissedLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
+      listConversationEvents(200)
+        .then((events) => {
+          const missed: MissedCall[] = [];
+          for (const ev of events) {
+            if (getTwilioCallOutcomeLabel(ev) !== "Missed call") continue;
+            const phone = ev.from || ev.to || "";
+            if (!phone) continue;
+            missed.push({
+              id: ev.id,
+              phone,
+              name: findContactName(phone),
+              time: ev.createdAt,
+            });
+            if (missed.length >= 50) break;
+          }
+          setMissedCalls(missed);
+        })
+        .catch(() => {})
+        .finally(() => setMissedLoading(false));
+    }
+  }, [activeTab, missedCalls.length, findContactName]);
 
   // -------------------------------------------------------------------------
   // Drag handlers
@@ -575,6 +613,7 @@ export default function FloatingDialer({
             {([
               { key: "keypad" as Tab, icon: Hash, label: "Keypad" },
               { key: "recents" as Tab, icon: Clock, label: "Recents" },
+              { key: "missed" as Tab, icon: PhoneMissed, label: "Missed" },
               { key: "contacts" as Tab, icon: Users, label: "Contacts" },
             ]).map((tab) => (
               <button
@@ -680,6 +719,43 @@ export default function FloatingDialer({
                         </p>
                         <p className="text-xs text-gray-500">
                           {call.direction === "inbound" ? "Incoming" : "Outgoing"} · {formatTime(call.time)}
+                        </p>
+                      </div>
+                      <Phone className="h-4 w-4 shrink-0 text-gray-300" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Missed Calls Tab */}
+          {activeTab === "missed" && (
+            <div className="max-h-[360px] overflow-y-auto">
+              {missedLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
+                </div>
+              ) : missedCalls.length === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-400">No missed calls</p>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {missedCalls.map((call) => (
+                    <button
+                      key={call.id}
+                      type="button"
+                      onClick={() => { setDialNumber(call.phone); setActiveTab("keypad"); }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100">
+                        <PhoneMissed className="h-4 w-4 text-red-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900">
+                          {call.name || formatPhone(call.phone)}
+                        </p>
+                        <p className="text-xs text-red-500">
+                          Missed · {formatTime(call.time)}
                         </p>
                       </div>
                       <Phone className="h-4 w-4 shrink-0 text-gray-300" />
