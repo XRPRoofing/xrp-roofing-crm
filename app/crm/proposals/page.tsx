@@ -13,6 +13,8 @@ import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { getCachedCrewData, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { createClient } from "@/lib/supabase/client";
+import { sendSms } from "@/lib/twilio/client";
+import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
 
 type Proposal = {
@@ -63,6 +65,11 @@ type Proposal = {
   createdBy?: string;
   updatedBy?: string;
   createdAt?: string;
+  sentViaSms?: boolean;
+  smsSentAt?: string;
+  smsSentBy?: string;
+  smsSentFrom?: string;
+  smsSentToPhone?: string;
 };
 
 type InspectionPhoto = {
@@ -478,6 +485,13 @@ export default function ProposalsPage() {
   const [sendNotice, setSendNotice] = useState("");
   const [sendConfirmation, setSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; proposalNumber: string; message: string } | null>(null);
   const [sendingProposal, setSendingProposal] = useState(false);
+
+  // SMS send state
+  const [showSmsSendModal, setShowSmsSendModal] = useState(false);
+  const [smsForm, setSmsForm] = useState({ toPhone: "", message: "", fromNumber: "" });
+  const [twilioLines] = useState<TwilioLine[]>(() => getTwilioLines());
+  const [sendingSms, setSendingSms] = useState(false);
+
   const [templateForm, setTemplateForm] = useState({
     label: "",
     description: "",
@@ -1149,6 +1163,84 @@ export default function ProposalsPage() {
     }
   }
 
+  function handleOpenSmsSendModal() {
+    if (!activeProposal) return;
+
+    const savedProposal = saveActiveProposal() || activeProposal;
+    setActiveProposal(savedProposal);
+
+    const phone = savedProposal.customerPhone || savedProposal.job?.phone || "";
+    const name = savedProposal.customerName;
+
+    setSmsForm({
+      toPhone: phone,
+      message: `Hi ${name},\nThank you for contacting XRP Roofing. Here is your proposal for your roofing project. Please review it using the link below and let us know if you have any questions. Thank you.`,
+      fromNumber: twilioLines[0]?.number || "",
+    });
+    setShowSmsSendModal(true);
+  }
+
+  async function handleSendProposalSms() {
+    if (!activeProposal || !smsForm.toPhone.trim()) return;
+
+    setSendingSms(true);
+
+    const sentProposal = saveActiveProposal({
+      status: "Sent",
+      sentViaSms: true,
+      smsSentAt: new Date().toISOString(),
+      smsSentBy: currentUserName || currentUserEmail || "CRM User",
+      smsSentFrom: smsForm.fromNumber,
+      smsSentToPhone: smsForm.toPhone,
+      proposalVersion: (activeProposal.proposalVersion ?? 0) + 1,
+    });
+    const proposalForLink = sentProposal || activeProposal;
+    const proposalLink = `${window.location.origin}/proposal/${encodeURIComponent(proposalForLink.id)}`;
+
+    if (sentProposal) {
+      setActiveProposal(sentProposal);
+    }
+
+    // Save the proposal to Supabase so the customer link works immediately
+    fetch("/api/proposals/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposalForLink),
+    }).catch(() => {});
+
+    // Build the SMS body: user's message + proposal link appended
+    const smsBody = `${smsForm.message.trim()}\n\n${proposalLink}`;
+
+    try {
+      await sendSms({
+        to: smsForm.toPhone,
+        body: smsBody,
+        from: smsForm.fromNumber || undefined,
+      });
+
+      // Log send activity
+      const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
+      sendLog.unshift({
+        type: "Proposal",
+        sentBy: currentUserName || currentUserEmail || "CRM User",
+        sentAt: new Date().toISOString(),
+        customerName: activeProposal.customerName,
+        documentNumber: proposalForLink.id,
+        deliveryMethod: "SMS",
+        recipient: smsForm.toPhone,
+      });
+      window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
+
+      setSendConfirmation({ type: "success", customerName: activeProposal.customerName, proposalNumber: proposalForLink.id, message: `Proposal sent via SMS to ${smsForm.toPhone}.\n\nProposal link: ${proposalLink}` });
+      setShowSmsSendModal(false);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unable to send SMS";
+      setSendConfirmation({ type: "error", customerName: activeProposal.customerName, proposalNumber: proposalForLink.id, message: `${errorMsg}\n\nProposal link: ${proposalLink}` });
+    } finally {
+      setSendingSms(false);
+    }
+  }
+
   function handleDeleteProposal(proposal: Proposal) {
     const trashedProposal = { ...proposal, deletedAt: new Date().toISOString() };
     setDeletedProposal(trashedProposal);
@@ -1298,7 +1390,8 @@ export default function ProposalsPage() {
             <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
-            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send</button>
+            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send Email</button>
+            <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send SMS</button>
             {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
               <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 active:scale-95">Mark as Signed Offline</button>
             )}
@@ -1829,6 +1922,71 @@ export default function ProposalsPage() {
           </div>
         )}
 
+        {/* ── SMS Send Modal ── */}
+        {showSmsSendModal && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-gray-950/50">
+            <div className="flex h-full w-full max-w-[530px] flex-col bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-7 py-5 shadow-sm">
+                <div className="flex items-center gap-3 text-xl font-bold text-gray-900">
+                  <span className="text-green-600">💬</span>
+                  <span>Send proposal via SMS</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={handleSendProposalSms} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingSms ? "Sending…" : "📤 Send SMS"}</button>
+                  <button type="button" onClick={() => setShowSmsSendModal(false)} className="text-2xl text-gray-500">×</button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="bg-gray-50 px-7 py-6">
+                  <div className="grid grid-cols-[44px_1fr] gap-4">
+                    <p className="pt-3 text-sm font-bold text-gray-900">To:</p>
+                    <div className="rounded-lg border border-gray-200 bg-white p-4">
+                      <p className="text-sm font-bold text-gray-900">{activeProposal?.customerName || "Customer"}</p>
+                      <input value={smsForm.toPhone} onChange={(event) => setSmsForm({ ...smsForm, toPhone: event.target.value })} className="mt-2 w-full border-none text-sm text-gray-600 outline-none" placeholder="Customer phone number" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-5 px-7 py-6">
+                  {twilioLines.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm font-bold text-gray-900">Send from</p>
+                      <select value={smsForm.fromNumber} onChange={(event) => setSmsForm({ ...smsForm, fromNumber: event.target.value })} className="w-full rounded border border-gray-200 px-4 py-3 text-sm font-bold outline-none">
+                        {twilioLines.map((line) => (
+                          <option key={line.key} value={line.number}>{line.label} ({line.number})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <label className="block text-sm font-bold text-gray-900">
+                    Message*
+                    <textarea required value={smsForm.message} onChange={(event) => setSmsForm({ ...smsForm, message: event.target.value })} className="mt-3 min-h-56 w-full rounded border border-gray-200 px-5 py-4 text-sm font-normal leading-7 outline-none" placeholder="Type your message to the customer..." />
+                  </label>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">Preview — what customer will receive:</p>
+                    <div className="rounded-lg bg-white p-4 text-sm leading-7 text-gray-800">
+                      <p className="whitespace-pre-line">{smsForm.message}</p>
+                      <p className="mt-3 text-blue-600 underline">{activeProposal ? `${window.location.origin}/proposal/${encodeURIComponent(activeProposal.id)}` : "Proposal link"}</p>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">The proposal link is automatically appended to your message.</p>
+                  </div>
+                  {activeProposal?.sentViaSms && activeProposal.smsSentAt && (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                      <p className="font-bold">Previously sent via SMS</p>
+                      <p>Sent: {new Date(activeProposal.smsSentAt).toLocaleString()}</p>
+                      {activeProposal.smsSentBy && <p>By: {activeProposal.smsSentBy}</p>}
+                      {activeProposal.smsSentToPhone && <p>To: {activeProposal.smsSentToPhone}</p>}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
+                <button type="button" onClick={() => setShowSmsSendModal(false)} className="text-sm font-bold text-green-600">Cancel</button>
+                <button type="button" onClick={handleSendProposalSms} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingSms ? "Sending…" : "📤 Send proposal via SMS"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Proposal Send Confirmation Modal ── */}
         {sendConfirmation && (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
@@ -2213,7 +2371,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}</p>
               </div>
             </div>
             </button>
