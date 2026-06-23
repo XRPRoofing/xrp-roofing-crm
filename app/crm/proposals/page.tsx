@@ -819,6 +819,17 @@ export default function ProposalsPage() {
         packages: normalizePackages(editorForm.packages),
       };
 
+      // Backfill Best package price from total when all packages are $0.
+      // Without this, the shared/public proposal shows $0 for all packages
+      // even though the admin set a total price.
+      if (updatedProposal.showPackages !== false) {
+        const pkgs = normalizePackages(updatedProposal.packages);
+        const totalVal = updatedProposal.total;
+        if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
+          updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
+        }
+      }
+
       setProposals((currentProposals) =>
         currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
       );
@@ -857,6 +868,14 @@ export default function ProposalsPage() {
       updatedBy: currentUserName,
       createdAt: new Date().toISOString(),
     };
+
+    // Backfill Best package price from total when creating from a job with a value
+    if (newProposal.total > 0) {
+      const pkgs = normalizePackages(newProposal.packages);
+      if (!pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
+        newProposal.packages = { ...pkgs, best: { ...pkgs.best, price: newProposal.total } };
+      }
+    }
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
     // Estimates are a lead source: find-or-create the customer (match by
@@ -906,6 +925,14 @@ export default function ProposalsPage() {
       updatedBy: currentUserName,
       createdAt: new Date().toISOString(),
     };
+
+    // Backfill Best package price from total when creating from a lead with a value
+    if (newProposal.total > 0) {
+      const pkgs = normalizePackages(newProposal.packages);
+      if (!pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
+        newProposal.packages = { ...pkgs, best: { ...pkgs.best, price: newProposal.total } };
+      }
+    }
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
     void findOrCreateCustomer({
@@ -1172,9 +1199,14 @@ export default function ProposalsPage() {
     const phone = savedProposal.customerPhone || savedProposal.job?.phone || "";
     const name = savedProposal.customerName;
 
+    // Use the same message as the email template for consistent communication
+    const savedTemplateId = savedProposal.sendSubject ? (emailTemplates.find((t) => applyEmailTemplateVars(t.subject, name) === savedProposal.sendSubject)?.id || "personalized") : "personalized";
+    const selected = emailTemplates.find((t) => t.id === savedTemplateId) || emailTemplates[0];
+    const emailMessage = savedProposal.sendMessage || applyEmailTemplateVars(selected.message, name);
+
     setSmsForm({
       toPhone: phone,
-      message: `Hi ${name},\nThank you for contacting XRP Roofing. Here is your proposal for your roofing project. Please review it using the link below and let us know if you have any questions. Thank you.`,
+      message: emailMessage,
       fromNumber: twilioLines[0]?.number || "",
     });
     setShowSmsSendModal(true);
