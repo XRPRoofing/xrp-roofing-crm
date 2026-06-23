@@ -1025,16 +1025,6 @@ export default function ProposalsPage() {
       ...extraFields,
     };
 
-    // If packages are shown and all prices are 0 but total > 0, populate Best
-    // with the total so the customer view shows real pricing instead of $0.
-    if (updatedProposal.showPackages !== false) {
-      const pkgs = normalizePackages(updatedProposal.packages);
-      const totalVal = updatedProposal.total;
-      if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
-        updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
-      }
-    }
-
     setProposals((currentProposals) =>
       currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
     );
@@ -1172,9 +1162,14 @@ export default function ProposalsPage() {
     const phone = savedProposal.customerPhone || savedProposal.job?.phone || "";
     const name = savedProposal.customerName;
 
+    // Use the same message as the email template for consistent communication
+    const savedTemplateId = savedProposal.sendSubject ? (emailTemplates.find((t) => applyEmailTemplateVars(t.subject, name) === savedProposal.sendSubject)?.id || "personalized") : "personalized";
+    const selected = emailTemplates.find((t) => t.id === savedTemplateId) || emailTemplates[0];
+    const emailMessage = savedProposal.sendMessage || applyEmailTemplateVars(selected.message, name);
+
     setSmsForm({
       toPhone: phone,
-      message: `Hi ${name},\nThank you for contacting XRP Roofing. Here is your proposal for your roofing project. Please review it using the link below and let us know if you have any questions. Thank you.`,
+      message: emailMessage,
       fromNumber: twilioLines[0]?.number || "",
     });
     setShowSmsSendModal(true);
