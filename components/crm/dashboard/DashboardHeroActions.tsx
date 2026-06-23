@@ -18,6 +18,7 @@ import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 import { createManualFolder } from "@/lib/manual-folders";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
+import { createClient } from "@/lib/supabase/client";
 import type { Lead } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 
@@ -69,6 +70,16 @@ const newActions: { id: NewAction; label: string; description: string; icon: typ
 
 export default function DashboardHeroActions() {
   const router = useRouter();
+  const [currentUserName, setCurrentUserName] = useState("CRM User");
+
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      const meta = data.session.user.user_metadata;
+      const name = (meta?.full_name || meta?.name || data.session.user.email?.split("@")[0] || "CRM User") as string;
+      setCurrentUserName(name);
+    }).catch(() => {});
+  }, []);
 
   /* Dropdown state */
   const [menuOpen, setMenuOpen] = useState(false);
@@ -275,6 +286,8 @@ export default function DashboardHeroActions() {
         total: Number(proposalForm.total) || 0,
         status: "Draft",
         createdAt: new Date().toISOString(),
+        createdBy: currentUserName,
+        updatedBy: currentUserName,
       };
       await fetch("/api/proposals", {
         method: "POST",

@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import type { Customer } from "@/types/crm";
 
 /**
@@ -86,6 +87,7 @@ export async function upsertCustomerRecord(customer: Customer): Promise<Customer
       writeLocal([customer, ...readLocal().filter((item) => item.id !== customer.id)]);
       return { ok: false, error: data.error || "Unable to save customer." };
     }
+    broadcastCrmUpdate();
     return { ok: true };
   } catch {
     writeLocal([customer, ...readLocal().filter((item) => item.id !== customer.id)]);
@@ -101,6 +103,7 @@ export async function deleteCustomerRecord(id: string): Promise<void> {
   }
   try {
     await fetch(`/api/customers?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    broadcastCrmUpdate();
   } catch {
     writeLocal(readLocal().filter((item) => item.id !== id));
   }

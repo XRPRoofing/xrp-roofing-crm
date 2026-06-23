@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 
 /**
  * Device-synced proposals (estimates).
@@ -40,6 +41,7 @@ export async function upsertProposalRecord(proposal: ProposalRecord): Promise<vo
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(proposal),
     });
+    broadcastCrmUpdate();
   } catch {
     /* keep the local copy; it retries on the next change/focus */
   }
@@ -50,6 +52,7 @@ export async function deleteProposalRecord(id: string): Promise<void> {
   if (!hasSupabaseConfig()) return;
   try {
     await fetch(`/api/proposals?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    broadcastCrmUpdate();
   } catch {
     /* ignore; realtime/focus reload reconciles */
   }
@@ -79,6 +82,7 @@ export async function saveTemplateRecords(templates: Record<string, unknown>[]):
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: TEMPLATES_ROW_ID, templates }),
     });
+    broadcastCrmUpdate();
   } catch {
     /* retry on next change */
   }

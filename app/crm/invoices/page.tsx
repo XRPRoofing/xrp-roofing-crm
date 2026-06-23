@@ -10,7 +10,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { refreshInvoices } from "@/lib/data-cache";
+import { refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -824,9 +824,38 @@ export default function InvoicesPage() {
       if (active) applyShare(share);
     });
 
+    // When the CrmShell refreshes the invoice cache (from realtime events on
+    // other devices), merge the full data into our local state automatically.
+    function onCacheRefresh() {
+      void loadAllInvoices<Invoice>().then((remoteInvoices) => {
+        if (!active || remoteInvoices.length === 0) return;
+        setInvoices((current) => {
+          const byId = new Map(current.map((inv) => [inv.id, inv]));
+          let changed = false;
+          for (const remote of remoteInvoices) {
+            const local = byId.get(remote.id);
+            if (!local) { byId.set(remote.id, remote); changed = true; }
+            else if ((remote.activity?.length ?? 0) > (local.activity?.length ?? 0)) {
+              byId.set(remote.id, remote); changed = true;
+            }
+          }
+          // Also handle deletions: if a remote list is smaller, remove deleted ones
+          if (remoteInvoices.length < current.length) {
+            const remoteIds = new Set(remoteInvoices.map((inv) => inv.id));
+            for (const [id] of byId) {
+              if (!remoteIds.has(id)) { byId.delete(id); changed = true; }
+            }
+          }
+          return changed ? Array.from(byId.values()) : current;
+        });
+      }).catch(() => {});
+    }
+    window.addEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
+
     return () => {
       active = false;
       unsubscribe();
+      window.removeEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
