@@ -2,5 +2,11 @@
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_SITE_URL": "https://xrp-roofing-crm.vercel.app"
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/proposal-follow-up",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

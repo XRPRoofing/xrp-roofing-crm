@@ -70,6 +70,9 @@ type Proposal = {
   smsSentBy?: string;
   smsSentFrom?: string;
   smsSentToPhone?: string;
+  viewedAt?: string;
+  followUpSentAt?: string;
+  followUpSentVia?: string;
 };
 
 type InspectionPhoto = {
@@ -491,6 +494,59 @@ export default function ProposalsPage() {
   const [smsForm, setSmsForm] = useState({ toPhone: "", message: "", fromNumber: "" });
   const [twilioLines] = useState<TwilioLine[]>(() => getTwilioLines());
   const [sendingSms, setSendingSms] = useState(false);
+
+  // Follow-up automation settings
+  const [followUpEnabled, setFollowUpEnabled] = useState(true);
+  const [followUpDelayHours, setFollowUpDelayHours] = useState(24);
+  const [followUpSubject, setFollowUpSubject] = useState("Following up — Your Roofing Proposal");
+  const [followUpTemplate, setFollowUpTemplate] = useState(
+    "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team"
+  );
+  const [followUpSaving, setFollowUpSaving] = useState(false);
+  const [followUpNotice, setFollowUpNotice] = useState("");
+  const followUpLoaded = useRef(false);
+
+  useEffect(() => {
+    if (followUpLoaded.current) return;
+    followUpLoaded.current = true;
+    fetch("/api/proposals/follow-up-config")
+      .then((res) => res.json())
+      .then((data: { config?: { enabled?: boolean; delayHours?: number; emailSubject?: string; emailTemplate?: string } }) => {
+        if (!data.config) return;
+        if (data.config.enabled !== undefined) setFollowUpEnabled(data.config.enabled);
+        if (data.config.delayHours !== undefined) setFollowUpDelayHours(data.config.delayHours);
+        if (data.config.emailSubject) setFollowUpSubject(data.config.emailSubject);
+        if (data.config.emailTemplate) setFollowUpTemplate(data.config.emailTemplate);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleSaveFollowUpConfig() {
+    setFollowUpSaving(true);
+    setFollowUpNotice("");
+    try {
+      const res = await fetch("/api/proposals/follow-up-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: followUpEnabled,
+          delayHours: followUpDelayHours,
+          emailSubject: followUpSubject,
+          emailTemplate: followUpTemplate,
+        }),
+      });
+      if (res.ok) {
+        setFollowUpNotice("Follow-up settings saved successfully.");
+      } else {
+        setFollowUpNotice("Failed to save follow-up settings.");
+      }
+    } catch {
+      setFollowUpNotice("Failed to save follow-up settings.");
+    } finally {
+      setFollowUpSaving(false);
+      setTimeout(() => setFollowUpNotice(""), 4000);
+    }
+  }
 
   const [templateForm, setTemplateForm] = useState({
     label: "",
@@ -2248,6 +2304,82 @@ export default function ProposalsPage() {
 
       {activeTab === "settings" && (
         <div className="space-y-5">
+          {/* Automated Proposal Follow-Up Settings */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Automation</p>
+                <h2 className="mt-2 text-2xl font-bold text-blue-700">Automated Proposal Follow-Up</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a follow-up email to customers who viewed a proposal but have not signed it. Follow-ups stop automatically when the customer signs.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFollowUpEnabled((v) => !v)}
+                className={`w-fit rounded-full px-5 py-3 text-sm font-bold transition ${
+                  followUpEnabled
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {followUpEnabled ? "Enabled" : "Disabled"}
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700">Follow-up delay (hours after viewed)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={followUpDelayHours}
+                  onChange={(e) => setFollowUpDelayHours(Math.max(1, Number(e.target.value)))}
+                  className="mt-1 w-32 rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-gray-400">Default: 24 hours. The system checks every hour and sends the email once the delay has passed.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700">Email subject</label>
+                <input
+                  type="text"
+                  value={followUpSubject}
+                  onChange={(e) => setFollowUpSubject(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Following up — Your Roofing Proposal"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700">Email message template</label>
+                <textarea
+                  value={followUpTemplate}
+                  onChange={(e) => setFollowUpTemplate(e.target.value)}
+                  rows={6}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Hi {customerName}, ..."
+                />
+                <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} to insert the customer&apos;s name. A &quot;View Proposal&quot; button with the proposal link is added automatically.</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveFollowUpConfig}
+                  disabled={followUpSaving}
+                  className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {followUpSaving ? "Saving..." : "Save Follow-Up Settings"}
+                </button>
+                {followUpNotice && (
+                  <span className={`text-sm font-medium ${followUpNotice.includes("success") ? "text-green-600" : "text-red-600"}`}>
+                    {followUpNotice}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div>
@@ -2366,7 +2498,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}</p>
               </div>
             </div>
             </button>
