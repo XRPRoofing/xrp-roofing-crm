@@ -8,6 +8,8 @@
  *
  * This module keeps the most recent result in memory so pages render
  * instantly with cached data, then silently refresh in the background.
+ * When a refresh completes, a global custom event is dispatched so every
+ * mounted component can react without its own Supabase subscription.
  *
  * Usage:
  *   const data = getCachedCrewData();   // instant — null only on first ever load
@@ -18,6 +20,23 @@ import { loadCrewDataset, type CrewDataset } from "./crew-sync";
 import { loadAllInvoices } from "./invoice-sync";
 import { loadProposalRecords } from "./proposal-sync";
 import { loadCustomerRecords } from "./customer-sync";
+
+// ---------------------------------------------------------------------------
+// Global cache-update events
+// ---------------------------------------------------------------------------
+
+export const CACHE_EVENTS = {
+  crew: "crm-cache-crew-updated",
+  invoices: "crm-cache-invoices-updated",
+  proposals: "crm-cache-proposals-updated",
+  customers: "crm-cache-customers-updated",
+} as const;
+
+function emitCacheEvent(event: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(event));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Cache stores
@@ -46,7 +65,7 @@ export function getCachedCrewData(): CrewDataset | null {
 export async function refreshCrewData(): Promise<CrewDataset> {
   if (crewFlight) return crewFlight;
   crewFlight = loadCrewDataset()
-    .then((data) => { crewCache = data; return data; })
+    .then((data) => { crewCache = data; emitCacheEvent(CACHE_EVENTS.crew); return data; })
     .finally(() => { crewFlight = null; });
   return crewFlight;
 }
@@ -62,7 +81,7 @@ export function getCachedInvoices<T>(): T[] | null {
 export async function refreshInvoices<T extends { id: string }>(): Promise<T[]> {
   if (invoiceFlight) return invoiceFlight as Promise<T[]>;
   invoiceFlight = loadAllInvoices<T>()
-    .then((data) => { invoiceCache = data; return data as unknown[]; })
+    .then((data) => { invoiceCache = data; emitCacheEvent(CACHE_EVENTS.invoices); return data as unknown[]; })
     .finally(() => { invoiceFlight = null; });
   return invoiceFlight as Promise<T[]>;
 }
@@ -78,7 +97,7 @@ export function getCachedProposals<T>(): T[] | null {
 export async function refreshProposals<T extends { id: string }>(): Promise<T[]> {
   if (proposalFlight) return proposalFlight as Promise<T[]>;
   proposalFlight = loadProposalRecords<T>()
-    .then((data) => { proposalCache = data; return data as unknown[]; })
+    .then((data) => { proposalCache = data; emitCacheEvent(CACHE_EVENTS.proposals); return data as unknown[]; })
     .finally(() => { proposalFlight = null; });
   return proposalFlight as Promise<T[]>;
 }
@@ -94,7 +113,7 @@ export function getCachedCustomers<T>(): T[] | null {
 export async function refreshCustomers<T>(): Promise<T[]> {
   if (customerFlight) return customerFlight as Promise<T[]>;
   customerFlight = loadCustomerRecords()
-    .then((data) => { customerCache = data; return data as unknown[]; })
+    .then((data) => { customerCache = data; emitCacheEvent(CACHE_EVENTS.customers); return data as unknown[]; })
     .finally(() => { customerFlight = null; });
   return customerFlight as Promise<T[]>;
 }

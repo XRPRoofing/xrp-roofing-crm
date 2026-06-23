@@ -20,7 +20,7 @@ const DashboardHeroActions = dynamic(() => import("@/components/crm/dashboard/Da
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshInvoices, refreshProposals } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshInvoices, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
 
@@ -110,11 +110,24 @@ export default function CrmDashboardPage() {
       }).catch(() => {});
     });
 
+    // Supplemental cache-event listeners: if the CrmShell's central hub
+    // refreshes data before this page's own subscription fires, we still
+    // pick up the update instantly.
+    function onCrewCache() { void refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {}); }
+    function onInvoiceCache() { void refreshInvoices<InvoiceSnap>().then((data) => { if (mounted) setInvoices(data); }).catch(() => {}); }
+    function onProposalCache() { void refreshProposals<ProposalSnap>().then((data) => { if (mounted) setProposals(data.filter((p) => !p.deletedAt)); }).catch(() => {}); }
+    window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
+    window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
+    window.addEventListener(CACHE_EVENTS.proposals, onProposalCache);
+
     return () => {
       mounted = false;
       unsubCrew();
       unsubInvoices();
       unsubProposals();
+      window.removeEventListener(CACHE_EVENTS.crew, onCrewCache);
+      window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
+      window.removeEventListener(CACHE_EVENTS.proposals, onProposalCache);
     };
   }, []);
 

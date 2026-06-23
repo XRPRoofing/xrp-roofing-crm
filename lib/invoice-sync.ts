@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 
 /**
  * Supabase-backed invoice sync using dedicated invoices table.
@@ -166,6 +167,7 @@ export async function upsertInvoiceRecord(invoice: Record<string, unknown> & { i
       /* network error */
     }
   }
+  broadcastCrmUpdate();
 }
 
 /**
@@ -186,6 +188,7 @@ export async function deleteInvoiceRecord(id: string): Promise<void> {
       /* ignore */
     }
   }
+  broadcastCrmUpdate();
 }
 
 /**

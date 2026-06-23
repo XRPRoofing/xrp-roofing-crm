@@ -541,6 +541,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [syncActive, setSyncActive] = useState(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Central realtime hub: every Supabase realtime event refreshes the shared
+  // data cache AND dispatches a window event so every mounted page picks up
+  // changes instantly — no per-page Supabase subscription required.
   useEffect(() => {
     if (!hasSupabaseConfig()) return;
     function flash() {
@@ -549,10 +552,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       syncTimeoutRef.current = setTimeout(() => setSyncActive(false), 2000);
     }
     const unsubs = [
-      subscribeToCrewData(flash),
-      subscribeToInvoiceShares(() => flash()),
-      subscribeToProposalRecords(flash),
-      subscribeToCustomerRecords(() => { flash(); void loadCustomerRecords(); }),
+      subscribeToCrewData(() => { flash(); void refreshCrewData().catch(() => {}); }),
+      subscribeToInvoiceShares(() => { flash(); void refreshInvoices().catch(() => {}); }),
+      subscribeToProposalRecords(() => { flash(); void refreshProposals().catch(() => {}); }),
+      subscribeToCustomerRecords(() => { flash(); void refreshCustomers().catch(() => {}); }),
       subscribeToTaskUpdates(() => flash()),
     ];
     return () => {

@@ -11,7 +11,8 @@ import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { getCachedCrewData, refreshCrewData, refreshProposals } from "@/lib/data-cache";
+import { getCachedCrewData, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { createClient } from "@/lib/supabase/client";
 import type { Lead } from "@/types/crm";
 
 type Proposal = {
@@ -59,6 +60,9 @@ type Proposal = {
   offlineSignatureFile?: string;
   offlineSignatureFileName?: string;
   brochures?: BrochureFile[];
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt?: string;
 };
 
 type InspectionPhoto = {
@@ -390,6 +394,20 @@ const initialProposalTemplates: ProposalTemplate[] = [
 ];
 
 export default function ProposalsPage() {
+  const [currentUserName, setCurrentUserName] = useState("CRM User");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+
+  // Resolve the logged-in user's display name and email for proposal tracking
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      if (!data.session) return;
+      const meta = data.session.user.user_metadata;
+      const name = (meta?.full_name || meta?.name || data.session.user.email?.split("@")[0] || "CRM User") as string;
+      setCurrentUserName(name);
+      setCurrentUserEmail(data.session.user.email || "");
+    }).catch(() => {});
+  }, []);
+
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
   const [jobs, setJobs] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
   const [selectedJobId, setSelectedJobId] = useState("");
@@ -643,10 +661,21 @@ export default function ProposalsPage() {
     const unsubscribeJobs = subscribeToCrewData(() => {
       void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
     });
+
+    // Also listen for cache refreshes triggered by the CrmShell's central
+    // realtime hub — ensures this page stays up-to-date even if the direct
+    // Supabase subscription temporarily stalls.
+    function onCacheRefresh() { void reloadFromServer(); }
+    window.addEventListener(CACHE_EVENTS.proposals, onCacheRefresh);
+    window.addEventListener(CACHE_EVENTS.crew, () => {
+      void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
+    });
+
     return () => {
       mounted = false;
       unsubscribe();
       unsubscribeJobs();
+      window.removeEventListener(CACHE_EVENTS.proposals, onCacheRefresh);
     };
   }, []);
 
@@ -810,6 +839,9 @@ export default function ProposalsPage() {
       terms: defaultTerms,
       inspectionPhotos: defaultInspectionPhotos,
       packages: defaultPackages,
+      createdBy: currentUserName,
+      updatedBy: currentUserName,
+      createdAt: new Date().toISOString(),
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
@@ -856,6 +888,9 @@ export default function ProposalsPage() {
       showPackages: true,
       inspectionPhotos: defaultInspectionPhotos,
       packages: defaultPackages,
+      createdBy: currentUserName,
+      updatedBy: currentUserName,
+      createdAt: new Date().toISOString(),
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
@@ -972,6 +1007,7 @@ export default function ProposalsPage() {
       inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
       packages: normalizePackages(editorForm.packages),
       brochures: editorBrochures.length > 0 ? editorBrochures : undefined,
+      updatedBy: currentUserName,
       ...extraFields,
     };
 
@@ -1094,7 +1130,7 @@ export default function ProposalsPage() {
         const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
         sendLog.unshift({
           type: "Proposal",
-          sentBy: "CRM User",
+          sentBy: currentUserName || currentUserEmail || "CRM User",
           sentAt: new Date().toISOString(),
           customerName: sendForm.toName,
           documentNumber: proposalForLink.id,
@@ -2176,8 +2212,8 @@ export default function ProposalsPage() {
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-bold leading-4 text-blue-700 shadow-sm">XRP<br />ROOF</div>
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
-                <p className="mt-1 text-sm text-gray-500">{proposal.customerName} <span className="mx-2">•</span> Assigned to Jonathan Gonzalez</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"} {proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "" : "by Jonathan Gonzalez"} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : "Today"}⌄</p>
+                <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}</p>
               </div>
             </div>
             </button>

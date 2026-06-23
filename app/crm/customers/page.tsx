@@ -17,7 +17,7 @@ import type { ConversationChannel, ConversationMessage } from "@/types/conversat
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
-import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
+import { getCachedCrewData, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -484,9 +484,12 @@ export default function CustomersPage() {
     void init();
 
     const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
+    function onCustomerCache() { void refreshCustomers(); }
+    window.addEventListener(CACHE_EVENTS.customers, onCustomerCache);
     return () => {
       mounted = false;
       unsubscribe();
+      window.removeEventListener(CACHE_EVENTS.customers, onCustomerCache);
     };
   }, []);
 

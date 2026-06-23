@@ -18,7 +18,7 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { getCachedCrewData, refreshCrewData, refreshProposals } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedProposals, getCachedInvoices, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
@@ -581,8 +581,10 @@ export default function LeadsPage() {
 
   // One-click from a Job to its Estimate editor: open the linked estimate if one
   // exists, otherwise create one from the job and open it (linked by job id).
+  // Prefers the shared data cache (synced across devices) over localStorage.
   function openEstimateForJob(job: Lead) {
-    const proposals = readStored<{ id: string; job?: { id?: string } }>("xrp-crm-proposals");
+    const cached = getCachedProposals<{ id: string; job?: { id?: string } }>();
+    const proposals = cached ?? readStored<{ id: string; job?: { id?: string } }>("xrp-crm-proposals");
     const existing = proposals.find((proposal) => proposal?.job?.id === job.id);
     if (existing) requestOpenEstimate(existing.id);
     else requestCreateEstimate(jobToBoardPayload(job));
@@ -591,8 +593,10 @@ export default function LeadsPage() {
 
   // One-click from a Job to its Invoice editor: open the linked invoice if one
   // exists, otherwise create one from the job and open it (linked by jobReference).
+  // Prefers the shared data cache (synced across devices) over localStorage.
   function openInvoiceForJob(job: Lead) {
-    const invoices = readStored<{ id: string; jobReference?: string }>("xrp-crm-invoices");
+    const cached = getCachedInvoices<{ id: string; jobReference?: string }>();
+    const invoices = cached ?? readStored<{ id: string; jobReference?: string }>("xrp-crm-invoices");
     const existing = invoices.find((invoice) => invoice?.jobReference === job.id);
     if (existing) requestOpenInvoice(existing.id);
     else requestCreateInvoice(jobToBoardPayload(job));
@@ -683,9 +687,16 @@ export default function LeadsPage() {
         }
       }).catch(() => {});
     });
+    function onCrewCache() {
+      void refreshCrewData().then((data) => {
+        if (mounted) { setJobs(data.jobs.map(normalizeJob)); setJobNotes(data.notes); }
+      }).catch(() => {});
+    }
+    window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     return () => {
       mounted = false;
       unsubscribe();
+      window.removeEventListener(CACHE_EVENTS.crew, onCrewCache);
     };
   }, []);
 

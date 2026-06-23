@@ -49,7 +49,7 @@ export function useAutoRefresh(onRefresh: () => void, { intervalMs }: { interval
       // BroadcastChannel not supported — fall back to storage events only
     }
 
-    const finalInterval = intervalMs ?? 30_000;
+    const finalInterval = intervalMs ?? 15_000;
     const timer = finalInterval > 0 ? window.setInterval(debouncedRun, finalInterval) : undefined;
 
     return () => {
@@ -107,7 +107,7 @@ export function useMobileAggressiveSync(onRefresh: () => void) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("pageshow", handlePageShow);
 
-    const timer = window.setInterval(debouncedRun, 60_000);
+    const timer = window.setInterval(debouncedRun, 30_000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
