@@ -819,17 +819,6 @@ export default function ProposalsPage() {
         packages: normalizePackages(editorForm.packages),
       };
 
-      // Backfill Best package price from total when all packages are $0.
-      // Without this, the shared/public proposal shows $0 for all packages
-      // even though the admin set a total price.
-      if (updatedProposal.showPackages !== false) {
-        const pkgs = normalizePackages(updatedProposal.packages);
-        const totalVal = updatedProposal.total;
-        if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
-          updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
-        }
-      }
-
       setProposals((currentProposals) =>
         currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
       );
@@ -868,14 +857,6 @@ export default function ProposalsPage() {
       updatedBy: currentUserName,
       createdAt: new Date().toISOString(),
     };
-
-    // Backfill Best package price from total when creating from a job with a value
-    if (newProposal.total > 0) {
-      const pkgs = normalizePackages(newProposal.packages);
-      if (!pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
-        newProposal.packages = { ...pkgs, best: { ...pkgs.best, price: newProposal.total } };
-      }
-    }
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
     // Estimates are a lead source: find-or-create the customer (match by
@@ -925,14 +906,6 @@ export default function ProposalsPage() {
       updatedBy: currentUserName,
       createdAt: new Date().toISOString(),
     };
-
-    // Backfill Best package price from total when creating from a lead with a value
-    if (newProposal.total > 0) {
-      const pkgs = normalizePackages(newProposal.packages);
-      if (!pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
-        newProposal.packages = { ...pkgs, best: { ...pkgs.best, price: newProposal.total } };
-      }
-    }
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
     void findOrCreateCustomer({
@@ -1051,16 +1024,6 @@ export default function ProposalsPage() {
       updatedBy: currentUserName,
       ...extraFields,
     };
-
-    // If packages are shown and all prices are 0 but total > 0, populate Best
-    // with the total so the customer view shows real pricing instead of $0.
-    if (updatedProposal.showPackages !== false) {
-      const pkgs = normalizePackages(updatedProposal.packages);
-      const totalVal = updatedProposal.total;
-      if (totalVal > 0 && !pkgs.good.price && !pkgs.better.price && !pkgs.best.price) {
-        updatedProposal.packages = { ...pkgs, best: { ...pkgs.best, price: totalVal } };
-      }
-    }
 
     setProposals((currentProposals) =>
       currentProposals.map((proposal) => proposal.id === updatedProposal.id ? updatedProposal : proposal)
