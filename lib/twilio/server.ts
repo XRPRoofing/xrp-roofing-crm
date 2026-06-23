@@ -32,9 +32,25 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID || "";
   const fromNumber = resolveFromNumber(payload.from);
-  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
+  // When a Messaging Service is configured, use it for proper 10DLC routing
+  // and better deliverability (avoids "Spam Likely" carrier filtering).
+  // Otherwise fall back to sending directly from the number.
+  if (messagingServiceSid) {
+    console.log(`[twilio:sms] to=${payload.to} messagingService=${messagingServiceSid} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
+    return client.messages.create({
+      to: payload.to,
+      messagingServiceSid,
+      from: fromNumber,
+      body: payload.body,
+      mediaUrl: payload.mediaUrl,
+      statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
+    });
+  }
+
+  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
   return client.messages.create({
     to: payload.to,
     from: fromNumber,
