@@ -35,15 +35,16 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID || "";
   const fromNumber = resolveFromNumber(payload.from);
 
-  // When a Messaging Service is configured, use it for proper 10DLC routing
-  // and better deliverability (avoids "Spam Likely" carrier filtering).
-  // Otherwise fall back to sending directly from the number.
+  // When a Messaging Service is configured, route ONLY through it (no `from`).
+  // Passing `from` alongside messagingServiceSid can bypass 10DLC campaign
+  // routing and cause carriers to flag the message as "Spam Likely".
+  // The Messaging Service automatically selects the correct number from its
+  // sender pool (linked to the 10DLC campaign).
   if (messagingServiceSid) {
-    console.log(`[twilio:sms] to=${payload.to} messagingService=${messagingServiceSid} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
+    console.log(`[twilio:sms] to=${payload.to} messagingService=${messagingServiceSid} (requested from=${payload.from ?? "undefined"})`);
     return client.messages.create({
       to: payload.to,
       messagingServiceSid,
-      from: fromNumber,
       body: payload.body,
       mediaUrl: payload.mediaUrl,
       statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
