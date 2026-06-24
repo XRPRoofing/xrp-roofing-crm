@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
 
     await publishConversationEvent({
       ...event,
+      id: event.callSid ? `${event.callSid}-dial-result` : event.id,
       direction: isBrowserOutbound ? "outbound" : event.direction,
       status: dialStatus || event.status || "completed",
       payload: {

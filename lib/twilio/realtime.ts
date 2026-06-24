@@ -51,6 +51,25 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     if (!updateRow.recording_url) delete updateRow.recording_url;
     delete updateRow.direction;
     delete updateRow.created_at;
+
+    // Preserve Dial-action payload fields (DialCallStatus, DialCallDuration)
+    // when a parent-call status callback re-fires without them — losing these
+    // turns answered calls into false "Missed call" entries.
+    const newPayload = updateRow.payload as Record<string, unknown> | undefined;
+    if (newPayload && !newPayload.DialCallStatus) {
+      const { data: existing } = await supabase
+        .from("conversation_events")
+        .select("payload, status")
+        .eq("id", row.id)
+        .single();
+      const existingPayload = existing?.payload as Record<string, unknown> | null;
+      if (existingPayload?.DialCallStatus) {
+        newPayload.DialCallStatus = existingPayload.DialCallStatus;
+        newPayload.DialCallDuration = existingPayload.DialCallDuration;
+        updateRow.status = existing!.status;
+      }
+    }
+
     const { error: updateError } = await supabase.from("conversation_events").update(updateRow).eq("id", row.id);
     if (updateError) return { stored: false, reason: getConversationEventsErrorMessage(updateError.message) };
     return { stored: true };
