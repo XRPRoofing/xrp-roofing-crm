@@ -14,6 +14,7 @@ type StoredInvoice = {
   viewedAt?: string;
   lineItems?: { quantity: number; unitPrice: number; tax: number }[];
   discount?: number;
+  jobReference?: string;
 };
 
 function getAdminClient() {
@@ -72,6 +73,21 @@ export async function POST(req: NextRequest) {
     amount: calculateTotals(invoice),
     customerEmail: invoice.email,
   });
+
+  if (invoice.jobReference) {
+    try {
+      await supabase.from("crew_activity_log").insert({
+        id: `act-view-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        job_id: invoice.jobReference,
+        job_name: invoice.clientName || "",
+        actor: invoice.clientName || "Client",
+        action: `Invoice viewed by ${invoice.clientName || "client"}`,
+        details: `${invoice.invoiceNumber || id} opened by customer`,
+        module: "Invoice",
+        created_at: new Date().toISOString(),
+      });
+    } catch { /* ignore */ }
+  }
 
   return NextResponse.json({ ok: true });
 }

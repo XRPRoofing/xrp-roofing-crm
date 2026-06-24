@@ -21,6 +21,7 @@ import { sendSms } from "@/lib/twilio/client";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
+import { logCrewActivity } from "@/lib/crew-activity";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
@@ -1091,6 +1092,16 @@ export default function InvoicesPage() {
     setSelectedInvoiceId(pendingReviewInvoice.id);
     pushInvoiceHash();
     void upsertInvoiceRecord(pendingReviewInvoice as unknown as Record<string, unknown> & { id: string });
+    if (pendingReviewInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: pendingReviewInvoice.jobReference,
+        jobName: pendingReviewInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: "Invoice created",
+        details: `${pendingReviewInvoice.invoiceNumber} — ${currency(calculateTotals(pendingReviewInvoice).finalTotal)}`,
+        module: "Invoice",
+      }).catch(() => {});
+    }
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
     setShowReviewModal(false);
@@ -1158,6 +1169,16 @@ export default function InvoicesPage() {
     if (amount <= 0) return;
     const payment: Payment = { ...paymentForm, amount, offline };
     updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, `${offline ? "Offline payment" : "Manual payment"} recorded: ${currency(amount)}`);
+    if (selectedInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: selectedInvoice.jobReference,
+        jobName: selectedInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: `Payment recorded (${currency(amount)})`,
+        details: `${selectedInvoice.invoiceNumber} — ${paymentForm.method}`,
+        module: "Invoice",
+      }).catch(() => {});
+    }
     setPaymentForm({ amount: "", date: today, method: "Cash", reference: "", notes: "" });
     setShowPaymentModal(false);
   }
@@ -1248,6 +1269,17 @@ export default function InvoicesPage() {
       });
       window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
 
+      if (selectedInvoice.jobReference) {
+        void logCrewActivity({
+          jobId: selectedInvoice.jobReference,
+          jobName: selectedInvoice.clientName,
+          actor: sentBy,
+          action: isPaidReceipt ? "Paid Receipt sent by Email" : "Invoice sent by Email",
+          details: `${selectedInvoice.invoiceNumber} sent to ${selectedInvoice.email}`,
+          module: "Invoice",
+        }).catch(() => {});
+      }
+
       setShowSendModal(false);
       if (isPaidReceipt) {
         setPaidReceiptConfirmation({ customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, sentAt });
@@ -1300,6 +1332,17 @@ export default function InvoicesPage() {
         activity: [`Invoice sent by SMS to ${selectedInvoice.phone} | By: ${sentBy} | ${sentAt}`, ...selectedInvoice.activity],
       };
       updateInvoice(updatedInvoice, `Invoice sent by SMS to ${selectedInvoice.phone}`);
+
+      if (selectedInvoice.jobReference) {
+        void logCrewActivity({
+          jobId: selectedInvoice.jobReference,
+          jobName: selectedInvoice.clientName,
+          actor: sentBy,
+          action: "Invoice sent by SMS",
+          details: `${selectedInvoice.invoiceNumber} sent to ${selectedInvoice.phone}`,
+          module: "Invoice",
+        }).catch(() => {});
+      }
 
       setShowSmsModal(false);
       setShowSendModal(false);
@@ -1657,6 +1700,17 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         documents: markPaidDocuments,
         checkImage: markPaidCheckImage,
       });
+    }
+
+    if (selectedInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: selectedInvoice.jobReference,
+        jobName: selectedInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: markPaidMethod === "Check" ? "Check payment submitted" : `Marked as Paid (${currency(balance)})`,
+        details: `${selectedInvoice.invoiceNumber} — ${markPaidMethod}`,
+        module: "Invoice",
+      }).catch(() => {});
     }
 
     setShowMarkPaidModal(false);
