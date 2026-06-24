@@ -47,7 +47,7 @@ function invoiceOverdue(inv: InvoiceSnap): boolean {
 }
 
 const UNACTIONED_STAGES = new Set(["new_lead"]);
-const FOLLOWUP_STAGES   = new Set(["inspection_scheduled", "inspection_complete", "estimate_sent", "waiting_approval", "approved"]);
+const FOLLOWUP_STAGES   = new Set(["inspection_scheduled", "inspection_complete", "estimate_sent", "follow_up", "waiting_approval", "approved"]);
 
 type MetricDef = {
   id: string;
