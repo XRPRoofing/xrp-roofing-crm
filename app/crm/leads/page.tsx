@@ -26,6 +26,8 @@ type ProposalSnap = { id: string; job?: { id?: string }; status: string; deleted
 type InvoiceSnap = {
   id: string;
   jobReference?: string;
+  clientName?: string;
+  propertyAddress?: string;
   status: string;
   dueDate: string;
   viewedAt?: string;
@@ -766,13 +768,7 @@ export default function LeadsPage() {
       }
       setProposalStatusMap(map);
     }).catch(() => {});
-    void refreshInvoices<InvoiceSnap>().then((invoices) => {
-      const map: Record<string, string> = {};
-      for (const inv of invoices) {
-        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
-      }
-      setInvoiceStatusMap(map);
-    }).catch(() => {});
+    void refreshInvoices<InvoiceSnap>().catch(() => {});
   });
 
   useEffect(() => {
@@ -796,7 +792,21 @@ export default function LeadsPage() {
     function buildInvoiceMap(invoices: InvoiceSnap[]) {
       const map: Record<string, string> = {};
       for (const inv of invoices) {
-        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
+        if (inv.isDeleted) continue;
+        const status = getInvoiceDisplayStatus(inv);
+        if (inv.jobReference) {
+          map[inv.jobReference] = status;
+        } else if (inv.clientName) {
+          const matched = jobs.find((j) => {
+            const nameMatch = j.name.toLowerCase().trim() === inv.clientName!.toLowerCase().trim();
+            if (!nameMatch) return false;
+            if (inv.propertyAddress && j.address) {
+              return inv.propertyAddress.toLowerCase().includes(j.address.toLowerCase());
+            }
+            return true;
+          });
+          if (matched) map[matched.id] = status;
+        }
       }
       if (mounted) setInvoiceStatusMap(map);
     }
@@ -807,7 +817,7 @@ export default function LeadsPage() {
     }
     window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
     return () => { mounted = false; window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache); };
-  }, []);
+  }, [jobs]);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
