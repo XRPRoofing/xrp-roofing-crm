@@ -32,12 +32,30 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     payload: event.payload,
     created_at: event.createdAt,
   };
-  const { error } = await supabase.from("conversation_events").upsert(row, { onConflict: "id" });
+
+  // Try insert first. On conflict (duplicate id), do a selective update that
+  // preserves non-empty body and recording_url — Twilio status callbacks often
+  // re-fire with the same id but without Body/recording data, which would
+  // otherwise blank out the original content.
+  const { error: insertError } = await supabase.from("conversation_events").insert(row);
+
+  const isConflict = insertError && (insertError.code === "23505" || insertError.message.includes("duplicate"));
+  if (isConflict) {
+    const updateRow: Record<string, unknown> = { ...row };
+    delete updateRow.id;
+    if (!updateRow.body) delete updateRow.body;
+    if (!updateRow.recording_url) delete updateRow.recording_url;
+    const { error: updateError } = await supabase.from("conversation_events").update(updateRow).eq("id", row.id);
+    if (updateError) return { stored: false, reason: getConversationEventsErrorMessage(updateError.message) };
+    return { stored: true };
+  }
+
+  const error = insertError;
 
   if (error && error.message.includes("recording_url")) {
     const fallbackRow: Record<string, unknown> = { ...row };
     delete fallbackRow.recording_url;
-    const fallback = await supabase.from("conversation_events").upsert(fallbackRow, { onConflict: "id" });
+    const fallback = await supabase.from("conversation_events").insert(fallbackRow);
     if (fallback.error) return { stored: false, reason: getConversationEventsErrorMessage(fallback.error.message) };
     return { stored: true };
   }
