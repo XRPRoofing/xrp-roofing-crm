@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToCrewData, leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
@@ -432,6 +433,8 @@ export default function ProposalsPage() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [jobSearch, setJobSearch] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [address, setAddress] = useState("");
   const [scope, setScope] = useState("");
   const [total, setTotal] = useState("");
@@ -885,17 +888,65 @@ export default function ProposalsPage() {
 
 
 
+  function findMatchingJob(name: string, addr: string, phone: string): Lead | undefined {
+    const normPhone = phone.replace(/\D/g, "");
+    const normName = name.toLowerCase().trim();
+    const normAddr = addr.toLowerCase().trim();
+    return jobs.find((job) => {
+      if (normPhone && normPhone.length >= 7 && job.phone.replace(/\D/g, "").includes(normPhone.slice(-7))) return true;
+      if (normName && job.name.toLowerCase().trim() === normName && normAddr && job.address.toLowerCase().trim().includes(normAddr.split(",")[0].trim())) return true;
+      return false;
+    });
+  }
+
+  function autoCreateJobFromProposal(name: string, addr: string, phone: string, email: string, value: number): Lead {
+    const city = addr.includes(",") ? addr.split(",").slice(1).join(",").trim().replace(/,?\s*AZ$/i, "").trim() || "Phoenix" : "Phoenix";
+    const newJob: Lead = {
+      id: `J-${Date.now()}`,
+      name,
+      email: email || "crm@xrproofing.com",
+      phone: phone || "(602) 555-0000",
+      address: addr.split(",")[0].trim() || "Address pending",
+      city,
+      stage: "estimate_sent",
+      value: value || 0,
+      assignedTo: currentUserName || "Office",
+      roofType: "Roofing",
+      source: "Estimate",
+      lastActivity: "Auto-created from proposal",
+      nextAction: "Review proposal",
+    };
+    void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
+    void createManualFolder({
+      name: `${name} - ${newJob.address}`,
+      address: newJob.address,
+      customerName: name,
+      workType: "Roofing",
+    }).catch(() => {});
+    setJobs((current) => [newJob, ...current]);
+    return newJob;
+  }
+
   function handleCreateProposal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (proposalMode === "job" && !selectedJob) return;
     if (proposalMode === "new" && (!customerName || !address)) return;
 
+    let linkedJob: Lead | undefined = proposalMode === "job" ? selectedJob : undefined;
+
+    if (proposalMode === "new") {
+      linkedJob = findMatchingJob(customerName, address, customerPhone || "");
+      if (!linkedJob) {
+        linkedJob = autoCreateJobFromProposal(customerName, address, customerPhone || "", customerEmail || "", Number(total) || 0);
+      }
+    }
+
     const newProposal: Proposal = {
       id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      job: proposalMode === "job" ? selectedJob : undefined,
+      job: linkedJob,
       customerName: proposalMode === "job" && selectedJob ? selectedJob.name : customerName,
-      customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : "",
-      customerPhone: proposalMode === "job" && selectedJob ? selectedJob.phone : "",
+      customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : customerEmail || "",
+      customerPhone: proposalMode === "job" && selectedJob ? selectedJob.phone : customerPhone || "",
       address: proposalMode === "job" && selectedJob ? `${selectedJob.address}, ${selectedJob.city}` : address,
       scope: scope || (proposalMode === "job" && selectedJob ? `${selectedJob.roofType} roofing proposal` : "Roofing proposal"),
       total: proposalMode === "job" && selectedJob ? selectedJob.value : Number(total) || 0,
@@ -915,8 +966,6 @@ export default function ProposalsPage() {
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
-    // Estimates are a lead source: find-or-create the customer (match by
-    // phone -> email -> address, no duplicates) so it appears on the Customer board.
     void findOrCreateCustomer({
       name: newProposal.customerName,
       email: newProposal.customerEmail,
@@ -929,6 +978,8 @@ export default function ProposalsPage() {
     openProposal(newProposal);
     setShowCreateForm(false);
     setCustomerName("");
+    setCustomerEmail("");
+    setCustomerPhone("");
     setAddress("");
     setScope("");
     setTotal("");
@@ -2442,6 +2493,14 @@ export default function ProposalsPage() {
               <label className="grid gap-2 text-sm font-bold text-gray-700">
                 Customer name
                 <input required value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Customer name" />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-gray-700">
+                Customer email
+                <input value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Email address" />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-gray-700">
+                Customer phone
+                <input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} className="rounded-lg border border-gray-200 px-4 py-3 outline-none" placeholder="Phone number" />
               </label>
               <label className="grid gap-2 text-sm font-bold text-gray-700">
                 Searchable address

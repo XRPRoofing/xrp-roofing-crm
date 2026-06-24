@@ -18,10 +18,55 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { getCachedCrewData, getCachedProposals, getCachedInvoices, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedProposals, getCachedInvoices, refreshCrewData, refreshProposals, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
 import { loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
+
+type InvoiceSnap = {
+  id: string;
+  jobReference?: string;
+  status: string;
+  dueDate: string;
+  viewedAt?: string;
+  sentAt?: string;
+  isDeleted?: boolean;
+  lineItems: { quantity: number; unitPrice: number; tax: number }[];
+  discount: number;
+  payments: { amount: number }[];
+  activity: string[];
+};
+
+function getInvoiceDisplayStatus(inv: InvoiceSnap): string {
+  if (inv.status === "Voided") return "Voided";
+  if (inv.status === "Draft") return "Draft";
+  if (inv.status === "Paid Mail Check") return "Paid";
+  const total = inv.lineItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0) +
+    inv.lineItems.reduce((s, i) => s + i.quantity * i.unitPrice * (i.tax / 100), 0) - inv.discount;
+  const paid = inv.payments.reduce((s, p) => s + p.amount, 0);
+  if (paid >= total && total > 0) return "Paid";
+  if (paid > 0) return "Partially Paid";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = new Date(`${inv.dueDate}T00:00:00`);
+  if (due < today) return "Overdue";
+  if (inv.viewedAt) return "Viewed";
+  if (inv.sentAt) return "Sent";
+  return "Draft";
+}
+
+const INVOICE_STATUS_STYLES: Record<string, string> = {
+  Draft: "bg-gray-100 text-gray-600",
+  Sent: "bg-sky-100 text-sky-700",
+  Viewed: "bg-amber-100 text-amber-700",
+  Overdue: "bg-red-100 text-red-700",
+  "Partially Paid": "bg-orange-100 text-orange-700",
+  Paid: "bg-emerald-100 text-emerald-700",
+  Voided: "bg-gray-100 text-gray-500",
+};
+
+function getInvoiceStatusStyle(status: string) {
+  return INVOICE_STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600";
+}
 
 const PROPOSAL_STATUS_STYLES: Record<string, string> = {
   Draft: "bg-gray-100 text-gray-600",
@@ -391,6 +436,7 @@ export default function LeadsPage() {
   const [lightbox, setLightbox] = useState<{ photos: JobPhoto[]; index: number } | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [proposalStatusMap, setProposalStatusMap] = useState<Record<string, string>>({});
+  const [invoiceStatusMap, setInvoiceStatusMap] = useState<Record<string, string>>({});
 
   const [jobFiles, setJobFiles] = useState<JobPhoto[]>([]);
   const [jobNotes, setJobNotes] = useState<JobNote[]>([]);
@@ -720,6 +766,13 @@ export default function LeadsPage() {
       }
       setProposalStatusMap(map);
     }).catch(() => {});
+    void refreshInvoices<InvoiceSnap>().then((invoices) => {
+      const map: Record<string, string> = {};
+      for (const inv of invoices) {
+        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
+      }
+      setInvoiceStatusMap(map);
+    }).catch(() => {});
   });
 
   useEffect(() => {
@@ -738,6 +791,23 @@ export default function LeadsPage() {
     return () => { mounted = false; unsub(); };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    function buildInvoiceMap(invoices: InvoiceSnap[]) {
+      const map: Record<string, string> = {};
+      for (const inv of invoices) {
+        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
+      }
+      if (mounted) setInvoiceStatusMap(map);
+    }
+    void refreshInvoices<InvoiceSnap>().then(buildInvoiceMap).catch(() => {});
+    function onInvoiceCache() {
+      const cached = getCachedInvoices<InvoiceSnap>();
+      if (cached && mounted) buildInvoiceMap(cached);
+    }
+    window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
+    return () => { mounted = false; window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache); };
+  }, []);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
@@ -1080,6 +1150,7 @@ export default function LeadsPage() {
                 {stageJobs.map((job) => {
                   const urgency = getUrgency(job);
                   const pStatus = proposalStatusMap[job.id];
+                  const iStatus = invoiceStatusMap[job.id];
                   return (
                     <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2.5 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
                       <div className="flex items-center justify-between gap-1">
@@ -1092,11 +1163,17 @@ export default function LeadsPage() {
                       <p className="mt-0.5 truncate text-xs leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
                       <div className="mt-1 flex items-center justify-between gap-1">
                         <span className="text-sm font-bold leading-none text-blue-700">{formatMoney(job.value)}</span>
-                        {pStatus ? (
-                          <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-3 w-3" />{getProposalStatusLabel(pStatus)}</span>
-                        ) : urgency.label !== "On Track" ? (
-                          <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
-                        ) : null}
+                        <div className="flex shrink-0 items-center gap-1">
+                          {pStatus && (
+                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-3 w-3" />{getProposalStatusLabel(pStatus)}</span>
+                          )}
+                          {iStatus && (
+                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getInvoiceStatusStyle(iStatus)}`}><DollarSign className="h-3 w-3" />{iStatus}</span>
+                          )}
+                          {!pStatus && !iStatus && urgency.label !== "On Track" && (
+                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   );
