@@ -320,7 +320,12 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string, at
     response.redirect(retryUrl.toString());
   } else {
     response.say("We did not receive a selection. Goodbye.");
-    response.hangup();
+    // Redirect to incoming-call with ?missed=1 so a missed-call event is
+    // published before hanging up.  This ensures IVR-timeout calls appear as
+    // "Missed call" on the Conversations Board.
+    const missedUrl = new URL(selfUrl);
+    missedUrl.searchParams.set("missed", "1");
+    response.redirect(missedUrl.toString());
   }
 
   return response.toString();

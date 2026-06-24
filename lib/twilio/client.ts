@@ -155,11 +155,22 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
   // channels by name, so reusing a fixed name across pages (Conversations +
   // Customers) returns the already-subscribed channel and throws
   // "cannot add postgres_changes callbacks ... after subscribe()".
+  //
+  // Listen for both INSERT and UPDATE so that upserted events (e.g. a
+  // call_status update for the same call) are reflected in real time.
   const channel = supabase
     .channel(`crm-conversation-events-${Math.random().toString(36).slice(2)}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "conversation_events" },
+      (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        onEvent(mapConversationEventRow(row));
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "conversation_events" },
       (payload) => {
         const row = payload.new as Record<string, unknown>;
         onEvent(mapConversationEventRow(row));
