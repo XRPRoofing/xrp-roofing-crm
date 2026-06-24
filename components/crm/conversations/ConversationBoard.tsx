@@ -199,6 +199,33 @@ function CallRow({ message }: { message: ConversationMessage }) {
   );
 }
 
+const SMS_TRUNCATE_LENGTH = 300;
+
+function SmsStatusBadge({ status, outbound }: { status?: string; outbound: boolean }) {
+  if (status === "delivered") return <span className="inline-flex items-center gap-0.5"><CheckCheck className="h-3 w-3" /><span>Delivered</span></span>;
+  if (status === "sent") return <span>Sent</span>;
+  if (status === "missed") return <span className={outbound ? "text-red-300" : "text-red-500"}>Failed</span>;
+  return null;
+}
+
+function TruncatedBody({ body, outbound }: { body: string; outbound: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  if (body.length <= SMS_TRUNCATE_LENGTH || expanded) {
+    return (
+      <>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(body)}</p>
+        {expanded && <button type="button" onClick={() => setExpanded(false)} className={`mt-1 text-xs font-semibold ${outbound ? "text-blue-200 hover:text-white" : "text-blue-600 hover:text-blue-800"}`}>Show less</button>}
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(body.slice(0, SMS_TRUNCATE_LENGTH) + "\u2026")}</p>
+      <button type="button" onClick={() => setExpanded(true)} className={`mt-1 text-xs font-semibold ${outbound ? "text-blue-200 hover:text-white" : "text-blue-600 hover:text-blue-800"}`}>View full message</button>
+    </>
+  );
+}
+
 function MessageRow({ message }: { message: ConversationMessage }) {
   const outbound = message.direction === "outbound";
   const internal = message.direction === "internal";
@@ -219,7 +246,12 @@ function MessageRow({ message }: { message: ConversationMessage }) {
   return (
     <div className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-lg px-4 py-3 ${outbound ? "bg-blue-600 text-white" : "border border-gray-200 bg-white text-gray-800 shadow-sm"}`}>
-        <div className={`mb-1 flex items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}><span>{message.author}</span><span>{message.timestamp}</span>{message.status === "delivered" && <CheckCheck className="h-3 w-3" />}{message.line && <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? (outbound ? "bg-purple-500/20 text-purple-100" : "bg-purple-50 text-purple-600 ring-1 ring-purple-200") : (outbound ? "bg-white/10 text-blue-100" : "bg-gray-50 text-gray-500 ring-1 ring-gray-200")}`}>{message.line}</span>}</div>
+        <div className={`mb-1 flex flex-wrap items-center gap-2 text-xs ${outbound ? "text-blue-100" : "text-gray-500"}`}>
+          <span>{message.author}</span>
+          <span>{message.timestamp}</span>
+          <SmsStatusBadge status={message.status} outbound={outbound} />
+          {message.line && <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? (outbound ? "bg-purple-500/20 text-purple-100" : "bg-purple-50 text-purple-600 ring-1 ring-purple-200") : (outbound ? "bg-white/10 text-blue-100" : "bg-gray-50 text-gray-500 ring-1 ring-gray-200")}`}>{message.line}</span>}
+        </div>
         {message.mediaUrls && message.mediaUrls.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {message.mediaUrls.map((url) => {
@@ -232,7 +264,7 @@ function MessageRow({ message }: { message: ConversationMessage }) {
             })}
           </div>
         )}
-        <p className="whitespace-pre-wrap break-words text-sm leading-6">{linkifyText(message.body)}</p>
+        <TruncatedBody body={message.body} outbound={outbound} />
         {message.attachments && <div className="mt-3 flex flex-wrap gap-2">{message.attachments.map((item) => <span key={item} className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-600 ring-1 ring-gray-200"><FileImage className="h-3 w-3 text-blue-600" />{item}</span>)}</div>}
       </div>
     </div>
@@ -548,16 +580,41 @@ function extractMediaUrls(payload: Record<string, unknown>): string[] {
   return urls;
 }
 
+function getSmsStatusLabel(event: TwilioConversationEvent): ConversationMessage["status"] {
+  const s = (event.status || "").toLowerCase();
+  if (s === "delivered" || s === "read") return "delivered";
+  if (s === "failed" || s === "undelivered") return "missed";
+  if (event.direction === "outbound") return "sent";
+  return "read";
+}
+
 function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: string): ConversationMessage {
   const isCall = event.type.includes("call");
   const channel: ConversationChannel = isCall ? "call" : "sms";
   const direction = event.direction || "internal";
   const callLabel = direction === "outbound" ? "Outbound call" : isMissedCallEvent(event) ? "Missed call" : "Inbound call";
   const duration = getCallDurationLabel(event);
-  const fallbackBody = event.type === "call_recording" ? "AI Summary Created" : isCall ? callLabel + (duration ? " · " + duration : "") : "Message activity";
   const twilioPhone = getTwilioLinePhone(event);
   const line = getLineLabelForNumber(twilioPhone) || fallbackLine || "";
   const mediaUrls = extractMediaUrls(event.payload);
+
+  // Build a descriptive fallback for SMS events that includes direction and
+  // line info instead of the generic "Message activity".
+  let fallbackBody: string;
+  if (event.type === "call_recording") {
+    fallbackBody = "AI Summary Created";
+  } else if (isCall) {
+    fallbackBody = callLabel + (duration ? " \u00b7 " + duration : "");
+  } else {
+    const lineTag = line ? ` from ${line}` : "";
+    fallbackBody = direction === "outbound"
+      ? `SMS sent${lineTag} to ${formatPhoneIdentity(event.to || "customer")}`
+      : `SMS received from ${formatPhoneIdentity(event.from || "customer")}${lineTag}`;
+  }
+
+  const messageStatus = isCall
+    ? (isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read")
+    : getSmsStatusLabel(event);
 
   return {
     id: getCallMessageId(event),
@@ -566,7 +623,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
     author: direction === "outbound" ? "XRP Roofing" : formatPhoneIdentity(event.from || "Customer"),
     body: event.body || fallbackBody,
     timestamp: new Date(event.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-    status: isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read",
+    status: messageStatus,
     recordingUrl: event.recordingUrl,
     line,
     ...(mediaUrls.length > 0 ? { mediaUrls } : {}),
@@ -717,7 +774,7 @@ function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { c
       <Card className="p-5">
         <h3 className="text-sm font-bold text-gray-950">Activity Timeline</h3>
         <div className="mt-4 space-y-3">
-          {conversation.messages.slice(0, 3).map((message) => <div key={message.id} className="border-l-2 border-gray-200 pl-3"><p className="text-sm text-gray-700">{message.body}</p><p className="mt-1 text-xs text-gray-500">{message.timestamp}</p></div>)}
+          {conversation.messages.slice(0, 3).map((message) => <div key={message.id} className="border-l-2 border-gray-200 pl-3"><p className="text-sm text-gray-700">{message.body.length > 120 ? message.body.slice(0, 120) + "\u2026" : message.body}</p><p className="mt-1 text-xs text-gray-500">{message.timestamp}{message.line && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">{message.line}</span>}{message.status === "delivered" && <span className="ml-1.5 text-green-600">Delivered</span>}{message.status === "sent" && <span className="ml-1.5">Sent</span>}{message.status === "missed" && message.channel === "sms" && <span className="ml-1.5 text-red-500">Failed</span>}</p></div>)}
         </div>
       </Card>
 
