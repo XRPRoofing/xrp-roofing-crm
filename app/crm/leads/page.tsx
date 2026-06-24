@@ -665,6 +665,14 @@ export default function LeadsPage() {
   useEffect(() => {
     migrateStaleDueDates();
     let mounted = true;
+
+    // Show cached data instantly, then refresh in background
+    const cached = getCachedCrewData();
+    if (cached) {
+      setJobs(cached.jobs.map(normalizeJob));
+      setJobNotes(cached.notes);
+    }
+
     async function loadJobs() {
       try {
         const data = await refreshCrewData();

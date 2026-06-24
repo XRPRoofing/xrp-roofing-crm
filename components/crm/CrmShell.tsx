@@ -98,6 +98,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     void refreshProposals().catch(() => {});
     void refreshCustomers().catch(() => {});
 
+    // Pre-download JS bundles for all nav pages so transitions are instant
+    for (const item of navigation) {
+      router.prefetch(item.href);
+    }
+
     if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
       setUserRole("admin");
       setCheckingAuth(false);
