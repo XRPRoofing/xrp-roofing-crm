@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+// html2canvas and jsPDF are loaded dynamically when generating PDFs to keep
+// the initial page bundle small (~460 KB savings).
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, deleteInvoiceRecord, loadAllInvoices, type InvoiceSharePayload } from "@/lib/invoice-sync";
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -907,9 +907,15 @@ export default function InvoicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load from Supabase on mount (primary source). Only fall back to localStorage if no Supabase.
+  // Show cached data instantly, then refresh from Supabase in background
   useEffect(() => {
     let mounted = true;
+
+    const cached = getCachedInvoices<Invoice>();
+    if (cached && cached.length > 0) {
+      setInvoices(cached);
+    }
+
     async function init() {
       if (hasSupabaseConfig()) {
         const remoteInvoices = await refreshInvoices<Invoice>();
@@ -1344,6 +1350,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     try {
+      const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(iframeDoc.body, {
         scale: 2,
         useCORS: true,
@@ -1353,6 +1360,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 0.75);
+      const { jsPDF } = await import("jspdf");
       const pdf = new jsPDF("p", "mm", "letter");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();

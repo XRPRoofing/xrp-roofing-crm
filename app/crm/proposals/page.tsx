@@ -11,7 +11,7 @@ import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { getCachedCrewData, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedProposals, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { createClient } from "@/lib/supabase/client";
 import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
@@ -421,7 +421,7 @@ export default function ProposalsPage() {
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
   const [jobs, setJobs] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
   const [selectedJobId, setSelectedJobId] = useState("");
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>(() => getCachedProposals<Proposal>()?.filter((p) => !p.deletedAt) ?? []);
   const prevProposalsRef = useRef<Proposal[]>([]);
   const permanentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const boardIntentHandledRef = useRef(false);

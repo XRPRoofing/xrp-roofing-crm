@@ -17,7 +17,7 @@ import type { ConversationChannel, ConversationMessage } from "@/types/conversat
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
-import { getCachedCrewData, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -251,7 +251,7 @@ function statusTone(status?: string) {
 export default function CustomersPage() {
   const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => {
     if (typeof window === "undefined") return [];
-    return readRawLocalCustomers();
+    return getCachedCustomers<Customer>() ?? readRawLocalCustomers();
   });
   const [jobList, setJobList] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? getSavedJobs());
   // Customer board shows ONLY live Supabase customer records (newest first from
