@@ -450,11 +450,15 @@ function isAnsweredCallEvent(event: TwilioConversationEvent) {
 }
 
 function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
-  if (!event.type.includes("call")) return true;
+  if (!event.type.includes("call") && event.type !== "incoming_call") return true;
   // Call recordings are rendered once as a dedicated CallInsightsCard, not as a
   // timeline message bubble — rendering both is what caused duplicate summaries.
   if (event.type === "call_recording") return false;
   if (event.type === "call_note") return true;
+
+  // incoming_call events are always visible so every inbound call appears on
+  // the board even if the caller abandons during the IVR.
+  if (event.type === "incoming_call") return true;
 
   const status = (event.status || String(event.payload.CallStatus || "")).toLowerCase();
   const label = getTwilioCallOutcomeLabel(event);
@@ -597,12 +601,30 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   // child leg (the actual conversation) was answered via <Dial>. That produces
   // a false "Missed call" that would overwrite the correct "Inbound call" from
   // the earlier Dial action callback. Detect and suppress the false positive.
-  let isFalsePositiveMissed = false;
-  if (message && message.status === "missed" && event.callSid) {
-    const messageId = message.id;
-    isFalsePositiveMissed = nextConversation.messages.some((m) => m.id === messageId && m.status !== "missed");
+  //
+  // Additionally, parent-call status callbacks (no DialCallStatus) should never
+  // overwrite a more specific message that originated from a Dial action
+  // callback — the Dial callback has the accurate outcome/duration.
+  //
+  // An initial incoming_call placeholder ("Inbound call", no duration) is NOT
+  // considered "specific" and CAN be replaced by a terminal event.
+  let isSuppressed = false;
+  if (message && event.callSid) {
+    const existingMsg = nextConversation.messages.find((m) => m.id === message.id);
+    if (existingMsg) {
+      const isExistingSpecific = existingMsg.status === "missed" || existingMsg.body.includes("\u00b7");
+      const isParentCallEvent = event.type === "call_status" && !event.payload.DialCallStatus;
+      // Don't let a parent-call callback overwrite a Dial-action result
+      if (isParentCallEvent && isExistingSpecific) {
+        isSuppressed = true;
+      }
+      // Don't let a "missed" status overwrite a non-missed specific result
+      if (message.status === "missed" && isExistingSpecific && existingMsg.status !== "missed") {
+        isSuppressed = true;
+      }
+    }
   }
-  const effectiveMessage = isFalsePositiveMissed ? null : message;
+  const effectiveMessage = isSuppressed ? null : message;
 
   const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => item.id !== effectiveMessage.id), effectiveMessage].slice(-50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
@@ -618,7 +640,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const readAt = nextConversation.readAt ?? readStates?.[id];
   const isAfterRead = !readAt || event.createdAt > readAt;
   const countsAsUnread = Boolean(effectiveMessage) && event.direction === "inbound" && !isMissedCallEvent(event) && isAfterRead;
-  const lastMissedAt = (isMissedCallEvent(event) && !isFalsePositiveMissed) ? event.createdAt : nextConversation.lastMissedAt;
+  const lastMissedAt = (isMissedCallEvent(event) && !isSuppressed) ? event.createdAt : nextConversation.lastMissedAt;
   const lastAnsweredAt = isAnsweredCallEvent(event) ? event.createdAt : nextConversation.lastAnsweredAt;
 
   const updated: ConversationRecord = {
