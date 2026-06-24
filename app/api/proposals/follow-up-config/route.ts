@@ -9,6 +9,8 @@ export interface FollowUpConfig {
   delayHours: number;
   emailSubject: string;
   emailTemplate: string;
+  smsEnabled: boolean;
+  smsTemplate: string;
 }
 
 const DEFAULT_CONFIG: FollowUpConfig = {
@@ -17,6 +19,9 @@ const DEFAULT_CONFIG: FollowUpConfig = {
   emailSubject: "Following up — Your Roofing Proposal",
   emailTemplate:
     "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team",
+  smsEnabled: false,
+  smsTemplate:
+    "Hi {customerName}, just following up on your roofing proposal. Let us know if you have any questions — we're happy to help! View your proposal here: {proposalLink} — XRP Roofing",
 };
 
 function getAdminClient() {
@@ -67,6 +72,8 @@ export async function POST(req: NextRequest) {
     delayHours: body.delayHours ?? current.delayHours,
     emailSubject: body.emailSubject ?? current.emailSubject,
     emailTemplate: body.emailTemplate ?? current.emailTemplate,
+    smsEnabled: body.smsEnabled ?? current.smsEnabled,
+    smsTemplate: body.smsTemplate ?? current.smsTemplate,
   };
 
   const { error } = await supabase

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
+import { sendConversationSms } from "@/lib/twilio/server";
+import { resolveFromNumber } from "@/lib/twilio/numbers";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,6 +14,8 @@ interface FollowUpConfig {
   delayHours: number;
   emailSubject: string;
   emailTemplate: string;
+  smsEnabled: boolean;
+  smsTemplate: string;
 }
 
 const DEFAULT_CONFIG: FollowUpConfig = {
@@ -20,15 +24,20 @@ const DEFAULT_CONFIG: FollowUpConfig = {
   emailSubject: "Following up — Your Roofing Proposal",
   emailTemplate:
     "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team",
+  smsEnabled: false,
+  smsTemplate:
+    "Hi {customerName}, just following up on your roofing proposal. Let us know if you have any questions — we're happy to help! View your proposal here: {proposalLink} — XRP Roofing",
 };
 
 interface ProposalPayload {
   id: string;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
   status?: string;
   viewedAt?: string;
   followUpSentAt?: string;
+  followUpSmsSentAt?: string;
   [key: string]: unknown;
 }
 
@@ -43,8 +52,23 @@ function escapeHtml(v: string) {
   return v.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-function fillTemplate(template: string, customerName: string): string {
-  return template.replaceAll("{customerName}", customerName);
+function fillTemplate(template: string, customerName: string, proposalLink?: string): string {
+  let result = template.replaceAll("{customerName}", customerName);
+  if (proposalLink) result = result.replaceAll("{proposalLink}", proposalLink);
+  return result;
+}
+
+async function sendFollowUpSms(
+  toPhone: string,
+  messageBody: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const fromNumber = resolveFromNumber();
+    await sendConversationSms({ to: toPhone, body: messageBody, from: fromNumber });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "SMS send failed" };
+  }
 }
 
 async function sendFollowUpEmail(
@@ -150,8 +174,8 @@ export async function GET(req: NextRequest) {
     // Skip if already followed up
     if (payload.followUpSentAt) continue;
 
-    // Skip if no customer email
-    if (!payload.customerEmail) continue;
+    // Skip if no customer email and no phone (need at least one contact method)
+    if (!payload.customerEmail && !payload.customerPhone) continue;
 
     // Check if enough time has passed since viewed
     if (!payload.viewedAt) continue;
@@ -159,30 +183,40 @@ export async function GET(req: NextRequest) {
     if (isNaN(viewedTime) || now - viewedTime < delayMs) continue;
 
     const customerName = payload.customerName || "Valued Customer";
-    const subject = fillTemplate(config.emailSubject, customerName);
-    const message = fillTemplate(config.emailTemplate, customerName);
     const proposalLink = `${appUrl}/proposal/${encodeURIComponent(payload.id)}`;
+    const sentVia: string[] = [];
 
-    const result = await sendFollowUpEmail(payload.customerEmail, customerName, subject, message, proposalLink);
+    // Send email follow-up
+    if (payload.customerEmail) {
+      const subject = fillTemplate(config.emailSubject, customerName, proposalLink);
+      const message = fillTemplate(config.emailTemplate, customerName, proposalLink);
+      const emailResult = await sendFollowUpEmail(payload.customerEmail, customerName, subject, message, proposalLink);
+      if (emailResult.ok) sentVia.push("email");
+      else results.push({ proposalId: payload.id, customerName, status: "failed", error: `Email: ${emailResult.error}` });
+    }
 
-    if (result.ok) {
-      // Mark follow-up as sent on the proposal
+    // Send SMS follow-up
+    if (config.smsEnabled && payload.customerPhone && !payload.followUpSmsSentAt) {
+      const smsMessage = fillTemplate(config.smsTemplate, customerName, proposalLink);
+      const smsResult = await sendFollowUpSms(payload.customerPhone, smsMessage);
+      if (smsResult.ok) sentVia.push("sms");
+      else results.push({ proposalId: payload.id, customerName, status: "failed", error: `SMS: ${smsResult.error}` });
+    }
+
+    if (sentVia.length > 0) {
       const updatedPayload = {
         ...payload,
-        followUpSentAt: new Date().toISOString(),
-        followUpSentVia: "email",
+        ...(sentVia.includes("email") ? { followUpSentAt: new Date().toISOString() } : {}),
+        ...(sentVia.includes("sms") ? { followUpSmsSentAt: new Date().toISOString() } : {}),
+        followUpSentVia: sentVia.join("+"),
       };
       await supabase
         .from("proposal_shares")
         .upsert({ id: row.id, payload: updatedPayload, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      results.push({ proposalId: payload.id, customerName, status: "sent" });
+    } else if (!results.some((r) => r.proposalId === payload.id)) {
+      results.push({ proposalId: payload.id, customerName, status: "skipped" });
     }
-
-    results.push({
-      proposalId: payload.id,
-      customerName,
-      status: result.ok ? "sent" : "failed",
-      ...(result.error ? { error: result.error } : {}),
-    });
   }
 
   return NextResponse.json({

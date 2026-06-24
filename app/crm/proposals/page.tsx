@@ -74,6 +74,7 @@ type Proposal = {
   smsSentToPhone?: string;
   viewedAt?: string;
   followUpSentAt?: string;
+  followUpSmsSentAt?: string;
   followUpSentVia?: string;
 };
 
@@ -506,6 +507,10 @@ export default function ProposalsPage() {
   const [followUpTemplate, setFollowUpTemplate] = useState(
     "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team"
   );
+  const [followUpSmsEnabled, setFollowUpSmsEnabled] = useState(false);
+  const [followUpSmsTemplate, setFollowUpSmsTemplate] = useState(
+    "Hi {customerName}, just following up on your roofing proposal. Let us know if you have any questions — we're happy to help! View your proposal here: {proposalLink} — XRP Roofing"
+  );
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [followUpNotice, setFollowUpNotice] = useState("");
   const followUpLoaded = useRef(false);
@@ -515,12 +520,14 @@ export default function ProposalsPage() {
     followUpLoaded.current = true;
     fetch("/api/proposals/follow-up-config")
       .then((res) => res.json())
-      .then((data: { config?: { enabled?: boolean; delayHours?: number; emailSubject?: string; emailTemplate?: string } }) => {
+      .then((data: { config?: { enabled?: boolean; delayHours?: number; emailSubject?: string; emailTemplate?: string; smsEnabled?: boolean; smsTemplate?: string } }) => {
         if (!data.config) return;
         if (data.config.enabled !== undefined) setFollowUpEnabled(data.config.enabled);
         if (data.config.delayHours !== undefined) setFollowUpDelayHours(data.config.delayHours);
         if (data.config.emailSubject) setFollowUpSubject(data.config.emailSubject);
         if (data.config.emailTemplate) setFollowUpTemplate(data.config.emailTemplate);
+        if (data.config.smsEnabled !== undefined) setFollowUpSmsEnabled(data.config.smsEnabled);
+        if (data.config.smsTemplate) setFollowUpSmsTemplate(data.config.smsTemplate);
       })
       .catch(() => {});
   }, []);
@@ -537,6 +544,8 @@ export default function ProposalsPage() {
           delayHours: followUpDelayHours,
           emailSubject: followUpSubject,
           emailTemplate: followUpTemplate,
+          smsEnabled: followUpSmsEnabled,
+          smsTemplate: followUpSmsTemplate,
         }),
       });
       if (res.ok) {
@@ -2394,7 +2403,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Automation</p>
                 <h2 className="mt-2 text-2xl font-bold text-blue-700">Automated Proposal Follow-Up</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a follow-up email to customers who viewed a proposal but have not signed it. Follow-ups stop automatically when the customer signs.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a follow-up email (and optionally SMS) to customers who viewed a proposal but have not signed it. Follow-ups stop automatically when the customer signs.</p>
               </div>
               <button
                 type="button"
@@ -2444,6 +2453,40 @@ export default function ProposalsPage() {
                   placeholder="Hi {customerName}, ..."
                 />
                 <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} to insert the customer&apos;s name. A &quot;View Proposal&quot; button with the proposal link is added automatically.</p>
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-gray-700">SMS Follow-Up</p>
+                    <p className="mt-1 text-xs text-gray-500">Also send a text message follow-up to customers who have a phone number on file.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFollowUpSmsEnabled((v) => !v)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      followUpSmsEnabled
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    {followUpSmsEnabled ? "SMS On" : "SMS Off"}
+                  </button>
+                </div>
+
+                {followUpSmsEnabled && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-bold text-gray-700">SMS message template</label>
+                    <textarea
+                      value={followUpSmsTemplate}
+                      onChange={(e) => setFollowUpSmsTemplate(e.target.value)}
+                      rows={4}
+                      className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
+                      placeholder="Hi {customerName}, just following up..."
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for the name and {'{proposalLink}'} for the proposal URL. SMS is sent to the customer&apos;s phone number.</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -2590,7 +2633,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}{proposal.followUpSmsSentAt ? <> <span className="mx-1">•</span> SMS follow-up sent {new Date(proposal.followUpSmsSentAt).toLocaleDateString()}</> : null}</p>
               </div>
             </div>
             </button>
