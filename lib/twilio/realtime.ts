@@ -43,8 +43,14 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
   if (isConflict) {
     const updateRow: Record<string, unknown> = { ...row };
     delete updateRow.id;
+    // Twilio status callbacks (sent→delivered) re-fire with the same id but
+    // omit Body, Direction, and recording fields. Preserve these from the
+    // original insert so outbound messages keep their body text, correct
+    // direction, and recording URL.
     if (!updateRow.body) delete updateRow.body;
     if (!updateRow.recording_url) delete updateRow.recording_url;
+    delete updateRow.direction;
+    delete updateRow.created_at;
     const { error: updateError } = await supabase.from("conversation_events").update(updateRow).eq("id", row.id);
     if (updateError) return { stored: false, reason: getConversationEventsErrorMessage(updateError.message) };
     return { stored: true };
