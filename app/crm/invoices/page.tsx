@@ -626,6 +626,8 @@ export default function InvoicesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showSmsModal, setShowSmsModal] = useState(false);
+  const [smsMessage, setSmsMessage] = useState("");
   const [editing, setEditing] = useState(false);
   const [invoiceFilter, setInvoiceFilter] = useState<(typeof filterOptions)[number]>("All");
   const [invoiceSearch, setInvoiceSearch] = useState("");
@@ -1260,11 +1262,21 @@ export default function InvoicesPage() {
     }
   }
 
+  function buildDefaultSmsMessage(invoice: Invoice): string {
+    const invoiceLink = `${window.location.origin}/invoice/${encodeURIComponent(invoice.id)}`;
+    const totals = calculateTotals(invoice);
+    const balance = Math.max(totals.finalTotal - getPaidAmount(invoice), 0);
+    return `Hi ${invoice.clientName}, here is your invoice ${invoice.invoiceNumber} from XRP Roofing for ${currency(balance)}. View and pay online: ${invoiceLink}`;
+  }
+
+  function openSmsModal() {
+    if (!selectedInvoice || !selectedInvoice.phone) return;
+    setSmsMessage(buildDefaultSmsMessage(selectedInvoice));
+    setShowSmsModal(true);
+  }
+
   async function handleSendInvoiceSms() {
     if (!selectedInvoice || !selectedInvoice.phone) return;
-    const invoiceLink = `${window.location.origin}/invoice/${encodeURIComponent(selectedInvoice.id)}`;
-    const totals = calculateTotals(selectedInvoice);
-    const balance = Math.max(totals.finalTotal - getPaidAmount(selectedInvoice), 0);
 
     setSendingInvoice(true);
     const sentAt = new Date().toISOString();
@@ -1277,9 +1289,7 @@ export default function InvoicesPage() {
         body: JSON.stringify(selectedInvoice),
       });
 
-      const smsBody = `Hi ${selectedInvoice.clientName}, here is your invoice ${selectedInvoice.invoiceNumber} from XRP Roofing for ${currency(balance)}. View and pay online: ${invoiceLink}`;
-
-      await sendSms({ to: selectedInvoice.phone, body: smsBody });
+      await sendSms({ to: selectedInvoice.phone, body: smsMessage });
 
       const updatedInvoice: Invoice = {
         ...selectedInvoice,
@@ -1291,6 +1301,7 @@ export default function InvoicesPage() {
       };
       updateInvoice(updatedInvoice, `Invoice sent by SMS to ${selectedInvoice.phone}`);
 
+      setShowSmsModal(false);
       setShowSendModal(false);
       setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent by SMS to ${selectedInvoice.phone}.` });
     } catch (error) {
@@ -1990,7 +2001,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 sm:gap-3">
               <button onClick={() => setEditing((current) => !current)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
               <button onClick={() => setShowSendModal(true)} className="rounded-lg sm:rounded-lg bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Send by Email</button>
-              <button onClick={handleSendInvoiceSms} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-lg sm:rounded-lg bg-green-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5 disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />Send by Text</button>
+              <button onClick={openSmsModal} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-lg sm:rounded-lg bg-green-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5 disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />Send by Text</button>
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
               <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
@@ -2541,7 +2552,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <button onClick={() => handleDownloadPaidReceiptPdf(selectedInvoice)} className="w-full sm:w-auto rounded-lg border border-green-300 bg-green-50 px-5 py-3 font-bold text-green-700 active:scale-95 transition order-3 sm:order-1">Download PDF</button>
               )}
               {!isPaidReceiptSelected && selectedInvoice.phone && (
-                <button onClick={handleSendInvoiceSms} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-green-600 px-5 py-3 font-bold text-white active:scale-95 transition order-2 disabled:opacity-50 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : "Send by Text"}</button>
+                <button onClick={() => { setShowSendModal(false); openSmsModal(); }} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-green-600 px-5 py-3 font-bold text-white active:scale-95 transition order-2 disabled:opacity-50 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : "Send by Text"}</button>
               )}
               <button onClick={handleSendInvoice} disabled={sendingInvoice || (isPaidReceiptSelected && !invoiceIsPaid)} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-3 disabled:opacity-50 flex items-center justify-center gap-2"><Mail className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : isPaidReceiptSelected ? "Send Paid Receipt" : "Send by Email"}</button>
             </div>
@@ -2570,6 +2581,30 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">View Invoice</button>
               )}
               <button type="button" onClick={() => setInvoiceSendConfirmation(null)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SMS Compose Modal ── */}
+      {showSmsModal && selectedInvoice && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
+          <div className="w-full max-w-lg rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-green-700 flex items-center gap-2"><MessageSquare className="h-5 w-5" />Send Invoice by Text</h2>
+            <div className="mt-4 grid gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-gray-500">To</label>
+                <input disabled value={selectedInvoice.phone} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-700 outline-none" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-gray-500">Message (editable)</label>
+                <textarea value={smsMessage} onChange={(e) => setSmsMessage(e.target.value)} className="min-h-36 w-full rounded-lg border border-gray-200 px-4 py-3 text-base outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100" placeholder="Type your message…" />
+              </div>
+              <p className="text-xs text-gray-400">{smsMessage.length} characters</p>
+            </div>
+            <div className="mt-5 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button onClick={() => setShowSmsModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition">Cancel</button>
+              <button onClick={handleSendInvoiceSms} disabled={sendingInvoice || !smsMessage.trim()} className="w-full sm:w-auto rounded-lg bg-green-600 px-5 py-3 font-bold text-white active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : "Send Text"}</button>
             </div>
           </div>
         </div>
