@@ -122,6 +122,39 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: updateError.message }, { status: 503 });
     }
 
+    const jobId = (proposal as Record<string, unknown>).job && typeof (proposal as Record<string, unknown>).job === "object" ? ((proposal as Record<string, unknown>).job as Record<string, unknown>)?.id as string | undefined : undefined;
+    if (jobId && updates.status === "Viewed" && !(proposal as Record<string, unknown>).viewedAt) {
+      const customerName = ((proposal as Record<string, unknown>).customerName as string) || "";
+      try {
+        await supabase.from("crew_activity_log").insert({
+          id: `act-pview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          job_id: jobId,
+          job_name: customerName,
+          actor: customerName || "Client",
+          action: `Proposal viewed by ${customerName || "client"}`,
+          details: `Proposal ${id} opened by customer`,
+          module: "Proposal",
+          created_at: new Date().toISOString(),
+        });
+      } catch { /* ignore */ }
+    }
+
+    if (jobId && (updates.signedAt || updates.signatureData)) {
+      const customerName = ((proposal as Record<string, unknown>).customerName as string) || "";
+      try {
+        await supabase.from("crew_activity_log").insert({
+          id: `act-psign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          job_id: jobId,
+          job_name: customerName,
+          actor: customerName || "Client",
+          action: `Proposal signed by ${customerName || "client"}`,
+          details: `Proposal ${id} accepted and signed`,
+          module: "Proposal",
+          created_at: new Date().toISOString(),
+        });
+      } catch { /* ignore */ }
+    }
+
     return NextResponse.json({ proposal: nextProposal });
   } catch (error) {
     if (error instanceof z.ZodError) {

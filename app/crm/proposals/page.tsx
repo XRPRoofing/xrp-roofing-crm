@@ -6,6 +6,7 @@ import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { subscribeToCrewData, leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { logCrewActivity } from "@/lib/crew-activity";
 import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
@@ -966,6 +967,16 @@ export default function ProposalsPage() {
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    if (newProposal.job?.id) {
+      void logCrewActivity({
+        jobId: newProposal.job.id,
+        jobName: newProposal.customerName,
+        actor: currentUserName || currentUserEmail || "Office",
+        action: "Proposal created",
+        details: `${newProposal.scope} — $${newProposal.total.toLocaleString()}`,
+        module: "Proposal",
+      }).catch(() => {});
+    }
     void findOrCreateCustomer({
       name: newProposal.customerName,
       email: newProposal.customerEmail,
@@ -1250,6 +1261,17 @@ export default function ProposalsPage() {
         });
         window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
 
+        if (proposalForLink.job?.id) {
+          void logCrewActivity({
+            jobId: proposalForLink.job.id,
+            jobName: proposalForLink.customerName,
+            actor: currentUserName || currentUserEmail || "Office",
+            action: "Proposal sent by Email",
+            details: `Sent to ${sendForm.toEmail}`,
+            module: "Proposal",
+          }).catch(() => {});
+        }
+
         setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
         setShowSendModal(false);
       }
@@ -1332,6 +1354,17 @@ export default function ProposalsPage() {
         recipient: smsForm.toPhone,
       });
       window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
+
+      if (proposalForLink.job?.id) {
+        void logCrewActivity({
+          jobId: proposalForLink.job.id,
+          jobName: proposalForLink.customerName,
+          actor: currentUserName || currentUserEmail || "Office",
+          action: "Proposal sent by SMS",
+          details: `Sent to ${smsForm.toPhone}`,
+          module: "Proposal",
+        }).catch(() => {});
+      }
 
       setSendConfirmation({ type: "success", customerName: activeProposal.customerName, proposalNumber: proposalForLink.id, message: `Proposal sent via SMS to ${smsForm.toPhone}.\n\nProposal link: ${proposalLink}` });
       setShowSmsSendModal(false);

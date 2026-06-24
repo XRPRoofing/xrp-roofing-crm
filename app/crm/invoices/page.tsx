@@ -21,6 +21,7 @@ import { sendSms } from "@/lib/twilio/client";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
+import { logCrewActivity } from "@/lib/crew-activity";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
@@ -1091,6 +1092,16 @@ export default function InvoicesPage() {
     setSelectedInvoiceId(pendingReviewInvoice.id);
     pushInvoiceHash();
     void upsertInvoiceRecord(pendingReviewInvoice as unknown as Record<string, unknown> & { id: string });
+    if (pendingReviewInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: pendingReviewInvoice.jobReference,
+        jobName: pendingReviewInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: "Invoice created",
+        details: `${pendingReviewInvoice.invoiceNumber} — ${currency(calculateTotals(pendingReviewInvoice).finalTotal)}`,
+        module: "Invoice",
+      }).catch(() => {});
+    }
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
     setShowReviewModal(false);
@@ -1158,6 +1169,16 @@ export default function InvoicesPage() {
     if (amount <= 0) return;
     const payment: Payment = { ...paymentForm, amount, offline };
     updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, `${offline ? "Offline payment" : "Manual payment"} recorded: ${currency(amount)}`);
+    if (selectedInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: selectedInvoice.jobReference,
+        jobName: selectedInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: `Payment recorded (${currency(amount)})`,
+        details: `${selectedInvoice.invoiceNumber} — ${paymentForm.method}`,
+        module: "Invoice",
+      }).catch(() => {});
+    }
     setPaymentForm({ amount: "", date: today, method: "Cash", reference: "", notes: "" });
     setShowPaymentModal(false);
   }
@@ -1248,6 +1269,17 @@ export default function InvoicesPage() {
       });
       window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
 
+      if (selectedInvoice.jobReference) {
+        void logCrewActivity({
+          jobId: selectedInvoice.jobReference,
+          jobName: selectedInvoice.clientName,
+          actor: sentBy,
+          action: isPaidReceipt ? "Paid Receipt sent by Email" : "Invoice sent by Email",
+          details: `${selectedInvoice.invoiceNumber} sent to ${selectedInvoice.email}`,
+          module: "Invoice",
+        }).catch(() => {});
+      }
+
       setShowSendModal(false);
       if (isPaidReceipt) {
         setPaidReceiptConfirmation({ customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, sentAt });
@@ -1300,6 +1332,17 @@ export default function InvoicesPage() {
         activity: [`Invoice sent by SMS to ${selectedInvoice.phone} | By: ${sentBy} | ${sentAt}`, ...selectedInvoice.activity],
       };
       updateInvoice(updatedInvoice, `Invoice sent by SMS to ${selectedInvoice.phone}`);
+
+      if (selectedInvoice.jobReference) {
+        void logCrewActivity({
+          jobId: selectedInvoice.jobReference,
+          jobName: selectedInvoice.clientName,
+          actor: sentBy,
+          action: "Invoice sent by SMS",
+          details: `${selectedInvoice.invoiceNumber} sent to ${selectedInvoice.phone}`,
+          module: "Invoice",
+        }).catch(() => {});
+      }
 
       setShowSmsModal(false);
       setShowSendModal(false);
@@ -1659,6 +1702,17 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       });
     }
 
+    if (selectedInvoice.jobReference) {
+      void logCrewActivity({
+        jobId: selectedInvoice.jobReference,
+        jobName: selectedInvoice.clientName,
+        actor: currentUserEmail || "Office",
+        action: markPaidMethod === "Check" ? "Check payment submitted" : `Marked as Paid (${currency(balance)})`,
+        details: `${selectedInvoice.invoiceNumber} — ${markPaidMethod}`,
+        module: "Invoice",
+      }).catch(() => {});
+    }
+
     setShowMarkPaidModal(false);
     addCrmNotification({
       title: markPaidMethod === "Check" ? "Check payment submitted" : "Payment recorded",
@@ -2005,8 +2059,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
               <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
-              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); }} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
-              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); }} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice marked as Paid Mail Check", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice voided", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
               <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
             </div>
             <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>

@@ -19,13 +19,15 @@ import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { getCachedCrewData, getCachedProposals, getCachedInvoices, refreshCrewData, refreshProposals, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
-import { loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
+import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
 
 type InvoiceSnap = {
   id: string;
   jobReference?: string;
+  clientName?: string;
+  propertyAddress?: string;
   status: string;
   dueDate: string;
   viewedAt?: string;
@@ -766,13 +768,7 @@ export default function LeadsPage() {
       }
       setProposalStatusMap(map);
     }).catch(() => {});
-    void refreshInvoices<InvoiceSnap>().then((invoices) => {
-      const map: Record<string, string> = {};
-      for (const inv of invoices) {
-        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
-      }
-      setInvoiceStatusMap(map);
-    }).catch(() => {});
+    void refreshInvoices<InvoiceSnap>().catch(() => {});
   });
 
   useEffect(() => {
@@ -796,7 +792,21 @@ export default function LeadsPage() {
     function buildInvoiceMap(invoices: InvoiceSnap[]) {
       const map: Record<string, string> = {};
       for (const inv of invoices) {
-        if (!inv.isDeleted && inv.jobReference) map[inv.jobReference] = getInvoiceDisplayStatus(inv);
+        if (inv.isDeleted) continue;
+        const status = getInvoiceDisplayStatus(inv);
+        if (inv.jobReference) {
+          map[inv.jobReference] = status;
+        } else if (inv.clientName) {
+          const matched = jobs.find((j) => {
+            const nameMatch = j.name.toLowerCase().trim() === inv.clientName!.toLowerCase().trim();
+            if (!nameMatch) return false;
+            if (inv.propertyAddress && j.address) {
+              return inv.propertyAddress.toLowerCase().includes(j.address.toLowerCase());
+            }
+            return true;
+          });
+          if (matched) map[matched.id] = status;
+        }
       }
       if (mounted) setInvoiceStatusMap(map);
     }
@@ -807,7 +817,7 @@ export default function LeadsPage() {
     }
     window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
     return () => { mounted = false; window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache); };
-  }, []);
+  }, [jobs]);
 
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
@@ -815,10 +825,21 @@ export default function LeadsPage() {
   }
 
   function updateJobStage(jobId: string, stage: LeadStage) {
-    updateJob(jobId, { stage, lastActivity: `Moved to ${leadStages.find((item) => item.id === stage)?.label || "workflow"}` });
-    if (stage === "completed") {
-      const job = jobs.find((item) => item.id === jobId);
-      if (job) ensureInvoiceTaskForJob({ id: job.id, name: job.name, address: job.address, city: job.city, value: job.value, jobLink: "/crm/leads" });
+    const stageLabel = leadStages.find((item) => item.id === stage)?.label || "workflow";
+    updateJob(jobId, { stage, lastActivity: `Moved to ${stageLabel}` });
+    const job = jobs.find((item) => item.id === jobId);
+    if (job) {
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: job.name,
+        actor: currentUserName || "Office",
+        action: `Job moved to ${stageLabel}`,
+        details: `Stage updated to ${stageLabel}`,
+        module: "Jobs",
+      }).catch(() => {});
+    }
+    if (stage === "completed" && job) {
+      ensureInvoiceTaskForJob({ id: job.id, name: job.name, address: job.address, city: job.city, value: job.value, jobLink: "/crm/leads" });
     }
   }
 
@@ -860,6 +881,14 @@ export default function LeadsPage() {
 
     setJobs((currentJobs) => [newJob, ...currentJobs]);
     void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
+    void logCrewActivity({
+      jobId: newJob.id,
+      jobName: newJob.name,
+      actor: currentUserName || "Office",
+      action: "Job created",
+      details: `${newJob.address}, ${newJob.city} — ${newJob.roofType}`,
+      module: "Jobs",
+    }).catch(() => {});
 
     // Auto-create folder in Files Dashboard for this job
     const folderName = `${form.name} - ${form.address || "Address pending"}`.trim();
@@ -1357,21 +1386,30 @@ export default function LeadsPage() {
                     <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
                       {jobActivities.length === 0 && jobFiles.length === 0 && <p className="text-sm font-semibold text-gray-400">No activity recorded yet.</p>}
 
-                      {/* Crew / admin activities */}
-                      {jobActivities.map((act) => (
-                        <div key={act.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
-                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-black text-blue-700">{act.actor.charAt(0).toUpperCase()}</div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-gray-900">{act.actor}</span>
-                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{act.module}</span>
+                      {/* All activities sorted newest first */}
+                      {jobActivities.map((act) => {
+                        const moduleColors: Record<string, { bg: string; text: string; badge: string; badgeText: string }> = {
+                          Invoice: { bg: "bg-emerald-100", text: "text-emerald-700", badge: "bg-emerald-50", badgeText: "text-emerald-600" },
+                          Proposal: { bg: "bg-purple-100", text: "text-purple-700", badge: "bg-purple-50", badgeText: "text-purple-600" },
+                          SMS: { bg: "bg-green-100", text: "text-green-700", badge: "bg-green-50", badgeText: "text-green-600" },
+                          Jobs: { bg: "bg-blue-100", text: "text-blue-700", badge: "bg-blue-50", badgeText: "text-blue-600" },
+                        };
+                        const colors = moduleColors[act.module] ?? { bg: "bg-blue-100", text: "text-blue-700", badge: "bg-blue-50", badgeText: "text-blue-600" };
+                        return (
+                          <div key={act.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                            <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${colors.bg} text-xs font-black ${colors.text}`}>{act.actor.charAt(0).toUpperCase()}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-gray-900">{act.actor}</span>
+                                <span className={`rounded-full ${colors.badge} px-2 py-0.5 text-[10px] font-bold ${colors.badgeText}`}>{act.module}</span>
+                              </div>
+                              <p className="mt-0.5 text-sm font-semibold text-gray-700">{act.action}</p>
+                              {act.details && <p className="mt-0.5 text-xs text-gray-500">{act.details}</p>}
+                              <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
                             </div>
-                            <p className="mt-0.5 text-sm font-semibold text-gray-700">{act.action}</p>
-                            {act.details && <p className="mt-0.5 text-xs text-gray-500">{act.details}</p>}
-                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       {/* File / photo activities */}
                       {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
