@@ -57,7 +57,7 @@ export async function logCrewActivity(input: {
   actor: string;
   action: string;
   details: string;
-  module: "Crew Portal" | "Crew Workflow" | "Jobs" | "Invoice" | "Proposal" | "SMS";
+  module: "Crew Portal" | "Crew Workflow" | "Jobs" | "Invoice" | "Proposal" | "SMS" | "Notes";
 }): Promise<void> {
   const activity: CrewActivity = {
     id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

@@ -9,9 +9,10 @@ interface QuickSmsModalProps {
   phone: string;
   name?: string;
   onClose: () => void;
+  onSent?: (body: string) => void;
 }
 
-export default function QuickSmsModal({ phone, name, onClose }: QuickSmsModalProps) {
+export default function QuickSmsModal({ phone, name, onClose, onSent }: QuickSmsModalProps) {
   const [lines] = useState<TwilioLine[]>(() => getTwilioLines());
   const [fromNumber, setFromNumber] = useState(() => lines[0]?.number || "");
   const [body, setBody] = useState("");
@@ -39,6 +40,7 @@ export default function QuickSmsModal({ phone, name, onClose }: QuickSmsModalPro
     try {
       await sendSms({ to: phone, body: trimmed, from: fromNumber });
       setSent(true);
+      onSent?.(trimmed);
       setTimeout(() => onClose(), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send message");

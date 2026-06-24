@@ -609,6 +609,14 @@ export default function LeadsPage() {
       await addJobNote(selectedJob.id, currentUserName, body);
       const data = await loadCrewDataset();
       setJobNotes(data.notes);
+      void logCrewActivity({
+        jobId: selectedJob.id,
+        jobName: selectedJob.name,
+        actor: currentUserName || "Office",
+        action: "Note added",
+        details: body.length > 120 ? body.slice(0, 120) + "…" : body,
+        module: "Notes",
+      }).catch(() => {});
     } catch {
       setNoteDraft(body);
     }
@@ -1392,6 +1400,7 @@ export default function LeadsPage() {
                           Invoice: { bg: "bg-emerald-100", text: "text-emerald-700", badge: "bg-emerald-50", badgeText: "text-emerald-600" },
                           Proposal: { bg: "bg-purple-100", text: "text-purple-700", badge: "bg-purple-50", badgeText: "text-purple-600" },
                           SMS: { bg: "bg-green-100", text: "text-green-700", badge: "bg-green-50", badgeText: "text-green-600" },
+                          Notes: { bg: "bg-amber-100", text: "text-amber-700", badge: "bg-amber-50", badgeText: "text-amber-600" },
                           Jobs: { bg: "bg-blue-100", text: "text-blue-700", badge: "bg-blue-50", badgeText: "text-blue-600" },
                         };
                         const colors = moduleColors[act.module] ?? { bg: "bg-blue-100", text: "text-blue-700", badge: "bg-blue-50", badgeText: "text-blue-600" };
@@ -1495,7 +1504,19 @@ export default function LeadsPage() {
           />
         );
       })()}
-      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
+      {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} onSent={(msgBody) => {
+        const job = jobs.find((j) => j.phone === smsTarget.phone) || (selectedJob?.phone === smsTarget.phone ? selectedJob : null);
+        if (job) {
+          void logCrewActivity({
+            jobId: job.id,
+            jobName: job.name,
+            actor: currentUserName || "Office",
+            action: "SMS sent",
+            details: msgBody.length > 120 ? msgBody.slice(0, 120) + "…" : msgBody,
+            module: "SMS",
+          }).catch(() => {});
+        }
+      }} />}
     </div>
   );
 }
