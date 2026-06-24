@@ -1,6 +1,6 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
-import { resolveFromNumber } from "@/lib/twilio/numbers";
+import { findTwilioLine, resolveFromNumber } from "@/lib/twilio/numbers";
 import { getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
@@ -272,12 +272,23 @@ export function normalizeTwilioWebhookEvent(type: TwilioConversationEvent["type"
   const callSid = String(payload.CallSid || "");
   const status = String(payload.MessageStatus || payload.SmsStatus || payload.CallStatus || payload.RecordingStatus || payload.TranscriptionStatus || "");
   const recordingSid = String(payload.RecordingSid || "");
+  const fromPhone = String(payload.From || "");
+
+  // Twilio status callbacks (sent→delivered) do not include a Direction field.
+  // Detect outbound by checking if From matches a configured Twilio number.
+  let direction: "outbound" | "inbound" = "inbound";
+  const directionRaw = String(payload.Direction || "");
+  if (directionRaw.includes("outbound")) {
+    direction = "outbound";
+  } else if (!directionRaw && type === "message_status" && fromPhone) {
+    direction = findTwilioLine(fromPhone) ? "outbound" : "inbound";
+  }
 
   return {
     id: messageSid || recordingSid || (callSid ? `${callSid}-${status || type}` : crypto.randomUUID()),
     type,
-    direction: String(payload.Direction || "").includes("outbound") ? "outbound" : "inbound",
-    from: String(payload.From || ""),
+    direction,
+    from: fromPhone,
     to: String(payload.To || ""),
     body: String(payload.Body || payload.TranscriptionText || ""),
     status,
