@@ -17,6 +17,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
+import { sendSms } from "@/lib/twilio/client";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
@@ -113,7 +114,11 @@ type Invoice = {
   pendingPayments?: PendingPayment[];
   isDeleted?: boolean;
   deletedAt?: string;
+  leadSource?: string;
+  smsSentAt?: string;
 };
+
+const INVOICE_LEAD_SOURCES = ["AZR", "Google Ads", "LSA", "Website", "Referral", "Facebook", "Yelp", "Other"] as const;
 
 const customersStorageKey = "xrp-crm-customers";
 
@@ -341,6 +346,7 @@ function createInvoiceFromJob(job: Lead, count: number): Invoice {
     dueDate: job.dueDate || today,
     projectCompletionDate: job.dueDate || today,
     lineItems: [{ description: `${job.roofType} roofing services`, quantity: 1, unitPrice: job.value, tax: 0 }],
+    leadSource: job.source || "",
   };
 }
 
@@ -365,6 +371,7 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
     warrantyNotes: "Warranty details follow the approved proposal scope and XRP Roofing workmanship terms.",
     lineItems: [{ description: selectedPackage.scope, quantity: 1, unitPrice: selectedPackage.price, tax: 0 }],
     activity: [`Invoice created from won proposal ${proposal.id}`, `${selectedPackage.selectedOption.toUpperCase()} package selected by customer`],
+    leadSource: job?.source || "",
   };
 }
 function statusBadgeClass(status: InvoiceStatus) {
@@ -1223,7 +1230,7 @@ export default function InvoicesPage() {
         // Save receipt to customer files
         savePaidReceiptToCustomerFiles(selectedInvoice, sentBy);
       } else {
-        updateInvoice(sentInvoice, `Invoice Sent to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
+        updateInvoice(sentInvoice, `Invoice sent by Email to ${selectedInvoice.email || selectedInvoice.clientName} by ${sentBy}`);
       }
 
       // Log send activity
@@ -1243,10 +1250,51 @@ export default function InvoicesPage() {
       if (isPaidReceipt) {
         setPaidReceiptConfirmation({ customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, sentAt });
       } else {
-        setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent to ${selectedInvoice.email}.` });
+        setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent by Email to ${selectedInvoice.email}.` });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invoice email could not be sent.";
+      setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message });
+    } finally {
+      setSendingInvoice(false);
+    }
+  }
+
+  async function handleSendInvoiceSms() {
+    if (!selectedInvoice || !selectedInvoice.phone) return;
+    const invoiceLink = `${window.location.origin}/invoice/${encodeURIComponent(selectedInvoice.id)}`;
+    const totals = calculateTotals(selectedInvoice);
+    const balance = Math.max(totals.finalTotal - getPaidAmount(selectedInvoice), 0);
+
+    setSendingInvoice(true);
+    const sentAt = new Date().toISOString();
+    const sentBy = currentUserEmail || "CRM user";
+
+    try {
+      await fetch("/api/invoices/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selectedInvoice),
+      });
+
+      const smsBody = `Hi ${selectedInvoice.clientName}, here is your invoice ${selectedInvoice.invoiceNumber} from XRP Roofing for ${currency(balance)}. View and pay online: ${invoiceLink}`;
+
+      await sendSms({ to: selectedInvoice.phone, body: smsBody });
+
+      const updatedInvoice: Invoice = {
+        ...selectedInvoice,
+        status: selectedInvoice.status === "Draft" ? "Sent" : selectedInvoice.status,
+        sentAt: selectedInvoice.sentAt || sentAt,
+        sentBy: selectedInvoice.sentBy || sentBy,
+        smsSentAt: sentAt,
+        activity: [`Invoice sent by SMS to ${selectedInvoice.phone} | By: ${sentBy} | ${sentAt}`, ...selectedInvoice.activity],
+      };
+      updateInvoice(updatedInvoice, `Invoice sent by SMS to ${selectedInvoice.phone}`);
+
+      setShowSendModal(false);
+      setInvoiceSendConfirmation({ type: "success", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message: `Invoice sent by SMS to ${selectedInvoice.phone}.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invoice SMS could not be sent.";
       setInvoiceSendConfirmation({ type: "error", customerName: selectedInvoice.clientName, invoiceNumber: selectedInvoice.invoiceNumber, message });
     } finally {
       setSendingInvoice(false);
@@ -1745,6 +1793,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Due date<input disabled={!editable} type="date" value={invoice.dueDate} onChange={(event) => onChange({ ...invoice, dueDate: event.target.value })} className={inputClass} /></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Roof type<input disabled={!editable} value={invoice.roofType} onChange={(event) => onChange({ ...invoice, roofType: event.target.value })} className={inputClass} placeholder="Roof type" /></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Proposal reference<input disabled={!editable} value={invoice.proposalReference} onChange={(event) => onChange({ ...invoice, proposalReference: event.target.value })} className={inputClass} placeholder="Proposal reference" /></label>
+        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Lead source<select disabled={!editable} value={invoice.leadSource || ""} onChange={(event) => onChange({ ...invoice, leadSource: event.target.value })} className={inputClass}><option value="">—</option>{INVOICE_LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></label>
@@ -1878,6 +1927,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm sm:text-base font-bold text-gray-950">{invoice.clientName}</p>
                             <p className="mt-1 truncate text-xs sm:text-sm text-gray-500">{invoice.invoiceNumber} · {invoice.jobName || invoice.roofType}</p>
+                            {invoice.leadSource && <span className="mt-1 inline-block rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 ring-1 ring-purple-200">{invoice.leadSource}</span>}
                           </div>
                           <span className={`shrink-0 rounded-full px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-semibold ring-1 ${statusBadgeClass(status)}`}>{status}</span>
                         </div>
@@ -1928,6 +1978,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-bold text-blue-700">{selectedInvoice.clientName}</h2>
                 <p className="mt-1 font-semibold text-sm sm:text-base text-gray-600">{selectedInvoice.jobName}</p>
                 <p className="text-xs sm:text-sm text-gray-500"><AddressLink value={selectedInvoice.propertyAddress} /></p>
+                {selectedInvoice.leadSource && <span className="mt-2 inline-block rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-200">{selectedInvoice.leadSource}</span>}
               </div>
               <div className="text-left lg:text-right">
                 <span className={`inline-block rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold ring-1 ${statusBadgeClass(getComputedStatus(selectedInvoice))}`}>{getComputedStatus(selectedInvoice)}</span>
@@ -1938,7 +1989,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             </div>
             <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 sm:gap-3">
               <button onClick={() => setEditing((current) => !current)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
-              <button onClick={() => setShowSendModal(true)} className="rounded-lg sm:rounded-lg bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition">Send</button>
+              <button onClick={() => setShowSendModal(true)} className="rounded-lg sm:rounded-lg bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Send by Email</button>
+              <button onClick={handleSendInvoiceSms} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-lg sm:rounded-lg bg-green-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5 disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />Send by Text</button>
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
               <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
@@ -1954,6 +2006,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <div className="flex flex-wrap gap-2">
                   {([
                     { label: "Email Delivered", at: selectedInvoice.emailDeliveredAt, fallbackDone: Boolean(selectedInvoice.sentAt) },
+                    { label: "SMS Sent", at: selectedInvoice.smsSentAt, fallbackDone: false },
                     { label: "Email Opened", at: selectedInvoice.emailOpenedAt, fallbackDone: false },
                     { label: "Invoice Viewed", at: selectedInvoice.viewedAt, fallbackDone: false },
                   ] as const).map((indicator) => {
@@ -1973,6 +2026,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Phone</p><p className="mt-1 flex items-center gap-2 text-sm font-bold text-blue-700"><PhoneLink value={selectedInvoice.phone} fallback="—" />{selectedInvoice.phone && <button onClick={() => setSmsTarget({ phone: selectedInvoice.phone, name: selectedInvoice.clientName })} className="inline-flex h-6 items-center gap-1 rounded bg-green-500 px-2 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" />SMS</button>}</p></div>
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Date Sent</p><p className="mt-1 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
                 <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Sent By User</p><p className="mt-1 text-sm font-bold text-blue-700 break-all">{selectedInvoice.sentBy || "—"}</p></div>
+                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">SMS Sent</p><p className="mt-1 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.smsSentAt) || "Not sent"}</p></div>
               </div>
             </section>
 
@@ -2482,11 +2536,14 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             )}
 
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
+              <button onClick={() => setShowSendModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-3 sm:order-1">Cancel</button>
               {isPaidReceiptSelected && invoiceIsPaid && (
-                <button onClick={() => handleDownloadPaidReceiptPdf(selectedInvoice)} className="w-full sm:w-auto rounded-lg border border-green-300 bg-green-50 px-5 py-3 font-bold text-green-700 active:scale-95 transition order-2 sm:order-1">Download PDF</button>
+                <button onClick={() => handleDownloadPaidReceiptPdf(selectedInvoice)} className="w-full sm:w-auto rounded-lg border border-green-300 bg-green-50 px-5 py-3 font-bold text-green-700 active:scale-95 transition order-3 sm:order-1">Download PDF</button>
               )}
-              <button onClick={handleSendInvoice} disabled={sendingInvoice || (isPaidReceiptSelected && !invoiceIsPaid)} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50">{sendingInvoice ? "Sending\u2026" : isPaidReceiptSelected ? "Send Paid Receipt" : "Send Invoice"}</button>
+              {!isPaidReceiptSelected && selectedInvoice.phone && (
+                <button onClick={handleSendInvoiceSms} disabled={sendingInvoice} className="w-full sm:w-auto rounded-lg bg-green-600 px-5 py-3 font-bold text-white active:scale-95 transition order-2 disabled:opacity-50 flex items-center justify-center gap-2"><MessageSquare className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : "Send by Text"}</button>
+              )}
+              <button onClick={handleSendInvoice} disabled={sendingInvoice || (isPaidReceiptSelected && !invoiceIsPaid)} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-3 disabled:opacity-50 flex items-center justify-center gap-2"><Mail className="h-4 w-4" />{sendingInvoice ? "Sending\u2026" : isPaidReceiptSelected ? "Send Paid Receipt" : "Send by Email"}</button>
             </div>
           </div>
         </div>
