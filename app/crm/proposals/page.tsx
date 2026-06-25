@@ -28,7 +28,7 @@ type Proposal = {
   address: string;
   scope: string;
   total: number;
-  status: "Draft" | "Sent" | "Viewed" | "Signed" | "Won" | "Approved" | "Signed Offline";
+  status: "Draft" | "Sent" | "Viewed" | "Signed" | "Won" | "Approved" | "Signed Offline" | "Declined";
   template: string;
   title: string;
   summary: string;
@@ -76,6 +76,9 @@ type Proposal = {
   followUpSentAt?: string;
   followUpSmsSentAt?: string;
   followUpSentVia?: string;
+  followUpStepCompleted?: number;
+  followUpStepSentAt?: string[];
+  declinedAt?: string;
 };
 
 type InspectionPhoto = {
@@ -502,15 +505,14 @@ export default function ProposalsPage() {
 
   // Follow-up automation settings
   const [followUpEnabled, setFollowUpEnabled] = useState(true);
-  const [followUpDelayHours, setFollowUpDelayHours] = useState(24);
-  const [followUpSubject, setFollowUpSubject] = useState("Following up — Your Roofing Proposal");
-  const [followUpTemplate, setFollowUpTemplate] = useState(
-    "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team"
-  );
   const [followUpSmsEnabled, setFollowUpSmsEnabled] = useState(false);
-  const [followUpSmsTemplate, setFollowUpSmsTemplate] = useState(
-    "Hi {customerName}, just following up on your roofing proposal. Let us know if you have any questions — we're happy to help! View your proposal here: {proposalLink} — XRP Roofing"
-  );
+  type FollowUpStepState = { delayHours: number; emailSubject: string; emailTemplate: string; smsTemplate: string };
+  const defaultSteps: FollowUpStepState[] = [
+    { delayHours: 24, emailSubject: "Following up — Your Roofing Proposal", emailTemplate: "Hi {customerName},\n\nWe just wanted to follow up regarding the roofing proposal we sent you. Please let us know if you have any questions. We are happy to help.\n\nThank you,\nXRP Roofing Team", smsTemplate: "Hi {customerName}, just following up on your roofing proposal. Let us know if you have any questions — we're happy to help! View your proposal here: {proposalLink} — XRP Roofing" },
+    { delayHours: 72, emailSubject: "Quick reminder — Your Roofing Proposal", emailTemplate: "Hi {customerName},\n\nJust a friendly reminder about the roofing proposal we sent. We'd love to help get your project started. If you have any questions or need changes, feel free to reach out anytime.\n\nBest regards,\nXRP Roofing Team", smsTemplate: "Hi {customerName}, just a reminder about your roofing proposal. We'd love to help — let us know if you have any questions! {proposalLink} — XRP Roofing" },
+    { delayHours: 168, emailSubject: "Final follow-up — Your Roofing Proposal", emailTemplate: "Hi {customerName},\n\nThis is our final follow-up regarding the roofing proposal we sent you. We understand timing is important, so we'll leave the ball in your court. Your proposal link remains active whenever you're ready to move forward.\n\nThank you for considering XRP Roofing.\n\nBest regards,\nXRP Roofing Team", smsTemplate: "Hi {customerName}, this is our final follow-up on your roofing proposal. Your proposal remains available whenever you're ready: {proposalLink} — XRP Roofing" },
+  ];
+  const [followUpSteps, setFollowUpSteps] = useState<FollowUpStepState[]>(defaultSteps);
   const [followUpSaving, setFollowUpSaving] = useState(false);
   const [followUpNotice, setFollowUpNotice] = useState("");
   const followUpLoaded = useRef(false);
@@ -520,17 +522,27 @@ export default function ProposalsPage() {
     followUpLoaded.current = true;
     fetch("/api/proposals/follow-up-config")
       .then((res) => res.json())
-      .then((data: { config?: { enabled?: boolean; delayHours?: number; emailSubject?: string; emailTemplate?: string; smsEnabled?: boolean; smsTemplate?: string } }) => {
+      .then((data: { config?: { enabled?: boolean; smsEnabled?: boolean; steps?: FollowUpStepState[] } }) => {
         if (!data.config) return;
         if (data.config.enabled !== undefined) setFollowUpEnabled(data.config.enabled);
-        if (data.config.delayHours !== undefined) setFollowUpDelayHours(data.config.delayHours);
-        if (data.config.emailSubject) setFollowUpSubject(data.config.emailSubject);
-        if (data.config.emailTemplate) setFollowUpTemplate(data.config.emailTemplate);
         if (data.config.smsEnabled !== undefined) setFollowUpSmsEnabled(data.config.smsEnabled);
-        if (data.config.smsTemplate) setFollowUpSmsTemplate(data.config.smsTemplate);
+        if (data.config.steps && data.config.steps.length > 0) setFollowUpSteps(data.config.steps);
       })
       .catch(() => {});
   }, []);
+
+  function updateStep(index: number, field: keyof FollowUpStepState, value: string | number) {
+    setFollowUpSteps((prev) => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  }
+
+  function addStep() {
+    setFollowUpSteps((prev) => [...prev, { delayHours: (prev[prev.length - 1]?.delayHours || 168) + 72, emailSubject: "Follow-up — Your Roofing Proposal", emailTemplate: "Hi {customerName},\n\nWe wanted to check in about your roofing proposal. We're here to help whenever you're ready.\n\nThank you,\nXRP Roofing Team", smsTemplate: "Hi {customerName}, checking in on your roofing proposal. We're here to help! {proposalLink} — XRP Roofing" }]);
+  }
+
+  function removeStep(index: number) {
+    if (followUpSteps.length <= 1) return;
+    setFollowUpSteps((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSaveFollowUpConfig() {
     setFollowUpSaving(true);
@@ -541,11 +553,12 @@ export default function ProposalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: followUpEnabled,
-          delayHours: followUpDelayHours,
-          emailSubject: followUpSubject,
-          emailTemplate: followUpTemplate,
+          delayHours: followUpSteps[0]?.delayHours || 24,
+          emailSubject: followUpSteps[0]?.emailSubject || "",
+          emailTemplate: followUpSteps[0]?.emailTemplate || "",
           smsEnabled: followUpSmsEnabled,
-          smsTemplate: followUpSmsTemplate,
+          smsTemplate: followUpSteps[0]?.smsTemplate || "",
+          steps: followUpSteps,
         }),
       });
       if (res.ok) {
@@ -2403,105 +2416,73 @@ export default function ProposalsPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Automation</p>
                 <h2 className="mt-2 text-2xl font-bold text-blue-700">Automated Proposal Follow-Up</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a follow-up email (and optionally SMS) to customers who viewed a proposal but have not signed it. Follow-ups stop automatically when the customer signs.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a multi-step follow-up sequence to customers who viewed a proposal but have not signed it. The sequence stops when the customer signs or clicks &quot;Not Interested&quot; in the email.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFollowUpEnabled((v) => !v)}
-                className={`w-fit rounded-full px-5 py-3 text-sm font-bold transition ${
-                  followUpEnabled
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {followUpEnabled ? "Enabled" : "Disabled"}
-              </button>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700">Follow-up delay (hours after viewed)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={168}
-                  value={followUpDelayHours}
-                  onChange={(e) => setFollowUpDelayHours(Math.max(1, Number(e.target.value)))}
-                  className="mt-1 w-32 rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                />
-                <p className="mt-1 text-xs text-gray-400">Default: 24 hours. The system checks every hour and sends the email once the delay has passed.</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700">Email subject</label>
-                <input
-                  type="text"
-                  value={followUpSubject}
-                  onChange={(e) => setFollowUpSubject(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  placeholder="Following up — Your Roofing Proposal"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700">Email message template</label>
-                <textarea
-                  value={followUpTemplate}
-                  onChange={(e) => setFollowUpTemplate(e.target.value)}
-                  rows={6}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                  placeholder="Hi {customerName}, ..."
-                />
-                <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} to insert the customer&apos;s name. A &quot;View Proposal&quot; button with the proposal link is added automatically.</p>
-              </div>
-
-              <div className="mt-6 border-t border-gray-200 pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-700">SMS Follow-Up</p>
-                    <p className="mt-1 text-xs text-gray-500">Also send a text message follow-up to customers who have a phone number on file.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFollowUpSmsEnabled((v) => !v)}
-                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
-                      followUpSmsEnabled
-                        ? "bg-green-100 text-green-700 hover:bg-green-200"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    {followUpSmsEnabled ? "SMS On" : "SMS Off"}
-                  </button>
-                </div>
-
-                {followUpSmsEnabled && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-bold text-gray-700">SMS message template</label>
-                    <textarea
-                      value={followUpSmsTemplate}
-                      onChange={(e) => setFollowUpSmsTemplate(e.target.value)}
-                      rows={4}
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
-                      placeholder="Hi {customerName}, just following up..."
-                    />
-                    <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for the name and {'{proposalLink}'} for the proposal URL. SMS is sent to the customer&apos;s phone number.</p>
-                  </div>
-                )}
-              </div>
-
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleSaveFollowUpConfig}
-                  disabled={followUpSaving}
-                  className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  onClick={() => setFollowUpSmsEnabled((v) => !v)}
+                  className={`rounded-full px-4 py-2 text-xs font-bold transition ${followUpSmsEnabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                 >
+                  {followUpSmsEnabled ? "SMS On" : "SMS Off"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFollowUpEnabled((v) => !v)}
+                  className={`rounded-full px-5 py-3 text-sm font-bold transition ${followUpEnabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+                >
+                  {followUpEnabled ? "Enabled" : "Disabled"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-6">
+              {followUpSteps.map((step, idx) => (
+                <div key={idx} className="rounded-lg border border-gray-200 bg-gray-50 p-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-blue-700">Step {idx + 1}{idx === followUpSteps.length - 1 ? " (Final)" : ""}</h3>
+                    {followUpSteps.length > 1 && (
+                      <button type="button" onClick={() => removeStep(idx)} className="text-xs font-medium text-red-500 hover:text-red-700">Remove</button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600">Delay (hours after proposal viewed)</label>
+                      <input type="number" min={1} max={720} value={step.delayHours} onChange={(e) => updateStep(idx, "delayHours", Math.max(1, Number(e.target.value)))} className="mt-1 w-32 rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                      <span className="ml-2 text-xs text-gray-400">({step.delayHours < 24 ? `${step.delayHours}h` : step.delayHours % 24 === 0 ? `${step.delayHours / 24} day${step.delayHours / 24 !== 1 ? "s" : ""}` : `${Math.floor(step.delayHours / 24)}d ${step.delayHours % 24}h`} after viewed)</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600">Email subject</label>
+                      <input type="text" value={step.emailSubject} onChange={(e) => updateStep(idx, "emailSubject", e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600">Email message</label>
+                      <textarea value={step.emailTemplate} onChange={(e) => updateStep(idx, "emailTemplate", e.target.value)} rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                      <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for name. &quot;View Proposal&quot; and &quot;Not Interested&quot; buttons are added automatically.</p>
+                    </div>
+
+                    {followUpSmsEnabled && (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600">SMS message</label>
+                        <textarea value={step.smsTemplate} onChange={(e) => updateStep(idx, "smsTemplate", e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100" />
+                        <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} and {'{proposalLink}'}. Sent to the customer&apos;s phone.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <button type="button" onClick={addStep} className="rounded-lg border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-500 transition hover:border-blue-400 hover:text-blue-600">+ Add Follow-Up Step</button>
+
+              <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
+                <button type="button" onClick={handleSaveFollowUpConfig} disabled={followUpSaving} className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
                   {followUpSaving ? "Saving..." : "Save Follow-Up Settings"}
                 </button>
                 {followUpNotice && (
-                  <span className={`text-sm font-medium ${followUpNotice.includes("success") ? "text-green-600" : "text-red-600"}`}>
-                    {followUpNotice}
-                  </span>
+                  <span className={`text-sm font-medium ${followUpNotice.includes("success") ? "text-green-600" : "text-red-600"}`}>{followUpNotice}</span>
                 )}
               </div>
             </div>
@@ -2633,7 +2614,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}{proposal.followUpSmsSentAt ? <> <span className="mx-1">•</span> SMS follow-up sent {new Date(proposal.followUpSmsSentAt).toLocaleDateString()}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.declinedAt ? new Date(proposal.declinedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}</p>
               </div>
             </div>
             </button>
@@ -2642,7 +2623,7 @@ export default function ProposalsPage() {
                 <p className="font-bold text-gray-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
                 <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
               </div>
-              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
+              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : proposal.status === "Declined" ? "bg-red-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
               <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
               <span className="text-xl font-bold text-gray-500">⋯</span>
             </div>

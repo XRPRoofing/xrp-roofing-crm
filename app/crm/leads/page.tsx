@@ -79,6 +79,7 @@ const PROPOSAL_STATUS_STYLES: Record<string, string> = {
   Signed: "bg-emerald-100 text-emerald-700",
   "Signed Offline": "bg-emerald-100 text-emerald-700",
   Rejected: "bg-red-100 text-red-700",
+  Declined: "bg-red-100 text-red-700",
   Expired: "bg-gray-100 text-gray-500",
 };
 
