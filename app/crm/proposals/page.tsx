@@ -1236,13 +1236,24 @@ export default function ProposalsPage() {
       setActiveProposal(sentProposal);
     }
 
-    // Save the proposal to Supabase immediately so the customer link works
-    // before the email arrives.
-    fetch("/api/proposals/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(proposalForLink),
-    }).catch(() => {});
+    // Save the proposal to Supabase so the status is persisted before the email
+    // is sent. Await the write so a network failure is visible instead of silent.
+    try {
+      await fetch("/api/proposals/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(proposalForLink),
+      });
+    } catch {
+      // Retry once on failure so a transient blip doesn't leave the status stuck
+      try {
+        await fetch("/api/proposals/share", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(proposalForLink),
+        });
+      } catch { /* upsertProposalRecord effect will retry later */ }
+    }
 
     try {
       const response = await fetch("/api/proposals/send", {
@@ -1347,12 +1358,23 @@ export default function ProposalsPage() {
       setActiveProposal(sentProposal);
     }
 
-    // Save the proposal to Supabase so the customer link works immediately
-    fetch("/api/proposals/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(proposalForLink),
-    }).catch(() => {});
+    // Save the proposal to Supabase so the status is persisted before the SMS
+    // is sent. Await the write so a network failure is visible instead of silent.
+    try {
+      await fetch("/api/proposals/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(proposalForLink),
+      });
+    } catch {
+      try {
+        await fetch("/api/proposals/share", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(proposalForLink),
+        });
+      } catch { /* upsertProposalRecord effect will retry later */ }
+    }
 
     // Build the SMS body: user's message + proposal link appended
     const smsBody = `${smsForm.message.trim()}\n\n${proposalLink}`;
