@@ -2416,7 +2416,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Automation</p>
                 <h2 className="mt-2 text-2xl font-bold text-blue-700">Automated Proposal Follow-Up</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a multi-step follow-up sequence to customers who viewed a proposal but have not signed it. The sequence stops when the customer signs or clicks &quot;Not Interested&quot; in the email.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Automatically send a multi-step follow-up sequence to customers who viewed a proposal but have not signed it. The sequence stops when the customer signs or clicks &quot;Decline Proposal&quot; in the email.</p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -2461,7 +2461,7 @@ export default function ProposalsPage() {
                     <div>
                       <label className="block text-xs font-bold text-gray-600">Email message</label>
                       <textarea value={step.emailTemplate} onChange={(e) => updateStep(idx, "emailTemplate", e.target.value)} rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
-                      <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for name. &quot;View Proposal&quot; and &quot;Not Interested&quot; buttons are added automatically.</p>
+                      <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for name. &quot;View Proposal&quot; and &quot;Decline Proposal&quot; buttons are added automatically.</p>
                     </div>
 
                     {followUpSmsEnabled && (

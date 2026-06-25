@@ -129,7 +129,7 @@ async function sendFollowUpEmail(
           <a href="${proposalLink}" style="display:inline-block;border-radius:999px;background:#1768c9;color:#fff;text-decoration:none;padding:12px 25px;font-weight:700;">View Proposal</a>
         </div>
         <div style="text-align:center;margin-top:16px;">
-          <a href="${declineLink}" style="display:inline-block;border-radius:999px;background:#f1f5f9;color:#64748b;text-decoration:none;padding:10px 22px;font-weight:600;font-size:13px;border:1px solid #e2e8f0;">Not Interested</a>
+          <a href="${declineLink}" style="display:inline-block;border-radius:999px;background:#f1f5f9;color:#64748b;text-decoration:none;padding:10px 22px;font-weight:600;font-size:13px;border:1px solid #e2e8f0;">Decline Proposal</a>
         </div>
       </div>
       <div style="background:#f8fafc;padding:16px 28px;border-top:1px solid #e2e8f0;text-align:center;">
