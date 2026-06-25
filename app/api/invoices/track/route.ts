@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { sendInternalInvoiceEmail } from "@/lib/invoice-emails";
+import { pushServerNotification } from "@/lib/server-notifications";
 
 const schema = z.object({ id: z.string().min(1) });
 
@@ -72,6 +73,13 @@ export async function POST(req: NextRequest) {
     invoiceNumber: invoice.invoiceNumber || id,
     amount: calculateTotals(invoice),
     customerEmail: invoice.email,
+  });
+
+  await pushServerNotification({
+    title: "Invoice viewed",
+    message: `${invoice.clientName || "Customer"} viewed ${invoice.invoiceNumber || id}`,
+    actor: invoice.clientName || "Client",
+    module: "Invoices",
   });
 
   if (invoice.jobReference) {

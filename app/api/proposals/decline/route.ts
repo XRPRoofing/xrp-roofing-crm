@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
+import { pushServerNotification } from "@/lib/server-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +56,9 @@ export async function GET(req: NextRequest) {
     .from("proposal_shares")
     .upsert({ id, payload: updatedPayload, updated_at: new Date().toISOString() }, { onConflict: "id" });
 
+  const customerName = (payload.customerName as string) || "Customer";
   const jobId = payload.job && typeof payload.job === "object" ? (payload.job as Record<string, unknown>)?.id as string | undefined : undefined;
   if (jobId) {
-    const customerName = (payload.customerName as string) || "";
     try {
       await supabase.from("crew_activity_log").insert({
         id: `act-pdecline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -71,6 +72,13 @@ export async function GET(req: NextRequest) {
       });
     } catch { /* ignore */ }
   }
+
+  await pushServerNotification({
+    title: "Proposal declined",
+    message: `${customerName} declined proposal ${id}`,
+    actor: customerName,
+    module: "Proposals",
+  });
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
   return new NextResponse(declinePage("Thank you for letting us know. We have noted your decision. If you change your mind in the future, please don't hesitate to reach out to us.", appUrl), { headers: { "Content-Type": "text/html" } });
