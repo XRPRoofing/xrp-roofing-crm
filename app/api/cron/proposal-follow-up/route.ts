@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { sendConversationSms } from "@/lib/twilio/server";
+import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { resolveFromNumber } from "@/lib/twilio/numbers";
 
 export const runtime = "nodejs";
@@ -94,7 +95,21 @@ async function sendFollowUpSms(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const fromNumber = resolveFromNumber();
-    await sendConversationSms({ to: toPhone, body: messageBody, from: fromNumber });
+    const message = await sendConversationSms({ to: toPhone, body: messageBody, from: fromNumber });
+    // Store the outbound message with its body so the Conversations Board
+    // shows the actual text instead of a blank "SMS received from" fallback.
+    await publishConversationEvent({
+      id: message.sid,
+      type: "message_status",
+      direction: "outbound",
+      from: message.from,
+      to: message.to,
+      body: message.body,
+      status: message.status,
+      messageSid: message.sid,
+      payload: { sid: message.sid, status: message.status },
+      createdAt: new Date().toISOString(),
+    });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "SMS send failed" };
