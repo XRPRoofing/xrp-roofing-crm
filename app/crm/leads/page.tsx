@@ -451,6 +451,9 @@ export default function LeadsPage() {
   const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
+  const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const pendingUpdatesRef = useRef<Record<string, Partial<Lead>>>({});
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showCallPaste, setShowCallPaste] = useState(false);
@@ -496,6 +499,7 @@ export default function LeadsPage() {
   const jobCardHashRef = useRef(false);
 
   const closeJobCard = useCallback(() => {
+    flushPendingUpdates();
     setSelectedJobId(null);
     jobCardHashRef.current = false;
     const url = new URL(window.location.href);
@@ -526,6 +530,11 @@ export default function LeadsPage() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeJobCard]);
+
+  // Flush pending debounced saves on unmount
+  useEffect(() => {
+    return () => { flushPendingUpdates(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-select a job when navigated from global search with ?job=<id>
   useEffect(() => {
@@ -606,10 +615,13 @@ export default function LeadsPage() {
     if (!selectedJob || !noteDraft.trim()) return;
     const body = noteDraft.trim();
     setNoteDraft("");
+    setNoteToast(null);
     try {
       await addJobNote(selectedJob.id, currentUserName, body);
       const data = await loadCrewDataset();
       setJobNotes(data.notes);
+      setNoteToast({ type: "success", message: "Note saved" });
+      setTimeout(() => setNoteToast(null), 3000);
       void logCrewActivity({
         jobId: selectedJob.id,
         jobName: selectedJob.name,
@@ -620,6 +632,8 @@ export default function LeadsPage() {
       }).catch(() => {});
     } catch {
       setNoteDraft(body);
+      setNoteToast({ type: "error", message: "Failed to save note" });
+      setTimeout(() => setNoteToast(null), 5000);
     }
   }
 
@@ -828,9 +842,20 @@ export default function LeadsPage() {
     return () => { mounted = false; window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache); };
   }, [jobs]);
 
+  function flushPendingUpdates() {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    const pending = pendingUpdatesRef.current;
+    pendingUpdatesRef.current = {};
+    Object.entries(pending).forEach(([id, patch]) => {
+      void updateJobRecord(id, patch).catch(() => {});
+    });
+  }
+
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
-    void updateJobRecord(jobId, updates).catch(() => {});
+    pendingUpdatesRef.current[jobId] = { ...pendingUpdatesRef.current[jobId], ...updates };
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(flushPendingUpdates, 500);
   }
 
   function updateJobStage(jobId: string, stage: LeadStage) {
@@ -1451,6 +1476,9 @@ export default function LeadsPage() {
                   ))}
                   {jobNotes.filter((n) => n.jobId === selectedJobId).length === 0 && <p className="text-sm font-semibold text-gray-500">No notes yet.</p>}
                 </div>
+                {noteToast && (
+                  <p className={`mt-2 rounded-lg px-3 py-2 text-xs font-bold ${noteToast.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{noteToast.message}</p>
+                )}
                 <div className="mt-3 flex gap-2">
                   <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddJobNote(); } }} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note..." />
                   <button type="button" onClick={() => void handleAddJobNote()} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700">Save</button>
