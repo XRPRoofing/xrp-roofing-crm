@@ -11,11 +11,12 @@ import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } f
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { refreshCrewData } from "@/lib/data-cache";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import { azDateTime, azDate } from "@/lib/arizona-time";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
 import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+  return azDateTime(value);
 }
 
 export default function FolderGalleryPage() {
@@ -353,7 +354,7 @@ export default function FolderGalleryPage() {
                         <div className="flex flex-1 flex-col gap-2">
                           <div className="flex items-center gap-2">
                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-700">{idx + 1}</span>
-                            <p className="text-xs font-bold text-gray-500">{photo.uploadedBy ?? "Crew"} · {photo.uploadedAt ? new Date(photo.uploadedAt).toLocaleDateString() : ""}</p>
+                            <p className="text-xs font-bold text-gray-500">{photo.uploadedBy ?? "Crew"} · {photo.uploadedAt ? azDate(photo.uploadedAt) : ""}</p>
                           </div>
                           <textarea
                             value={reportNotes[photo.id] ?? ""}
@@ -439,7 +440,7 @@ function ShareFolderModal({ folder, onClose }: { folder: CrmFileFolder; onClose:
                 {copied ? <><Check className="h-4 w-4" /> Copied</> : <><Copy className="h-4 w-4" /> Copy</>}
               </button>
             </div>
-            {expiresAt && <p className="text-xs font-bold text-gray-500">Link expires {new Date(expiresAt).toLocaleDateString()}.</p>}
+            {expiresAt && <p className="text-xs font-bold text-gray-500">Link expires {azDate(expiresAt)}.</p>}
             {password && <p className="text-xs font-bold text-gray-500">Protected with a password — share it separately with the customer.</p>}
           </div>
         ) : (

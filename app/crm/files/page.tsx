@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, FolderOpen, FolderPlus, Search, UploadCloud, X } from "lucide-react";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
+import { azDateTime } from "@/lib/arizona-time";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { createManualFolder, loadManualFolders, manualFoldersUpdatedEvent, type ManualFolder } from "@/lib/manual-folders";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -31,7 +32,7 @@ function mergeFolders(crewFolders: CrmFileFolder[], manual: ManualFolder[]): Crm
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+  return azDateTime(value);
 }
 
 export default function FilesPage() {

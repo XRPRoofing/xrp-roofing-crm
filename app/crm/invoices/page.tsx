@@ -14,6 +14,7 @@ import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cac
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { azDateTime, azDate } from "@/lib/arizona-time";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
@@ -392,7 +393,7 @@ function formatDateTime(value?: string) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString();
+  return azDateTime(date);
 }
 
 type TimelineStep = { label: string; at?: string; done: boolean };
@@ -2125,7 +2126,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                           <p className="text-sm font-bold text-gray-900">{pending.method} · {currency(pending.amount)}</p>
                           {pending.checkNumber && <p className="text-xs font-semibold text-gray-600">Check #{pending.checkNumber}{pending.checkAmount ? ` · written for ${currency(pending.checkAmount)}` : ""}</p>}
                           {pending.notes && <p className="text-xs font-semibold text-gray-500">Note: {pending.notes}</p>}
-                          <p className="text-xs text-gray-400">Submitted {new Date(pending.submittedAt).toLocaleString()}</p>
+                          <p className="text-xs text-gray-400">Submitted {azDateTime(pending.submittedAt)}</p>
                         </div>
                         {pending.checkImageBase64 && pending.checkImageMimeType && (
                           <a
@@ -2589,7 +2590,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                   <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Customer</span><span className="font-bold text-gray-900">{selectedInvoice.clientName}</span></div>
                   <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Invoice #</span><span className="font-bold text-gray-900">{selectedInvoice.invoiceNumber}</span></div>
                   <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Amount Paid</span><span className="font-bold text-green-700">{currency(getPaidAmount(selectedInvoice))}</span></div>
-                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Date Paid</span><span className="font-bold text-gray-900">{selectedInvoice.paidAt ? new Date(selectedInvoice.paidAt).toLocaleDateString() : lastPayment?.date || today}</span></div>
+                  <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Date Paid</span><span className="font-bold text-gray-900">{selectedInvoice.paidAt ? azDate(selectedInvoice.paidAt) : lastPayment?.date || today}</span></div>
                   <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Payment Method</span><span className="font-bold text-gray-900">{lastPayment?.method || "Payment"}</span></div>
                   {lastPayment?.reference && <div className="flex justify-between rounded-lg bg-white px-3 py-2"><span className="font-semibold text-gray-600">Reference</span><span className="font-bold text-gray-900">{lastPayment.reference}</span></div>}
                 </div>
@@ -2685,7 +2686,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             <div className="mt-4 space-y-2 text-sm">
               <p className="font-semibold text-gray-700">Customer: <span className="font-bold text-gray-900">{paidReceiptConfirmation.customerName}</span></p>
               <p className="font-semibold text-gray-700">Invoice: <span className="font-bold text-gray-900">{paidReceiptConfirmation.invoiceNumber}</span></p>
-              <p className="font-semibold text-gray-700">Sent: <span className="font-bold text-gray-900">{new Date(paidReceiptConfirmation.sentAt).toLocaleString()}</span></p>
+              <p className="font-semibold text-gray-700">Sent: <span className="font-bold text-gray-900">{azDateTime(paidReceiptConfirmation.sentAt)}</span></p>
             </div>
             <p className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-xs font-semibold text-green-700">A copy has been saved to the customer&apos;s Payment Documents folder.</p>
             <div className="mt-6">

@@ -11,6 +11,7 @@ import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConv
 import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
+import { azDateTime } from "@/lib/arizona-time";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
@@ -304,7 +305,7 @@ function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEven
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div>
             <p className="text-sm font-bold text-gray-950">Call summary</p>
-            <p className="text-xs font-semibold text-gray-500">{new Date(event.createdAt).toLocaleString()}</p>
+            <p className="text-xs font-semibold text-gray-500">{azDateTime(event.createdAt)}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>

@@ -13,6 +13,7 @@ import { addJobNote, addJobPhotos, deleteJobPhoto, deleteJobRecord, ensureSeedJo
 import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import { azDateTime } from "@/lib/arizona-time";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
@@ -1454,7 +1455,7 @@ export default function LeadsPage() {
                               </div>
                               <p className="mt-0.5 text-sm font-semibold text-gray-700">{act.action}</p>
                               {act.details && <p className="mt-0.5 text-xs text-gray-500">{act.details}</p>}
-                              <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
+                              <p className="mt-1 text-[11px] font-semibold text-gray-400">{azDateTime(act.createdAt)}</p>
                             </div>
                           </div>
                         );
@@ -1470,7 +1471,7 @@ export default function LeadsPage() {
                               <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-600">{file.photoType || "File"}</span>
                             </div>
                             <p className="mt-0.5 text-sm font-semibold text-gray-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Uploaded document: ") : `Uploaded photo: ${file.name}`}</p>
-                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{new Date(file.createdAt).toLocaleString()}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{azDateTime(file.createdAt)}</p>
                           </div>
                         </div>
                       ))}
@@ -1485,7 +1486,7 @@ export default function LeadsPage() {
                   {jobNotes.filter((n) => n.jobId === selectedJobId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((note) => (
                     <div key={note.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
                       <p className="font-semibold text-gray-700">{note.body}</p>
-                      <p className="mt-1 text-xs font-bold text-gray-400">{note.author} • {new Date(note.createdAt).toLocaleString()}</p>
+                      <p className="mt-1 text-xs font-bold text-gray-400">{note.author} • {azDateTime(note.createdAt)}</p>
                     </div>
                   ))}
                   {jobNotes.filter((n) => n.jobId === selectedJobId).length === 0 && <p className="text-sm font-semibold text-gray-500">No notes yet.</p>}

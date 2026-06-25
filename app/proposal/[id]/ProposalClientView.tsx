@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { azDate } from "@/lib/arizona-time";
 
 type PublicProposal = {
   id: string;
@@ -199,7 +200,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
             <span className="rounded-full bg-white/10 px-2.5 py-1">ID {proposal.id}</span>
-            <span className="rounded-full bg-white/10 px-2.5 py-1">Issued {new Date().toLocaleDateString()}</span>
+            <span className="rounded-full bg-white/10 px-2.5 py-1">Issued {azDate(new Date())}</span>
             <span className="rounded-full bg-blue-500 px-2.5 py-1 text-white">{proposal.status || "Sent"}</span>
           </div>
         </header>
@@ -347,7 +348,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                 <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Signed by</p>
                 <div className="mt-1 text-xl font-bold italic text-slate-900">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-1 max-h-20 w-full object-contain" /> : proposal.signedBy}</div>
                 <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-slate-500">Date signed</p>
-                <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? new Date(proposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
               </div>
               {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
             </section>

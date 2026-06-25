@@ -12,6 +12,7 @@ import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
+import { azDateTime } from "@/lib/arizona-time";
 import FloatingCallCard, { type CallerInfo } from "@/components/crm/FloatingCallCard";
 import FloatingDialer from "@/components/crm/FloatingDialer";
 import { getTwilioLines } from "@/lib/twilio/numbers";
@@ -868,7 +869,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                             </div>
                             <p className="mt-0.5 text-xs text-gray-500">{notification.message}</p>
                             <div className="mt-2 flex items-center justify-between">
-                              <p className="text-xs text-gray-400">{notification.actor} · {notification.module} · {new Date(notification.createdAt).toLocaleString()}</p>
+                              <p className="text-xs text-gray-400">{notification.actor} · {notification.module} · {azDateTime(notification.createdAt)}</p>
                               <button onClick={() => handleDeleteNotification(notification.id)} className="text-xs font-medium text-red-500 hover:text-red-700">Delete</button>
                             </div>
                           </div>
