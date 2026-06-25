@@ -283,6 +283,7 @@ export default function CalendarPage() {
     null,
   );
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
 
   // Team & color filters
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(
@@ -612,6 +613,8 @@ export default function CalendarPage() {
       }
 
       setStatusMessage("Event created successfully.");
+      setCreateSuccess(true);
+      setTimeout(() => setCreateSuccess(false), 4000);
       setForm({
         title: "",
         customer_name: "",
@@ -759,12 +762,13 @@ export default function CalendarPage() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
         {/* Weekday Headers */}
         <div className="grid shrink-0 grid-cols-7 border-b border-gray-200 bg-gray-50">
-          {WEEKDAYS.map((day) => (
+          {WEEKDAYS_FULL.map((day, i) => (
             <div
               key={day}
               className="border-r border-gray-100 px-0.5 py-2 text-center text-xs font-bold uppercase tracking-wider text-gray-600 last:border-r-0 sm:px-2 sm:py-3 sm:text-sm"
             >
-              {day}
+              <span className="sm:hidden">{WEEKDAYS[i]}</span>
+              <span className="hidden sm:inline">{day}</span>
             </div>
           ))}
         </div>
@@ -830,17 +834,17 @@ export default function CalendarPage() {
             return (
               <div
                 key={i}
-                className={`cursor-pointer border-r border-gray-100 px-1 py-2 text-center last:border-r-0 hover:bg-blue-50 ${isToday ? "bg-blue-50" : ""}`}
+                className={`cursor-pointer border-r border-gray-100 px-1 py-2.5 text-center last:border-r-0 hover:bg-blue-50 sm:py-3 ${isToday ? "bg-blue-50" : ""}`}
                 onClick={() => {
                   setCurrentDate(day);
                   setViewMode("day");
                 }}
               >
-                <div className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                  {WEEKDAYS[i]}
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 sm:text-xs">
+                  {WEEKDAYS_FULL[day.getDay()]}
                 </div>
                 <div
-                  className={`mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${isToday ? "bg-blue-600 text-white" : "text-gray-900"}`}
+                  className={`mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold sm:h-8 sm:w-8 sm:text-base ${isToday ? "bg-blue-600 text-white" : "text-gray-900"}`}
                 >
                   {day.getDate()}
                 </div>
@@ -982,8 +986,20 @@ export default function CalendarPage() {
 
   return (
     <div className="flex min-h-0 max-w-full flex-1 flex-col overflow-x-hidden">
+      {/* Success Toast */}
+      {createSuccess && (
+        <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 animate-bounce">
+          <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-5 py-3 shadow-lg">
+            <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-sm font-bold text-green-700">Event created successfully</p>
+          </div>
+        </div>
+      )}
+
       {/* Status Messages */}
-      {(error || statusMessage) && (
+      {(error || statusMessage) && !createSuccess && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
           {error && (
             <p className="text-sm font-medium text-red-600">{error}</p>
@@ -1272,6 +1288,11 @@ export default function CalendarPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              {error && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-medium text-red-600">{error}</p>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
                   required
@@ -1377,8 +1398,7 @@ export default function CalendarPage() {
                   placeholder="Notes"
                 />
                 <input
-                  type="email"
-                  multiple
+                  type="text"
                   value={form.guestEmails}
                   onChange={(e) =>
                     setForm({ ...form, guestEmails: e.target.value })
