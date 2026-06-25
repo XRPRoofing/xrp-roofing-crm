@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import {
   AlignLeft,
@@ -271,10 +272,22 @@ export default function CalendarPage() {
   } | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
 
+  // URL search params for deep-linking (e.g. ?view=day&date=2026-06-22)
+  const searchParams = useSearchParams();
+
   // View state
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const v = searchParams.get("view");
+    if (v === "day" || v === "week" || v === "month") return v;
+    return "month";
+  });
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => {
+    const dp = searchParams.get("date");
+    if (dp) {
+      const [y, m, d] = dp.split("-").map(Number);
+      if (y && m && d) return new Date(y, m - 1, d);
+    }
     const t = arizonaToday();
     return new Date(t.year, t.month, t.day);
   });
