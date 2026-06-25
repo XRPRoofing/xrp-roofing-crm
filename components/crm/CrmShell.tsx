@@ -74,6 +74,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [globalDialerOpen, setGlobalDialerOpen] = useState(false);
   const [globalCallActive, setGlobalCallActive] = useState(false);
   const [dialerCustomers, setDialerCustomers] = useState<Customer[]>([]);
+  const [pendingDialNumber, setPendingDialNumber] = useState<string | undefined>();
+  const [pendingCallerId, setPendingCallerId] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -582,6 +584,18 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     return getTwilioLines().map((line) => ({ label: line.label, number: line.number }));
   }, []);
 
+  // Listen for "crm:open-dialer" custom events from child pages (e.g. calendar click-to-call)
+  useEffect(() => {
+    function handleOpenDialer(e: Event) {
+      const detail = (e as CustomEvent).detail as { phone?: string; callerId?: string } | undefined;
+      if (detail?.phone) setPendingDialNumber(detail.phone);
+      if (detail?.callerId) setPendingCallerId(detail.callerId);
+      setGlobalDialerOpen(true);
+    }
+    window.addEventListener("crm:open-dialer", handleOpenDialer);
+    return () => window.removeEventListener("crm:open-dialer", handleOpenDialer);
+  }, []);
+
   const [syncActive, setSyncActive] = useState(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -956,11 +970,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {!isCrewUser && (
         <FloatingDialer
           open={globalDialerOpen}
-          onClose={() => setGlobalDialerOpen(false)}
+          onClose={() => { setGlobalDialerOpen(false); setPendingDialNumber(undefined); setPendingCallerId(undefined); }}
           voiceDeviceRef={voiceDeviceRef}
           phoneNumbers={dialerPhoneNumbers}
           customers={dialerCustomers}
           onCallStateChange={setGlobalCallActive}
+          initialDialNumber={pendingDialNumber}
+          initialCallerId={pendingCallerId}
         />
       )}
 

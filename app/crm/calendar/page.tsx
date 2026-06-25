@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import {
   AlignLeft,
   Briefcase,
@@ -12,6 +12,7 @@ import {
   MapPin,
   MessageSquare,
   Phone,
+  PhoneOutgoing,
   Plus,
   RefreshCw,
   Trash2,
@@ -28,6 +29,8 @@ import {
   subscribeToCalendarUpdates,
   type CalendarEvent,
 } from "@/lib/calendar-sync";
+import { getTwilioLines } from "@/lib/twilio/numbers";
+import { logCrewActivity } from "@/lib/crew-activity";
 
 // Arizona Mountain Time
 const ARIZONA_TIMEZONE = "America/Phoenix";
@@ -285,6 +288,10 @@ export default function CalendarPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  // Click-to-call state
+  const [callPickerEvent, setCallPickerEvent] = useState<CalendarEvent | null>(null);
+  const twilioLines = useMemo(() => getTwilioLines(), []);
 
   // Team & color filters
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(
@@ -614,8 +621,17 @@ export default function CalendarPage() {
       }
 
       setStatusMessage("Event created successfully.");
+      broadcastCrmUpdate();
       setCreateSuccess(true);
       setTimeout(() => setCreateSuccess(false), 4000);
+      void logCrewActivity({
+        jobId: result.id || "",
+        jobName: form.title,
+        actor: TEAM_MEMBERS.find((m) => m.id === form.assigned_to)?.name || form.assigned_to,
+        action: "Calendar event created",
+        details: `${form.title} — ${form.customer_name || "No customer"} on ${form.date}`,
+        module: "Calendar",
+      });
       setForm({
         title: "",
         customer_name: "",
@@ -670,6 +686,15 @@ export default function CalendarPage() {
       }
 
       setStatusMessage("Event updated successfully.");
+      broadcastCrmUpdate();
+      void logCrewActivity({
+        jobId: selectedEvent.id,
+        jobName: editForm.title,
+        actor: TEAM_MEMBERS.find((m) => m.id === editForm.assigned_to)?.name || editForm.assigned_to,
+        action: "Calendar event updated",
+        details: `Updated "${editForm.title}" — ${editForm.customer_name || "No customer"}`,
+        module: "Calendar",
+      });
       setSelectedEvent(null);
       setEditMode(false);
       await loadEvents();
@@ -692,6 +717,15 @@ export default function CalendarPage() {
         return;
       }
       setStatusMessage("Event deleted.");
+      broadcastCrmUpdate();
+      void logCrewActivity({
+        jobId: selectedEvent.id,
+        jobName: selectedEvent.title || "Untitled",
+        actor: selectedEvent.assigned_to || "Unknown",
+        action: "Calendar event deleted",
+        details: `Deleted "${selectedEvent.title || "Untitled"}" — ${selectedEvent.customer_name || "No customer"}`,
+        module: "Calendar",
+      });
       setSelectedEvent(null);
       setEditMode(false);
       setDeleteConfirmOpen(false);
@@ -724,38 +758,69 @@ export default function CalendarPage() {
     });
   }, [selectedEvent]);
 
+  /** Open the FloatingDialer via CrmShell with the customer phone pre-filled */
+  function openDialerForEvent(event: CalendarEvent, callerIdNumber?: string) {
+    const phone = event.customer_phone?.replace(/[^\d+]/g, "");
+    if (!phone) return;
+    window.dispatchEvent(
+      new CustomEvent("crm:open-dialer", {
+        detail: { phone, callerId: callerIdNumber },
+      }),
+    );
+    setCallPickerEvent(null);
+  }
+
   /* ── Render helpers ─────────────────────────────────────────────────── */
 
   function renderEventChip(event: CalendarEvent, compact = false) {
     const cc = getColorConfig(event.color);
     const time = formatEventTime(event);
     const isGcal = isGoogleEvent(event);
+    const hasPhone = Boolean(event.customer_phone?.replace(/[^\d+]/g, ""));
     return (
-      <button
-        key={event.id}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedEvent(event);
-        }}
-        className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${cc.color}`}
-        title={`${isGcal ? "[Google] " : ""}${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
-      >
-        {compact ? (
-          <>
-            {isGcal && <span className="mr-0.5 text-[8px]">G</span>}
-            {event.title || "Untitled"}
-          </>
-        ) : (
-          <span className="truncate">
-            {isGcal && <span className="mr-0.5 text-[8px] sm:text-[9px]">G</span>}
-            {event.title || "Untitled"}
-            {time && (
-              <span className="ml-1 hidden opacity-70 sm:inline">{time}</span>
-            )}
-          </span>
+      <div key={event.id} className="group relative flex w-full items-center">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedEvent(event);
+          }}
+          className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${hasPhone ? "pr-5 sm:pr-6" : ""} ${cc.color}`}
+          title={`${isGcal ? "[Google] " : ""}${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
+        >
+          {compact ? (
+            <>
+              {isGcal && <span className="mr-0.5 text-[8px]">G</span>}
+              {event.title || "Untitled"}
+            </>
+          ) : (
+            <span className="truncate">
+              {isGcal && <span className="mr-0.5 text-[8px] sm:text-[9px]">G</span>}
+              {event.title || "Untitled"}
+              {time && (
+                <span className="ml-1 hidden opacity-70 sm:inline">{time}</span>
+              )}
+            </span>
+          )}
+        </button>
+        {hasPhone && (
+          <button
+            type="button"
+            title="Call customer"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (twilioLines.length <= 1) {
+                openDialerForEvent(event, twilioLines[0]?.number);
+              } else {
+                setCallPickerEvent(event);
+              }
+            }}
+            className="absolute right-0.5 top-1/2 z-10 hidden -translate-y-1/2 rounded p-0.5 text-green-700 hover:bg-green-100 group-hover:inline-flex sm:right-1"
+          >
+            <PhoneOutgoing className="h-3 w-3" />
+          </button>
         )}
-      </button>
+      </div>
     );
   }
 
@@ -881,23 +946,38 @@ export default function CalendarPage() {
                           eventEndHour(ev) - eventHour(ev),
                         );
                         const cc = getColorConfig(ev.color);
+                        const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                         return (
-                          <button
-                            key={ev.id}
-                            type="button"
-                            onClick={() => setSelectedEvent(ev)}
-                            className={`absolute inset-x-0.5 z-10 overflow-hidden rounded border px-1 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
-                            style={{
-                              top: 0,
-                              height: `${span * 48}px`,
-                            }}
-                            title={`${ev.title} ${formatEventTimeRange(ev)}`}
-                          >
-                            <div className="truncate">{ev.title}</div>
-                            <div className="truncate opacity-70">
-                              {formatEventTimeRange(ev)}
-                            </div>
-                          </button>
+                          <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * 48}px` }}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEvent(ev)}
+                              className={`h-full w-full overflow-hidden rounded border px-1 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
+                              title={`${ev.title} ${formatEventTimeRange(ev)}`}
+                            >
+                              <div className="truncate">{ev.title}</div>
+                              <div className="truncate opacity-70">
+                                {formatEventTimeRange(ev)}
+                              </div>
+                            </button>
+                            {evHasPhone && (
+                              <button
+                                type="button"
+                                title="Call customer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (twilioLines.length <= 1) {
+                                    openDialerForEvent(ev, twilioLines[0]?.number);
+                                  } else {
+                                    setCallPickerEvent(ev);
+                                  }
+                                }}
+                                className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-white/80 p-0.5 text-green-700 shadow-sm hover:bg-green-100 group-hover/ev:inline-flex"
+                              >
+                                <PhoneOutgoing className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -948,32 +1028,47 @@ export default function CalendarPage() {
                         eventEndHour(ev) - eventHour(ev),
                       );
                       const cc = getColorConfig(ev.color);
+                      const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                       return (
-                        <button
-                          key={ev.id}
-                          type="button"
-                          onClick={() => setSelectedEvent(ev)}
-                          className={`absolute inset-x-1 z-10 overflow-hidden rounded-lg border px-3 py-2 text-left transition hover:opacity-80 ${cc.color}`}
-                          style={{
-                            top: 0,
-                            height: `${span * 56}px`,
-                          }}
-                        >
-                          <div className="text-sm font-bold">{ev.title}</div>
-                          <div className="mt-0.5 text-xs opacity-80">
-                            {formatEventTimeRange(ev)}
-                          </div>
-                          {ev.customer_name && (
-                            <div className="mt-0.5 text-xs opacity-70">
-                              {ev.customer_name}
+                        <div key={ev.id} className="group/ev absolute inset-x-1 z-10" style={{ top: 0, height: `${span * 56}px` }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEvent(ev)}
+                            className={`h-full w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition hover:opacity-80 ${cc.color}`}
+                          >
+                            <div className="text-sm font-bold">{ev.title}</div>
+                            <div className="mt-0.5 text-xs opacity-80">
+                              {formatEventTimeRange(ev)}
                             </div>
+                            {ev.customer_name && (
+                              <div className="mt-0.5 text-xs opacity-70">
+                                {ev.customer_name}
+                              </div>
+                            )}
+                            {ev.location && (
+                              <div className="mt-0.5 text-xs opacity-60">
+                                {ev.location}
+                              </div>
+                            )}
+                          </button>
+                          {evHasPhone && (
+                            <button
+                              type="button"
+                              title="Call customer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (twilioLines.length <= 1) {
+                                  openDialerForEvent(ev, twilioLines[0]?.number);
+                                } else {
+                                  setCallPickerEvent(ev);
+                                }
+                              }}
+                              className="absolute right-1 top-1 z-20 hidden rounded bg-white/80 p-1 text-green-700 shadow-sm hover:bg-green-100 group-hover/ev:inline-flex"
+                            >
+                              <PhoneOutgoing className="h-3.5 w-3.5" />
+                            </button>
                           )}
-                          {ev.location && (
-                            <div className="mt-0.5 text-xs opacity-60">
-                              {ev.location}
-                            </div>
-                          )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1505,13 +1600,20 @@ export default function CalendarPage() {
                     <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
                     {telHref(selectedEvent.customer_phone) && (
                       <>
-                        <a
-                          href={telHref(selectedEvent.customer_phone)}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (twilioLines.length <= 1) {
+                              openDialerForEvent(selectedEvent, twilioLines[0]?.number);
+                            } else {
+                              setCallPickerEvent(selectedEvent);
+                            }
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600"
                         >
-                          <Phone className="h-3 w-3" />
+                          <PhoneOutgoing className="h-3 w-3" />
                           Call
-                        </a>
+                        </button>
                         <button
                           type="button"
                           onClick={() =>
@@ -1613,13 +1715,20 @@ export default function CalendarPage() {
                     <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
                     {telHref(selectedEvent.customer_phone) && (
                       <>
-                        <a
-                          href={telHref(selectedEvent.customer_phone)}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (twilioLines.length <= 1) {
+                              openDialerForEvent(selectedEvent, twilioLines[0]?.number);
+                            } else {
+                              setCallPickerEvent(selectedEvent);
+                            }
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600"
                         >
-                          <Phone className="h-3 w-3" />
+                          <PhoneOutgoing className="h-3 w-3" />
                           Call
-                        </a>
+                        </button>
                         <button
                           type="button"
                           onClick={() =>
@@ -1805,13 +1914,18 @@ export default function CalendarPage() {
                         placeholder="Phone number"
                       />
                       {telHref(editForm.customer_phone) && (
-                        <a
-                          href={telHref(editForm.customer_phone)}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const phone = editForm.customer_phone.replace(/[^\d+]/g, "");
+                            if (!phone) return;
+                            window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone, callerId: twilioLines[0]?.number } }));
+                          }}
                           className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-500 px-4 py-3 font-bold text-white hover:bg-blue-600"
                         >
-                          <Phone className="h-4 w-4" />
+                          <PhoneOutgoing className="h-4 w-4" />
                           Call
-                        </a>
+                        </button>
                       )}
                       {telHref(editForm.customer_phone) && (
                         <button
@@ -2027,6 +2141,49 @@ export default function CalendarPage() {
           name={smsTarget.name}
           onClose={() => setSmsTarget(null)}
         />
+      )}
+
+      {/* Phone Number Picker for Click-to-Call */}
+      {callPickerEvent && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/40 p-4"
+          onClick={() => setCallPickerEvent(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+              <h3 className="text-lg font-bold text-gray-900">Select Outbound Number</h3>
+              <button
+                type="button"
+                onClick={() => setCallPickerEvent(null)}
+                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-gray-500">
+              Calling <span className="font-semibold text-gray-700">{callPickerEvent.customer_name || callPickerEvent.customer_phone}</span>
+            </p>
+            <div className="mt-4 space-y-2">
+              {twilioLines.map((line) => (
+                <button
+                  key={line.key}
+                  type="button"
+                  onClick={() => openDialerForEvent(callPickerEvent, line.number)}
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                >
+                  <PhoneOutgoing className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{line.label}</div>
+                    <div className="text-xs text-gray-500">{line.number}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

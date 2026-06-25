@@ -1142,6 +1142,16 @@ export default function InvoicesPage() {
       actor: currentUserEmail || "Office",
       module: "Invoices",
     });
+    if (deleteTarget.jobReference) {
+      void logCrewActivity({
+        jobId: deleteTarget.jobReference,
+        jobName: deleteTarget.clientName,
+        actor: currentUserEmail || "Office",
+        action: "Invoice deleted",
+        details: `${deleteTarget.invoiceNumber} permanently deleted`,
+        module: "Invoice",
+      });
+    }
   }
 
   function handleStartInvoice() {
