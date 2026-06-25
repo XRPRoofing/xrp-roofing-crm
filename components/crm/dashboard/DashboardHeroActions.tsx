@@ -20,6 +20,7 @@ import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 import { createManualFolder } from "@/lib/manual-folders";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
 import { createClient } from "@/lib/supabase/client";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { Lead } from "@/types/crm";
 import type { OfficeTask } from "@/lib/office-tasks";
 
@@ -406,7 +407,7 @@ export default function DashboardHeroActions() {
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Phone</span><input value={leadForm.phone} onChange={(event) => setLeadForm((f) => ({ ...f, phone: event.target.value }))} className={inputClass} placeholder="(602) 555-0123" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Email</span><input value={leadForm.email} onChange={(event) => setLeadForm((f) => ({ ...f, email: event.target.value }))} className={inputClass} placeholder="name@email.com" /></label>
               </div>
-              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><input value={leadForm.propertyAddress} onChange={(event) => setLeadForm((f) => ({ ...f, propertyAddress: event.target.value }))} className={inputClass} placeholder="Street, city, AZ" /></label>
+              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><AddressAutocomplete value={leadForm.propertyAddress} onChange={(address) => setLeadForm((f) => ({ ...f, propertyAddress: address }))} placeholder="Start typing address..." /></label>
               <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Roof details</span><input value={leadForm.roofDetails} onChange={(event) => setLeadForm((f) => ({ ...f, roofDetails: event.target.value }))} className={inputClass} placeholder="Optional" /></label>
               <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Insurance carrier</span><input value={leadForm.insuranceCarrier} onChange={(event) => setLeadForm((f) => ({ ...f, insuranceCarrier: event.target.value }))} className={inputClass} placeholder="Optional" /></label>
               {leadError && <p className="text-sm font-medium text-red-600">{leadError}</p>}
@@ -435,7 +436,7 @@ export default function DashboardHeroActions() {
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Customer</span><input value={scheduleForm.name} onChange={(event) => setScheduleForm((f) => ({ ...f, name: event.target.value }))} className={inputClass} placeholder="Name" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Phone</span><input value={scheduleForm.phone} onChange={(event) => setScheduleForm((f) => ({ ...f, phone: event.target.value }))} className={inputClass} placeholder="(602) 555-0123" /></label>
               </div>
-              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Address</span><input value={scheduleForm.address} onChange={(event) => setScheduleForm((f) => ({ ...f, address: event.target.value }))} className={inputClass} placeholder="Property address" /></label>
+              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Address</span><AddressAutocomplete value={scheduleForm.address} onChange={(address) => setScheduleForm((f) => ({ ...f, address }))} placeholder="Start typing address..." /></label>
               <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Type</span><select value={scheduleForm.jobKind} onChange={(event) => setScheduleForm((f) => ({ ...f, jobKind: event.target.value }))} className={inputClass}>{appointmentTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
               <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Date</span><input type="date" value={scheduleForm.date} onChange={(event) => setScheduleForm((f) => ({ ...f, date: event.target.value }))} className={inputClass} /></label>
               <div className="grid grid-cols-2 gap-3">
@@ -470,7 +471,7 @@ export default function DashboardHeroActions() {
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Phone</span><input value={jobForm.phone} onChange={(e) => setJobForm((f) => ({ ...f, phone: e.target.value }))} className={inputClass} placeholder="(602) 555-0123" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Email</span><input value={jobForm.email} onChange={(e) => setJobForm((f) => ({ ...f, email: e.target.value }))} className={inputClass} placeholder="name@email.com" /></label>
               </div>
-              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><input value={jobForm.address} onChange={(e) => setJobForm((f) => ({ ...f, address: e.target.value }))} className={inputClass} placeholder="Street, city, AZ" /></label>
+              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><AddressAutocomplete value={jobForm.address} onChange={(address) => setJobForm((f) => ({ ...f, address }))} placeholder="Start typing address..." /></label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Roof type</span><input value={jobForm.roofType} onChange={(e) => setJobForm((f) => ({ ...f, roofType: e.target.value }))} className={inputClass} placeholder="Tile, Shingle, Flat…" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Source</span>
@@ -510,7 +511,7 @@ export default function DashboardHeroActions() {
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Email</span><input value={proposalForm.customerEmail} onChange={(e) => setProposalForm((f) => ({ ...f, customerEmail: e.target.value }))} className={inputClass} placeholder="name@email.com" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Phone</span><input value={proposalForm.customerPhone} onChange={(e) => setProposalForm((f) => ({ ...f, customerPhone: e.target.value }))} className={inputClass} placeholder="(602) 555-0123" /></label>
               </div>
-              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><input value={proposalForm.address} onChange={(e) => setProposalForm((f) => ({ ...f, address: e.target.value }))} className={inputClass} placeholder="Street, city, AZ" /></label>
+              <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Property address</span><AddressAutocomplete value={proposalForm.address} onChange={(address) => setProposalForm((f) => ({ ...f, address }))} placeholder="Start typing address..." /></label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Scope</span><input value={proposalForm.scope} onChange={(e) => setProposalForm((f) => ({ ...f, scope: e.target.value }))} className={inputClass} placeholder="Roofing" /></label>
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Total ($)</span><input type="number" value={proposalForm.total} onChange={(e) => setProposalForm((f) => ({ ...f, total: e.target.value }))} className={inputClass} placeholder="0" /></label>
@@ -539,7 +540,7 @@ export default function DashboardHeroActions() {
               <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Task title *</span><input value={taskForm.title} onChange={(e) => setTaskForm((f) => ({ ...f, title: e.target.value }))} className={inputClass} placeholder="e.g. Follow up with insurance" autoFocus /></label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Customer</span><input value={taskForm.customerName} onChange={(e) => setTaskForm((f) => ({ ...f, customerName: e.target.value }))} className={inputClass} placeholder="Customer name" /></label>
-                <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Job address</span><input value={taskForm.jobAddress} onChange={(e) => setTaskForm((f) => ({ ...f, jobAddress: e.target.value }))} className={inputClass} placeholder="Address" /></label>
+                <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Job address</span><AddressAutocomplete value={taskForm.jobAddress} onChange={(address) => setTaskForm((f) => ({ ...f, jobAddress: address }))} placeholder="Start typing address..." /></label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1"><span className="text-xs font-medium text-gray-500">Assigned to</span><input value={taskForm.assignedUser} onChange={(e) => setTaskForm((f) => ({ ...f, assignedUser: e.target.value }))} className={inputClass} placeholder="Team member" /></label>

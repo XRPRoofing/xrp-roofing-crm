@@ -268,3 +268,8 @@
     page-break-inside: avoid;
   }
 }
+
+/* Google Places autocomplete dropdown above modals */
+.pac-container {
+  z-index: 99999 !important;
+}
