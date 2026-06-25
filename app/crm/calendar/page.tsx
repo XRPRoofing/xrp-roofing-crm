@@ -147,7 +147,7 @@ function telHref(phone: string) {
 }
 
 function getWeekStart(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
   d.setDate(d.getDate() - d.getDay());
   return d;
 }
@@ -286,10 +286,11 @@ export default function CalendarPage() {
     const dp = searchParams.get("date");
     if (dp) {
       const [y, m, d] = dp.split("-").map(Number);
-      if (y && m && d) return new Date(y, m - 1, d);
+      // Use noon to avoid day-boundary shift when browser tz ≠ Arizona
+      if (y && m && d) return new Date(y, m - 1, d, 12, 0, 0);
     }
     const t = arizonaToday();
-    return new Date(t.year, t.month, t.day);
+    return new Date(t.year, t.month, t.day, 12, 0, 0);
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -375,17 +376,17 @@ export default function CalendarPage() {
     const cells: Array<{ date: Date; isCurrentMonth: boolean }> = [];
     for (let i = startWeekday - 1; i >= 0; i--) {
       cells.push({
-        date: new Date(year, month - 1, prevMonthDays - i),
+        date: new Date(year, month - 1, prevMonthDays - i, 12),
         isCurrentMonth: false,
       });
     }
     for (let day = 1; day <= daysInMonth; day += 1) {
-      cells.push({ date: new Date(year, month, day), isCurrentMonth: true });
+      cells.push({ date: new Date(year, month, day, 12), isCurrentMonth: true });
     }
     while (cells.length % 7 !== 0) {
       const nextDay = cells.length - startWeekday - daysInMonth + 1;
       cells.push({
-        date: new Date(year, month + 1, nextDay),
+        date: new Date(year, month + 1, nextDay, 12),
         isCurrentMonth: false,
       });
     }
@@ -408,7 +409,7 @@ export default function CalendarPage() {
       const d = prevMonthDays - i;
       cells.push({
         day: d,
-        date: new Date(year, month - 1, d),
+        date: new Date(year, month - 1, d, 12),
         isCurrentMonth: false,
         key: dateKey(year, month - 1, d),
       });
@@ -416,7 +417,7 @@ export default function CalendarPage() {
     for (let day = 1; day <= daysInMonth; day++) {
       cells.push({
         day,
-        date: new Date(year, month, day),
+        date: new Date(year, month, day, 12),
         isCurrentMonth: true,
         key: dateKey(year, month, day),
       });
@@ -425,7 +426,7 @@ export default function CalendarPage() {
       const d = cells.length - startWeekday - daysInMonth + 1;
       cells.push({
         day: d,
-        date: new Date(year, month + 1, d),
+        date: new Date(year, month + 1, d, 12),
         isCurrentMonth: false,
         key: dateKey(year, month + 1, d),
       });
@@ -541,7 +542,7 @@ export default function CalendarPage() {
   function navigate(delta: number) {
     setCurrentDate((prev) => {
       if (viewMode === "month") {
-        return new Date(prev.getFullYear(), prev.getMonth() + delta, 1);
+        return new Date(prev.getFullYear(), prev.getMonth() + delta, 1, 12, 0, 0);
       }
       if (viewMode === "week") {
         const d = new Date(prev);
@@ -557,7 +558,7 @@ export default function CalendarPage() {
 
   function goToToday() {
     const t = arizonaToday();
-    setCurrentDate(new Date(t.year, t.month, t.day));
+    setCurrentDate(new Date(t.year, t.month, t.day, 12, 0, 0));
   }
 
   function goToDate(date: Date) {

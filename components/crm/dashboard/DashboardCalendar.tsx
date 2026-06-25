@@ -38,6 +38,7 @@ function getWeekDays(baseDate: Date): Date[] {
   const day = baseDate.getDay();
   const sunday = new Date(baseDate);
   sunday.setDate(baseDate.getDate() - day);
+  sunday.setHours(12, 0, 0, 0);
   const days: Date[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(sunday);
@@ -91,7 +92,7 @@ export default function DashboardCalendar() {
 
   const today = useMemo(() => {
     const { year, month, day } = getArizonaToday();
-    return new Date(year, month, day);
+    return new Date(year, month, day, 12, 0, 0);
   }, []);
 
   const baseDate = useMemo(() => {
