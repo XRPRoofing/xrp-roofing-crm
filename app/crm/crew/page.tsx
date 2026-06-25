@@ -34,6 +34,7 @@ import {
 } from "@/lib/crew-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 const filters: { label: string; value: "all" | CrewJobStatus }[] = [
   { label: "All Jobs", value: "all" },
@@ -539,7 +540,7 @@ export default function CrewWorkflowPage() {
             <input value={newJob.name} onChange={(event) => setNewJob({ ...newJob, name: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-1" placeholder="Customer name" />
             <input value={newJob.phone} onChange={(event) => setNewJob({ ...newJob, phone: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Phone" />
             <input value={newJob.email} onChange={(event) => setNewJob({ ...newJob, email: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Email" />
-            <input value={newJob.address} onChange={(event) => setNewJob({ ...newJob, address: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none md:col-span-2" placeholder="Property address" />
+            <AddressAutocomplete value={newJob.address} onChange={(address) => setNewJob({ ...newJob, address })} placeholder="Start typing address..." className="md:col-span-2" />
             <input value={newJob.city} onChange={(event) => setNewJob({ ...newJob, city: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="City" />
             <input value={newJob.roofType} onChange={(event) => setNewJob({ ...newJob, roofType: event.target.value })} className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Roof type" />
             <input value={newJob.value} onChange={(event) => setNewJob({ ...newJob, value: event.target.value })} type="number" className="rounded-lg border border-blue-100 px-4 py-3 text-sm font-bold outline-none" placeholder="Job value" />
