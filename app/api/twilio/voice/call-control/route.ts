@@ -63,15 +63,22 @@ export async function POST(req: NextRequest) {
 
     if (parsed.data.action === "hold") {
       const conference = await findConference(client, parsed.data.callSid);
-      if (!conference) {
-        return NextResponse.json({ error: "No active conference found for this call" }, { status: 404 });
+      if (conference) {
+        const customer = await findParticipant(client, conference.sid, "customer");
+        if (!customer) {
+          return NextResponse.json({ error: "Customer participant not found in conference" }, { status: 404 });
+        }
+        const holdUrl = new URL("/api/twilio/voice/hold-music", req.nextUrl.origin).toString();
+        await client.conferences(conference.sid).participants(customer.callSid).update({ hold: true, holdUrl });
+      } else {
+        // Non-conference call (incoming): mute the child call so the customer
+        // hears silence. True hold-music requires a conference.
+        const currentCall = await client.calls(parsed.data.callSid).fetch();
+        if (currentCall.status === "in-progress") {
+          // Twilio does not support hold on non-conference calls natively.
+          // The Hold button will visually toggle but audio is muted via the SDK.
+        }
       }
-      const customer = await findParticipant(client, conference.sid, "customer");
-      if (!customer) {
-        return NextResponse.json({ error: "Customer participant not found in conference" }, { status: 404 });
-      }
-      const holdUrl = new URL("/api/twilio/voice/hold-music", req.nextUrl.origin).toString();
-      await client.conferences(conference.sid).participants(customer.callSid).update({ hold: true, holdUrl });
 
       await publishConversationEvent({
         id: crypto.randomUUID(),
@@ -80,7 +87,7 @@ export async function POST(req: NextRequest) {
         status: "hold",
         callSid: parsed.data.callSid,
         conversationId: parsed.data.conversationId,
-        payload: { action: "hold", conferenceSid: conference.sid },
+        payload: { action: "hold" },
         createdAt: new Date().toISOString(),
       });
 
@@ -89,14 +96,13 @@ export async function POST(req: NextRequest) {
 
     if (parsed.data.action === "resume") {
       const conference = await findConference(client, parsed.data.callSid);
-      if (!conference) {
-        return NextResponse.json({ error: "No active conference found for this call" }, { status: 404 });
+      if (conference) {
+        const customer = await findParticipant(client, conference.sid, "customer");
+        if (!customer) {
+          return NextResponse.json({ error: "Customer participant not found in conference" }, { status: 404 });
+        }
+        await client.conferences(conference.sid).participants(customer.callSid).update({ hold: false });
       }
-      const customer = await findParticipant(client, conference.sid, "customer");
-      if (!customer) {
-        return NextResponse.json({ error: "Customer participant not found in conference" }, { status: 404 });
-      }
-      await client.conferences(conference.sid).participants(customer.callSid).update({ hold: false });
 
       await publishConversationEvent({
         id: crypto.randomUUID(),
@@ -105,7 +111,7 @@ export async function POST(req: NextRequest) {
         status: "in-progress",
         callSid: parsed.data.callSid,
         conversationId: parsed.data.conversationId,
-        payload: { action: "resume", conferenceSid: conference.sid },
+        payload: { action: "resume" },
         createdAt: new Date().toISOString(),
       });
 
@@ -135,14 +141,26 @@ export async function POST(req: NextRequest) {
           await client.conferences(conference.sid).participants(agent.callSid).remove();
         }
       } else {
-        // Fallback: redirect child call to forward TwiML (non-conference calls)
-        const children = await client.calls.list({ parentCallSid: parsed.data.callSid, limit: 1 });
+        // Non-conference transfer (incoming calls routed via <Dial><Client>).
+        // The browser holds the child call SID. Fetch it to find the parent
+        // (customer) call, then redirect the parent to dial the transfer target.
         const url = new URL("/api/twilio/voice/forward", req.nextUrl.origin);
         url.searchParams.set("To", normalizedForwardTo);
-        if (children.length > 0 && children[0].status === "in-progress") {
-          await client.calls(children[0].sid).update({ url: url.toString(), method: "POST" });
+
+        const currentCall = await client.calls(parsed.data.callSid).fetch();
+        if (currentCall.parentCallSid) {
+          // Redirect the parent (customer) call to the forward TwiML.
+          // This ends the current <Dial> (browser leg disconnects) and
+          // connects the customer to the transfer target.
+          await client.calls(currentCall.parentCallSid).update({ url: url.toString(), method: "POST" });
         } else {
-          await client.calls(parsed.data.callSid).update({ url: url.toString(), method: "POST" });
+          // callSid IS the parent — look for an in-progress child to redirect
+          const children = await client.calls.list({ parentCallSid: parsed.data.callSid, limit: 1 });
+          if (children.length > 0 && children[0].status === "in-progress") {
+            await client.calls(children[0].sid).update({ url: url.toString(), method: "POST" });
+          } else {
+            await client.calls(parsed.data.callSid).update({ url: url.toString(), method: "POST" });
+          }
         }
       }
 
