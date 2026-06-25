@@ -38,7 +38,8 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   const streamRef = useRef<MediaStream | null>(null);
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const savingCount = useRef(0);
+  const [savingDisplay, setSavingDisplay] = useState(0);
   const [count, setCount] = useState(0);
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     }
   }, [zoom]);
 
-  const capture = useCallback(async () => {
+  const capture = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -96,7 +97,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, w, h);
 
-    // Compress to JPEG
+    // Compress to JPEG — use smaller canvas
     const MAX = 1600;
     const scale = Math.min(1, MAX / Math.max(w, h));
     const cw = Math.round(w * scale);
@@ -105,19 +106,50 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     small.width = cw;
     small.height = ch;
     small.getContext("2d")?.drawImage(canvas, 0, 0, cw, ch);
-    const dataUrl = small.toDataURL("image/jpeg", 0.75);
+
+    // Quick low-res thumbnail for the strip (never blocks shutter)
+    const thumbCanvas = document.createElement("canvas");
+    thumbCanvas.width = 160;
+    thumbCanvas.height = Math.round(160 * (ch / cw));
+    thumbCanvas.getContext("2d")?.drawImage(small, 0, 0, thumbCanvas.width, thumbCanvas.height);
+    const thumbUrl = thumbCanvas.toDataURL("image/jpeg", 0.5);
 
     // Instant UI feedback — never block the shutter
-    const photo: CapturedPhoto = { dataUrl, name: `${label.toLowerCase()}-${Date.now()}.jpg` };
     setCount((c) => c + 1);
-    setThumbs((prev) => [...prev, dataUrl]);
+    setThumbs((prev) => [...prev, thumbUrl]);
     setToast(true);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(false), 1800);
 
-    // Save in background — camera stays ready immediately
-    setSaving(true);
-    void Promise.resolve(onCapture(photo)).finally(() => setSaving(false));
+    // Compress full-res in background, then save — camera stays ready
+    savingCount.current += 1;
+    setSavingDisplay(savingCount.current);
+
+    const photoName = `${label.toLowerCase()}-${Date.now()}.jpg`;
+
+    // Use OffscreenCanvas for async compression when available
+    const compressAndSave = async () => {
+      let dataUrl: string;
+      if (typeof OffscreenCanvas !== "undefined") {
+        const offscreen = new OffscreenCanvas(cw, ch);
+        offscreen.getContext("2d")?.drawImage(small, 0, 0);
+        const blob = await offscreen.convertToBlob({ type: "image/jpeg", quality: 0.75 });
+        dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        dataUrl = small.toDataURL("image/jpeg", 0.75);
+      }
+      const photo: CapturedPhoto = { dataUrl, name: photoName };
+      await Promise.resolve(onCapture(photo));
+    };
+
+    void compressAndSave().finally(() => {
+      savingCount.current -= 1;
+      setSavingDisplay(savingCount.current);
+    });
   }, [label, onCapture]);
 
   // Hardware shutter button via volume keys / Enter
@@ -253,13 +285,20 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
         {/* Shutter button */}
         <button
           type="button"
-          disabled={!ready || saving}
+          disabled={!ready}
           onClick={() => void capture()}
-          className={`flex h-20 w-20 items-center justify-center rounded-full border-4 border-white shadow-xl transition active:scale-90 ${saving ? "opacity-50" : "active:bg-white/20"}`}
+          className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white shadow-xl transition active:scale-90 active:bg-white/20"
           aria-label="Take photo"
         >
-          <span className={`h-14 w-14 rounded-full bg-white ${saving ? "animate-pulse opacity-60" : ""}`} />
+          <span className="h-14 w-14 rounded-full bg-white" />
         </button>
+
+        {/* Background upload indicator */}
+        {savingDisplay > 0 && (
+          <p className="text-xs font-bold text-white/70 animate-pulse">
+            Uploading {savingDisplay} photo{savingDisplay !== 1 ? "s" : ""}…
+          </p>
+        )}
 
         {/* HIDDEN / IMAGE / OUTLINE tab bar */}
         <div className="flex w-full items-center justify-center gap-0">
