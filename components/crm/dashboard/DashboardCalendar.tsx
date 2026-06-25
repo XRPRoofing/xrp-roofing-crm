@@ -220,7 +220,14 @@ export default function DashboardCalendar() {
                 className={`min-h-[180px] ${isToday ? "bg-blue-50/40" : "bg-white"}`}
               >
                 {/* Day header */}
-                <div className={`border-b px-2 py-2 text-center ${isToday ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"}`}>
+                <div
+                  className={`cursor-pointer border-b px-2 py-2 text-center transition hover:bg-blue-100 ${isToday ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"}`}
+                  onClick={() => {
+                    const mm = String(day.getMonth() + 1).padStart(2, "0");
+                    const dd = String(day.getDate()).padStart(2, "0");
+                    router.push(`/crm/calendar?view=day&date=${day.getFullYear()}-${mm}-${dd}`);
+                  }}
+                >
                   <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? "text-blue-600" : "text-gray-500"}`}>
                     {WEEKDAY_LABELS[idx]}
                   </p>
@@ -246,7 +253,11 @@ export default function DashboardCalendar() {
                               ? "border-l-2 border-orange-400 bg-orange-50 text-orange-800"
                               : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
                           }`}
-                          onClick={() => router.push("/crm/calendar")}
+                          onClick={() => {
+                            const mm = String(day.getMonth() + 1).padStart(2, "0");
+                            const dd = String(day.getDate()).padStart(2, "0");
+                            router.push(`/crm/calendar?view=day&date=${day.getFullYear()}-${mm}-${dd}`);
+                          }}
                           title={`${title}${time ? ` ${time}` : ""}`}
                         >
                           <span className="line-clamp-2">
