@@ -158,8 +158,8 @@ const EVENT_TYPE_CONFIG: ColorConfig[] = [
 /* ── Team members ──────────────────────────────────────────────────────── */
 
 const TEAM_MEMBERS = [
-  { id: "jonathan", name: "Jonathan Gonzalez" },
-  { id: "darwin", name: "Darwin Rodas Garcia" },
+  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com" },
+  { id: "darwin", name: "Darwin Rodas Garcia", email: "" },
 ];
 
 export default function CalendarPage() {
@@ -212,6 +212,8 @@ export default function CalendarPage() {
   });
   const [enabledTypes, setEnabledTypes] = useState<Set<string>>(new Set(EVENT_TYPE_CONFIG.map((t) => t.id)));
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(new Set(TEAM_MEMBERS.map((m) => m.id)));
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const calendarCells = useMemo(() => {
     const year = monthCursor.getFullYear();
@@ -443,7 +445,28 @@ export default function CalendarPage() {
 
   function isEventVisible(event: GoogleCalendarEvent) {
     const colorConfig = getEventColorConfig(event);
-    return enabledTypes.has(colorConfig.id);
+    if (!enabledTypes.has(colorConfig.id)) return false;
+
+    if (enabledTeam.size < TEAM_MEMBERS.length) {
+      const attendeeEmails = (event.attendees || []).map((a) => (a.email || "").toLowerCase());
+      const eventName = (event.extendedProperties?.private?.crmName || event.summary || "").toLowerCase();
+      const matched = TEAM_MEMBERS.some((m) => {
+        if (!enabledTeam.has(m.id)) return false;
+        if (m.email && attendeeEmails.includes(m.email.toLowerCase())) return true;
+        const nameParts = m.name.toLowerCase().split(" ");
+        return nameParts.some((part) => eventName.includes(part));
+      });
+      if (!matched && enabledTeam.size > 0) {
+        const anyMemberMatched = TEAM_MEMBERS.some((m) => {
+          if (m.email && attendeeEmails.includes(m.email.toLowerCase())) return true;
+          const nameParts = m.name.toLowerCase().split(" ");
+          return nameParts.some((part) => eventName.includes(part));
+        });
+        if (anyMemberMatched) return false;
+      }
+    }
+
+    return true;
   }
 
   return (
@@ -481,9 +504,18 @@ export default function CalendarPage() {
             <button type="button" onClick={loadEvents} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 sm:p-2" aria-label="Refresh">
               <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button type="button" className="hidden items-center gap-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 sm:flex sm:px-3 sm:py-2 sm:text-sm">
-              Monthly <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-            </button>
+            <div className="relative hidden sm:block">
+              <button type="button" onClick={() => setViewDropdownOpen((prev) => !prev)} className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                Monthly <ChevronDown className={`h-4 w-4 transition-transform ${viewDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+              {viewDropdownOpen && (
+                <div className="absolute right-0 z-30 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  <button type="button" onClick={() => setViewDropdownOpen(false)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-blue-700 bg-blue-50">
+                    Monthly
+                  </button>
+                </div>
+              )}
+            </div>
             <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm">
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Event
             </button>
@@ -496,9 +528,9 @@ export default function CalendarPage() {
         {/* Calendar Grid */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
           {/* Weekday Headers */}
-          <div className="grid grid-cols-7 border-b border-gray-200">
+          <div className="grid shrink-0 grid-cols-7 border-b border-gray-200 bg-gray-50">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="border-r border-gray-100 px-0.5 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500 last:border-r-0 sm:px-2 sm:py-3 sm:text-sm">
+              <div key={day} className="border-r border-gray-100 px-0.5 py-2 text-center text-xs font-bold uppercase tracking-wider text-gray-600 last:border-r-0 sm:px-2 sm:py-3 sm:text-sm">
                 {day}
               </div>
             ))}
@@ -510,12 +542,13 @@ export default function CalendarPage() {
               const key = dateKey(cell.date.getFullYear(), cell.date.getMonth(), cell.date.getDate());
               const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
               const isToday = key === todayKey;
+              const isDaySelected = key === selectedDay;
               const maxVisible = 6;
 
               return (
                 <div
                   key={`${key}-${index}`}
-                  className={`min-h-[80px] border-b border-r border-gray-100 p-0.5 sm:min-h-[160px] sm:p-1.5 ${!cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                  className={`min-h-[80px] border-b border-r border-gray-100 p-0.5 sm:min-h-[160px] sm:p-1.5 ${isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
                 >
                   {/* Day number */}
                   <div className="mb-0.5 text-right sm:mb-1">
@@ -583,13 +616,22 @@ export default function CalendarPage() {
             <div className="mt-1 grid grid-cols-7 gap-0.5 text-center">
               {miniCalCells.map((cell, idx) => {
                 const isToday2 = cell.key === todayKey;
+                const isSelected = cell.key === selectedDay;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={`mini-${idx}`}
-                    className={`rounded-full py-0.5 text-xs ${isToday2 ? "bg-blue-600 font-bold text-white" : cell.isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}
+                    onClick={() => {
+                      setSelectedDay(cell.key);
+                      const [y, m] = cell.key.split("-").map(Number);
+                      if (m !== monthCursor.getMonth()) {
+                        setMonthCursor(new Date(y, m, 1));
+                      }
+                    }}
+                    className={`rounded-full py-0.5 text-xs cursor-pointer hover:bg-gray-100 ${isSelected && !isToday2 ? "bg-blue-100 font-bold text-blue-700" : isToday2 ? "bg-blue-600 font-bold text-white" : cell.isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}
                   >
                     {cell.day}
-                  </div>
+                  </button>
                 );
               })}
             </div>
