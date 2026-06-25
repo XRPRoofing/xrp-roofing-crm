@@ -540,6 +540,18 @@ export async function addJobPhotos(jobId: string, photos: { photoType: JobPhotoT
   broadcastCrmUpdate();
 }
 
+export async function updateJobPhotoType(photoId: string, photoType: JobPhotoType): Promise<void> {
+  if (!hasSupabaseConfig()) {
+    writeLocal(crewSyncPhotosKey, readLocal<JobPhoto[]>(crewSyncPhotosKey, []).map((p) => (p.id === photoId ? { ...p, photoType } : p)));
+    broadcastCrmUpdate();
+    return;
+  }
+  const supabase = createClient();
+  const { error } = await supabase.from(jobPhotosTable).update({ photo_type: photoType }).eq("id", photoId);
+  if (error) throw new Error(error.message);
+  broadcastCrmUpdate();
+}
+
 export async function deleteJobPhoto(photoId: string): Promise<void> {
   if (!hasSupabaseConfig()) {
     writeLocal(crewSyncPhotosKey, readLocal<JobPhoto[]>(crewSyncPhotosKey, []).filter((p) => p.id !== photoId));
