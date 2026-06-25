@@ -1050,6 +1050,16 @@ export default function ProposalsPage() {
     };
 
     setProposals((currentProposals) => [newProposal, ...currentProposals]);
+    if (job.id) {
+      void logCrewActivity({
+        jobId: job.id,
+        jobName: newProposal.customerName,
+        actor: currentUserName || currentUserEmail || "Office",
+        action: "Estimate created",
+        details: `${newProposal.scope} — $${newProposal.total.toLocaleString()}`,
+        module: "Estimates",
+      });
+    }
     void findOrCreateCustomer({
       name: newProposal.customerName,
       email: newProposal.customerEmail,
@@ -1425,6 +1435,16 @@ export default function ProposalsPage() {
     const trashedProposal = { ...proposal, deletedAt: new Date().toISOString() };
     setDeletedProposal(trashedProposal);
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
+    if (proposal.job?.id) {
+      void logCrewActivity({
+        jobId: proposal.job.id,
+        jobName: proposal.customerName,
+        actor: currentUserName || currentUserEmail || "Office",
+        action: "Proposal deleted",
+        details: `${proposal.scope} — $${proposal.total.toLocaleString()}`,
+        module: "Proposal",
+      });
+    }
     if (activeProposal?.id === proposal.id) {
       setActiveProposal(null);
       proposalCardHashRef.current = false;

@@ -26,6 +26,7 @@ import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { Customer } from "@/types/crm";
+import { logCrewActivity } from "@/lib/crew-activity";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,6 +64,8 @@ interface FloatingDialerProps {
   phoneNumbers: PhoneNumber[];
   customers: Customer[];
   onCallStateChange?: (active: boolean) => void;
+  initialDialNumber?: string;
+  initialCallerId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +112,8 @@ export default function FloatingDialer({
   phoneNumbers,
   customers,
   onCallStateChange,
+  initialDialNumber,
+  initialCallerId,
 }: FloatingDialerProps) {
   // Position state for dragging
   const [position, setPosition] = useState({ x: -1, y: -1 });
@@ -177,6 +182,17 @@ export default function FloatingDialer({
   useEffect(() => {
     onCallStateChange?.(callState !== "idle");
   }, [callState, onCallStateChange]);
+
+  // Apply initial dial number / caller ID when provided (e.g. from calendar click-to-call)
+  useEffect(() => {
+    if (open && initialDialNumber) {
+      setDialNumber(initialDialNumber); // eslint-disable-line react-hooks/set-state-in-effect
+      setActiveTab("keypad"); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+    if (open && initialCallerId) {
+      setSelectedCallerId(initialCallerId); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, [open, initialDialNumber, initialCallerId]);
 
   const findContactName = useCallback((phone: string): string | undefined => {
     const digits = phone.replace(/\D/g, "");
@@ -303,6 +319,16 @@ export default function FloatingDialer({
       setCallState("active");
       setIsMuted(false);
       setCallerTag(null);
+      // Log the outbound call to activity history
+      const matchedCustomer = customers.find((c) => c.phone?.replace(/[^\d+]/g, "") === destination.replace(/[^\d+]/g, ""));
+      void logCrewActivity({
+        jobId: matchedCustomer?.id || "",
+        jobName: matchedCustomer?.name || destination,
+        actor: "Office",
+        action: "Outbound call placed",
+        details: `Called ${destination}${selectedCallerId ? ` from ${selectedCallerId}` : ""}`,
+        module: "Calls",
+      });
       // Capture CallSid — may already be available or arrive via "accept"
       const existingSid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
       if (existingSid) setCallSid(existingSid);

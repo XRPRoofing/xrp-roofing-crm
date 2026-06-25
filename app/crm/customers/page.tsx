@@ -18,6 +18,7 @@ import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
 import { getCachedCrewData, getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { logCrewActivity } from "@/lib/crew-activity";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -565,9 +566,18 @@ export default function CustomersPage() {
     );
     setEditingCustomerId(null);
     setEditForm(null);
+    const isNew = !savedCustomers.some((c) => c.id === edited.id);
     const result = await upsertCustomerRecord(edited);
     setCustomersError(result.ok ? null : result.error ?? "Unable to save customer.");
     await syncFromServer(edited.id, true);
+    void logCrewActivity({
+      jobId: edited.id,
+      jobName: edited.name,
+      actor: "Office",
+      action: isNew ? "Customer created" : "Customer updated",
+      details: `${edited.name} — ${edited.phone || edited.email || "No contact"}`,
+      module: "Customers",
+    });
   }
 
   const [showDeleteCustomerModal, setShowDeleteCustomerModal] = useState(false);
@@ -589,13 +599,33 @@ export default function CustomersPage() {
     history.replaceState(history.state, "", url.pathname + url.search);
     setShowDeleteCustomerModal(false);
     setDeleteCustomerTarget(null);
+    const customer = savedCustomers.find((c) => c.id === deleteCustomerTarget);
     await deleteCustomerRecord(deleteCustomerTarget);
     await syncFromServer();
+    if (customer) {
+      void logCrewActivity({
+        jobId: deleteCustomerTarget,
+        jobName: customer.name,
+        actor: "Office",
+        action: "Customer deleted",
+        details: `${customer.name} removed`,
+        module: "Customers",
+      });
+    }
   }
 
   function handleSaveNote(id: string) {
     writeCustomerNote(id, noteDraft);
     setCustomerNotes(readCustomerNotes());
+    const customer = savedCustomers.find((c) => c.id === id);
+    void logCrewActivity({
+      jobId: id,
+      jobName: customer?.name || "Unknown",
+      actor: "Office",
+      action: "Customer note saved",
+      details: noteDraft.length > 120 ? noteDraft.slice(0, 120) + "…" : noteDraft,
+      module: "Customers",
+    });
   }
 
   return (

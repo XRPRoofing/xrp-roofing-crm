@@ -11,6 +11,7 @@
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { addCrmNotification } from "@/lib/crm-notifications";
+import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 
 export type CrewActivity = {
   id: string;
@@ -57,7 +58,7 @@ export async function logCrewActivity(input: {
   actor: string;
   action: string;
   details: string;
-  module: "Crew Portal" | "Crew Workflow" | "Jobs" | "Invoice" | "Proposal" | "SMS" | "Notes";
+  module: "Crew Portal" | "Crew Workflow" | "Jobs" | "Invoice" | "Proposal" | "SMS" | "Notes" | "Calendar" | "Calls" | "Emails" | "Customers" | "Estimates";
 }): Promise<void> {
   const activity: CrewActivity = {
     id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -77,6 +78,9 @@ export async function logCrewActivity(input: {
     actor: input.actor,
     module: input.module,
   });
+
+  // Notify other tabs so activity history refreshes without manual reload
+  broadcastCrmUpdate();
 
   // Persist the activity to Supabase or localStorage
   if (!hasSupabaseConfig()) {

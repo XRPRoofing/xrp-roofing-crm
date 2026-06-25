@@ -848,6 +848,21 @@ export default function LeadsPage() {
     pendingUpdatesRef.current = {};
     Object.entries(pending).forEach(([id, patch]) => {
       void updateJobRecord(id, patch).catch(() => {});
+      // Log meaningful field updates to activity history
+      const job = jobs.find((j) => j.id === id);
+      if (job) {
+        const fields = Object.keys(patch).filter((k) => k !== "lastActivity");
+        if (fields.length > 0) {
+          void logCrewActivity({
+            jobId: id,
+            jobName: job.name || "Unknown Job",
+            actor: currentUserName || "Office",
+            action: "Job updated",
+            details: `Updated: ${fields.join(", ")}`,
+            module: "Jobs",
+          });
+        }
+      }
     });
   }
 
