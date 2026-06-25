@@ -21,38 +21,9 @@ interface GooglePlaceResult {
   geometry?: GooglePlaceGeometry;
 }
 
-interface AutocompletePrediction {
-  place_id: string;
-  description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
-}
-
-interface AutocompleteService {
-  getPlacePredictions: (
-    request: {
-      input: string;
-      componentRestrictions?: { country: string | string[] };
-      locationBias?: unknown;
-      types?: string[];
-    },
-    callback: (
-      predictions: AutocompletePrediction[] | null,
-      status: string
-    ) => void
-  ) => void;
-}
-
-interface PlacesService {
-  getDetails: (
-    request: { placeId: string; fields: string[] },
-    callback: (
-      result: GooglePlaceResult | null,
-      status: string
-    ) => void
-  ) => void;
+interface GoogleAutocomplete {
+  addListener: (event: string, callback: () => void) => void;
+  getPlace: () => GooglePlaceResult;
 }
 
 declare global {
@@ -60,21 +31,21 @@ declare global {
     google?: {
       maps: {
         places: {
-          Autocomplete: unknown;
-          AutocompleteService: new () => AutocompleteService;
-          PlacesService: new (
-            div: HTMLDivElement
-          ) => PlacesService;
-          PlacesServiceStatus: { OK: string };
+          Autocomplete: new (
+            input: HTMLInputElement,
+            options?: {
+              bounds?: unknown;
+              componentRestrictions?: { country: string | string[] };
+              fields?: string[];
+              strictBounds?: boolean;
+              types?: string[];
+            }
+          ) => GoogleAutocomplete;
         };
         LatLngBounds: new (
           sw: { lat: number; lng: number },
           ne: { lat: number; lng: number }
         ) => unknown;
-        LatLng: new (
-          lat: number,
-          lng: number
-        ) => { lat: () => number; lng: () => number };
       };
     };
   }
@@ -106,6 +77,13 @@ type AddressAutocompleteProps = {
   onAddressParsed?: (data: AddressData) => void;
 };
 
+const arizonaBounds = {
+  north: 37.0,
+  south: 31.0,
+  east: -109.0,
+  west: -114.8,
+};
+
 /* ── Component ───────────────────────────────────────────────────── */
 
 export function AddressAutocomplete({
@@ -121,17 +99,9 @@ export function AddressAutocomplete({
   onAddressParsed,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const attrDivRef = useRef<HTMLDivElement | null>(null);
-  const serviceRef = useRef<AutocompleteService | null>(null);
-  const placesRef = useRef<PlacesService | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const autocompleteRef = useRef<GoogleAutocomplete | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [predictions, setPredictions] = useState<AutocompletePrediction[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
 
   // Keep latest callbacks in refs to avoid stale closures
   const onChangeRef = useRef(onChange);
@@ -139,6 +109,16 @@ export function AddressAutocomplete({
   useEffect(() => {
     onChangeRef.current = onChange;
     onAddressParsedRef.current = onAddressParsed;
+  });
+
+  // Sync parent value → DOM when parent changes it externally
+  // (e.g., form reset). Skip if user is actively typing.
+  const lastReportedRef = useRef(value);
+  useEffect(() => {
+    if (inputRef.current && value !== lastReportedRef.current) {
+      inputRef.current.value = value;
+      lastReportedRef.current = value;
+    }
   });
 
   /* ── Parse Google place result ──────────────────────────────────── */
@@ -191,23 +171,22 @@ export function AddressAutocomplete({
       return;
     }
 
-    if (window.google?.maps?.places?.AutocompleteService) {
-      const ready = true;
-      queueMicrotask(() => setIsLoaded(ready));
+    if (window.google?.maps?.places?.Autocomplete) {
+      queueMicrotask(() => setIsLoaded(true));
       return;
     }
 
     const scriptId = "google-maps-script";
     const poll = () => {
       const iv = setInterval(() => {
-        if (window.google?.maps?.places?.AutocompleteService) {
+        if (window.google?.maps?.places?.Autocomplete) {
           clearInterval(iv);
           queueMicrotask(() => setIsLoaded(true));
         }
       }, 100);
       const timeout = setTimeout(() => {
         clearInterval(iv);
-        if (!window.google?.maps?.places?.AutocompleteService)
+        if (!window.google?.maps?.places?.Autocomplete)
           queueMicrotask(() => setHasError(true));
       }, 10000);
       return () => {
@@ -228,149 +207,56 @@ export function AddressAutocomplete({
     document.head.appendChild(script);
   }, []);
 
-  /* ── Initialize services once loaded ────────────────────────────── */
+  /* ── Initialize Autocomplete widget once loaded ─────────────────── */
   useEffect(() => {
-    if (!isLoaded || serviceRef.current) return;
-    const gm = window.google?.maps?.places;
-    if (!gm) return;
+    if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
+    if (!window.google?.maps?.places?.Autocomplete) return;
 
     try {
-      serviceRef.current = new gm.AutocompleteService();
-      const div = document.createElement("div");
-      attrDivRef.current = div;
-      placesRef.current = new gm.PlacesService(div);
+      const GoogleMaps = window.google.maps;
+      const autocomplete = new GoogleMaps.places.Autocomplete(
+        inputRef.current,
+        {
+          bounds: new GoogleMaps.LatLngBounds(
+            { lat: arizonaBounds.south, lng: arizonaBounds.west },
+            { lat: arizonaBounds.north, lng: arizonaBounds.east }
+          ) as unknown as undefined,
+          componentRestrictions: { country: "us" },
+          fields: ["formatted_address", "address_components", "geometry"],
+          strictBounds: false,
+        }
+      );
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place.formatted_address) return;
+        const data = parseAddressComponents(place);
+        lastReportedRef.current = data.formattedAddress;
+        onChangeRef.current(data.formattedAddress, data);
+        onAddressParsedRef.current?.(data);
+      });
+
+      autocompleteRef.current = autocomplete;
     } catch {
       queueMicrotask(() => setHasError(true));
     }
+  }, [isLoaded, parseAddressComponents]);
 
-    return () => {
-      attrDivRef.current = null;
-    };
-  }, [isLoaded]);
-
-  /* ── Fetch predictions as user types ────────────────────────────── */
-  const fetchPredictions = useCallback(
-    (input: string) => {
-      if (!serviceRef.current || input.length < 3) {
-        setPredictions([]);
-        setShowDropdown(false);
-        return;
-      }
-
-      serviceRef.current.getPlacePredictions(
-        {
-          input,
-          componentRestrictions: { country: "us" },
-          types: ["address"],
-        },
-        (results, status) => {
-          if (
-            status ===
-              (window.google?.maps?.places?.PlacesServiceStatus?.OK ?? "OK") &&
-            results
-          ) {
-            setPredictions(results);
-            setShowDropdown(true);
-            setActiveIndex(-1);
-          } else {
-            setPredictions([]);
-            setShowDropdown(false);
-          }
-        }
-      );
-    },
-    []
-  );
-
-  /* ── Select a prediction ────────────────────────────────────────── */
-  const selectPrediction = useCallback(
-    (prediction: AutocompletePrediction) => {
-      setShowDropdown(false);
-      setPredictions([]);
-
-      if (!placesRef.current) {
-        onChangeRef.current(prediction.description);
-        return;
-      }
-
-      placesRef.current.getDetails(
-        {
-          placeId: prediction.place_id,
-          fields: ["formatted_address", "address_components", "geometry"],
-        },
-        (result, status) => {
-          if (
-            status ===
-              (window.google?.maps?.places?.PlacesServiceStatus?.OK ?? "OK") &&
-            result
-          ) {
-            const data = parseAddressComponents(result);
-            onChangeRef.current(data.formattedAddress, data);
-            onAddressParsedRef.current?.(data);
-          } else {
-            onChangeRef.current(prediction.description);
-          }
-        }
-      );
-    },
-    [parseAddressComponents]
-  );
-
-  /* ── Input change handler ───────────────────────────────────────── */
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      onChangeRef.current(val);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => fetchPredictions(val), 250);
-    },
-    [fetchPredictions]
-  );
-
-  /* ── Keyboard navigation ────────────────────────────────────────── */
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (!showDropdown || predictions.length === 0) return;
-
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setActiveIndex((i) => (i < predictions.length - 1 ? i + 1 : 0));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setActiveIndex((i) => (i > 0 ? i - 1 : predictions.length - 1));
-      } else if (e.key === "Enter" && activeIndex >= 0) {
-        e.preventDefault();
-        selectPrediction(predictions[activeIndex]);
-      } else if (e.key === "Escape") {
-        setShowDropdown(false);
-      }
-    },
-    [showDropdown, predictions, activeIndex, selectPrediction]
-  );
-
-  /* ── Close dropdown on outside click ────────────────────────────── */
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+  /* ── Native input handler (reports typed text to parent) ─────────── */
+  const handleInput = useCallback(() => {
+    if (!inputRef.current) return;
+    const val = inputRef.current.value;
+    lastReportedRef.current = val;
+    onChangeRef.current(val);
   }, []);
 
   /* ── Clear ──────────────────────────────────────────────────────── */
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
+    if (inputRef.current) inputRef.current.value = "";
+    lastReportedRef.current = "";
     onChangeRef.current("");
-    setPredictions([]);
-    setShowDropdown(false);
     inputRef.current?.focus();
-  };
+  }, []);
 
   return (
     <div className="relative">
@@ -379,12 +265,8 @@ export function AddressAutocomplete({
         <input
           ref={inputRef}
           type="text"
-          value={value}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (predictions.length > 0) setShowDropdown(true);
-          }}
+          defaultValue={value}
+          onInput={handleInput}
           placeholder={placeholder}
           required={required}
           disabled={disabled || hasError}
@@ -411,38 +293,6 @@ export function AddressAutocomplete({
           </button>
         )}
       </div>
-
-      {showDropdown && predictions.length > 0 && (
-        <div
-          ref={dropdownRef}
-          className="absolute left-0 right-0 top-full z-[99999] mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
-        >
-          {predictions.map((p, i) => (
-            <button
-              key={p.place_id}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectPrediction(p)}
-              onMouseEnter={() => setActiveIndex(i)}
-              className={`flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
-                i === activeIndex
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-              <span>
-                <span className="font-semibold">
-                  {p.structured_formatting.main_text}
-                </span>{" "}
-                <span className="text-slate-500">
-                  {p.structured_formatting.secondary_text}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
 
       {hasError && (
         <p className="mt-1 text-xs text-amber-600">
