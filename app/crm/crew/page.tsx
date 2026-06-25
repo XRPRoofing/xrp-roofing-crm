@@ -24,12 +24,14 @@ import {
   setChecklistItemDone,
   subscribeToCrewData,
   supabaseSyncEnabled,
+  updateJobPhotoType,
   updateJobRecord,
   upsertJobRecord,
   type CrewPresenceState,
   type JobChecklistItem,
   type JobNote,
   type JobPhoto,
+  type JobPhotoType,
   type JobRecord,
 } from "@/lib/crew-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
@@ -83,6 +85,7 @@ export default function CrewWorkflowPage() {
   const [currentUserName, setCurrentUserName] = useState("CRM user");
   const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
   const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
+  const [labelPickerPhoto, setLabelPickerPhoto] = useState<JobPhoto | null>(null);
   const presenceRef = useRef<{ update: (next: Partial<CrewPresenceState>) => void; leave: () => void } | null>(null);
 
   const crewJobs = useMemo(() => assembleCrewJobs(jobs, photos), [jobs, photos]);
@@ -322,6 +325,22 @@ export default function CrewWorkflowPage() {
       setPhotos(previousPhotos);
       setSelectedPhotos(previousSelected);
       reportError(uploadError instanceof Error ? uploadError.message : "Failed to upload photos.");
+    }
+  }
+
+  async function handleChangePhotoLabel(photo: JobPhoto, newType: JobPhotoType) {
+    if (photo.photoType === newType) return;
+    const prevPhotos = photos;
+    const prevSelected = selectedPhotos;
+    const updated = { ...photo, photoType: newType };
+    setPhotos((cur) => cur.map((p) => (p.id === photo.id ? updated : p)));
+    setSelectedPhotos((cur) => cur.map((p) => (p.id === photo.id ? updated : p)));
+    try {
+      await updateJobPhotoType(photo.id, newType);
+    } catch {
+      setPhotos(prevPhotos);
+      setSelectedPhotos(prevSelected);
+      reportError("Failed to update photo label.");
     }
   }
 
@@ -630,7 +649,15 @@ export default function CrewWorkflowPage() {
                 {photosLoading ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-20 w-full animate-pulse rounded-lg bg-gray-200" />)}</div>
                 ) : (
-                  <div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedPhotos.map((photo) => <Image key={photo.id} src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-20 w-full rounded-lg object-cover" />)}</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedPhotos.map((photo) => (
+                    <button key={photo.id} type="button" onClick={() => setLabelPickerPhoto(photo)} className="group relative h-20 w-full overflow-hidden rounded-lg">
+                      <Image src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-full w-full object-cover" />
+                      {photo.photoType && photo.photoType !== "Job Photo" && (
+                        <span className={`absolute left-1 top-1 rounded px-1.5 py-0.5 text-[9px] font-black uppercase text-white ${photo.photoType === "Before" ? "bg-blue-600" : photo.photoType === "After" ? "bg-emerald-600" : "bg-orange-500"}`}>{photo.photoType}</span>
+                      )}
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-bold text-white opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">Change Label</span>
+                    </button>
+                  ))}</div>
                 )}
                 {!photosLoading && selectedPhotos.length === 0 && <p className="mt-1.5 text-xs font-semibold text-gray-500">No photos uploaded yet.</p>}
               </div>
@@ -730,14 +757,44 @@ export default function CrewWorkflowPage() {
             accentColor={accentMap[liveCamera.type]}
             existingCount={existingCount}
             onCapture={async (photo) => {
-              const file = await fetch(photo.dataUrl).then((r) => r.blob()).then((b) => new File([b], photo.name, { type: "image/jpeg" }));
-              await handlePhotoUpload(camJob, liveCamera.type, (() => { const dt = new DataTransfer(); dt.items.add(file); return dt.files; })());
+              const uploadedBy = camJob.assignedCrew[0] || "Crew";
+              const optimistic = buildOptimisticPhotosFromData(camJob.id, liveCamera.type, [{ name: photo.name, dataUrl: photo.dataUrl }], uploadedBy);
+              setPhotos((cur) => [...cur, ...optimistic.map((p) => ({ ...p, dataUrl: "" }))]);
+              if (camJob.id === selectedJobId) setSelectedPhotos((cur) => [...cur, ...optimistic]);
+              await addJobPhotos(camJob.id, [{ photoType: liveCamera.type, name: photo.name, dataUrl: photo.dataUrl, uploadedBy }]);
+              await refresh();
+              if (camJob.id === selectedJobId) setSelectedPhotos(await loadJobPhotos(camJob.id));
             }}
             onClose={() => setLiveCamera(null)}
           />
         );
       })()}
       {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
+
+      {/* Photo Label Picker Modal */}
+      {labelPickerPhoto && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => setLabelPickerPhoto(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-full max-w-xs rounded-t-2xl bg-white p-5 pb-8 shadow-xl sm:rounded-2xl sm:pb-5" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-3 text-center text-sm font-black text-gray-800">Change Photo Label</p>
+            <div className="space-y-1.5">
+              {([["Before", "bg-blue-600"], ["Progress", "bg-orange-500"], ["After", "bg-emerald-600"], ["Job Photo", "bg-gray-500"]] as const).map(([type, color]) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => { void handleChangePhotoLabel(labelPickerPhoto, type); setLabelPickerPhoto(null); }}
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition active:scale-[0.98] ${labelPickerPhoto.photoType === type ? "bg-blue-50 text-blue-700 ring-2 ring-blue-500" : "bg-gray-50 text-gray-700 hover:bg-gray-100"}`}
+                >
+                  <span className={`h-3 w-3 rounded-full ${color}`} />
+                  {type === "Job Photo" ? "No Label" : type}
+                  {labelPickerPhoto.photoType === type && <span className="ml-auto text-xs text-blue-500">Current</span>}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setLabelPickerPhoto(null)} className="mt-3 w-full rounded-xl py-2.5 text-center text-sm font-bold text-gray-500 hover:text-gray-700">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
