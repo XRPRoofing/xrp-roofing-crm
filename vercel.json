@@ -1,7 +1,8 @@
 {
   "framework": "nextjs",
   "env": {
-    "NEXT_PUBLIC_SITE_URL": "https://xrp-roofing-crm.vercel.app"
+    "NEXT_PUBLIC_SITE_URL": "https://xrp-roofing-crm.vercel.app",
+    "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyBGeY3AOO-DdzgWlbHhIuWRpZHIKsgwxR8"
   },
   "crons": [
     {
