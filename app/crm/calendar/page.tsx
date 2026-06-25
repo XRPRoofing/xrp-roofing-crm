@@ -195,7 +195,6 @@ function getColorConfig(colorId: string): ColorConfig {
 const TEAM_MEMBERS = [
   { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com" },
   { id: "darwin", name: "Darwin Rodas Garcia", email: "" },
-  { id: "omar", name: "Omar Garcia", email: "" },
 ];
 
 /* ── Main Component ────────────────────────────────────────────────────── */
