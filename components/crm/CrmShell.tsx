@@ -8,7 +8,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
 import { controlCall, createBrowserVoiceDevice, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
-import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
+import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { PhoneLink } from "@/components/ContactLinks";
@@ -162,11 +162,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         addTwilioCrmNotification(event);
         setNotifications(readCrmNotifications());
 
-        if (event.type === "incoming_call") {
-          const phone = getTwilioEventPhone(event);
-          setGlobalIncomingCall({ name: phone || "Unknown caller", phone: phone || "Unknown number" });
-          window.setTimeout(() => setGlobalIncomingCall(null), 30000);
-        }
+        // NOTE: Do NOT trigger the ringing UI from the Supabase
+        // `incoming_call` event — that event fires at IVR start, before
+        // the customer selects a menu option.  The Twilio SDK `incoming`
+        // event (registered in registerGlobalVoiceDevice below) is the
+        // correct trigger because it only fires when `<Dial><Client>`
+        // executes after IVR selection.
       });
     } catch {
       return undefined;
