@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Briefcase,
@@ -391,8 +392,8 @@ export default function DashboardHeroActions() {
       </button>
 
       {/* ── Contact modal ──────────────────────────────────────────── */}
-      {leadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setLeadOpen(false)}>
+      {leadOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4" onClick={() => setLeadOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveLead} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><UserPlus className="mr-2 inline h-4 w-4 text-blue-600" />New Contact</p>
@@ -415,12 +416,13 @@ export default function DashboardHeroActions() {
               <button type="submit" className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 ${leadSaving ? "pointer-events-none opacity-60" : ""}`}>{leadSaving ? "Saving…" : "Add contact"}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Schedule modal ─────────────────────────────────────────── */}
-      {scheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setScheduleOpen(false)}>
+      {scheduleOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4" onClick={() => setScheduleOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveSchedule} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><CalendarPlus className="mr-2 inline h-4 w-4 text-blue-600" />Schedule Inspection</p>
@@ -449,12 +451,13 @@ export default function DashboardHeroActions() {
               <button type="submit" className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 ${scheduleSaving ? "pointer-events-none opacity-60" : ""}`}>{scheduleSaving ? "Saving…" : "Save appointment"}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Job modal ──────────────────────────────────────────────── */}
-      {jobOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setJobOpen(false)}>
+      {jobOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4" onClick={() => setJobOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveJob} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><Briefcase className="mr-2 inline h-4 w-4 text-blue-600" />New Job</p>
@@ -488,12 +491,13 @@ export default function DashboardHeroActions() {
               <button type="submit" className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 ${jobSaving ? "pointer-events-none opacity-60" : ""}`}>{jobSaving ? "Saving…" : "Create job"}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Proposal modal ─────────────────────────────────────────── */}
-      {proposalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setProposalOpen(false)}>
+      {proposalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4" onClick={() => setProposalOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveProposal} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><FileText className="mr-2 inline h-4 w-4 text-blue-600" />New Proposal</p>
@@ -518,12 +522,13 @@ export default function DashboardHeroActions() {
               <button type="submit" className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 ${proposalSaving ? "pointer-events-none opacity-60" : ""}`}>{proposalSaving ? "Saving…" : "Create proposal"}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Task modal ─────────────────────────────────────────────── */}
-      {taskOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setTaskOpen(false)}>
+      {taskOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 p-4" onClick={() => setTaskOpen(false)}>
           <form onClick={(event) => event.stopPropagation()} onSubmit={handleSaveTask} className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-base font-semibold text-gray-900"><ClipboardList className="mr-2 inline h-4 w-4 text-blue-600" />New Task</p>
@@ -547,7 +552,8 @@ export default function DashboardHeroActions() {
               <button type="submit" className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 ${taskSaving ? "pointer-events-none opacity-60" : ""}`}>{taskSaving ? "Saving…" : "Create task"}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
