@@ -129,7 +129,7 @@ async function sendFollowUpEmail(
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, error: "RESEND_API_KEY not configured" };
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
   const logoUrl = `${appUrl}/images/logo.jpeg`;
   const safeMessage = escapeHtml(messageBody).replaceAll("\n", "<br />");
 
@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
 
   const now = Date.now();
   const results: { proposalId: string; customerName: string; status: string; step?: number; error?: string }[] = [];
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
   const apiUrl = appUrl;
 
   for (const row of rows || []) {

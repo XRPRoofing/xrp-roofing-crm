@@ -30,7 +30,7 @@ export async function sendPaymentRejectedEmail(input: RejectionEmailInput): Prom
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
 
-  const logoUrl = `${(process.env.NEXT_PUBLIC_APP_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "")}/images/logo.jpeg`;
+  const logoUrl = `${(process.env.NEXT_PUBLIC_APP_URL || "https://www.xrproofing.app").replace(/\/+$/, "")}/images/logo.jpeg`;
   const when = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Phoenix" });
 
   const html = `
