@@ -784,7 +784,9 @@ export default function ProposalsPage() {
       setProposals((current) => {
         const serverIds = new Set(filtered.map((p) => p.id));
         const localOnly = current.filter((p) => !serverIds.has(p.id) && !deletedIds.has(p.id));
-        return [...filtered, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
+        const merged = [...filtered, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
+        prevProposalsRef.current = merged;
+        return merged;
       });
     }).catch(() => {});
   });
@@ -1237,22 +1239,21 @@ export default function ProposalsPage() {
     }
 
     // Save the proposal to Supabase so the status is persisted before the email
-    // is sent. Await the write so a network failure is visible instead of silent.
+    // is sent. Await the write and verify the response so a failure doesn't leave
+    // the status stuck on "Draft".
     try {
-      await fetch("/api/proposals/share", {
+      const shareRes = await fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
       });
+      if (!shareRes.ok) {
+        await upsertProposalRecord(proposalForLink);
+      }
     } catch {
-      // Retry once on failure so a transient blip doesn't leave the status stuck
       try {
-        await fetch("/api/proposals/share", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(proposalForLink),
-        });
-      } catch { /* upsertProposalRecord effect will retry later */ }
+        await upsertProposalRecord(proposalForLink);
+      } catch { /* sync effect will retry on next change */ }
     }
 
     try {
@@ -1359,21 +1360,21 @@ export default function ProposalsPage() {
     }
 
     // Save the proposal to Supabase so the status is persisted before the SMS
-    // is sent. Await the write so a network failure is visible instead of silent.
+    // is sent. Await the write and verify the response so a failure doesn't leave
+    // the status stuck on "Draft".
     try {
-      await fetch("/api/proposals/share", {
+      const shareRes = await fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
       });
+      if (!shareRes.ok) {
+        await upsertProposalRecord(proposalForLink);
+      }
     } catch {
       try {
-        await fetch("/api/proposals/share", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(proposalForLink),
-        });
-      } catch { /* upsertProposalRecord effect will retry later */ }
+        await upsertProposalRecord(proposalForLink);
+      } catch { /* sync effect will retry on next change */ }
     }
 
     // Build the SMS body: user's message + proposal link appended
