@@ -195,13 +195,26 @@ export function AddressAutocomplete({
 
     const script = document.createElement("script");
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     
     script.onload = () => {
-      setIsLoaded(true);
-      setHasError(false);
+      // Poll until Places library is fully ready (may lag behind script load)
+      const checkPlaces = setInterval(() => {
+        if (window.google?.maps?.places?.Autocomplete) {
+          setIsLoaded(true);
+          setHasError(false);
+          clearInterval(checkPlaces);
+        }
+      }, 100);
+      // Timeout after 10s
+      setTimeout(() => {
+        clearInterval(checkPlaces);
+        if (!window.google?.maps?.places?.Autocomplete) {
+          setHasError(true);
+        }
+      }, 10000);
     };
     
     script.onerror = () => {
@@ -219,7 +232,7 @@ export function AddressAutocomplete({
   useEffect(() => {
     if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
 
-    if (!window.google?.maps) return;
+    if (!window.google?.maps?.places) return;
 
     try {
       const GoogleMaps = window.google.maps;
