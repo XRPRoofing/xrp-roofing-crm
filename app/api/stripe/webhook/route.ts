@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { sendInternalInvoiceEmail } from "@/lib/invoice-emails";
+import { pushServerNotification } from "@/lib/server-notifications";
 
 // Stripe needs the raw request body for signature verification, so this route
 // must run on the Node.js runtime (not edge) and read the body as text.
@@ -227,6 +228,12 @@ export async function POST(req: NextRequest) {
 
     if (!alreadyRecorded) {
       await sendInternalInvoiceEmail({ event: "paid", customerName, invoiceNumber, amount, customerEmail });
+      await pushServerNotification({
+        title: "Payment received",
+        message: `${customerName || "Customer"} paid $${amount.toLocaleString()} on ${invoiceNumber}`,
+        actor: "Stripe",
+        module: "Invoices",
+      });
     }
 
     return NextResponse.json({ ok: true });
@@ -255,6 +262,13 @@ export async function POST(req: NextRequest) {
     invoiceNumber,
     amount: failedAmount || calculateTotals(invoice),
     customerEmail,
+  });
+
+  await pushServerNotification({
+    title: "Payment failed",
+    message: `${customerName || "Customer"} — payment of $${(failedAmount || calculateTotals(invoice)).toLocaleString()} failed on ${invoiceNumber}`,
+    actor: "Stripe",
+    module: "Invoices",
   });
 
   return NextResponse.json({ ok: true });
