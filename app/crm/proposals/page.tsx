@@ -7,6 +7,7 @@ import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { subscribeToCrewData, leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { azDateTime, azDate } from "@/lib/arizona-time";
 import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
@@ -1611,7 +1612,7 @@ export default function ProposalsPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Signed proposal copy</p>
                 <span className="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">🔒 Locked</span>
               </div>
-              <p className="mt-2 text-sm font-bold text-gray-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleString() : "today"}.</p>
+              <p className="mt-2 text-sm font-bold text-gray-700">Signed by {activeProposal.signedBy || activeProposal.customerName} on {activeProposal.signedAt ? azDateTime(activeProposal.signedAt) : "today"}.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <div className="rounded-lg bg-gray-50 px-3 py-2">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Accepted package</p>
@@ -1776,7 +1777,7 @@ export default function ProposalsPage() {
                   )}
                   <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wider">
                     <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">ID {activeProposal.id}</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">Issued {new Date().toLocaleDateString()}</span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">Issued {azDate(new Date())}</span>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{activeProposal.status}</span>
                   </div>
                 </div>
@@ -1996,7 +1997,7 @@ export default function ProposalsPage() {
                       </label>
                       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                         <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Date</p>
-                        <p className="mt-3 font-bold text-blue-700">{activeProposal.signedAt ? new Date(activeProposal.signedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+                        <p className="mt-3 font-bold text-blue-700">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : azDate(new Date())}</p>
                       </div>
                     </div>
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
@@ -2172,7 +2173,7 @@ export default function ProposalsPage() {
                   {activeProposal?.sentViaSms && activeProposal.smsSentAt && (
                     <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
                       <p className="font-bold">Previously sent via SMS</p>
-                      <p>Sent: {new Date(activeProposal.smsSentAt).toLocaleString()}</p>
+                      <p>Sent: {azDateTime(activeProposal.smsSentAt)}</p>
                       {activeProposal.smsSentBy && <p>By: {activeProposal.smsSentBy}</p>}
                       {activeProposal.smsSentToPhone && <p>To: {activeProposal.smsSentToPhone}</p>}
                     </div>
@@ -2560,7 +2561,7 @@ export default function ProposalsPage() {
                       <div>
                         <p className="text-base font-bold text-blue-700">{proposal.customerName}</p>
                         <p className="mt-1 text-sm text-gray-600">{proposal.address}</p>
-                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-gray-500">Deleted {deletedAt.toLocaleDateString()} · Permanently deletes in {daysLeft} days</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-gray-500">Deleted {azDate(deletedAt)} · Permanently deletes in {daysLeft} days</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">Restore</button>
@@ -2657,7 +2658,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? new Date(proposal.signedAt).toLocaleString() : proposal.declinedAt ? new Date(proposal.declinedAt).toLocaleString() : proposal.createdAt ? new Date(proposal.createdAt).toLocaleString() : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {new Date(proposal.followUpSentAt).toLocaleDateString()}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
               </div>
             </div>
             </button>

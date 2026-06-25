@@ -280,6 +280,9 @@ export default function CalendarPage() {
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // Mobile week view: selected day index within the week (0–6)
+  const [mobileWeekDayIdx, setMobileWeekDayIdx] = useState(() => new Date().getDay());
+
   // Modal state
   const [newScheduleOpen, setNewScheduleOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
@@ -443,8 +446,9 @@ export default function CalendarPage() {
       const fmt = new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: ARIZONA_TIMEZONE,
       });
-      const yearFmt = new Intl.DateTimeFormat("en-US", { year: "numeric" });
+      const yearFmt = new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: ARIZONA_TIMEZONE });
       return `${fmt.format(start)} – ${fmt.format(end)}, ${yearFmt.format(end)}`;
     }
     return new Intl.DateTimeFormat("en-US", {
@@ -452,6 +456,7 @@ export default function CalendarPage() {
       month: "long",
       day: "numeric",
       year: "numeric",
+      timeZone: ARIZONA_TIMEZONE,
     }).format(currentDate);
   }, [viewMode, monthLabel, weekDays, currentDate]);
 
@@ -891,11 +896,88 @@ export default function CalendarPage() {
 
   /* ── Week View ──────────────────────────────────────────────────────── */
 
+  function renderWeekDayTimeGrid(days: Date[], colTemplate: string, cellHeight: number) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className={`grid ${colTemplate}`}>
+          {HOURS.map((hour) => (
+            <div key={hour} className="contents">
+              <div className="border-b border-r border-gray-100 px-1 py-2 text-right text-[10px] font-medium text-gray-400 sm:text-xs">
+                {formatHour(hour)}
+              </div>
+              {days.map((day, dayIdx) => {
+                const key = dateKeyFromDate(day);
+                const hourEvents = (eventsByDate[key] || [])
+                  .filter(isEventVisible)
+                  .filter((ev) => eventHour(ev) === hour);
+                return (
+                  <div
+                    key={dayIdx}
+                    className="relative border-b border-r border-gray-100 p-0.5 last:border-r-0"
+                    style={{ minHeight: `${cellHeight}px` }}
+                  >
+                    {hourEvents.map((ev) => {
+                      const span = Math.max(
+                        1,
+                        eventEndHour(ev) - eventHour(ev),
+                      );
+                      const cc = getColorConfig(ev.color);
+                      const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
+                      return (
+                        <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * cellHeight}px` }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedEvent(ev)}
+                            className={`h-full w-full overflow-hidden rounded border px-1.5 py-1 text-left text-xs font-semibold transition hover:opacity-80 sm:px-1 sm:py-0.5 sm:text-[10px] ${cc.color}`}
+                            title={`${ev.title} ${formatEventTimeRange(ev)}`}
+                          >
+                            <div className="truncate">{ev.title}</div>
+                            <div className="truncate opacity-70">
+                              {formatEventTimeRange(ev)}
+                            </div>
+                            {ev.customer_name && (
+                              <div className="truncate text-[10px] opacity-60 sm:hidden">
+                                {ev.customer_name}
+                              </div>
+                            )}
+                          </button>
+                          {evHasPhone && (
+                            <button
+                              type="button"
+                              title="Call customer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (twilioLines.length <= 1) {
+                                  openDialerForEvent(ev, twilioLines[0]?.number);
+                                } else {
+                                  setCallPickerEvent(ev);
+                                }
+                              }}
+                              className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-white/80 p-0.5 text-green-700 shadow-sm hover:bg-green-100 group-hover/ev:inline-flex"
+                            >
+                              <PhoneOutgoing className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   function renderWeekView() {
+    const mobileDay = weekDays[mobileWeekDayIdx] || weekDays[0];
+
     return (
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {/* Day headers */}
-        <div className="grid shrink-0 grid-cols-[60px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50">
+        {/* ── Desktop day headers (hidden on mobile) ── */}
+        <div className="hidden shrink-0 grid-cols-[60px_repeat(7,1fr)] border-b border-gray-200 bg-gray-50 sm:grid">
           <div className="border-r border-gray-100" />
           {weekDays.map((day, i) => {
             const key = dateKeyFromDate(day);
@@ -903,17 +985,17 @@ export default function CalendarPage() {
             return (
               <div
                 key={i}
-                className={`cursor-pointer border-r border-gray-100 px-1 py-2.5 text-center last:border-r-0 hover:bg-blue-50 sm:py-3 ${isToday ? "bg-blue-50" : ""}`}
+                className={`cursor-pointer border-r border-gray-100 px-1 py-3 text-center last:border-r-0 hover:bg-blue-50 ${isToday ? "bg-blue-50" : ""}`}
                 onClick={() => {
                   setCurrentDate(day);
                   setViewMode("day");
                 }}
               >
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 sm:text-xs">
+                <div className="text-xs font-bold uppercase tracking-wider text-gray-500">
                   {WEEKDAYS_FULL[day.getDay()]}
                 </div>
                 <div
-                  className={`mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold sm:h-8 sm:w-8 sm:text-base ${isToday ? "bg-blue-600 text-white" : "text-gray-900"}`}
+                  className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-bold ${isToday ? "bg-blue-600 text-white" : "text-gray-900"}`}
                 >
                   {day.getDate()}
                 </div>
@@ -922,70 +1004,60 @@ export default function CalendarPage() {
           })}
         </div>
 
-        {/* Time grid */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-[60px_repeat(7,1fr)]">
-            {HOURS.map((hour) => (
-              <div key={hour} className="contents">
-                <div className="border-b border-r border-gray-100 px-1 py-2 text-right text-[10px] font-medium text-gray-400 sm:text-xs">
-                  {formatHour(hour)}
-                </div>
-                {weekDays.map((day, dayIdx) => {
-                  const key = dateKeyFromDate(day);
-                  const hourEvents = (eventsByDate[key] || [])
-                    .filter(isEventVisible)
-                    .filter((ev) => eventHour(ev) === hour);
-                  return (
-                    <div
-                      key={dayIdx}
-                      className="relative min-h-[48px] border-b border-r border-gray-100 p-0.5 last:border-r-0"
-                    >
-                      {hourEvents.map((ev) => {
-                        const span = Math.max(
-                          1,
-                          eventEndHour(ev) - eventHour(ev),
-                        );
-                        const cc = getColorConfig(ev.color);
-                        const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
-                        return (
-                          <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * 48}px` }}>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedEvent(ev)}
-                              className={`h-full w-full overflow-hidden rounded border px-1 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
-                              title={`${ev.title} ${formatEventTimeRange(ev)}`}
-                            >
-                              <div className="truncate">{ev.title}</div>
-                              <div className="truncate opacity-70">
-                                {formatEventTimeRange(ev)}
-                              </div>
-                            </button>
-                            {evHasPhone && (
-                              <button
-                                type="button"
-                                title="Call customer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (twilioLines.length <= 1) {
-                                    openDialerForEvent(ev, twilioLines[0]?.number);
-                                  } else {
-                                    setCallPickerEvent(ev);
-                                  }
-                                }}
-                                className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-white/80 p-0.5 text-green-700 shadow-sm hover:bg-green-100 group-hover/ev:inline-flex"
-                              >
-                                <PhoneOutgoing className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+        {/* ── Mobile day selector strip (visible only on mobile) ── */}
+        <div className="flex shrink-0 items-center border-b border-gray-200 bg-gray-50 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileWeekDayIdx((i) => Math.max(0, i - 1))}
+            className="shrink-0 p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+            disabled={mobileWeekDayIdx === 0}
+            aria-label="Previous day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="flex flex-1 justify-around">
+            {weekDays.map((day, i) => {
+              const key = dateKeyFromDate(day);
+              const isToday = key === todayKey;
+              const isSelected = i === mobileWeekDayIdx;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setMobileWeekDayIdx(i)}
+                  className={`flex flex-col items-center rounded-lg px-1.5 py-1.5 transition ${isSelected ? "bg-blue-600 text-white" : isToday ? "text-blue-600" : "text-gray-600"}`}
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-wider">
+                    {WEEKDAYS[day.getDay()]}
+                  </span>
+                  <span
+                    className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isSelected ? "bg-white/20" : isToday && !isSelected ? "bg-blue-100" : ""}`}
+                  >
+                    {day.getDate()}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+          <button
+            type="button"
+            onClick={() => setMobileWeekDayIdx((i) => Math.min(6, i + 1))}
+            className="shrink-0 p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+            disabled={mobileWeekDayIdx === 6}
+            aria-label="Next day"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* ── Desktop time grid (7 columns, hidden on mobile) ── */}
+        <div className="hidden sm:flex sm:min-h-0 sm:flex-1 sm:flex-col">
+          {renderWeekDayTimeGrid(weekDays, "grid-cols-[60px_repeat(7,1fr)]", 48)}
+        </div>
+
+        {/* ── Mobile time grid (single day, visible only on mobile) ── */}
+        <div className="flex min-h-0 flex-1 flex-col sm:hidden">
+          {renderWeekDayTimeGrid([mobileDay], "grid-cols-[50px_1fr]", 56)}
         </div>
       </div>
     );
@@ -1000,6 +1072,7 @@ export default function CalendarPage() {
       month: "long",
       day: "numeric",
       year: "numeric",
+      timeZone: ARIZONA_TIMEZONE,
     }).format(currentDate);
 
     return (

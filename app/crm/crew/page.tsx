@@ -8,6 +8,7 @@ import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import { logCrewActivity, loadJobActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import { azDateTime } from "@/lib/arizona-time";
 import { createClient } from "@/lib/supabase/client";
 import { ensureInvoiceTaskForCompletedJob, syncCrewJobToTaskBoard } from "@/lib/office-tasks";
 import { crewMembers, crewStatuses, type CrewJob, type CrewJobStatus } from "@/lib/crew-workflow";
@@ -685,7 +686,7 @@ export default function CrewWorkflowPage() {
                   {selectedNotes.map((note) => (
                     <div key={note.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
                       <p className="font-semibold text-gray-700">{note.body}</p>
-                      <p className="mt-1 text-xs font-bold text-gray-400">{note.author} • {new Date(note.createdAt).toLocaleString()}</p>
+                      <p className="mt-1 text-xs font-bold text-gray-400">{note.author} • {azDateTime(note.createdAt)}</p>
                     </div>
                   ))}
                   {selectedNotes.length === 0 && <p className="text-sm font-semibold text-gray-500">No notes yet.</p>}
@@ -707,7 +708,7 @@ export default function CrewWorkflowPage() {
                 <p className="text-sm font-bold text-blue-700">Activity History</p>
                 <div className="mt-3 space-y-2 text-sm font-semibold text-gray-600">
                   <p>Current status: <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${statusStyles[selectedJob.status]}`}>{selectedJob.status}</span></p>
-                  {selectedJob.completion.submittedAt && <p>Marked done: {new Date(selectedJob.completion.submittedAt).toLocaleString()}</p>}
+                  {selectedJob.completion.submittedAt && <p>Marked done: {azDateTime(selectedJob.completion.submittedAt)}</p>}
                   {selectedJob.adminNotification && <p>{selectedJob.adminNotification}</p>}
                 </div>
                 <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
@@ -721,7 +722,7 @@ export default function CrewWorkflowPage() {
                           <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{act.module}</span>
                         </div>
                         <p className="text-sm text-gray-700">{act.action}{act.details ? ` — ${act.details}` : ""}</p>
-                        <p className="text-[11px] text-gray-400">{new Date(act.createdAt).toLocaleString()}</p>
+                        <p className="text-[11px] text-gray-400">{azDateTime(act.createdAt)}</p>
                       </div>
                     </div>
                   ))}

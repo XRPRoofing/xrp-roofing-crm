@@ -113,6 +113,7 @@ export default function DashboardCalendar() {
       month: "long",
       day: "numeric",
       year: "numeric",
+      timeZone: ARIZONA_TIMEZONE,
     }).format(today);
   }, [today]);
 
