@@ -1,6 +1,6 @@
 ---
 name: testing-crm
-description: Test the XRP Roofing CRM locally (invoices, crew camera/photos, real-time/no-refresh). Use when verifying CRM UI or photo-handling changes end-to-end.
+description: Test the XRP Roofing CRM locally (invoices, crew camera/photos, real-time/no-refresh, call flows). Use when verifying CRM UI or photo-handling changes end-to-end.
 ---
 
 # Testing the XRP Roofing CRM
@@ -15,6 +15,63 @@ NEXT_PUBLIC_TEST_FORCE_LOCAL=1
 - `TEST_FORCE_LOCAL` runs in "Local mode" — data (jobs, customers, draft invoices, crew photos) is stored in the browser's localStorage instead of Supabase. The header shows a "Local mode (configure Supabase for live sync)" banner.
 
 Start with `npm run dev` (serves on http://localhost:3000). Maximize the browser before recording.
+
+## Twilio Call Flow Testing
+
+### Architecture
+- **Outbound calls** use Twilio Conferences — the agent and customer are both participants.
+- **Incoming calls** use `<Dial><Client>crm-agent</Client>` — no conference. The customer's call is the parent; the browser leg is the child.
+- Call state is managed globally in `CrmShell.tsx` via React state (`globalActiveIncomingCall`, `globalIncomingHeld`, etc.).
+- The `FloatingCallCard` component renders for both outbound and incoming active calls with Mute, Hold, Transfer, End buttons.
+- `BroadcastChannel` syncs call state across browser tabs.
+
+### Testing call UI locally (no Twilio needed)
+Twilio Voice SDK won't initialize without real API keys, so you can't make actual calls locally. To test call UI changes:
+
+1. Add a temporary test trigger button in `CrmShell.tsx` (just before the `{/* Sidebar */}` comment) to simulate an active incoming call:
+```tsx
+{process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1" && !globalActiveIncomingCall && !globalIncomingCall && (
+  <button
+    type="button"
+    onClick={() => {
+      setGlobalActiveIncomingCall(true);
+      setGlobalIncomingCaller({ name: "Test Customer", phone: "+16235551234" });
+      setGlobalIncomingTwilioNumber("+16233000611");
+    }}
+    className="fixed bottom-4 right-4 z-[9999] rounded bg-purple-600 px-3 py-2 text-xs text-white shadow-lg"
+  >
+    Simulate Incoming Call
+  </button>
+)}
+```
+2. Click the button to show the FloatingCallCard in "active" state.
+3. Verify UI elements (buttons, inputs, state transitions).
+4. **Revert this trigger before merge** — it's only for local testing.
+
+### What CAN be tested locally
+- FloatingCallCard renders with correct buttons (Mute, Hold, Transfer, End)
+- Transfer button reveals number input with disabled submit when empty
+- End button clears call state and removes the card
+- Card shows caller info (name, phone number)
+
+### What CANNOT be tested locally (requires real Twilio calls)
+- `endConferenceOnExit` behavior (customer hangup ending the conference)
+- `disconnect`/`error` event handler timing (handlers before `accept()`)
+- Hold/Resume toggle (depends on Twilio API `controlCall()` succeeding)
+- Call transfer via parent SID redirect
+- IVR flow (DTMF `<Gather>` input routing)
+- Real-time call status webhooks
+
+### Key files for call flow
+- `lib/twilio/server.ts` — TwiML builders (conference, IVR, forward)
+- `components/crm/CrmShell.tsx` — Global call state, answer/end/transfer/hold handlers
+- `components/crm/FloatingCallCard.tsx` — Call UI component (shared by outbound and incoming)
+- `app/api/twilio/voice/call-control/route.ts` — Hold, resume, forward API
+- `app/api/twilio/webhooks/incoming-call/route.ts` — IVR entry point
+- `lib/twilio/client.ts` — Browser Voice SDK, `controlCall()` helper
+
+### Production domain
+The CRM production domain is `https://www.xrproofing.app`. Twilio webhooks and TwiML App must point to this domain. Google Maps API key referrer restrictions must include `www.xrproofing.app/*`.
 
 ## Proposals
 The proposal system is at `/crm/proposals`. In local mode, proposals are stored in localStorage.
@@ -106,8 +163,10 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 - **Port conflicts**: If port 3000 is in use, Next.js may start on 3001. Delete `.next/dev/lock` and kill old processes if needed.
 - **Address autocomplete**: Requires `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`. Without it, the field shows "Address autocomplete unavailable" — you can still manually type or use console to remove the disabled attribute.
 - **Proposal scope collapse threshold**: The collapse button only appears when `scopeLines.length > 2` (3+ items after splitting by `\n|✓|•|·|;`). For edge case testing, use 1-2 lines for "no button" and 4+ lines for "should collapse".
+- **Twilio call features**: Hold, transfer, and conference behaviors require real Twilio credentials and actual phone calls. The `controlCall()` function makes API requests that will fail silently in local mode. Test UI rendering and state transitions locally; test actual call behavior in production.
 
 ## Devin Secrets Needed
 - None for local UI testing (bypass + local mode require no secrets).
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — optional, only needed for address autocomplete in proposal creation.
 - For production/Stripe webhook or email flows: `STRIPE_SECRET_KEY` (sk_live_…), `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `INVOICE_NOTIFICATION_EMAIL` (set in Vercel, not needed locally).
+- For Twilio call flow testing in production: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_API_KEY`, `TWILIO_API_SECRET` (set in Vercel).
