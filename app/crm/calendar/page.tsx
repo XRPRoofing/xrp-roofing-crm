@@ -197,6 +197,61 @@ const TEAM_MEMBERS = [
   { id: "darwin", name: "Darwin Rodas Garcia", email: "" },
 ];
 
+/* ── Google Calendar helpers ────────────────────────────────────────────── */
+
+type GoogleCalendarEvent = {
+  id: string;
+  summary?: string;
+  description?: string;
+  location?: string;
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
+  attendees?: { email?: string; displayName?: string }[];
+  creator?: { email?: string };
+  extendedProperties?: { private?: Record<string, string> };
+  created?: string;
+  updated?: string;
+};
+
+const GCAL_PREFIX = "gcal:";
+
+function isGoogleEvent(event: CalendarEvent): boolean {
+  return event.id.startsWith(GCAL_PREFIX);
+}
+
+function mapGoogleEvent(ge: GoogleCalendarEvent): CalendarEvent {
+  const allDay = Boolean(ge.start?.date && !ge.start?.dateTime);
+  const startRaw = ge.start?.dateTime || ge.start?.date || "";
+  const endRaw = ge.end?.dateTime || ge.end?.date || "";
+  const startTime = startRaw ? new Date(startRaw).toISOString() : new Date().toISOString();
+  let endTime = endRaw ? new Date(endRaw).toISOString() : startTime;
+  if (allDay && endRaw) {
+    const ed = new Date(endRaw);
+    ed.setDate(ed.getDate() - 1);
+    if (ed >= new Date(startRaw)) {
+      endTime = ed.toISOString();
+    }
+  }
+  const priv = ge.extendedProperties?.private || {};
+  return {
+    id: `${GCAL_PREFIX}${ge.id}`,
+    title: ge.summary || "(No title)",
+    description: ge.description || "",
+    start_time: startTime,
+    end_time: endTime,
+    all_day: allDay,
+    location: ge.location || priv.crmAddress || "",
+    color: "cyan",
+    assigned_to: "",
+    customer_name: priv.crmName || "",
+    customer_phone: priv.crmPhone || "",
+    job_kind: priv.crmJobKind || "",
+    created_by: ge.creator?.email || "",
+    created_at: ge.created || "",
+    updated_at: ge.updated || "",
+  };
+}
+
 /* ── Main Component ────────────────────────────────────────────────────── */
 
 export default function CalendarPage() {
@@ -211,6 +266,7 @@ export default function CalendarPage() {
     phone: string;
     name?: string;
   } | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -400,8 +456,23 @@ export default function CalendarPage() {
       // Load 2 months around current view for week/day edge cases
       const timeMin = new Date(year, month - 1, 1).toISOString();
       const timeMax = new Date(year, month + 2, 1).toISOString();
-      const loaded = await loadCalendarEvents(timeMin, timeMax);
-      setEvents(loaded);
+
+      // Fetch CRM events and Google Calendar events in parallel
+      const [crmEvents, gcalResult] = await Promise.all([
+        loadCalendarEvents(timeMin, timeMax),
+        fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`)
+          .then((r) => r.json())
+          .catch(() => ({ connected: false, events: [] })),
+      ]);
+
+      const gcalConnected = gcalResult.connected === true;
+      setGoogleConnected(gcalConnected);
+
+      const gcalEvents: CalendarEvent[] = gcalConnected
+        ? ((gcalResult.events || []) as GoogleCalendarEvent[]).map(mapGoogleEvent)
+        : [];
+
+      setEvents([...crmEvents, ...gcalEvents]);
     } catch {
       setError("Unable to load calendar events.");
     } finally {
@@ -426,7 +497,11 @@ export default function CalendarPage() {
     const timeMax = new Date(year, month + 2, 1).toISOString();
 
     const unsubscribe = subscribeToCalendarUpdates(
-      (updated) => setEvents(updated),
+      (updated) =>
+        setEvents((prev) => {
+          const gcalEvents = prev.filter((e) => isGoogleEvent(e));
+          return [...updated, ...gcalEvents];
+        }),
       timeMin,
       timeMax,
     );
@@ -621,6 +696,7 @@ export default function CalendarPage() {
   function renderEventChip(event: CalendarEvent, compact = false) {
     const cc = getColorConfig(event.color);
     const time = formatEventTime(event);
+    const isGcal = isGoogleEvent(event);
     return (
       <button
         key={event.id}
@@ -630,12 +706,16 @@ export default function CalendarPage() {
           setSelectedEvent(event);
         }}
         className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${cc.color}`}
-        title={`${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
+        title={`${isGcal ? "[Google] " : ""}${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
       >
         {compact ? (
-          event.title || "Untitled"
+          <>
+            {isGcal && <span className="mr-0.5 text-[8px]">G</span>}
+            {event.title || "Untitled"}
+          </>
         ) : (
           <span className="truncate">
+            {isGcal && <span className="mr-0.5 text-[8px] sm:text-[9px]">G</span>}
             {event.title || "Untitled"}
             {time && (
               <span className="ml-1 hidden opacity-70 sm:inline">{time}</span>
@@ -1087,6 +1167,30 @@ export default function CalendarPage() {
             ))}
           </div>
 
+          {/* Google Calendar Status */}
+          <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <h3 className="mb-2 text-sm font-bold text-gray-900">Google Calendar</h3>
+            {googleConnected ? (
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                <span className="text-xs font-medium text-green-700">Connected</span>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
+                  <span className="text-xs font-medium text-gray-500">Not connected</span>
+                </div>
+                <a
+                  href="/api/google-calendar/connect"
+                  className="mt-2 inline-block rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
+                >
+                  Connect Google Calendar
+                </a>
+              </div>
+            )}
+          </div>
+
           {/* Event Colors Legend */}
           <div className="rounded-lg border border-gray-200 bg-white p-3">
             <h3 className="mb-2 text-sm font-bold text-gray-900">
@@ -1101,6 +1205,10 @@ export default function CalendarPage() {
                   </span>
                 </div>
               ))}
+              <div className="flex items-center gap-2 px-1 py-1">
+                <span className="h-3 w-3 rounded-sm bg-cyan-500" />
+                <span className="text-xs font-medium text-gray-700">Google Calendar</span>
+              </div>
             </div>
           </div>
         </aside>
@@ -1265,7 +1373,133 @@ export default function CalendarPage() {
       )}
 
       {/* ── Event Detail / Edit Modal ──────────────────────────────── */}
-      {selectedEvent && (
+      {selectedEvent && isGoogleEvent(selectedEvent) && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-bold text-cyan-700">
+                  Google Calendar
+                </span>
+                <h2 className="text-2xl font-bold text-cyan-700">
+                  {selectedEvent.title}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEvent(null)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-gray-400" />
+                <span className="text-sm text-gray-700">
+                  {selectedEvent.all_day
+                    ? new Intl.DateTimeFormat("en-US", {
+                        dateStyle: "full",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.start_time))
+                    : `${new Intl.DateTimeFormat("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.start_time))} — ${new Intl.DateTimeFormat("en-US", {
+                        timeStyle: "short",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.end_time))}`}
+                </span>
+              </div>
+              {selectedEvent.location && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.location)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    {selectedEvent.location}
+                  </a>
+                </div>
+              )}
+              {selectedEvent.customer_name && (
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm text-gray-700">{selectedEvent.customer_name}</span>
+                </div>
+              )}
+              {selectedEvent.customer_phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
+                    {telHref(selectedEvent.customer_phone) && (
+                      <>
+                        <a
+                          href={telHref(selectedEvent.customer_phone)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600"
+                        >
+                          <Phone className="h-3 w-3" />
+                          Call
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSmsTarget({
+                              phone: selectedEvent.customer_phone,
+                              name: selectedEvent.customer_name,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-600"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          SMS
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedEvent.job_kind && (
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm text-gray-700">{selectedEvent.job_kind}</span>
+                </div>
+              )}
+              {selectedEvent.description && (
+                <div className="flex items-start gap-3">
+                  <AlignLeft className="mt-0.5 h-5 w-5 text-gray-400" />
+                  <p className="whitespace-pre-wrap text-sm text-gray-700">
+                    {selectedEvent.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedEvent(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedEvent && !isGoogleEvent(selectedEvent) && (
         <div
           className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
           onClick={() => setSelectedEvent(null)}
