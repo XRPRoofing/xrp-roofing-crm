@@ -989,7 +989,7 @@ export default function CalendarPage() {
   /* ── Main Render ────────────────────────────────────────────────────── */
 
   return (
-    <div className="flex min-h-0 max-w-full flex-1 flex-col overflow-x-hidden">
+    <div className="flex min-h-0 max-w-full flex-1 flex-col overflow-x-clip">
       {/* Success Toast */}
       {createSuccess && (
         <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 animate-bounce">
