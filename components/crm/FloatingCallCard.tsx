@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { Customer } from "@/types/crm";
 import { getLineLabelForNumber } from "@/lib/twilio/numbers";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 export type CallCardState = "ringing" | "active" | "held";
 
@@ -400,7 +401,7 @@ export default function FloatingCallCard({
             </label>
             <label className="grid gap-1">
               <span className="text-xs font-medium text-gray-500">Address</span>
-              <input value={callerInfo.address} onChange={(e) => setCallerInfo((p) => ({ ...p, address: e.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" placeholder="Property address" />
+              <AddressAutocomplete value={callerInfo.address} onChange={(address) => setCallerInfo((p) => ({ ...p, address }))} placeholder="Start typing address..." />
             </label>
             <label className="grid gap-1">
               <span className="text-xs font-medium text-gray-500">Email</span>
