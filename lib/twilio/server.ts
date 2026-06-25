@@ -259,7 +259,7 @@ export function buildOutboundBrowserCallTwiml(to?: string | null, statusCallback
 export function buildConferenceCustomerTwiml(confName: string, statusCallbackUrl?: string) {
   const response = new twilio.twiml.VoiceResponse();
   response.dial().conference(
-    { beep: "false", endConferenceOnExit: false, startConferenceOnEnter: true, record: "do-not-record", participantLabel: "customer", statusCallback: statusCallbackUrl, statusCallbackEvent: ["join", "leave"], statusCallbackMethod: "POST" },
+    { beep: "false", endConferenceOnExit: true, startConferenceOnEnter: true, record: "do-not-record", participantLabel: "customer", statusCallback: statusCallbackUrl, statusCallbackEvent: ["join", "leave"], statusCallbackMethod: "POST" },
     confName,
   );
   return response.toString();

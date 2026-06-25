@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { createBrowserVoiceDevice, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification, getTwilioEventPhone } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
@@ -68,6 +68,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const [globalActiveIncomingCall, setGlobalActiveIncomingCall] = useState(false);
   const [globalIncomingMuted, setGlobalIncomingMuted] = useState(false);
+  const [globalIncomingHeld, setGlobalIncomingHeld] = useState(false);
   const [globalIncomingCaller, setGlobalIncomingCaller] = useState<{ name: string; phone: string }>({ name: "", phone: "" });
   const [globalIncomingTwilioNumber, setGlobalIncomingTwilioNumber] = useState("");
   const [globalDialerOpen, setGlobalDialerOpen] = useState(false);
@@ -455,7 +456,24 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     if (!incoming) return;
 
     try {
-      // Accept FIRST while audio context is still active (ringtone playing).
+      // Register disconnect/error handlers BEFORE accept() so we never miss
+      // a hangup that fires between accept and listener registration.
+      incoming.on("disconnect", () => {
+        setGlobalActiveIncomingCall(false);
+        setGlobalIncomingMuted(false);
+        setGlobalIncomingHeld(false);
+        incomingCallRef.current = null;
+        callChannelRef.current?.postMessage({ type: "ended" });
+      });
+      incoming.on("error", () => {
+        setGlobalActiveIncomingCall(false);
+        setGlobalIncomingMuted(false);
+        setGlobalIncomingHeld(false);
+        incomingCallRef.current = null;
+        callChannelRef.current?.postMessage({ type: "ended" });
+      });
+
+      // Accept while audio context is still active (ringtone playing).
       // Clearing globalIncomingCall stops the ringtone which can suspend the
       // browser audio context and cause the WebRTC stream to fail.
       incoming.accept();
@@ -467,12 +485,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setGlobalIncomingCaller({ name: incoming.parameters?.From || "Unknown", phone: incoming.parameters?.From || "" });
       setGlobalIncomingTwilioNumber(incoming.parameters?.To || "");
 
-      incoming.on("disconnect", () => {
-        setGlobalActiveIncomingCall(false);
-        setGlobalIncomingMuted(false);
-        incomingCallRef.current = null;
-        callChannelRef.current?.postMessage({ type: "ended" });
-      });
       callChannelRef.current?.postMessage({ type: "answered" });
     } catch {
       incomingCallRef.current = null;
@@ -496,6 +508,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     incomingCallRef.current = null;
     setGlobalActiveIncomingCall(false);
     setGlobalIncomingMuted(false);
+    setGlobalIncomingHeld(false);
     callChannelRef.current?.postMessage({ type: "ended" });
   }
 
@@ -529,6 +542,31 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     if (info.name) params.set("name", info.name);
     if (info.phone) params.set("phone", info.phone);
     router.push(`/crm/calendar?schedule=1&${params.toString()}`);
+  }
+
+  async function handleTransferGlobalIncomingCall(number: string) {
+    const callSid = incomingCallRef.current?.parameters?.CallSid;
+    if (!callSid || !number.trim()) return;
+    try {
+      await controlCall({ callSid, action: "forward", forwardTo: number.trim() });
+      incomingCallRef.current = null;
+      setGlobalActiveIncomingCall(false);
+      setGlobalIncomingMuted(false);
+      callChannelRef.current?.postMessage({ type: "ended" });
+    } catch {}
+  }
+
+  async function handleHoldGlobalIncomingCall() {
+    const call = incomingCallRef.current;
+    const callSid = call?.parameters?.CallSid;
+    if (!callSid) return;
+    try {
+      const action = globalIncomingHeld ? "resume" : "hold";
+      await controlCall({ callSid, action });
+      // Mute/unmute audio via the SDK as a local hold indicator
+      try { call?.mute?.(!globalIncomingHeld); } catch {}
+      setGlobalIncomingHeld(!globalIncomingHeld);
+    } catch {}
   }
 
   // Load customers for the floating dialer contacts tab
@@ -648,7 +686,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {/* Floating Call Card — active incoming call */}
       {globalActiveIncomingCall && !globalIncomingCall && !isCrewUser && (
         <FloatingCallCard
-          state="active"
+          state={globalIncomingHeld ? "held" : "active"}
           caller={globalIncomingCaller}
           muted={globalIncomingMuted}
           twilioNumber={globalIncomingTwilioNumber}
@@ -657,6 +695,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           onDecline={() => {}}
           onEnd={handleEndGlobalIncomingCall}
           onMute={handleMuteGlobalIncomingCall}
+          onHold={handleHoldGlobalIncomingCall}
+          onTransfer={handleTransferGlobalIncomingCall}
           onSaveNotes={handleIncomingCallSaveNotes}
           onCreateLead={handleIncomingCallCreateLead}
           onSchedule={handleIncomingCallSchedule}
