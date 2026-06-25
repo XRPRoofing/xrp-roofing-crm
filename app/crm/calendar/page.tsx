@@ -302,6 +302,7 @@ export default function CalendarPage() {
     description: "",
     color: "blue",
     assigned_to: TEAM_MEMBERS[0].id,
+    guestEmails: "",
   });
 
   // Edit form
@@ -586,6 +587,30 @@ export default function CalendarPage() {
         return;
       }
 
+      // Sync to Google Calendar (best-effort)
+      if (googleConnected) {
+        try {
+          await fetch("/api/google-calendar/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: form.title,
+              name: form.customer_name || form.title,
+              address: form.location || "N/A",
+              jobKind: form.job_kind || "Other",
+              phone: form.customer_phone,
+              date: form.date,
+              startTime: form.startTime,
+              endTime: form.endTime,
+              notes: form.description,
+              guestEmails: form.guestEmails,
+            }),
+          });
+        } catch {
+          // Google sync failed but CRM event was saved
+        }
+      }
+
       setStatusMessage("Event created successfully.");
       setForm({
         title: "",
@@ -599,6 +624,7 @@ export default function CalendarPage() {
         description: "",
         color: "blue",
         assigned_to: TEAM_MEMBERS[0].id,
+        guestEmails: "",
       });
       setNewScheduleOpen(false);
       await loadEvents();
@@ -1349,6 +1375,16 @@ export default function CalendarPage() {
                   }
                   className="min-h-[80px] rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2"
                   placeholder="Notes"
+                />
+                <input
+                  type="email"
+                  multiple
+                  value={form.guestEmails}
+                  onChange={(e) =>
+                    setForm({ ...form, guestEmails: e.target.value })
+                  }
+                  className="rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2"
+                  placeholder="Invite guests (comma-separated emails)"
                 />
               </div>
             </div>
