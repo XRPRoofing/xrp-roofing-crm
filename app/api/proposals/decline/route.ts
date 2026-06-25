@@ -36,12 +36,12 @@ export async function GET(req: NextRequest) {
   const payload = data.payload as Record<string, unknown>;
 
   if (payload.status === "Won" || payload.status === "Signed" || payload.status === "Signed Offline") {
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
     return new NextResponse(declinePage("This proposal has already been signed and cannot be declined.", appUrl), { headers: { "Content-Type": "text/html" } });
   }
 
   if (payload.status === "Declined") {
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
     return new NextResponse(declinePage("This proposal has already been declined. Thank you for letting us know.", appUrl), { headers: { "Content-Type": "text/html" } });
   }
 
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     module: "Proposals",
   });
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
   return new NextResponse(declinePage("Thank you for letting us know. We have noted your decision. If you change your mind in the future, please don't hesitate to reach out to us.", appUrl), { headers: { "Content-Type": "text/html" } });
 }
 

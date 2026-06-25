@@ -31,7 +31,7 @@ async function sendEmail(to: string, subject: string, body: string): Promise<{ o
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, error: "RESEND_API_KEY not configured" };
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
   const logoUrl = `${appUrl}/images/logo.jpeg`;
   const html = `
     <div style="margin:0;background:#f1f5f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">

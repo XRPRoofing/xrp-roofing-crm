@@ -48,7 +48,7 @@ export async function sendInternalInvoiceEmail(input: InvoiceEmailInput): Promis
   if (!apiKey) return false;
 
   const recipient = process.env.INVOICE_NOTIFICATION_EMAIL || "info@xrproofing.com";
-  const logoUrl = `${(process.env.NEXT_PUBLIC_APP_URL || "https://xrp-roofing-crm.vercel.app").replace(/\/+$/, "")}/images/logo.jpeg`;
+  const logoUrl = `${(process.env.NEXT_PUBLIC_APP_URL || "https://www.xrproofing.app").replace(/\/+$/, "")}/images/logo.jpeg`;
   const copy = eventCopy[input.event];
   const when = new Date().toLocaleString("en-US", {
     dateStyle: "medium",
