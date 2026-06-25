@@ -96,6 +96,8 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [termsOpen, setTermsOpen] = useState(false);
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({});
   const isAccepted = proposal.status === "Won";
+  const isDeclined = proposal.status === "Declined";
+  const [declining, setDeclining] = useState(false);
 
   const showPackages = proposal.showPackages !== false;
 
@@ -349,6 +351,17 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               </div>
               {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
+          ) : isDeclined ? (
+            <section className="rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-6 text-center shadow-sm sm:p-8">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-2xl text-red-600">✕</div>
+              <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-red-600">Proposal Declined</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you for letting us know</h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm font-semibold leading-6 text-slate-600">We have noted your decision. If you change your mind in the future, please don&apos;t hesitate to reach out to us.</p>
+              <div className="mx-auto mt-5 flex justify-center gap-3">
+                <a href="tel:6233008097" className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700">Call Us</a>
+                <a href="mailto:info@xrproofing.com" className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Email Us</a>
+              </div>
+            </section>
           ) : (
             <section className="rounded-2xl border-2 border-blue-200 bg-white p-5 sm:p-6">
               <div className="flex items-center gap-2">
@@ -370,6 +383,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               <button type="button" disabled={!agreementAccepted || !signatureDataUrl} onClick={handleSignProposal} className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept &amp; Sign Proposal</button>
               {!agreementAccepted || !signatureDataUrl ? <p className="mt-2 text-center text-xs font-semibold text-slate-400">Check the box and add your signature to enable signing.</p> : null}
               {notice && <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
+              <div className="mt-6 border-t border-slate-200 pt-4 text-center">
+                <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined" })); } catch { setDeclining(false); } }} className="text-sm font-semibold text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
+              </div>
             </section>
           )}
         </div>
