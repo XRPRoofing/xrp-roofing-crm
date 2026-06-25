@@ -284,6 +284,7 @@ export default function CalendarPage() {
   );
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   // Team & color filters
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(
@@ -670,6 +671,7 @@ export default function CalendarPage() {
 
       setStatusMessage("Event updated successfully.");
       setSelectedEvent(null);
+      setEditMode(false);
       await loadEvents();
     } catch {
       setError("Unable to update event.");
@@ -691,6 +693,7 @@ export default function CalendarPage() {
       }
       setStatusMessage("Event deleted.");
       setSelectedEvent(null);
+      setEditMode(false);
       setDeleteConfirmOpen(false);
       await loadEvents();
     } catch {
@@ -703,6 +706,7 @@ export default function CalendarPage() {
   // Populate edit form when selecting an event
   useEffect(() => {
     if (!selectedEvent) return;
+    setEditMode(false);
     const s = new Date(selectedEvent.start_time);
     const e = new Date(selectedEvent.end_time);
     setEditForm({
@@ -1555,10 +1559,158 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {selectedEvent && !isGoogleEvent(selectedEvent) && (
+      {selectedEvent && !isGoogleEvent(selectedEvent) && !editMode && (
         <div
           className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
           onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+              <h2 className="text-2xl font-bold text-blue-700">
+                {selectedEvent.title || "Untitled"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSelectedEvent(null)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-gray-400" />
+                <span className="text-sm text-gray-700">
+                  {selectedEvent.all_day
+                    ? new Intl.DateTimeFormat("en-US", {
+                        dateStyle: "full",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.start_time))
+                    : `${new Intl.DateTimeFormat("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.start_time))} — ${new Intl.DateTimeFormat("en-US", {
+                        timeStyle: "short",
+                        timeZone: ARIZONA_TIMEZONE,
+                      }).format(new Date(selectedEvent.end_time))}`}
+                </span>
+              </div>
+              {selectedEvent.customer_name && (
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700">{selectedEvent.customer_name}</span>
+                </div>
+              )}
+              {selectedEvent.customer_phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
+                    {telHref(selectedEvent.customer_phone) && (
+                      <>
+                        <a
+                          href={telHref(selectedEvent.customer_phone)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-600"
+                        >
+                          <Phone className="h-3 w-3" />
+                          Call
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSmsTarget({
+                              phone: selectedEvent.customer_phone,
+                              name: selectedEvent.customer_name,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg bg-green-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-600"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          SMS
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedEvent.location && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedEvent.location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {selectedEvent.location}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {selectedEvent.job_kind && (
+                <div className="flex items-center gap-3">
+                  <Briefcase className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm text-gray-700">{selectedEvent.job_kind}</span>
+                </div>
+              )}
+              {selectedEvent.assigned_to && (
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm text-gray-500">
+                    Assigned to: {TEAM_MEMBERS.find((m) => m.id === selectedEvent.assigned_to)?.name || selectedEvent.assigned_to}
+                  </span>
+                </div>
+              )}
+              {selectedEvent.description && (
+                <div className="flex items-start gap-3">
+                  <AlignLeft className="mt-0.5 h-5 w-5 text-gray-400" />
+                  <p className="whitespace-pre-wrap text-sm text-gray-700">
+                    {selectedEvent.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 font-bold text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEvent(null)}
+                  className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditMode(true)}
+                  className="rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white hover:bg-blue-700"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedEvent && !isGoogleEvent(selectedEvent) && editMode && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
+          onClick={() => { setSelectedEvent(null); setEditMode(false); }}
         >
           <form
             onSubmit={handleUpdateEvent}
@@ -1579,7 +1731,7 @@ export default function CalendarPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setSelectedEvent(null)}
+                  onClick={() => { setSelectedEvent(null); setEditMode(false); }}
                   className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
                 >
                   <X className="h-5 w-5" />
