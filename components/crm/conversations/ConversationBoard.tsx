@@ -576,7 +576,7 @@ function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
   // Call recordings are rendered once as a dedicated CallInsightsCard, not as a
   // timeline message bubble — rendering both is what caused duplicate summaries.
   if (event.type === "call_recording") return false;
-  if (event.type === "call_note") return true;
+  if (event.type === "call_note") return false;
 
   // incoming_call events are always visible so every inbound call appears on
   // the board even if the caller abandons during the IVR.
@@ -778,6 +778,8 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
 
   // When a call_note event carries a disposition, propagate it to the matching call row
   const noteDisposition = event.type === "call_note" && event.callSid && typeof event.payload?.disposition === "string" ? event.payload.disposition : undefined;
+  // When a call_recording event arrives, attach its recordingUrl to the matching call row
+  const recordingUrl = event.type === "call_recording" && event.callSid && event.recordingUrl ? event.recordingUrl : undefined;
 
   const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => {
     if (item.id === effectiveMessage.id) return false;
@@ -785,15 +787,17 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     if (event.messageSid && item.direction === "outbound" && effectiveMessage.direction === "outbound" && item.body === effectiveMessage.body && !item.id.startsWith("SM")) return false;
     return true;
   }).map((m) => {
-    if (noteDisposition && event.callSid && m.id === "call-" + event.callSid && !m.disposition) {
-      return { ...m, disposition: noteDisposition };
-    }
-    return m;
+    if (m.id !== "call-" + event.callSid) return m;
+    let updated = m;
+    if (noteDisposition) updated = { ...updated, disposition: noteDisposition };
+    if (recordingUrl && !updated.recordingUrl) updated = { ...updated, recordingUrl };
+    return updated;
   }), effectiveMessage].slice(-50) : nextConversation.messages.map((m) => {
-    if (noteDisposition && event.callSid && m.id === "call-" + event.callSid && !m.disposition) {
-      return { ...m, disposition: noteDisposition };
-    }
-    return m;
+    if (m.id !== "call-" + event.callSid) return m;
+    let updated = m;
+    if (noteDisposition) updated = { ...updated, disposition: noteDisposition };
+    if (recordingUrl && !updated.recordingUrl) updated = { ...updated, recordingUrl };
+    return updated;
   });
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
@@ -1258,7 +1262,7 @@ export default function ConversationBoard() {
         return tb - ta;
       });
       setConversations(savedConversations.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
-      setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
+      setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")));
       setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
       scrollMessageBoardToBottom();
@@ -1287,7 +1291,7 @@ export default function ConversationBoard() {
           return tb - ta;
         });
         setConversations(sorted.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
-        setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")).slice(-5).reverse());
+        setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")));
       }).catch(() => {});
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -1328,7 +1332,7 @@ export default function ConversationBoard() {
         });
         scrollMessageBoardToBottom();
         if (event.type === "call_recording") {
-          setCallInsights((current: TwilioConversationEvent[]) => dedupeCallInsights([event, ...current]).slice(0, 5));
+          setCallInsights((current: TwilioConversationEvent[]) => dedupeCallInsights([event, ...current]));
         }
         if (event.type === "incoming_call") {
           notifyIncomingCall(getEventPhone(event));
@@ -1717,7 +1721,7 @@ export default function ConversationBoard() {
                 <div className="flex items-start gap-3"><button type="button" onClick={() => { setShowMobileThread(false); setShowMobileContact(false); }} className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-gray-950">{active.contact.name}</p><p className="text-sm text-gray-500"><AddressLink value={active.contact.address} /></p></div></div>
                 <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><Button className="xl:hidden" onClick={() => setShowMobileContact(true)}><UserRound className="mr-1.5 h-4 w-4" />Contact</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-gray-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-gray-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
-              <div className="relative min-h-0 flex-1 bg-gray-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((message) => <MessageRow key={message.id} message={message} />)}{callInsights.filter((event) => eventMatchesConversation(event, active)).map((event) => <CallInsightsCard key={event.id} event={event} onOpen={setSelectedCallInsight} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-gray-800">Latest messages</button></div>
+              <div className="relative min-h-0 flex-1 bg-gray-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{(() => { const insights = callInsights.filter((e) => eventMatchesConversation(e, active)); const bySid = new Map<string, TwilioConversationEvent>(); for (const e of insights) if (e.callSid) bySid.set(e.callSid, e); const shown = new Set<string>(); return [...active.messages.flatMap((msg) => { const sid = msg.id.startsWith("call-") ? msg.id.slice(5) : ""; const insight = sid ? bySid.get(sid) : undefined; if (insight) { shown.add(insight.id); return [<MessageRow key={msg.id} message={msg} />, <CallInsightsCard key={insight.id} event={insight} onOpen={setSelectedCallInsight} />]; } return [<MessageRow key={msg.id} message={msg} />]; }), ...insights.filter((e) => !shown.has(e.id)).map((e) => <CallInsightsCard key={e.id} event={e} onOpen={setSelectedCallInsight} />)]; })()}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-gray-800">Latest messages</button></div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-gray-50 p-8 text-center">
