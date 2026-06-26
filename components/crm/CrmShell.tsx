@@ -77,6 +77,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [dialerCustomers, setDialerCustomers] = useState<Customer[]>([]);
   const [pendingDialNumber, setPendingDialNumber] = useState<string | undefined>();
   const [pendingCallerId, setPendingCallerId] = useState<string | undefined>();
+
+  // Post-call disposition modal state
+  const [showPostCallDisposition, setShowPostCallDisposition] = useState(false);
+  const [postCallSid, setPostCallSid] = useState<string | undefined>();
+  const [postCallDisposition, setPostCallDisposition] = useState("");
+  const [postCallNotes, setPostCallNotes] = useState("");
+  const [postCallSaving, setPostCallSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -463,11 +470,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       // Register disconnect/error handlers BEFORE accept() so we never miss
       // a hangup that fires between accept and listener registration.
       incoming.on("disconnect", () => {
+        const endedSid = incoming.parameters?.CallSid;
         setGlobalActiveIncomingCall(false);
         setGlobalIncomingMuted(false);
         setGlobalIncomingHeld(false);
         incomingCallRef.current = null;
         callChannelRef.current?.postMessage({ type: "ended" });
+        if (endedSid && pathnameRef.current !== "/crm/conversations") { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
       });
       incoming.on("error", () => {
         setGlobalActiveIncomingCall(false);
@@ -506,6 +515,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   function handleEndGlobalIncomingCall() {
+    const endedSid = incomingCallRef.current?.parameters?.CallSid;
     try {
       incomingCallRef.current?.disconnect();
     } catch {}
@@ -514,6 +524,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setGlobalIncomingMuted(false);
     setGlobalIncomingHeld(false);
     callChannelRef.current?.postMessage({ type: "ended" });
+    if (endedSid && pathnameRef.current !== "/crm/conversations") { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
   }
 
   function handleMuteGlobalIncomingCall() {
@@ -579,6 +590,28 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     if (cached) setDialerCustomers(cached); // eslint-disable-line react-hooks/set-state-in-effect
     else refreshCustomers<Customer>().then(setDialerCustomers).catch(() => {});
   }, []);
+
+  // Disposition modal handlers (shared by incoming calls + global dialer)
+  function handleDialerCallEnd(sid: string) {
+    if (pathnameRef.current === "/crm/conversations") return; // ConversationBoard has its own modal
+    setPostCallSid(sid);
+    setShowPostCallDisposition(true);
+  }
+  async function handleSavePostCallDisposition() {
+    if (!postCallSid || !postCallDisposition) return;
+    setPostCallSaving(true);
+    try {
+      await saveCallNotes({ callSid: postCallSid, notes: postCallNotes.trim(), disposition: postCallDisposition });
+    } catch {}
+    setPostCallSaving(false);
+    closePostCallDisposition();
+  }
+  function closePostCallDisposition() {
+    setShowPostCallDisposition(false);
+    setPostCallSid(undefined);
+    setPostCallDisposition("");
+    setPostCallNotes("");
+  }
 
   // Phone numbers available for caller ID selection — driven by centralized registry
   const dialerPhoneNumbers = useMemo(() => {
@@ -976,6 +1009,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           phoneNumbers={dialerPhoneNumbers}
           customers={dialerCustomers}
           onCallStateChange={setGlobalCallActive}
+          onCallEnd={handleDialerCallEnd}
           initialDialNumber={pendingDialNumber}
           initialCallerId={pendingCallerId}
         />
@@ -990,6 +1024,41 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="hidden text-sm font-medium sm:block">{unreadTeamChatCount > 0 ? `${unreadTeamChatCount} unread` : "Team Chat"}</span>
         </Link>
+      )}
+
+      {/* Post-call disposition modal (incoming calls + global dialer) */}
+      {showPostCallDisposition && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Call Disposition</h3>
+              <p className="mt-0.5 text-sm text-gray-500">Select the outcome of this call</p>
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                {(["No Answer","Left Voicemail","Interested","Not Interested","Call Back Requested","Follow-Up Needed","Appointment Scheduled","Estimate Scheduled","Proposal Sent","Proposal Signed","Job Won","Wrong Number","Spam","Do Not Call","Customer Unavailable","Other"] as const).map((d) => {
+                  const colorMap: Record<string, string> = { Interested: "bg-green-500", "Appointment Scheduled": "bg-green-500", "Estimate Scheduled": "bg-green-500", "Job Won": "bg-green-500", "Proposal Sent": "bg-blue-500", "Proposal Signed": "bg-blue-500", "Follow-Up Needed": "bg-blue-500", "Call Back Requested": "bg-blue-500", "Left Voicemail": "bg-yellow-500", "No Answer": "bg-yellow-500", "Customer Unavailable": "bg-yellow-500", "Not Interested": "bg-red-500", "Wrong Number": "bg-red-500", Spam: "bg-red-500", "Do Not Call": "bg-red-500" };
+                  return (
+                    <button key={d} type="button" onClick={() => setPostCallDisposition(d)} className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition ${postCallDisposition === d ? "border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200" : "border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50"}`}>
+                      <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${colorMap[d] || "bg-gray-400"}`} />
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-gray-500">Notes (optional)</label>
+                <textarea value={postCallNotes} onChange={(e) => setPostCallNotes(e.target.value)} className="mt-1 min-h-[72px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" placeholder="Add call notes..." />
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+              <button type="button" onClick={closePostCallDisposition} className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-500 transition hover:bg-gray-100">Skip</button>
+              <button type="button" onClick={handleSavePostCallDisposition} disabled={!postCallDisposition || postCallSaving} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                {postCallSaving ? "Saving..." : "Save Disposition"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
