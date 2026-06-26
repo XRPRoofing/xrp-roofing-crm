@@ -1,33 +1,49 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useInsertionEffect, useRef } from "react";
 
 /**
- * Re-run `onRefresh` whenever the user returns to the page so data is reloaded
- * without a manual refresh:
+ * Minimum elapsed time (ms) between two refresh callbacks.  When the user
+ * returns to the tab (focus / visibilitychange) we only re-fetch if more
+ * than this many milliseconds have passed since the last refresh, preventing
+ * the rapid-fire reloads that previously made the CRM feel unstable.
+ */
+const FOCUS_COOLDOWN_MS = 5_000;
+
+/**
+ * Re-run `onRefresh` when the user returns to the page **and** the data is
+ * stale (more than FOCUS_COOLDOWN_MS since the last refresh):
+ *
  *  - window `focus` (switching back to the tab/window)
- *  - `visibilitychange` -> visible (returning from another app, esp. on mobile)
+ *  - `visibilitychange` → visible (returning from another app, mobile)
  *  - cross-tab `storage` writes on the same device
  *  - BroadcastChannel messages from other tabs on the same device
- *  - a safety-net polling interval (default 30s; callers can override)
  *
- * Refreshes are debounced so rapid events (e.g. focus + visibilitychange firing
- * together) only trigger one callback.
+ * **No polling interval** — data freshness comes from Supabase realtime
+ * subscriptions. The hook only fires on user-initiated navigation events,
+ * keeping pages stable and free of random refreshes.
  *
- * The latest callback is held in a ref so callers can pass an inline function
- * without re-binding listeners on every render.
+ * The latest callback is held in a ref so callers can pass an inline
+ * function without re-binding listeners on every render.
  */
-export function useAutoRefresh(onRefresh: () => void, { intervalMs }: { intervalMs?: number } = {}) {
+export function useAutoRefresh(onRefresh: () => void) {
   const callbackRef = useRef(onRefresh);
-  callbackRef.current = onRefresh;
+  useInsertionEffect(() => { callbackRef.current = onRefresh; });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    let lastRun = Date.now();
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const debouncedRun = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => callbackRef.current(), 300);
+      debounceTimer = setTimeout(() => {
+        const now = Date.now();
+        if (now - lastRun < FOCUS_COOLDOWN_MS) return;
+        lastRun = now;
+        callbackRef.current();
+      }, 300);
     };
 
     const onVisible = () => {
@@ -49,18 +65,14 @@ export function useAutoRefresh(onRefresh: () => void, { intervalMs }: { interval
       // BroadcastChannel not supported — fall back to storage events only
     }
 
-    const finalInterval = intervalMs ?? 60_000;
-    const timer = finalInterval > 0 ? window.setInterval(debouncedRun, finalInterval) : undefined;
-
     return () => {
       window.removeEventListener("focus", debouncedRun);
       window.removeEventListener("storage", debouncedRun);
       document.removeEventListener("visibilitychange", onVisible);
       if (bc) { try { bc.close(); } catch { /* ignore */ } }
       if (debounceTimer) clearTimeout(debounceTimer);
-      if (timer) window.clearInterval(timer);
     };
-  }, [intervalMs]);
+  }, []);
 }
 
 /** Notify all other open tabs to refresh their data immediately. */
@@ -73,47 +85,4 @@ export function broadcastCrmUpdate() {
   } catch {
     // BroadcastChannel not supported
   }
-}
-
-/**
- * Hook for ensuring data freshness when the app returns to the foreground.
- * Refreshes on visibility change and pageshow events with debouncing.
- */
-export function useMobileAggressiveSync(onRefresh: () => void) {
-  const callbackRef = useRef(onRefresh);
-  callbackRef.current = onRefresh;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedRun = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => callbackRef.current(), 300);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        debouncedRun();
-      }
-    };
-
-    const handlePageShow = () => {
-      debouncedRun();
-    };
-
-    callbackRef.current();
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pageshow", handlePageShow);
-
-    const timer = window.setInterval(debouncedRun, 30_000);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pageshow", handlePageShow);
-      if (debounceTimer) clearTimeout(debounceTimer);
-      window.clearInterval(timer);
-    };
-  }, []);
 }

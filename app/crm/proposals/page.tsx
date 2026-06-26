@@ -431,11 +431,13 @@ export default function ProposalsPage() {
   const [proposals, setProposals] = useState<Proposal[]>(() => getCachedProposals<Proposal>()?.filter((p) => !p.deletedAt) ?? []);
   const prevProposalsRef = useRef<Proposal[]>([]);
   const permanentlyDeletedIdsRef = useRef<Set<string>>(new Set());
+  const locallyDeletedIdsRef = useRef<Set<string>>(new Set());
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [emailTemplates, setEmailTemplates] = useState<ProposalEmailTemplate[]>(defaultEmailTemplates);
   const [editorBrochures, setEditorBrochures] = useState<BrochureFile[]>([]);
-  const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "settings">("proposals");
+  const [activeTab, setActiveTab] = useState<"proposals" | "drafts" | "templates" | "trash" | "settings">("proposals");
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState<Proposal | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [jobSearch, setJobSearch] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -669,13 +671,22 @@ export default function ProposalsPage() {
       const server = await loadProposalRecords<Proposal>();
       if (!mounted) return;
       const deletedIds = permanentlyDeletedIdsRef.current;
+      const softDeletedIds = locallyDeletedIdsRef.current;
       const filtered = server.filter((proposal) => !deletedIds.has(proposal.id));
       setProposals((current) => {
         const serverIds = new Set(filtered.map((proposal) => proposal.id));
         const localOnly = current.filter((proposal) => !serverIds.has(proposal.id) && !deletedIds.has(proposal.id));
-        const merged = retain([...filtered, ...localOnly]);
-        // Treat server data as already-synced so the diff effect doesn't echo it
-        // back (jsonb reorders keys, which would otherwise look like a change).
+        const merged = retain([...filtered, ...localOnly]).map((proposal) => {
+          // Preserve local soft-delete if the server hasn't caught up yet
+          if (softDeletedIds.has(proposal.id) && !proposal.deletedAt) {
+            return { ...proposal, deletedAt: new Date().toISOString() };
+          }
+          // Server now reflects the deletion — stop tracking locally
+          if (softDeletedIds.has(proposal.id) && proposal.deletedAt) {
+            softDeletedIds.delete(proposal.id);
+          }
+          return proposal;
+        });
         prevProposalsRef.current = merged;
         return merged;
       });
@@ -781,11 +792,22 @@ export default function ProposalsPage() {
     if (!proposalSyncEnabled()) return;
     void refreshProposals<Proposal>().then((server) => {
       const deletedIds = permanentlyDeletedIdsRef.current;
+      const softDeletedIds = locallyDeletedIdsRef.current;
       const filtered = server.filter((p) => !deletedIds.has(p.id));
       setProposals((current) => {
         const serverIds = new Set(filtered.map((p) => p.id));
         const localOnly = current.filter((p) => !serverIds.has(p.id) && !deletedIds.has(p.id));
-        const merged = [...filtered, ...localOnly].filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs);
+        const merged = [...filtered, ...localOnly]
+          .filter((p) => !p.deletedAt || Date.now() - new Date(p.deletedAt).getTime() < trashRetentionMs)
+          .map((p) => {
+            if (softDeletedIds.has(p.id) && !p.deletedAt) {
+              return { ...p, deletedAt: new Date().toISOString() };
+            }
+            if (softDeletedIds.has(p.id) && p.deletedAt) {
+              softDeletedIds.delete(p.id);
+            }
+            return p;
+          });
         prevProposalsRef.current = merged;
         return merged;
       });
@@ -1434,6 +1456,7 @@ export default function ProposalsPage() {
 
   function handleDeleteProposal(proposal: Proposal) {
     const trashedProposal = { ...proposal, deletedAt: new Date().toISOString() };
+    locallyDeletedIdsRef.current.add(proposal.id);
     setDeletedProposal(trashedProposal);
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? trashedProposal : currentProposal));
     if (proposal.job?.id) {
@@ -1458,16 +1481,18 @@ export default function ProposalsPage() {
 
   function handleUndoDelete() {
     if (!deletedProposal) return;
-
+    locallyDeletedIdsRef.current.delete(deletedProposal.id);
     setProposals((currentProposals) => currentProposals.map((proposal) => proposal.id === deletedProposal.id ? { ...proposal, deletedAt: undefined } : proposal));
     setDeletedProposal(null);
   }
 
   function handleRestoreProposal(proposal: Proposal) {
+    locallyDeletedIdsRef.current.delete(proposal.id);
     setProposals((currentProposals) => currentProposals.map((currentProposal) => currentProposal.id === proposal.id ? { ...currentProposal, deletedAt: undefined } : currentProposal));
   }
 
   function handlePermanentDeleteProposal(proposal: Proposal) {
+    locallyDeletedIdsRef.current.delete(proposal.id);
     permanentlyDeletedIdsRef.current.add(proposal.id);
     setProposals((currentProposals) => currentProposals.filter((currentProposal) => currentProposal.id !== proposal.id));
     if (deletedProposal?.id === proposal.id) {
@@ -2237,6 +2262,7 @@ export default function ProposalsPage() {
             <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
             <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
             <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
+            <button type="button" onClick={() => setActiveTab("trash")} className={`px-1 pb-4 ${activeTab === "trash" ? "border-b-2 border-red-600 text-red-600" : "text-gray-600"}`}>Trash{trashedProposals.length > 0 ? ` (${trashedProposals.length})` : ""}</button>
             <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
           </div>
         </div>
@@ -2452,6 +2478,68 @@ export default function ProposalsPage() {
         </div>
       )}
 
+      {activeTab === "trash" && (
+        <div className="space-y-5">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-red-600">Trash Bin</p>
+                <h2 className="mt-2 text-2xl font-bold text-blue-700">Deleted Proposals</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Deleted proposals are kept here for {trashRetentionDays} days. You can restore them or permanently delete them.</p>
+              </div>
+              {trashedProposals.length > 0 && (
+                <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-gray-200 bg-gray-50 px-5 py-3 text-sm font-bold text-gray-700 hover:bg-white">Clear expired trash</button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            {trashedProposals.length === 0 ? (
+              <div className="rounded-lg bg-gray-50 p-8 text-center">
+                <p className="text-lg font-bold text-blue-700">Trash bin is empty</p>
+                <p className="mt-2 text-sm text-gray-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {trashedProposals.map((proposal) => {
+                  const deletedAt = proposal.deletedAt ? new Date(proposal.deletedAt) : new Date();
+                  const daysUsed = Math.max(0, Math.floor((Date.now() - deletedAt.getTime()) / (24 * 60 * 60 * 1000)));
+                  const daysLeft = Math.max(0, trashRetentionDays - daysUsed);
+
+                  return (
+                    <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 md:flex-row md:items-center">
+                      <div>
+                        <p className="text-base font-bold text-blue-700">{proposal.customerName}</p>
+                        <p className="mt-1 text-sm text-gray-600">{proposal.address}</p>
+                        <p className="mt-1 text-xs text-gray-500">${proposal.total.toLocaleString()} &middot; {proposal.scope}</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-gray-500">Deleted {azDate(deletedAt)} &middot; Permanently deletes in {daysLeft} days</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Restore</button>
+                        <button type="button" onClick={() => setConfirmPermanentDelete(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100">Delete forever</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {confirmPermanentDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">Permanently delete proposal?</h3>
+            <p className="mt-2 text-sm text-gray-600">This will permanently delete the proposal for <strong>{confirmPermanentDelete.customerName}</strong>. This action cannot be undone.</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setConfirmPermanentDelete(null)} className="rounded-full border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={() => { handlePermanentDeleteProposal(confirmPermanentDelete); setConfirmPermanentDelete(null); }} className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700">Delete forever</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "settings" && (
         <div className="space-y-5">
           {/* Automated Proposal Follow-Up Settings */}
@@ -2537,46 +2625,15 @@ export default function ProposalsPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">Settings</p>
                 <h2 className="mt-2 text-2xl font-bold text-blue-700">Proposal trash bin</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Deleted proposals are hidden from the proposal board and drafts. They stay here for {trashRetentionDays} days before they are removed completely.</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Deleted proposals are hidden from the proposal board and drafts. They stay in the <button type="button" onClick={() => setActiveTab("trash")} className="font-bold text-blue-600 hover:underline">Trash tab</button> for {trashRetentionDays} days before they are removed completely.</p>
               </div>
-              <button type="button" onClick={handleEmptyExpiredTrash} className="w-fit rounded-full border border-gray-200 bg-gray-50 px-5 py-3 text-sm font-bold text-gray-700 hover:bg-white">Clear expired trash</button>
+              <button type="button" onClick={() => setActiveTab("trash")} className="w-fit rounded-full border border-gray-200 bg-gray-50 px-5 py-3 text-sm font-bold text-gray-700 hover:bg-white">View Trash ({trashedProposals.length})</button>
             </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            {trashedProposals.length === 0 ? (
-              <div className="rounded-lg bg-gray-50 p-8 text-center">
-                <p className="text-lg font-bold text-blue-700">Trash bin is empty</p>
-                <p className="mt-2 text-sm text-gray-500">Deleted proposals will appear here for {trashRetentionDays} days.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {trashedProposals.map((proposal) => {
-                  const deletedAt = proposal.deletedAt ? new Date(proposal.deletedAt) : new Date();
-                  const daysUsed = Math.max(0, Math.floor((Date.now() - deletedAt.getTime()) / (24 * 60 * 60 * 1000)));
-                  const daysLeft = Math.max(0, trashRetentionDays - daysUsed);
-
-                  return (
-                    <div key={proposal.id} className="flex flex-col justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 md:flex-row md:items-center">
-                      <div>
-                        <p className="text-base font-bold text-blue-700">{proposal.customerName}</p>
-                        <p className="mt-1 text-sm text-gray-600">{proposal.address}</p>
-                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-gray-500">Deleted {azDate(deletedAt)} · Permanently deletes in {daysLeft} days</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => handleRestoreProposal(proposal)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white">Restore</button>
-                        <button type="button" onClick={() => handlePermanentDeleteProposal(proposal)} className="rounded-full bg-red-50 px-4 py-2 text-sm font-bold text-red-700">Delete forever</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {activeTab !== "templates" && activeTab !== "settings" && showCreateForm && (
+      {activeTab !== "templates" && activeTab !== "trash" && activeTab !== "settings" && showCreateForm && (
       <form onSubmit={handleCreateProposal} className="rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap gap-2">
           <button type="button" onClick={() => setProposalMode("job")} className={`rounded-lg px-4 py-2 text-sm font-bold ${proposalMode === "job" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"}`}>From selected job</button>
@@ -2648,7 +2705,7 @@ export default function ProposalsPage() {
       </form>
       )}
 
-      {activeTab !== "templates" && activeTab !== "settings" && (
+      {activeTab !== "templates" && activeTab !== "trash" && activeTab !== "settings" && (
       <div className="space-y-3 pb-20 pr-2 lg:pb-0">
         {filteredProposals.map((proposal) => (
           <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-lg border border-white/70 bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
