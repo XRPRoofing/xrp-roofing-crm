@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
+import { azNoon, azParts } from "@/lib/arizona-time";
 import {
   AlignLeft,
   Briefcase,
@@ -62,7 +63,8 @@ function dateKey(year: number, month: number, day: number) {
 }
 
 function dateKeyFromDate(d: Date): string {
-  return dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+  const p = azParts(d);
+  return dateKey(p.year, p.month, p.day);
 }
 
 function arizonaToday(): { year: number; month: number; day: number } {
@@ -147,16 +149,15 @@ function telHref(phone: string) {
 }
 
 function getWeekStart(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
-  d.setDate(d.getDate() - d.getDay());
-  return d;
+  const p = azParts(date);
+  return azNoon(p.year, p.month, p.day - p.dow);
 }
 
 function isoDate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const p = azParts(d);
+  const mm = String(p.month + 1).padStart(2, "0");
+  const dd = String(p.day).padStart(2, "0");
+  return `${p.year}-${mm}-${dd}`;
 }
 
 function isoTime(d: Date): string {
@@ -286,16 +287,27 @@ export default function CalendarPage() {
     const dp = searchParams.get("date");
     if (dp) {
       const [y, m, d] = dp.split("-").map(Number);
-      // Use noon to avoid day-boundary shift when browser tz ≠ Arizona
-      if (y && m && d) return new Date(y, m - 1, d, 12, 0, 0);
+      if (y && m && d) return azNoon(y, m - 1, d);
     }
     const t = arizonaToday();
-    return new Date(t.year, t.month, t.day, 12, 0, 0);
+    return azNoon(t.year, t.month, t.day);
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // Sync state when URL search params change (Next.js soft navigation)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    const v = searchParams.get("view");
+    if (v === "day" || v === "week" || v === "month") setViewMode(v);
+    const dp = searchParams.get("date");
+    if (dp) {
+      const [y, m, d] = dp.split("-").map(Number);
+      if (y && m && d) setCurrentDate(azNoon(y, m - 1, d));
+    }
+  }, [searchParams]);
+
   // Mobile week view: selected day index within the week (0–6)
-  const [mobileWeekDayIdx, setMobileWeekDayIdx] = useState(() => new Date().getDay());
+  const [mobileWeekDayIdx, setMobileWeekDayIdx] = useState(() => azParts(new Date()).dow);
 
   // Modal state
   const [newScheduleOpen, setNewScheduleOpen] = useState(false);
@@ -348,16 +360,17 @@ export default function CalendarPage() {
 
   /* ── Derived values ─────────────────────────────────────────────────── */
 
-  const monthCursor = useMemo(
-    () => new Date(currentDate.getFullYear(), currentDate.getMonth(), 1),
-    [currentDate],
-  );
+  const monthCursor = useMemo(() => {
+    const p = azParts(currentDate);
+    return azNoon(p.year, p.month, 1);
+  }, [currentDate]);
 
   const monthLabel = useMemo(
     () =>
       new Intl.DateTimeFormat("en-US", {
         month: "long",
         year: "numeric",
+        timeZone: ARIZONA_TIMEZONE,
       }).format(monthCursor),
     [monthCursor],
   );
@@ -368,25 +381,26 @@ export default function CalendarPage() {
   }, []);
 
   const calendarCells = useMemo(() => {
-    const year = monthCursor.getFullYear();
-    const month = monthCursor.getMonth();
-    const startWeekday = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const prevMonthDays = new Date(year, month, 0).getDate();
+    const mc = azParts(monthCursor);
+    const year = mc.year;
+    const month = mc.month;
+    const startWeekday = azParts(azNoon(year, month, 1)).dow;
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const prevMonthDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const cells: Array<{ date: Date; isCurrentMonth: boolean }> = [];
     for (let i = startWeekday - 1; i >= 0; i--) {
       cells.push({
-        date: new Date(year, month - 1, prevMonthDays - i, 12),
+        date: azNoon(year, month - 1, prevMonthDays - i),
         isCurrentMonth: false,
       });
     }
     for (let day = 1; day <= daysInMonth; day += 1) {
-      cells.push({ date: new Date(year, month, day, 12), isCurrentMonth: true });
+      cells.push({ date: azNoon(year, month, day), isCurrentMonth: true });
     }
     while (cells.length % 7 !== 0) {
       const nextDay = cells.length - startWeekday - daysInMonth + 1;
       cells.push({
-        date: new Date(year, month + 1, nextDay, 12),
+        date: azNoon(year, month + 1, nextDay),
         isCurrentMonth: false,
       });
     }
@@ -394,11 +408,12 @@ export default function CalendarPage() {
   }, [monthCursor]);
 
   const miniCalCells = useMemo(() => {
-    const year = monthCursor.getFullYear();
-    const month = monthCursor.getMonth();
-    const startWeekday = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const prevMonthDays = new Date(year, month, 0).getDate();
+    const mc = azParts(monthCursor);
+    const year = mc.year;
+    const month = mc.month;
+    const startWeekday = azParts(azNoon(year, month, 1)).dow;
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const prevMonthDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const cells: Array<{
       day: number;
       date: Date;
@@ -409,7 +424,7 @@ export default function CalendarPage() {
       const d = prevMonthDays - i;
       cells.push({
         day: d,
-        date: new Date(year, month - 1, d, 12),
+        date: azNoon(year, month - 1, d),
         isCurrentMonth: false,
         key: dateKey(year, month - 1, d),
       });
@@ -417,7 +432,7 @@ export default function CalendarPage() {
     for (let day = 1; day <= daysInMonth; day++) {
       cells.push({
         day,
-        date: new Date(year, month, day, 12),
+        date: azNoon(year, month, day),
         isCurrentMonth: true,
         key: dateKey(year, month, day),
       });
@@ -426,7 +441,7 @@ export default function CalendarPage() {
       const d = cells.length - startWeekday - daysInMonth + 1;
       cells.push({
         day: d,
-        date: new Date(year, month + 1, d, 12),
+        date: azNoon(year, month + 1, d),
         isCurrentMonth: false,
         key: dateKey(year, month + 1, d),
       });
@@ -445,11 +460,10 @@ export default function CalendarPage() {
   // Week view: 7 days starting from Sunday of the current week
   const weekDays = useMemo(() => {
     const start = getWeekStart(currentDate);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
+    const sp = azParts(start);
+    return Array.from({ length: 7 }, (_, i) =>
+      azNoon(sp.year, sp.month, sp.day + i),
+    );
   }, [currentDate]);
 
   const headerLabel = useMemo(() => {
@@ -480,11 +494,10 @@ export default function CalendarPage() {
     if (events.length === 0) setLoading(true);
     setError("");
     try {
-      const year = monthCursor.getFullYear();
-      const month = monthCursor.getMonth();
+      const mc = azParts(monthCursor);
       // Load 2 months around current view for week/day edge cases
-      const timeMin = new Date(year, month - 1, 1).toISOString();
-      const timeMax = new Date(year, month + 2, 1).toISOString();
+      const timeMin = azNoon(mc.year, mc.month - 1, 1).toISOString();
+      const timeMax = azNoon(mc.year, mc.month + 2, 1).toISOString();
 
       // Fetch CRM events and Google Calendar events in parallel
       const [crmEvents, gcalResult] = await Promise.all([
@@ -520,10 +533,9 @@ export default function CalendarPage() {
 
   // Real-time subscription
   useEffect(() => {
-    const year = monthCursor.getFullYear();
-    const month = monthCursor.getMonth();
-    const timeMin = new Date(year, month - 1, 1).toISOString();
-    const timeMax = new Date(year, month + 2, 1).toISOString();
+    const mc2 = azParts(monthCursor);
+    const timeMin = azNoon(mc2.year, mc2.month - 1, 1).toISOString();
+    const timeMax = azNoon(mc2.year, mc2.month + 2, 1).toISOString();
 
     const unsubscribe = subscribeToCalendarUpdates(
       (updated) =>
@@ -541,24 +553,21 @@ export default function CalendarPage() {
 
   function navigate(delta: number) {
     setCurrentDate((prev) => {
+      const p = azParts(prev);
       if (viewMode === "month") {
-        return new Date(prev.getFullYear(), prev.getMonth() + delta, 1, 12, 0, 0);
+        return azNoon(p.year, p.month + delta, 1);
       }
       if (viewMode === "week") {
-        const d = new Date(prev);
-        d.setDate(d.getDate() + delta * 7);
-        return d;
+        return azNoon(p.year, p.month, p.day + delta * 7);
       }
       // day
-      const d = new Date(prev);
-      d.setDate(d.getDate() + delta);
-      return d;
+      return azNoon(p.year, p.month, p.day + delta);
     });
   }
 
   function goToToday() {
     const t = arizonaToday();
-    setCurrentDate(new Date(t.year, t.month, t.day, 12, 0, 0));
+    setCurrentDate(azNoon(t.year, t.month, t.day));
   }
 
   function goToDate(date: Date) {
@@ -887,7 +896,7 @@ export default function CalendarPage() {
                   <span
                     className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}
                   >
-                    {cell.date.getDate()}
+                    {azParts(cell.date).day}
                   </span>
                 </div>
                 <div className="space-y-0.5">
@@ -1006,12 +1015,12 @@ export default function CalendarPage() {
                 }}
               >
                 <div className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                  {WEEKDAYS_FULL[day.getDay()]}
+                  {WEEKDAYS_FULL[azParts(day).dow]}
                 </div>
                 <div
                   className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-base font-bold ${isToday ? "bg-blue-600 text-white" : "text-gray-900"}`}
                 >
-                  {day.getDate()}
+                  {azParts(day).day}
                 </div>
               </div>
             );
@@ -1042,12 +1051,12 @@ export default function CalendarPage() {
                   className={`flex flex-col items-center rounded-lg px-1.5 py-1.5 transition ${isSelected ? "bg-blue-600 text-white" : isToday ? "text-blue-600" : "text-gray-600"}`}
                 >
                   <span className="text-[9px] font-bold uppercase tracking-wider">
-                    {WEEKDAYS[day.getDay()]}
+                    {WEEKDAYS[azParts(day).dow]}
                   </span>
                   <span
                     className={`mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${isSelected ? "bg-white/20" : isToday && !isSelected ? "bg-blue-100" : ""}`}
                   >
-                    {day.getDate()}
+                    {azParts(day).day}
                   </span>
                 </button>
               );
@@ -1300,10 +1309,10 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setCurrentDate(
-                      (prev) =>
-                        new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
-                    )
+                    setCurrentDate((prev) => {
+                      const p = azParts(prev);
+                      return azNoon(p.year, p.month - 1, 1);
+                    })
                   }
                   className="rounded p-0.5 text-gray-400 hover:text-gray-600"
                   aria-label="Previous month"
@@ -1313,10 +1322,10 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    setCurrentDate(
-                      (prev) =>
-                        new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
-                    )
+                    setCurrentDate((prev) => {
+                      const p = azParts(prev);
+                      return azNoon(p.year, p.month + 1, 1);
+                    })
                   }
                   className="rounded p-0.5 text-gray-400 hover:text-gray-600"
                   aria-label="Next month"

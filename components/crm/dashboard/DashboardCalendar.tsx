@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { azNoon, azParts, AZ_TZ } from "@/lib/arizona-time";
 
 type CalendarEvent = {
   id: string;
@@ -17,35 +18,16 @@ type CalendarEvent = {
   };
 };
 
-const ARIZONA_TIMEZONE = "America/Phoenix";
-
 function getArizonaToday() {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: ARIZONA_TIMEZONE,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-  const parts = formatter.formatToParts(new Date());
-  return {
-    year: Number(parts.find((p) => p.type === "year")?.value),
-    month: Number(parts.find((p) => p.type === "month")?.value) - 1,
-    day: Number(parts.find((p) => p.type === "day")?.value),
-  };
+  return azParts(new Date());
 }
 
 function getWeekDays(baseDate: Date): Date[] {
-  const day = baseDate.getDay();
-  const sunday = new Date(baseDate);
-  sunday.setDate(baseDate.getDate() - day);
-  sunday.setHours(12, 0, 0, 0);
-  const days: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(sunday);
-    d.setDate(sunday.getDate() + i);
-    days.push(d);
-  }
-  return days;
+  const p = azParts(baseDate);
+  const sundayDay = p.day - p.dow;
+  return Array.from({ length: 7 }, (_, i) =>
+    azNoon(p.year, p.month, sundayDay + i),
+  );
 }
 
 function eventDateKey(event: CalendarEvent): string | null {
@@ -57,17 +39,8 @@ function eventDateKey(event: CalendarEvent): string | null {
     return `${y}-${m - 1}-${d}`;
   }
 
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: ARIZONA_TIMEZONE,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-  const parts = formatter.formatToParts(new Date(value));
-  const year = Number(parts.find((p) => p.type === "year")?.value);
-  const month = Number(parts.find((p) => p.type === "month")?.value) - 1;
-  const dayNum = Number(parts.find((p) => p.type === "day")?.value);
-  return `${year}-${month}-${dayNum}`;
+  const p = azParts(new Date(value));
+  return `${p.year}-${p.month}-${p.day}`;
 }
 
 function formatEventTime(event: CalendarEvent): string {
@@ -77,7 +50,7 @@ function formatEventTime(event: CalendarEvent): string {
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    timeZone: ARIZONA_TIMEZONE,
+    timeZone: AZ_TZ,
   }).format(new Date(dateValue));
 }
 
@@ -92,13 +65,12 @@ export default function DashboardCalendar() {
 
   const today = useMemo(() => {
     const { year, month, day } = getArizonaToday();
-    return new Date(year, month, day, 12, 0, 0);
+    return azNoon(year, month, day);
   }, []);
 
   const baseDate = useMemo(() => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + weekOffset * 7);
-    return d;
+    const p = azParts(today);
+    return azNoon(p.year, p.month, p.day + weekOffset * 7);
   }, [today, weekOffset]);
 
   const weekDays = useMemo(() => getWeekDays(baseDate), [baseDate]);
@@ -114,7 +86,7 @@ export default function DashboardCalendar() {
       month: "long",
       day: "numeric",
       year: "numeric",
-      timeZone: ARIZONA_TIMEZONE,
+      timeZone: AZ_TZ,
     }).format(today);
   }, [today]);
 
@@ -131,10 +103,10 @@ export default function DashboardCalendar() {
     async function fetchEvents() {
       setLoading(true);
       try {
-        const sunday = weekDays[0];
-        const saturday = weekDays[6];
-        const timeMin = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate()).toISOString();
-        const timeMax = new Date(saturday.getFullYear(), saturday.getMonth(), saturday.getDate() + 1).toISOString();
+        const sp = azParts(weekDays[0]);
+        const ep = azParts(weekDays[6]);
+        const timeMin = azNoon(sp.year, sp.month, sp.day).toISOString();
+        const timeMax = azNoon(ep.year, ep.month, ep.day + 1).toISOString();
 
         const res = await fetch(
           `/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
@@ -211,7 +183,8 @@ export default function DashboardCalendar() {
       ) : (
         <div className="grid grid-cols-7 divide-x divide-gray-100 overflow-hidden rounded-lg border border-gray-200">
           {weekDays.map((day, idx) => {
-            const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
+            const dp = azParts(day);
+            const key = `${dp.year}-${dp.month}-${dp.day}`;
             const isToday = key === todayKey;
             const dayEvents = eventsByDate[key] || [];
 
@@ -224,16 +197,16 @@ export default function DashboardCalendar() {
                 <div
                   className={`cursor-pointer border-b px-2 py-2 text-center transition hover:bg-blue-100 ${isToday ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"}`}
                   onClick={() => {
-                    const mm = String(day.getMonth() + 1).padStart(2, "0");
-                    const dd = String(day.getDate()).padStart(2, "0");
-                    router.push(`/crm/calendar?view=day&date=${day.getFullYear()}-${mm}-${dd}`);
+                    const mm = String(dp.month + 1).padStart(2, "0");
+                    const dd = String(dp.day).padStart(2, "0");
+                    router.push(`/crm/calendar?view=day&date=${dp.year}-${mm}-${dd}`);
                   }}
                 >
                   <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? "text-blue-600" : "text-gray-500"}`}>
                     {WEEKDAY_LABELS[idx]}
                   </p>
                   <p className={`text-base font-bold ${isToday ? "text-blue-700" : "text-gray-900"}`}>
-                    {day.getDate()}
+                    {dp.day}
                   </p>
                 </div>
 
@@ -255,9 +228,9 @@ export default function DashboardCalendar() {
                               : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
                           }`}
                           onClick={() => {
-                            const mm = String(day.getMonth() + 1).padStart(2, "0");
-                            const dd = String(day.getDate()).padStart(2, "0");
-                            router.push(`/crm/calendar?view=day&date=${day.getFullYear()}-${mm}-${dd}`);
+                            const mm = String(dp.month + 1).padStart(2, "0");
+                            const dd = String(dp.day).padStart(2, "0");
+                            router.push(`/crm/calendar?view=day&date=${dp.year}-${mm}-${dd}`);
                           }}
                           title={`${title}${time ? ` ${time}` : ""}`}
                         >
