@@ -83,9 +83,10 @@ function conversationMatchesFilter(conversation: ConversationRecord, filter: Inb
   }
 }
 
-function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void; onCollapse?: () => void }) {
+function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse, onDelete }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void; onCollapse?: () => void; onDelete?: (conversation: ConversationRecord) => void }) {
   const [filter, setFilter] = useState<InboxFilter>("All");
   const [search, setSearch] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
     const result = {} as Record<InboxFilter, number>;
@@ -150,25 +151,39 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse 
           const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-blue-700" : "text-blue-600";
           const lineLabel = conversation.twilioNumber ? getLineLabelForNumber(conversation.twilioNumber) : "";
           return (
-            <button key={conversation.id} type="button" onClick={() => onSelect(conversation)} className={`w-full rounded-lg border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-50"}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  {unreadCount > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden />}
-                  <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-gray-950" : "font-semibold text-gray-800"}`}>{conversation.contact.name}</p>
-                  {lineLabel && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${lineLabel === "Partner Referral" ? "bg-purple-50 text-purple-600 ring-1 ring-purple-200" : "bg-gray-100 text-gray-500 ring-1 ring-gray-200"}`}>{lineLabel}</span>}
+            <div key={conversation.id} className={`relative rounded-lg border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-50"}`}>
+              <button type="button" onClick={() => onSelect(conversation)} className="w-full text-left">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {unreadCount > 0 && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600" aria-hidden />}
+                    <p className={`truncate text-base ${unreadCount > 0 ? "font-bold text-gray-950" : "font-semibold text-gray-800"}`}>{conversation.contact.name}</p>
+                    {lineLabel && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${lineLabel === "Partner Referral" ? "bg-purple-50 text-purple-600 ring-1 ring-purple-200" : "bg-gray-100 text-gray-500 ring-1 ring-gray-200"}`}>{lineLabel}</span>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {unreadCount > 0 && <Badge tone="blue">{unreadCount}</Badge>}
+                    <span className="text-xs text-gray-500">{conversation.lastActivityAt}</span>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {unreadCount > 0 && <Badge tone="blue">{unreadCount}</Badge>}
-                  <span className="text-xs text-gray-500">{conversation.lastActivityAt}</span>
+                <p className="mt-1 truncate text-sm font-medium text-gray-700"><PhoneLink value={conversation.contact.phone} /></p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-gray-500"><AddressLink value={conversation.contact.address} /></p>
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-600">{linkifyText(conversation.lastMessage)}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
                 </div>
-              </div>
-              <p className="mt-1 truncate text-sm font-medium text-gray-700"><PhoneLink value={conversation.contact.phone} /></p>
-              <p className="mt-0.5 line-clamp-1 text-xs text-gray-500"><AddressLink value={conversation.contact.address} /></p>
-              <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-600">{linkifyText(conversation.lastMessage)}</p>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
-              </div>
-            </button>
+              </button>
+              {onDelete && confirmDeleteId !== conversation.id && (
+                <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(conversation.id); }} className="absolute right-2 top-2 rounded-full p-1.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500" title="Delete conversation">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {onDelete && confirmDeleteId === conversation.id && (
+                <div className="mt-2 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <p className="flex-1 text-xs font-medium text-red-800">Delete this conversation?</p>
+                  <button type="button" onClick={() => { onDelete(conversation); setConfirmDeleteId(null); }} className="rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">Delete</button>
+                  <button type="button" onClick={() => setConfirmDeleteId(null)} className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">Cancel</button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -1004,6 +1019,23 @@ export default function ConversationBoard() {
     void persistConversationRead(conversationId);
   }
 
+  async function handleDeleteConversation(conversation: ConversationRecord) {
+    try {
+      const res = await fetch("/api/twilio/conversations/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: conversation.id, phone: conversation.contact.phone }),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setConversations((current) => current.filter((c) => c.id !== conversation.id));
+      if (activeConversationId === conversation.id) {
+        setActiveConversationId("");
+      }
+    } catch (error) {
+      console.error("[Conversation Delete]", error);
+    }
+  }
+
   function handleSelectConversation(conversation: ConversationRecord) {
     setActiveConversationId(conversation.id);
     setDialNumber(conversation.contact.phone);
@@ -1551,7 +1583,7 @@ export default function ConversationBoard() {
       <div className={`grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:auto-rows-[minmax(0,1fr)] xl:overflow-hidden ${inboxCollapsed ? "xl:grid-cols-[3rem_minmax(0,1fr)_320px]" : "xl:grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
         <div className={`${showMobileThread ? "hidden xl:block" : "block"} min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden`}>
           <div className={inboxCollapsed ? "xl:hidden" : "xl:h-full xl:min-h-0"}>
-            <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} />
+            <ConversationInbox conversations={conversations} active={active} onSelect={handleSelectConversation} onNew={openNewConversation} onCollapse={toggleInboxCollapsed} onDelete={handleDeleteConversation} />
           </div>
           {inboxCollapsed && <CollapsedInboxRail onExpand={toggleInboxCollapsed} onNew={openNewConversation} />}
         </div>
