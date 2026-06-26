@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Check } from "lucide-react";
 import { requestOpenInvoice } from "@/lib/crm-board-nav";
-import { getCachedInvoices, refreshInvoices } from "@/lib/data-cache";
+import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
+import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 type PaymentRecord = {
   amount: number;
@@ -78,18 +80,41 @@ export default function PaymentsPage() {
   }
 
   useEffect(() => {
+    let mounted = true;
     async function load() {
       try {
         const invs = await refreshInvoices<LoadedInvoice>();
-        setInvoices(invs);
+        if (mounted) setInvoices(invs);
       } catch {
         /* leave empty */
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
     load();
+
+    const unsubscribe = subscribeToInvoiceShares(() => {
+      void refreshInvoices<LoadedInvoice>().then((data) => {
+        if (mounted) setInvoices(data);
+      }).catch(() => {});
+    });
+
+    function onCacheRefresh() {
+      const cached = getCachedInvoices<LoadedInvoice>();
+      if (cached && mounted) setInvoices(cached);
+    }
+    window.addEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.removeEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
+    };
   }, []);
+
+  useAutoRefresh(() => {
+    void refreshInvoices<LoadedInvoice>().then(setInvoices).catch(() => {});
+  });
 
   const { paidInvoices, unpaidInvoices, totalPaid, totalUnpaid } = useMemo(() => {
     const paid: LoadedInvoice[] = [];
