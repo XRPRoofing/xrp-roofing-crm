@@ -15,7 +15,7 @@ import { azDateTime } from "@/lib/arizona-time";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Trash2, Upload, UserRound, X } from "lucide-react";
 import { PhoneLink, AddressLink, linkifyContactInfo } from "@/components/ContactLinks";
 import { getTwilioLines, getLineLabelForNumber } from "@/lib/twilio/numbers";
 import { toE164 } from "@/lib/twilio/config";
@@ -292,8 +292,9 @@ function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; o
   );
 }
 
-function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEvent | null; onClose: () => void }) {
+function CallTranscriptModal({ event, onClose, onDeleteRecording }: { event: TwilioConversationEvent | null; onClose: () => void; onDeleteRecording?: (event: TwilioConversationEvent) => void }) {
   const [showTranscript, setShowTranscript] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   if (!event) return null;
 
   const transcript = typeof event.payload.transcript === "string" ? event.payload.transcript : "";
@@ -314,7 +315,22 @@ function CallTranscriptModal({ event, onClose }: { event: TwilioConversationEven
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700"><Sparkles className="h-3.5 w-3.5" />Summary</p>
             <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-gray-800">{summary || "Summary is still processing or unavailable."}</p>
           </div>
-          {event.recordingUrl && <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="w-full" />}
+          {event.recordingUrl && (
+            <div className="flex items-center gap-2">
+              <audio controls src={proxyRecordingUrl(event.recordingUrl)} className="min-w-0 flex-1" />
+              {onDeleteRecording && !confirmDelete && (
+                <button onClick={() => setConfirmDelete(true)} className="shrink-0 rounded-full p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600" title="Delete recording">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+              {onDeleteRecording && confirmDelete && (
+                <div className="flex shrink-0 items-center gap-1">
+                  <button onClick={() => { onDeleteRecording(event); onClose(); }} className="rounded-md bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">Delete</button>
+                  <button onClick={() => setConfirmDelete(false)} className="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200">Cancel</button>
+                </div>
+              )}
+            </div>
+          )}
           <div className="rounded-lg border border-gray-200 bg-gray-50">
             <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-gray-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
             {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{transcript || "Transcript is still processing or unavailable."}</p>}
@@ -1612,7 +1628,15 @@ export default function ConversationBoard() {
         )}
       </div>
 
-      <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} />
+      <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} onDeleteRecording={async (evt) => {
+        try {
+          const res = await fetch("/api/twilio/recording/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callSid: evt.callSid, recordingSid: evt.recordingSid }) });
+          if (!res.ok) throw new Error("Delete failed");
+          setCallInsights((current) => current.filter((ci) => ci.callSid !== evt.callSid));
+        } catch (error) {
+          console.error("[Recording Delete]", error);
+        }
+      }} />
 
       {newConvoOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setNewConvoOpen(false)}>
