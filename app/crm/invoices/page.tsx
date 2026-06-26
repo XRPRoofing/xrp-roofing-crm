@@ -23,6 +23,7 @@ import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "@/lib/unified-numbering";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
@@ -67,6 +68,7 @@ type ProposalPackageOption = {
 
 type StoredProposal = {
   id: string;
+  proposalNumber?: string;
   customerName: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -305,8 +307,9 @@ function getComputedStatus(invoice: Invoice): InvoiceStatus {
   return invoice.status === "Pending" || invoice.status === "Due Soon" || invoice.status === "Overdue" ? invoice.status : "Pending";
 }
 
-function createInvoiceNumber(count: number) {
-  return `XRP-INV-${String(1001 + count).padStart(4, "0")}`;
+function createInvoiceNumber(_count?: number) {
+  const num = getNextUnifiedNumber();
+  return `#${num}`;
 }
 
 function createBlankInvoice(count: number): Invoice {
@@ -356,9 +359,12 @@ function createInvoiceFromJob(job: Lead, count: number): Invoice {
 function createInvoiceFromProposal(proposal: StoredProposal, count: number): Invoice {
   const selectedPackage = getProposalSelectedPackage(proposal);
   const job = proposal.job;
+  const base = createBlankInvoice(count);
+  const invoiceNumber = proposal.proposalNumber ? `#${proposal.proposalNumber}` : base.invoiceNumber;
 
   return {
-    ...createBlankInvoice(count),
+    ...base,
+    invoiceNumber,
     clientName: proposal.customerName,
     email: proposal.customerEmail || job?.email || "",
     phone: proposal.customerPhone || job?.phone || "",
@@ -372,7 +378,7 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
     paymentTerms: "Customer may pay online by credit card or ACH bank transfer. Payment is due according to the approved proposal terms.",
     warrantyNotes: "Warranty details follow the approved proposal scope and XRP Roofing workmanship terms.",
     lineItems: [{ description: selectedPackage.scope, quantity: 1, unitPrice: selectedPackage.price, tax: 0 }],
-    activity: [`Invoice created from won proposal ${proposal.id}`, `${selectedPackage.selectedOption.toUpperCase()} package selected by customer`],
+    activity: [`Invoice created from won proposal ${proposal.proposalNumber ? `#${proposal.proposalNumber}` : proposal.id}`, `${selectedPackage.selectedOption.toUpperCase()} package selected by customer`],
     leadSource: job?.source || "",
   };
 }
@@ -927,6 +933,13 @@ export default function InvoicesPage() {
       setInvoices(cached);
     }
 
+    // Initialize unified counter from existing invoice numbers
+    const allInvoices = cached || readStoredInvoices() || invoices;
+    const existingNums = allInvoices
+      .map((inv) => parseUnifiedNumber(inv.invoiceNumber))
+      .filter((n) => !Number.isNaN(n));
+    if (existingNums.length) ensureCounterAtLeast(Math.max(...existingNums) + 1);
+
     async function init() {
       if (hasSupabaseConfig()) {
         const remoteInvoices = await refreshInvoices<Invoice>();
@@ -941,6 +954,7 @@ export default function InvoicesPage() {
     }
     void init();
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-refresh: when user returns to tab, sync from Supabase (primary source)

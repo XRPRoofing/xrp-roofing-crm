@@ -6,6 +6,7 @@ import { azDate } from "@/lib/arizona-time";
 
 type PublicProposal = {
   id: string;
+  proposalNumber?: string;
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
@@ -199,7 +200,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-            <span className="rounded-full bg-white/10 px-2.5 py-1">ID {proposal.id}</span>
+            <span className="rounded-full bg-white/10 px-2.5 py-1">{proposal.proposalNumber ? `#${proposal.proposalNumber}` : `ID ${proposal.id}`}</span>
             <span className="rounded-full bg-white/10 px-2.5 py-1">Issued {azDate(new Date())}</span>
             <span className="rounded-full bg-blue-500 px-2.5 py-1 text-white">{proposal.status || "Sent"}</span>
           </div>

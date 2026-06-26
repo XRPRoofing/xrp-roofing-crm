@@ -19,9 +19,11 @@ import { createClient } from "@/lib/supabase/client";
 import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
+import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "@/lib/unified-numbering";
 
 type Proposal = {
   id: string;
+  proposalNumber?: string;
   job?: Lead;
   customerName: string;
   customerEmail?: string;
@@ -758,6 +760,13 @@ export default function ProposalsPage() {
         prevProposalsRef.current = local;
       }
 
+      // Initialize unified counter from existing proposal numbers
+      const allProposals = prevProposalsRef.current;
+      const existingNumbers = allProposals
+        .map((p) => p.proposalNumber ? parseUnifiedNumber(p.proposalNumber) : NaN)
+        .filter((n) => !Number.isNaN(n));
+      if (existingNumbers.length) ensureCounterAtLeast(Math.max(...existingNumbers) + 1);
+
       if (mounted) setDataLoaded(true);
     }
 
@@ -989,8 +998,10 @@ export default function ProposalsPage() {
       }
     }
 
+    const unifiedNum = getNextUnifiedNumber();
     const newProposal: Proposal = {
       id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      proposalNumber: String(unifiedNum),
       job: linkedJob,
       customerName: proposalMode === "job" && selectedJob ? selectedJob.name : customerName,
       customerEmail: proposalMode === "job" && selectedJob ? selectedJob.email : customerEmail || "",
@@ -1047,8 +1058,10 @@ export default function ProposalsPage() {
   // customer profile) and open its editor. The job is stored on the proposal so
   // future clicks open this same estimate instead of creating another.
   function createEstimateFromLead(job: Lead) {
+    const unifiedNum = getNextUnifiedNumber();
     const newProposal: Proposal = {
       id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      proposalNumber: String(unifiedNum),
       job,
       customerName: job.name,
       customerEmail: job.email,
@@ -1310,9 +1323,9 @@ export default function ProposalsPage() {
         const data = await response.json().catch(() => null) as { error?: string } | null;
         const serverError = typeof data?.error === "string" ? data.error : "Unable to send proposal email";
         if (serverError === "Email service is not configured") {
-          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
         } else {
-          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `${serverError}\n\nProposal link: ${proposalLink}` });
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `${serverError}\n\nProposal link: ${proposalLink}` });
         }
       } else {
         // Log send activity
@@ -1322,7 +1335,7 @@ export default function ProposalsPage() {
           sentBy: currentUserName || currentUserEmail || "CRM User",
           sentAt: new Date().toISOString(),
           customerName: sendForm.toName,
-          documentNumber: proposalForLink.id,
+          documentNumber: proposalForLink.proposalNumber || proposalForLink.id,
           deliveryMethod: "Email",
           recipient: sendForm.toEmail,
         });
@@ -1339,11 +1352,11 @@ export default function ProposalsPage() {
           }).catch(() => {});
         }
 
-        setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
+        setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
         setShowSendModal(false);
       }
     } catch {
-      setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.id, message: `Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}` });
+      setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}` });
     } finally {
       setSendingProposal(false);
     }
@@ -1427,7 +1440,7 @@ export default function ProposalsPage() {
         sentBy: currentUserName || currentUserEmail || "CRM User",
         sentAt: new Date().toISOString(),
         customerName: activeProposal.customerName,
-        documentNumber: proposalForLink.id,
+        documentNumber: proposalForLink.proposalNumber || proposalForLink.id,
         deliveryMethod: "SMS",
         recipient: smsForm.toPhone,
       });
@@ -1444,11 +1457,11 @@ export default function ProposalsPage() {
         }).catch(() => {});
       }
 
-      setSendConfirmation({ type: "success", customerName: activeProposal.customerName, proposalNumber: proposalForLink.id, message: `Proposal sent via SMS to ${smsForm.toPhone}.\n\nProposal link: ${proposalLink}` });
+      setSendConfirmation({ type: "success", customerName: activeProposal.customerName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Proposal sent via SMS to ${smsForm.toPhone}.\n\nProposal link: ${proposalLink}` });
       setShowSmsSendModal(false);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Unable to send SMS";
-      setSendConfirmation({ type: "error", customerName: activeProposal.customerName, proposalNumber: proposalForLink.id, message: `${errorMsg}\n\nProposal link: ${proposalLink}` });
+      setSendConfirmation({ type: "error", customerName: activeProposal.customerName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `${errorMsg}\n\nProposal link: ${proposalLink}` });
     } finally {
       setSendingSms(false);
     }
@@ -1801,7 +1814,7 @@ export default function ProposalsPage() {
                     <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-bold tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-blue-700"}`} />
                   )}
                   <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wider">
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">ID {activeProposal.id}</span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">{activeProposal.proposalNumber ? `#${activeProposal.proposalNumber}` : `ID ${activeProposal.id}`}</span>
                     <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">Issued {azDate(new Date())}</span>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{activeProposal.status}</span>
                   </div>
@@ -2713,7 +2726,7 @@ export default function ProposalsPage() {
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-bold leading-4 text-blue-700 shadow-sm">XRP<br />ROOF</div>
               <div>
-                <p className="font-bold text-blue-700">{proposal.address}</p>
+                <p className="font-bold text-blue-700">{proposal.proposalNumber ? `#${proposal.proposalNumber} — ` : ""}{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
                 <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
               </div>
