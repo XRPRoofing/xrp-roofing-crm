@@ -5,6 +5,27 @@ import { publishConversationEvent, lookupCallEventByCallSid } from "@/lib/twilio
 
 export const maxDuration = 60;
 
+const NO_RECORDING_STATUSES = ["no-answer", "busy", "failed", "canceled"];
+
+function buildFallbackCallSummary(status: string, direction?: "inbound" | "outbound"): string {
+  const s = status.toLowerCase();
+  if (s === "no-answer") {
+    return direction === "outbound"
+      ? "Summary: Outbound call was placed but the customer did not answer. No conversation occurred.\nNext steps:\n- Try calling again later\n- Consider sending a follow-up text"
+      : "Summary: Inbound call was received but was not answered in time. The caller may try again.\nNext steps:\n- Return the call when available\n- Check for voicemail";
+  }
+  if (s === "busy") {
+    return `Summary: The call could not be completed because the ${direction === "outbound" ? "customer's" : "caller's"} line was busy.\nNext steps:\n- Try calling again in a few minutes`;
+  }
+  if (s === "failed") {
+    return `Summary: The ${direction === "outbound" ? "outbound" : "inbound"} call could not be connected due to a network or carrier issue.\nNext steps:\n- Verify the phone number is correct\n- Try again later`;
+  }
+  if (s === "canceled") {
+    return "Summary: The call was canceled before it was answered.\nNext steps:\n- Reach out via text if follow-up is needed";
+  }
+  return `Summary: Call ended with status: ${status}. No conversation occurred.`;
+}
+
 export async function POST(req: NextRequest) {
   let isDialActionCallback = false;
 
@@ -108,6 +129,53 @@ export async function POST(req: NextRequest) {
           console.error("Unable to process call recording", error);
         }
       });
+    }
+
+    // For calls that end without a recording (no-answer, busy, failed,
+    // canceled), publish a call_recording event with a status-based fallback
+    // summary so the Conversation Board always shows a Call Summary card.
+    if (!event.recordingUrl && event.callSid) {
+      const dialStatus = String(event.payload.DialCallStatus || "").toLowerCase();
+      const callStatus = (event.status || "").toLowerCase();
+      const effectiveStatus = dialStatus || callStatus;
+
+      if (NO_RECORDING_STATUSES.includes(effectiveStatus)) {
+        let fallbackFrom = event.from;
+        let fallbackTo = event.to;
+        let fallbackDirection = event.direction;
+        let fallbackConversationId = event.conversationId;
+
+        if ((!fallbackFrom || !fallbackTo) && event.callSid) {
+          const original = await lookupCallEventByCallSid(event.callSid);
+          if (original) {
+            fallbackFrom = fallbackFrom || original.from;
+            fallbackTo = fallbackTo || original.to;
+            fallbackDirection = original.direction;
+            fallbackConversationId = fallbackConversationId || original.conversationId || undefined;
+          }
+        }
+
+        const summary = buildFallbackCallSummary(effectiveStatus, fallbackDirection);
+        await publishConversationEvent({
+          id: `${event.callSid}-status-summary`,
+          type: "call_recording",
+          direction: fallbackDirection,
+          from: fallbackFrom,
+          to: fallbackTo,
+          status: "completed",
+          callSid: event.callSid,
+          conversationId: fallbackConversationId,
+          body: summary,
+          payload: {
+            ...event.payload,
+            summary,
+            isFallbackSummary: true,
+            callOutcome: effectiveStatus,
+          },
+          createdAt: new Date().toISOString(),
+        });
+        console.log("[Twilio Call Status] Fallback summary published", { callSid: event.callSid, status: effectiveStatus });
+      }
     }
 
     if (isDialActionCallback) {
