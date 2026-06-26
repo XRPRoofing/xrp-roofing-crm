@@ -168,6 +168,21 @@ export async function PATCH(req: NextRequest) {
             created_at: new Date().toISOString(),
           });
         } catch { /* ignore */ }
+
+        // Auto-move job to "approved" stage when proposal is signed
+        try {
+          await supabase.from("jobs").update({ stage: "approved" }).eq("id", jobId);
+          await supabase.from("crew_activity_log").insert({
+            id: `act-jauto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            job_id: jobId,
+            job_name: proposalCustomerName,
+            actor: "System",
+            action: "Proposal signed by customer – Job moved to Approved",
+            details: `Job automatically moved to Approved after proposal ${id} was signed by ${proposalCustomerName || "customer"}`,
+            module: "Jobs",
+            created_at: new Date().toISOString(),
+          });
+        } catch { /* ignore — job update is best-effort */ }
       }
     }
 

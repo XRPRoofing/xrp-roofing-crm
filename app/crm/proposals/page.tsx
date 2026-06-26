@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { subscribeToCrewData, leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { subscribeToCrewData, leadToJobRecord, upsertJobRecord, updateJobRecord } from "@/lib/crew-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime, azDate } from "@/lib/arizona-time";
 import { createManualFolder } from "@/lib/manual-folders";
@@ -1547,6 +1547,19 @@ export default function ProposalsPage() {
 
     if (signedProposal) {
       setActiveProposal(signedProposal);
+      // Auto-move linked job to "approved" stage
+      const linkedJobId = signedProposal.job?.id;
+      if (linkedJobId) {
+        void updateJobRecord(linkedJobId, { stage: "approved" });
+        void logCrewActivity({
+          jobId: linkedJobId,
+          jobName: signedProposal.customerName,
+          actor: "System",
+          action: "Proposal signed by customer – Job moved to Approved",
+          details: `Job automatically moved to Approved after proposal ${signedProposal.proposalNumber || signedProposal.id} was signed`,
+          module: "Proposal",
+        });
+      }
     }
   }
 
@@ -1579,6 +1592,19 @@ export default function ProposalsPage() {
 
     if (signedProposal) {
       setActiveProposal(signedProposal);
+      // Auto-move linked job to "approved" stage
+      const linkedJobId = signedProposal.job?.id;
+      if (linkedJobId) {
+        void updateJobRecord(linkedJobId, { stage: "approved" });
+        void logCrewActivity({
+          jobId: linkedJobId,
+          jobName: signedProposal.customerName,
+          actor: "System",
+          action: "Proposal signed by customer – Job moved to Approved",
+          details: `Job automatically moved to Approved after proposal ${signedProposal.proposalNumber || signedProposal.id} was signed offline`,
+          module: "Proposal",
+        });
+      }
     }
     setShowOfflineSignModal(false);
   }
