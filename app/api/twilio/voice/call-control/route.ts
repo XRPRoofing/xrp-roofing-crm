@@ -153,26 +153,21 @@ export async function POST(req: NextRequest) {
         }
       } else {
         // Non-conference transfer (incoming calls routed via <Dial><Client>).
-        // The browser holds the child call SID. Fetch it to find the parent
-        // (customer) call, then redirect the parent to dial the transfer target.
-        const url = new URL("/api/twilio/voice/forward", req.nextUrl.origin);
-        url.searchParams.set("To", normalizedForwardTo);
+        // Provide TwiML directly instead of redirecting to the forward URL,
+        // because Twilio's POST to the redirect URL includes its own "To"
+        // field (the Twilio number) which shadows the forwarding destination
+        // in the query string, causing the call to dial back to the IVR.
+        const statusCallbackUrl = resolveCallStatusCallbackUrl(req.nextUrl.origin);
+        const forwardTwiml = [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          `<Response><Dial record="record-from-answer-dual" recordingStatusCallback="${statusCallbackUrl}" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST">`,
+          `<Number>${normalizedForwardTo}</Number>`,
+          '</Dial></Response>',
+        ].join('');
 
         const currentCall = await client.calls(parsed.data.callSid).fetch();
-        if (currentCall.parentCallSid) {
-          // Redirect the parent (customer) call to the forward TwiML.
-          // This ends the current <Dial> (browser leg disconnects) and
-          // connects the customer to the transfer target.
-          await client.calls(currentCall.parentCallSid).update({ url: url.toString(), method: "POST" });
-        } else {
-          // callSid IS the parent — look for an in-progress child to redirect
-          const children = await client.calls.list({ parentCallSid: parsed.data.callSid, limit: 1 });
-          if (children.length > 0 && children[0].status === "in-progress") {
-            await client.calls(children[0].sid).update({ url: url.toString(), method: "POST" });
-          } else {
-            await client.calls(parsed.data.callSid).update({ url: url.toString(), method: "POST" });
-          }
-        }
+        const targetCallSid = currentCall.parentCallSid || parsed.data.callSid;
+        await client.calls(targetCallSid).update({ twiml: forwardTwiml });
       }
 
       await publishConversationEvent({
