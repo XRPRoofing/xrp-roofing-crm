@@ -458,6 +458,8 @@ export default function LeadsPage() {
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const pendingUpdatesRef = useRef<Record<string, Partial<Lead>>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedJobIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedJobIdRef.current = selectedJobId; }, [selectedJobId]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showCallPaste, setShowCallPaste] = useState(false);
@@ -888,6 +890,9 @@ export default function LeadsPage() {
           setJobNotes(data.notes);
         }
       }).catch(() => {});
+      // Refresh photos for the currently selected job (real-time gallery update)
+      const jid = selectedJobIdRef.current;
+      if (jid) void loadJobPhotos(jid).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
     });
     function onCrewCache() {
       const cached = getCachedCrewData();
