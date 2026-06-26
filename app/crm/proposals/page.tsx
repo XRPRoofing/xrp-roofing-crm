@@ -952,8 +952,8 @@ export default function ProposalsPage() {
     const newJob: Lead = {
       id: `J-${Date.now()}`,
       name,
-      email: email || "crm@xrproofing.com",
-      phone: phone || "(602) 555-0000",
+      email: email || "",
+      phone: phone || "",
       address: addr.split(",")[0].trim() || "Address pending",
       city,
       stage: "estimate_sent",
