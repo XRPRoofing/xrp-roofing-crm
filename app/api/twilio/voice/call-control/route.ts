@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getTwilioClient } from "@/lib/twilio/server";
+import { getTwilioClient, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 import { getTwilioConfig } from "@/lib/twilio/config";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 
@@ -126,18 +126,29 @@ export async function POST(req: NextRequest) {
       const conference = await findConference(client, parsed.data.callSid);
 
       if (conference) {
-        // Conference-based transfer: add the transfer target to the conference,
-        // then remove the agent. Customer stays connected to the new party.
+        // Conference-based transfer: dial the transfer target with explicit
+        // conference-joining TwiML so they connect directly — without this,
+        // Twilio falls back to the phone number's voice webhook (the IVR).
         const config = getTwilioConfig();
-        await client.conferences(conference.sid).participants.create({
+        const confName = `call-${parsed.data.callSid}`;
+        const statusCallbackUrl = resolveCallStatusCallbackUrl(req.nextUrl.origin);
+        const transferTwiml = [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<Response><Dial>',
+          `<Conference beep="false" endConferenceOnExit="true" startConferenceOnEnter="true" record="do-not-record" participantLabel="transfer">${confName}</Conference>`,
+          '</Dial></Response>',
+        ].join('');
+        await client.calls.create({
           to: normalizedForwardTo,
           from: config.phoneNumber,
-          endConferenceOnExit: true,
-          label: "transfer",
+          twiml: transferTwiml,
+          statusCallback: statusCallbackUrl,
+          statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
         });
-        // Remove the agent from the conference (they're done)
+        // Let the agent leave without ending the conference
         const agent = await findParticipant(client, conference.sid, "agent");
         if (agent) {
+          await client.conferences(conference.sid).participants(agent.callSid).update({ endConferenceOnExit: false });
           await client.conferences(conference.sid).participants(agent.callSid).remove();
         }
       } else {

@@ -12,22 +12,27 @@ function normalizeForwardNumber(value?: string | null) {
   return normalized.length >= 7 ? normalized : "";
 }
 
-function buildForwardTwiml(to?: string | null) {
+function buildForwardTwiml(to?: string | null, recordingCallbackUrl?: string) {
   const forwardTo = normalizeForwardNumber(to);
 
   if (!forwardTo) {
     return '<?xml version="1.0" encoding="UTF-8"?><Response><Say>No valid forwarding number was provided.</Say></Response>';
   }
 
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Number>${escapeXml(forwardTo)}</Number></Dial></Response>`;
+  const recordAttrs = recordingCallbackUrl
+    ? ` record="record-from-answer-dual" recordingStatusCallback="${escapeXml(recordingCallbackUrl)}" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST"`
+    : ' record="record-from-answer-dual"';
+
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Dial${recordAttrs}><Number>${escapeXml(forwardTo)}</Number></Dial></Response>`;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData().catch(() => new FormData());
     const to = formData.get("To")?.toString() || req.nextUrl.searchParams.get("To");
+    const callbackUrl = new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
 
-    return new NextResponse(buildForwardTwiml(to), { headers: { "Content-Type": "text/xml" } });
+    return new NextResponse(buildForwardTwiml(to, callbackUrl), { headers: { "Content-Type": "text/xml" } });
   } catch {
     return new NextResponse('<?xml version="1.0" encoding="UTF-8"?><Response><Say>Forwarding could not be completed.</Say></Response>', { headers: { "Content-Type": "text/xml" } });
   }
@@ -35,6 +40,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("To");
+  const callbackUrl = new URL("/api/twilio/webhooks/call-status", req.nextUrl.origin).toString();
 
-  return new NextResponse(buildForwardTwiml(to), { headers: { "Content-Type": "text/xml" } });
+  return new NextResponse(buildForwardTwiml(to, callbackUrl), { headers: { "Content-Type": "text/xml" } });
 }
