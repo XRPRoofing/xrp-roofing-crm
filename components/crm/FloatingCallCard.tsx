@@ -66,7 +66,12 @@ function formatPhone(phone: string): string {
 }
 
 const SCHEDULE_TYPES = ["Inspection", "Estimate Appointment", "Repair Appointment", "Follow-up Call"] as const;
-const DISPOSITIONS = ["Not interested", "Booked Appointment", "Free Inspection", "Not answer", "Voicemail", "Left Message", "Callback Requested"] as const;
+const DISPOSITIONS = [
+  "No Answer", "Left Voicemail", "Interested", "Not Interested",
+  "Call Back Requested", "Follow-Up Needed", "Appointment Scheduled",
+  "Estimate Scheduled", "Proposal Sent", "Proposal Signed", "Job Won",
+  "Wrong Number", "Spam", "Do Not Call", "Customer Unavailable", "Other",
+] as const;
 const LEAD_SOURCES = ["Google", "Facebook", "Website", "Referral", "Partner Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
 
 export default function FloatingCallCard({
