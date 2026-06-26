@@ -64,6 +64,7 @@ interface FloatingDialerProps {
   phoneNumbers: PhoneNumber[];
   customers: Customer[];
   onCallStateChange?: (active: boolean) => void;
+  onCallEnd?: (callSid: string) => void;
   initialDialNumber?: string;
   initialCallerId?: string;
 }
@@ -112,6 +113,7 @@ export default function FloatingDialer({
   phoneNumbers,
   customers,
   onCallStateChange,
+  onCallEnd,
   initialDialNumber,
   initialCallerId,
 }: FloatingDialerProps) {
@@ -337,11 +339,13 @@ export default function FloatingDialer({
         if (sid) setCallSid(sid);
       });
       call.on("disconnect", () => {
+        const endedSid = callSid || (call as unknown as BrowserVoiceCall).parameters?.CallSid;
         setCallState("idle");
         setCallSid(undefined);
         browserCallRef.current = null;
         setShowTransfer(false);
         setShowInCallKeypad(false);
+        if (endedSid) onCallEnd?.(endedSid);
       });
       call.on("error", () => {
         setCallState("idle");
@@ -353,6 +357,7 @@ export default function FloatingDialer({
   }
 
   function handleEndCall() {
+    const endedSid = callSid;
     browserCallRef.current?.disconnect();
     browserCallRef.current = null;
     setCallState("idle");
@@ -360,6 +365,7 @@ export default function FloatingDialer({
     setIsMuted(false);
     setShowTransfer(false);
     setShowInCallKeypad(false);
+    if (endedSid) onCallEnd?.(endedSid);
   }
 
   function handleMute() {
