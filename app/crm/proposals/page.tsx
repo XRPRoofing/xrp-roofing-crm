@@ -779,20 +779,18 @@ export default function ProposalsPage() {
       void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
     });
 
-    // Also listen for cache refreshes triggered by the CrmShell's central
-    // realtime hub — ensures this page stays up-to-date even if the direct
-    // Supabase subscription temporarily stalls.
+    // Cache-event listeners read already-updated cache — no re-fetch cascade.
     function onCacheRefresh() { void reloadFromServer(); }
+    function onCrewCacheRefresh() { const c = getCachedCrewData(); if (c && mounted) setJobs(c.jobs); }
     window.addEventListener(CACHE_EVENTS.proposals, onCacheRefresh);
-    window.addEventListener(CACHE_EVENTS.crew, () => {
-      void refreshCrewData().then((data) => { if (mounted) setJobs(data.jobs); }).catch(() => {});
-    });
+    window.addEventListener(CACHE_EVENTS.crew, onCrewCacheRefresh);
 
     return () => {
       mounted = false;
       unsubscribe();
       unsubscribeJobs();
       window.removeEventListener(CACHE_EVENTS.proposals, onCacheRefresh);
+      window.removeEventListener(CACHE_EVENTS.crew, onCrewCacheRefresh);
     };
   }, []);
 

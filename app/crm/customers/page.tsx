@@ -485,7 +485,7 @@ export default function CustomersPage() {
     void init();
 
     const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
-    function onCustomerCache() { void refreshCustomers(); }
+    function onCustomerCache() { const c = getCachedCustomers<Customer>(); if (c && mounted) setSavedCustomers(c); }
     window.addEventListener(CACHE_EVENTS.customers, onCustomerCache);
     return () => {
       mounted = false;

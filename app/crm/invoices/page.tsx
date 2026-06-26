@@ -877,52 +877,7 @@ export default function InvoicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Mobile-specific: force refresh when page becomes visible (handles mobile app switching)
-  useEffect(() => {
-    let lastVisible = document.visibilityState === "visible";
-    function handleVisibilityChange() {
-      const isVisible = document.visibilityState === "visible";
-      if (isVisible && !lastVisible) {
-        // Page just became visible - force data refresh for mobile accuracy
-        void loadAllInvoices<Invoice>()
-          .then((remoteInvoices) => {
-            if (remoteInvoices.length === 0) return;
-            setInvoices((current) => {
-              const byId = new Map(current.map((inv) => [inv.id, inv]));
-              let changed = false;
-              for (const remote of remoteInvoices) {
-                const local = byId.get(remote.id);
-                if (!local) { byId.set(remote.id, remote); changed = true; }
-                else if ((remote.activity?.length ?? 0) > (local.activity?.length ?? 0)) {
-                  byId.set(remote.id, remote); changed = true;
-                }
-              }
-              return changed ? Array.from(byId.values()) : current;
-            });
-          })
-          .catch(() => {});
-        void loadInvoiceShares()
-          .then((shares) => {
-            setInvoices((current) => {
-              let changed = false;
-              const next = current.map((inv) => {
-                const share = shares.find((s) => s.id === inv.id);
-                if (!share) return inv;
-                const merged = mergeShareIntoInvoice(inv, share);
-                if (merged !== inv) changed = true;
-                return merged;
-              });
-              return changed ? next : current;
-            });
-          })
-          .catch(() => {});
-      }
-      lastVisible = isVisible;
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
 
   // Show cached data instantly, then refresh from Supabase in background
   useEffect(() => {

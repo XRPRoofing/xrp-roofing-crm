@@ -4,27 +4,22 @@ import { useEffect, useInsertionEffect, useRef } from "react";
 
 /**
  * Minimum elapsed time (ms) between two refresh callbacks.  When the user
- * returns to the tab (focus / visibilitychange) we only re-fetch if more
- * than this many milliseconds have passed since the last refresh, preventing
- * the rapid-fire reloads that previously made the CRM feel unstable.
+ * returns to the tab (focus / visibilitychange) we only re-fetch if the data
+ * was marked dirty while the tab was in the background, preventing the
+ * rapid-fire reloads that previously made the CRM feel unstable.
  */
-const FOCUS_COOLDOWN_MS = 5_000;
+const FOCUS_COOLDOWN_MS = 30_000;
 
 /**
- * Re-run `onRefresh` when the user returns to the page **and** the data is
- * stale (more than FOCUS_COOLDOWN_MS since the last refresh):
+ * Re-run `onRefresh` only when the data is known to be stale:
  *
- *  - window `focus` (switching back to the tab/window)
- *  - `visibilitychange` → visible (returning from another app, mobile)
- *  - cross-tab `storage` writes on the same device
- *  - BroadcastChannel messages from other tabs on the same device
+ *  - cross-tab BroadcastChannel / storage write sets a dirty flag
+ *  - returning to the tab (focus / visibilitychange) triggers a refresh
+ *    ONLY if dirty OR more than FOCUS_COOLDOWN_MS have elapsed
  *
  * **No polling interval** — data freshness comes from Supabase realtime
- * subscriptions. The hook only fires on user-initiated navigation events,
- * keeping pages stable and free of random refreshes.
- *
- * The latest callback is held in a ref so callers can pass an inline
- * function without re-binding listeners on every render.
+ * subscriptions. The hook only fires on genuine staleness, keeping pages
+ * stable and free of random refreshes.
  */
 export function useAutoRefresh(onRefresh: () => void) {
   const callbackRef = useRef(onRefresh);
@@ -34,40 +29,44 @@ export function useAutoRefresh(onRefresh: () => void) {
     if (typeof window === "undefined") return;
 
     let lastRun = Date.now();
+    let dirty = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const debouncedRun = () => {
+    const runIfNeeded = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         const now = Date.now();
-        if (now - lastRun < FOCUS_COOLDOWN_MS) return;
+        const stale = now - lastRun >= FOCUS_COOLDOWN_MS;
+        if (!dirty && !stale) return;
+        dirty = false;
         lastRun = now;
         callbackRef.current();
       }, 300);
     };
 
+    const markDirty = () => { dirty = true; };
+
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        debouncedRun();
+        runIfNeeded();
       }
     };
 
-    window.addEventListener("focus", debouncedRun);
-    window.addEventListener("storage", debouncedRun);
+    window.addEventListener("focus", runIfNeeded);
+    window.addEventListener("storage", markDirty);
     document.addEventListener("visibilitychange", onVisible);
 
-    // BroadcastChannel for instant cross-tab sync on the same device
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel("xrp-crm-sync");
-      bc.onmessage = () => debouncedRun();
+      bc.onmessage = () => { dirty = true; runIfNeeded(); };
     } catch {
       // BroadcastChannel not supported — fall back to storage events only
     }
 
     return () => {
-      window.removeEventListener("focus", debouncedRun);
-      window.removeEventListener("storage", debouncedRun);
+      window.removeEventListener("focus", runIfNeeded);
+      window.removeEventListener("storage", markDirty);
       document.removeEventListener("visibilitychange", onVisible);
       if (bc) { try { bc.close(); } catch { /* ignore */ } }
       if (debounceTimer) clearTimeout(debounceTimer);
