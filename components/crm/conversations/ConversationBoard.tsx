@@ -335,24 +335,28 @@ function MessageRow({ message }: { message: ConversationMessage }) {
 
 function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; onOpen: (event: TwilioConversationEvent) => void }) {
   const isProcessing = event.status === "processing";
+  const isFallback = Boolean(event.payload.isFallbackSummary);
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
   const eventDisposition = typeof event.payload.disposition === "string" ? event.payload.disposition : undefined;
+  const callOutcome = typeof event.payload.callOutcome === "string" ? event.payload.callOutcome : "";
+  const outcomeLabel = callOutcome ? callOutcome.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase()) : "";
 
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-950">
+    <div className={`rounded-lg border px-3 py-2.5 text-sm ${isFallback ? "border-amber-100 bg-amber-50 text-amber-950" : "border-blue-100 bg-blue-50 text-blue-950"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <p className="flex items-center gap-1.5 font-bold"><Sparkles className="h-3.5 w-3.5" />Call summary</p>
+          <p className="flex items-center gap-1.5 font-bold">{isFallback ? <><PhoneOff className="h-3.5 w-3.5" />Call status</> : <><Sparkles className="h-3.5 w-3.5" />Call summary</>}</p>
+          {outcomeLabel && isFallback && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200">{outcomeLabel}</span>}
           {eventDisposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(eventDisposition)}`}>{eventDisposition}</span>}
         </div>
-        <span className="text-[11px] font-semibold text-blue-700">{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+        <span className={`text-[11px] font-semibold ${isFallback ? "text-amber-700" : "text-blue-700"}`}>{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
       </div>
       {isProcessing ? (
         <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-blue-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />Generating summary…</p>
       ) : (
-        <p className="mt-1 line-clamp-3 whitespace-pre-wrap break-words leading-5 text-blue-900">{summary || "Summary unavailable."}</p>
+        <p className={`mt-1 line-clamp-3 whitespace-pre-wrap break-words leading-5 ${isFallback ? "text-amber-900" : "text-blue-900"}`}>{summary || "Summary unavailable."}</p>
       )}
-      <button onClick={() => onOpen(event)} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-800 underline-offset-2 hover:underline">Details &amp; recording<ChevronRight className="h-3.5 w-3.5" /></button>
+      <button onClick={() => onOpen(event)} className={`mt-2 inline-flex items-center gap-1 text-xs font-bold underline-offset-2 hover:underline ${isFallback ? "text-amber-800" : "text-blue-800"}`}>{isFallback ? "Details" : "Details & recording"}<ChevronRight className="h-3.5 w-3.5" /></button>
     </div>
   );
 }
@@ -396,10 +400,12 @@ function CallTranscriptModal({ event, onClose, onDeleteRecording }: { event: Twi
               )}
             </div>
           )}
-          <div className="rounded-lg border border-gray-200 bg-gray-50">
-            <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-gray-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
-            {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{transcript || "Transcript is still processing or unavailable."}</p>}
-          </div>
+          {!event.payload.isFallbackSummary && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50">
+              <button type="button" onClick={() => setShowTranscript((value) => !value)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-gray-600">Full transcript<ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} /></button>
+              {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{transcript || "Transcript is still processing or unavailable."}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>

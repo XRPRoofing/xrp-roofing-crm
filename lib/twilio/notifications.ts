@@ -35,7 +35,15 @@ export function getTwilioCallOutcomeLabel(event: TwilioConversationEvent) {
   const effectiveStatus = status || payloadStatus;
 
   const isOutbound = event.direction === "outbound";
-  if (event.type === "call_recording") return "Call recorded with summary";
+  if (event.type === "call_recording" && !event.payload.isFallbackSummary) return "Call recorded with summary";
+  if (event.type === "call_recording" && event.payload.isFallbackSummary) {
+    const outcome = String(event.payload.callOutcome || "").toLowerCase();
+    if (outcome === "no-answer") return isOutbound ? "No answer" : "Missed call";
+    if (outcome === "busy") return "Line busy";
+    if (outcome === "failed") return "Call failed";
+    if (outcome === "canceled") return "Call canceled";
+    return "Call ended";
+  }
 
   // incoming_call events are published the moment a call arrives. They have no
   // terminal status yet, so label them as "Incoming Call".
