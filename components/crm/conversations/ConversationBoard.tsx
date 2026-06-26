@@ -512,7 +512,7 @@ function isMissedCallEvent(event: TwilioConversationEvent) {
 }
 
 function isAnsweredCallEvent(event: TwilioConversationEvent) {
-  return ["Answered call", "Completed call", "Call recorded with summary"].includes(getTwilioCallOutcomeLabel(event));
+  return ["Answered call", "Completed call", "Call recorded with summary", "Call forwarded"].includes(getTwilioCallOutcomeLabel(event));
 }
 
 function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
@@ -530,7 +530,7 @@ function isVisibleCallTimelineEvent(event: TwilioConversationEvent) {
   const label = getTwilioCallOutcomeLabel(event);
 
   if (["ringing", "initiated", "queued", "in-progress"].includes(status)) return false;
-  return ["Incoming Call", "Outgoing Call", "Missed call", "Completed call", "Answered call", "Call recorded with summary"].includes(label) || status === "completed";
+  return ["Incoming Call", "Outgoing Call", "Missed call", "Completed call", "Answered call", "Call recorded with summary", "Call forwarded"].includes(label) || status === "completed";
 }
 
 function getConversationIdForPhone(phone: string) {
@@ -739,12 +739,26 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   const lastMissedAt = (isMissedCallEvent(event) && !isSuppressed) ? event.createdAt : nextConversation.lastMissedAt;
   const lastAnsweredAt = isAnsweredCallEvent(event) ? event.createdAt : nextConversation.lastAnsweredAt;
 
+  // Determine whether this event represents meaningful new activity that
+  // should update the conversation's position in the inbox — even when the
+  // event itself doesn't produce a visible timeline message.
+  const isNewActivity = (() => {
+    if (effectiveMessage) return true;
+    if (event.type === "message_status") return false;
+    if (event.type === "call_recording" && event.status === "completed") return true;
+    if (event.type === "call_status") {
+      const s = (event.status || "").toLowerCase();
+      return ["completed", "no-answer", "busy", "failed", "canceled", "forwarded"].includes(s);
+    }
+    return false;
+  })();
+
   const updated: ConversationRecord = {
     ...nextConversation,
     id,
     lastMessage: effectiveMessage?.body || nextConversation.lastMessage,
-    lastActivityAt: effectiveMessage ? formatActivityTime(event.createdAt) : nextConversation.lastActivityAt,
-    lastActivityIso: effectiveMessage ? event.createdAt : nextConversation.lastActivityIso,
+    lastActivityAt: isNewActivity ? formatActivityTime(event.createdAt) : nextConversation.lastActivityAt,
+    lastActivityIso: isNewActivity ? event.createdAt : nextConversation.lastActivityIso,
     unreadCount: countsAsUnread ? nextConversation.unreadCount + 1 : nextConversation.unreadCount,
     isMissedCall: isMissedCallOutstanding(lastMissedAt, lastAnsweredAt, readAt),
     readAt,
@@ -756,7 +770,7 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
     callSids: nextCallSids,
   };
 
-  if (effectiveMessage) {
+  if (isNewActivity) {
     return [updated, ...current.filter((conversation) => conversation.id !== id)];
   }
   return current.map((conversation) => conversation.id === id ? updated : conversation);
@@ -1227,6 +1241,13 @@ export default function ConversationBoard() {
         addTwilioCrmNotification(event);
         setConversations((current: ConversationRecord[]) => {
           const next = upsertConversationFromEvent(current, event, undefined, liveCustomerLookupRef.current);
+          // Re-sort so the conversation with the most recent activity is
+          // always at the top, regardless of which event type triggered it.
+          next.sort((a, b) => {
+            const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
+            const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
+            return tb - ta;
+          });
           if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
           return next;
         });

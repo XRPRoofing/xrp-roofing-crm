@@ -137,6 +137,25 @@ function getConversationEventsErrorMessage(message: string) {
 }
 
 
+/** Look up the original call event by CallSid to recover From/To phone numbers
+ * that may be missing from recording-status callbacks. */
+export async function lookupCallEventByCallSid(callSid: string) {
+  const supabase = getAdminClient();
+  if (!supabase || !callSid) return null;
+
+  const { data } = await supabase
+    .from("conversation_events")
+    .select("from_phone, to_phone, direction, conversation_id")
+    .eq("call_sid", callSid)
+    .not("from_phone", "eq", "")
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (!data || data.length === 0) return null;
+  const row = data[0] as { from_phone: string; to_phone: string; direction: string; conversation_id: string | null };
+  return { from: row.from_phone, to: row.to_phone, direction: row.direction as "inbound" | "outbound", conversationId: row.conversation_id };
+}
+
 export async function listConversationReadStates() {
   const supabase = getAdminClient();
 

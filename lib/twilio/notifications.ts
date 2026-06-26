@@ -67,6 +67,8 @@ export function getTwilioCallOutcomeLabel(event: TwilioConversationEvent) {
   if (effectiveStatus === "ringing") return "Ringing call";
   if (effectiveStatus === "initiated" || effectiveStatus === "queued") return "Call started";
 
+  if (effectiveStatus === "forwarded") return "Call forwarded";
+
   // IVR-routed events: the caller pressed a digit but the call hasn't reached
   // a terminal state yet via this event alone.
   if (effectiveStatus === "ivr-routed") return "Incoming Call";
