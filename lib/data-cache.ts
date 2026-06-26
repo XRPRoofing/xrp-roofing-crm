@@ -11,6 +11,11 @@
  * When a refresh completes, a global custom event is dispatched so every
  * mounted component can react without its own Supabase subscription.
  *
+ * Cache entries carry a timestamp so callers can check freshness.  The
+ * STALE_AFTER_MS constant controls how long a cached value is considered
+ * fresh — after that, the next page that reads cached data will also
+ * trigger a background refresh.
+ *
  * Usage:
  *   const data = getCachedCrewData();   // instant — null only on first ever load
  *   refreshCrewData().then(setJobs);    // background fetch, updates cache
@@ -39,13 +44,18 @@ function emitCacheEvent(event: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Cache stores
+// Cache stores with timestamps
 // ---------------------------------------------------------------------------
 
-let crewCache: CrewDataset | null = null;
-let invoiceCache: unknown[] | null = null;
-let proposalCache: unknown[] | null = null;
-let customerCache: unknown[] | null = null;
+interface CacheEntry<T> {
+  data: T;
+  updatedAt: number;
+}
+
+let crewCache: CacheEntry<CrewDataset> | null = null;
+let invoiceCache: CacheEntry<unknown[]> | null = null;
+let proposalCache: CacheEntry<unknown[]> | null = null;
+let customerCache: CacheEntry<unknown[]> | null = null;
 
 // In-flight deduplication: if a refresh is already running, return its promise
 // instead of firing a second identical request.
@@ -59,13 +69,13 @@ let customerFlight: Promise<unknown[]> | null = null;
 // ---------------------------------------------------------------------------
 
 export function getCachedCrewData(): CrewDataset | null {
-  return crewCache;
+  return crewCache?.data ?? null;
 }
 
 export async function refreshCrewData(): Promise<CrewDataset> {
   if (crewFlight) return crewFlight;
   crewFlight = loadCrewDataset()
-    .then((data) => { crewCache = data; emitCacheEvent(CACHE_EVENTS.crew); return data; })
+    .then((data) => { crewCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.crew); return data; })
     .finally(() => { crewFlight = null; });
   return crewFlight;
 }
@@ -75,13 +85,13 @@ export async function refreshCrewData(): Promise<CrewDataset> {
 // ---------------------------------------------------------------------------
 
 export function getCachedInvoices<T>(): T[] | null {
-  return invoiceCache as T[] | null;
+  return (invoiceCache?.data as T[] | undefined) ?? null;
 }
 
 export async function refreshInvoices<T extends { id: string }>(): Promise<T[]> {
   if (invoiceFlight) return invoiceFlight as Promise<T[]>;
   invoiceFlight = loadAllInvoices<T>()
-    .then((data) => { invoiceCache = data; emitCacheEvent(CACHE_EVENTS.invoices); return data as unknown[]; })
+    .then((data) => { invoiceCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.invoices); return data as unknown[]; })
     .finally(() => { invoiceFlight = null; });
   return invoiceFlight as Promise<T[]>;
 }
@@ -91,13 +101,13 @@ export async function refreshInvoices<T extends { id: string }>(): Promise<T[]> 
 // ---------------------------------------------------------------------------
 
 export function getCachedProposals<T>(): T[] | null {
-  return proposalCache as T[] | null;
+  return (proposalCache?.data as T[] | undefined) ?? null;
 }
 
 export async function refreshProposals<T extends { id: string }>(): Promise<T[]> {
   if (proposalFlight) return proposalFlight as Promise<T[]>;
   proposalFlight = loadProposalRecords<T>()
-    .then((data) => { proposalCache = data; emitCacheEvent(CACHE_EVENTS.proposals); return data as unknown[]; })
+    .then((data) => { proposalCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.proposals); return data as unknown[]; })
     .finally(() => { proposalFlight = null; });
   return proposalFlight as Promise<T[]>;
 }
@@ -107,13 +117,13 @@ export async function refreshProposals<T extends { id: string }>(): Promise<T[]>
 // ---------------------------------------------------------------------------
 
 export function getCachedCustomers<T>(): T[] | null {
-  return customerCache as T[] | null;
+  return (customerCache?.data as T[] | undefined) ?? null;
 }
 
 export async function refreshCustomers<T>(): Promise<T[]> {
   if (customerFlight) return customerFlight as Promise<T[]>;
   customerFlight = loadCustomerRecords()
-    .then((data) => { customerCache = data; emitCacheEvent(CACHE_EVENTS.customers); return data as unknown[]; })
+    .then((data) => { customerCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.customers); return data as unknown[]; })
     .finally(() => { customerFlight = null; });
   return customerFlight as Promise<T[]>;
 }
