@@ -46,6 +46,33 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
 // Convert URLs, phone numbers, and emails in text to clickable links
 const linkifyText = linkifyContactInfo;
 
+const CALL_DISPOSITIONS = [
+  "No Answer", "Left Voicemail", "Interested", "Not Interested",
+  "Call Back Requested", "Follow-Up Needed", "Appointment Scheduled",
+  "Estimate Scheduled", "Proposal Sent", "Proposal Signed", "Job Won",
+  "Wrong Number", "Spam", "Do Not Call", "Customer Unavailable", "Other",
+] as const;
+
+function getDispositionColor(d: string): string {
+  switch (d) {
+    case "Interested": case "Appointment Scheduled": case "Estimate Scheduled": case "Job Won": return "bg-green-500";
+    case "Proposal Sent": case "Proposal Signed": case "Follow-Up Needed": case "Call Back Requested": return "bg-blue-500";
+    case "Left Voicemail": case "No Answer": case "Customer Unavailable": return "bg-yellow-500";
+    case "Not Interested": case "Wrong Number": case "Spam": case "Do Not Call": return "bg-red-500";
+    default: return "bg-gray-400";
+  }
+}
+
+function getDispositionBadgeStyle(d: string): string {
+  switch (d) {
+    case "Interested": case "Appointment Scheduled": case "Estimate Scheduled": case "Job Won": return "bg-green-50 text-green-700 ring-green-200";
+    case "Proposal Sent": case "Proposal Signed": case "Follow-Up Needed": case "Call Back Requested": return "bg-blue-50 text-blue-700 ring-blue-200";
+    case "Left Voicemail": case "No Answer": case "Customer Unavailable": return "bg-yellow-50 text-yellow-700 ring-yellow-200";
+    case "Not Interested": case "Wrong Number": case "Spam": case "Do Not Call": return "bg-red-50 text-red-700 ring-red-200";
+    default: return "bg-gray-50 text-gray-600 ring-gray-200";
+  }
+}
+
 function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: () => void }) {
   return (
     <Card className="hidden h-full flex-col items-center gap-2 overflow-hidden p-2 xl:flex">
@@ -83,10 +110,18 @@ function conversationMatchesFilter(conversation: ConversationRecord, filter: Inb
   }
 }
 
+function getLastDisposition(conversation: ConversationRecord): string | undefined {
+  for (let i = conversation.messages.length - 1; i >= 0; i--) {
+    if (conversation.messages[i].disposition) return conversation.messages[i].disposition;
+  }
+  return undefined;
+}
+
 function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse, onDelete }: { conversations: ConversationRecord[]; active?: ConversationRecord; onSelect: (conversation: ConversationRecord) => void; onNew: () => void; onCollapse?: () => void; onDelete?: (conversation: ConversationRecord) => void }) {
   const [filter, setFilter] = useState<InboxFilter>("All");
   const [search, setSearch] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [dispositionFilter, setDispositionFilter] = useState<string>("");
 
   const counts = useMemo(() => {
     const result = {} as Record<InboxFilter, number>;
@@ -100,6 +135,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse,
     const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
     return conversations.filter((conversation) => {
       if (!conversationMatchesFilter(conversation, filter)) return false;
+      if (dispositionFilter && getLastDisposition(conversation) !== dispositionFilter) return false;
       if (!query) return true;
       const textMatch = [conversation.contact.name, conversation.contact.phone, conversation.contact.address, conversation.lastMessage]
         .some((value) => value?.toLowerCase().includes(query));
@@ -111,7 +147,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse,
       }
       return false;
     });
-  }, [conversations, filter, search]);
+  }, [conversations, filter, search, dispositionFilter]);
 
   return (
     <Card className="flex max-h-[calc(100dvh-12rem)] min-h-0 flex-col overflow-hidden xl:max-h-none xl:h-full">
@@ -140,6 +176,10 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse,
             );
           })}
         </div>
+        <select value={dispositionFilter} onChange={(e) => setDispositionFilter(e.target.value)} className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs font-semibold outline-none transition ${dispositionFilter ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 bg-gray-50 text-gray-500"} focus:border-blue-300 focus:ring-2 focus:ring-blue-100`}>
+          <option value="">All Dispositions</option>
+          {CALL_DISPOSITIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {conversations.length === 0 && <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600">No conversations yet. Dial, receive a call, or send a text to create an accurate client conversation.</div>}
@@ -150,6 +190,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse,
           const status = conversation.isMissedCall ? "Missed call" : unreadCount > 0 ? "Unread" : "Read";
           const statusClassName = conversation.isMissedCall || unreadCount === 0 ? "text-blue-700" : "text-blue-600";
           const lineLabel = conversation.twilioNumber ? getLineLabelForNumber(conversation.twilioNumber) : "";
+          const lastDisp = getLastDisposition(conversation);
           return (
             <div key={conversation.id} className={`relative rounded-lg border p-3 text-left transition ${selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-transparent bg-white hover:border-gray-200 hover:bg-gray-50"}`}>
               <button type="button" onClick={() => onSelect(conversation)} className="w-full text-left">
@@ -169,6 +210,7 @@ function ConversationInbox({ conversations, active, onSelect, onNew, onCollapse,
                 <p className="mt-1 line-clamp-2 text-sm leading-5 text-gray-600">{linkifyText(conversation.lastMessage)}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className={`text-xs font-bold ${statusClassName}`}>{status}</span>
+                  {lastDisp && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(lastDisp)}`}>{lastDisp}</span>}
                 </div>
               </button>
               {onDelete && confirmDeleteId !== conversation.id && (
@@ -207,7 +249,11 @@ function CallRow({ message }: { message: ConversationMessage }) {
         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ${tone.text} ring-1 ${tone.ring}`}><Icon className="h-4 w-4" /></span>
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-semibold ${tone.text}`}>{message.body}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-500">{message.author} · {message.timestamp}{message.line && <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? "bg-purple-50 text-purple-600" : "bg-gray-100 text-gray-500"}`}>{message.line}</span>}</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-xs text-gray-500">{message.author} · {message.timestamp}</span>
+            {message.line && <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${message.line === "Partner Referral" ? "bg-purple-50 text-purple-600" : "bg-gray-100 text-gray-500"}`}>{message.line}</span>}
+            {message.disposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(message.disposition)}`}>{message.disposition}</span>}
+          </div>
         </div>
         {message.recordingUrl && <audio controls src={proxyRecordingUrl(message.recordingUrl)} className="h-8 w-40 max-w-[40%]" />}
       </div>
@@ -290,11 +336,15 @@ function MessageRow({ message }: { message: ConversationMessage }) {
 function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; onOpen: (event: TwilioConversationEvent) => void }) {
   const isProcessing = event.status === "processing";
   const summary = typeof event.payload.summary === "string" ? event.payload.summary : event.body || "";
+  const eventDisposition = typeof event.payload.disposition === "string" ? event.payload.disposition : undefined;
 
   return (
     <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-950">
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 font-bold"><Sparkles className="h-3.5 w-3.5" />Call summary</p>
+        <div className="flex items-center gap-1.5">
+          <p className="flex items-center gap-1.5 font-bold"><Sparkles className="h-3.5 w-3.5" />Call summary</p>
+          {eventDisposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(eventDisposition)}`}>{eventDisposition}</span>}
+        </div>
         <span className="text-[11px] font-semibold text-blue-700">{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
       </div>
       {isProcessing ? (
@@ -363,7 +413,7 @@ function FloatingDialer({ contactName, dialNumber, forwardNumber, callNotes, cal
   if (!isOpen) return null;
 
   const keys = "123456789*0#".split("");
-  const dispositions = ["Not interested", "Marketing", "Booked Appointment", "Free Inspection", "Not answer", "Voicemail"];
+  const dispositions = CALL_DISPOSITIONS;
 
   return (
     <div className="fixed inset-x-3 bottom-3 z-50 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[340px]">
@@ -650,6 +700,8 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
     ? (isMissedCallEvent(event) ? "missed" : direction === "outbound" ? "sent" : "read")
     : getSmsStatusLabel(event);
 
+  const disposition = typeof event.payload?.disposition === "string" ? event.payload.disposition : undefined;
+
   return {
     id: getCallMessageId(event),
     channel,
@@ -661,6 +713,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
     recordingUrl: event.recordingUrl,
     line,
     ...(mediaUrls.length > 0 ? { mediaUrls } : {}),
+    ...(disposition ? { disposition } : {}),
   };
 }
 // Decide whether a missed call is still "outstanding" (i.e. should show the
@@ -717,12 +770,25 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   }
   const effectiveMessage = isSuppressed ? null : message;
 
+  // When a call_note event carries a disposition, propagate it to the matching call row
+  const noteDisposition = event.type === "call_note" && event.callSid && typeof event.payload?.disposition === "string" ? event.payload.disposition : undefined;
+
   const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => {
     if (item.id === effectiveMessage.id) return false;
     // Replace optimistic outbound message when server confirmation arrives
     if (event.messageSid && item.direction === "outbound" && effectiveMessage.direction === "outbound" && item.body === effectiveMessage.body && !item.id.startsWith("SM")) return false;
     return true;
-  }), effectiveMessage].slice(-50) : nextConversation.messages;
+  }).map((m) => {
+    if (noteDisposition && event.callSid && m.id === "call-" + event.callSid && !m.disposition) {
+      return { ...m, disposition: noteDisposition };
+    }
+    return m;
+  }), effectiveMessage].slice(-50) : nextConversation.messages.map((m) => {
+    if (noteDisposition && event.callSid && m.id === "call-" + event.callSid && !m.disposition) {
+      return { ...m, disposition: noteDisposition };
+    }
+    return m;
+  });
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
   const nextCallSids = event.callSid && !nextConversation.callSids?.includes(event.callSid)
@@ -935,6 +1001,9 @@ export default function ConversationBoard() {
     if (typeof window === "undefined" || !("Notification" in window)) return "default";
     return Notification.permission;
   });
+  const [showDispositionModal, setShowDispositionModal] = useState(false);
+  const [dispositionCallSid, setDispositionCallSid] = useState<string>();
+  const [dispositionSaving, setDispositionSaving] = useState(false);
   const matchedDialContact = findCrmContactByPhone(dialNumber) || conversations.find((conversation) => normalizePhone(conversation.contact.phone) === normalizePhone(dialNumber))?.contact;
 
   // Auto-select the From number based on the active conversation's line
@@ -1347,14 +1416,14 @@ export default function ConversationBoard() {
         if (sid) setCallSid(sid);
       });
       call.on("disconnect", () => {
+        browserCallRef.current = null;
         setIsActiveCall(false);
         setIsHeld(false);
         setIsMuted(false);
-        setCallSid(undefined);
-        setCallNotes("");
-        setCallDisposition("");
-        browserCallRef.current = null;
-        setTwilioNotice("Call ended");
+        const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
+        if (sid) setDispositionCallSid(sid);
+        setShowDispositionModal(true);
+        setTwilioNotice("Call ended — select a disposition");
       });
       call.on("error", (error) => {
         setTwilioNotice(error instanceof Error ? error.message : "Browser call error");
@@ -1421,16 +1490,16 @@ export default function ConversationBoard() {
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
-      setCallSid(undefined);
-      setCallNotes("");
-      setCallDisposition("");
-      setTwilioNotice(`Call ${result.status}`);
+      setDispositionCallSid(callSid);
+      setShowDispositionModal(true);
+      setTwilioNotice(`Call ${result.status} — select a disposition`);
     } catch {
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
-      setCallSid(undefined);
-      setTwilioNotice("Call ended");
+      setDispositionCallSid(callSid);
+      setShowDispositionModal(true);
+      setTwilioNotice("Call ended — select a disposition");
     }
   }
 
@@ -1525,6 +1594,39 @@ export default function ConversationBoard() {
     } catch {
       setTwilioNotice("Call notes could not be saved");
     }
+  }
+
+  async function handleSubmitDisposition() {
+    const sid = dispositionCallSid || callSid;
+    if (!sid || !active) {
+      closeDispositionModal();
+      return;
+    }
+    if (!callDisposition) {
+      setTwilioNotice("Please select a disposition");
+      return;
+    }
+    setDispositionSaving(true);
+    try {
+      await saveCallNotes({ callSid: sid, conversationId: active.id, notes: callNotes.trim(), disposition: callDisposition });
+      setTwilioNotice("Disposition saved");
+    } catch {
+      setTwilioNotice("Disposition could not be saved");
+    }
+    setDispositionSaving(false);
+    closeDispositionModal();
+  }
+
+  function skipDisposition() {
+    closeDispositionModal();
+  }
+
+  function closeDispositionModal() {
+    setShowDispositionModal(false);
+    setDispositionCallSid(undefined);
+    setCallSid(undefined);
+    setCallNotes("");
+    setCallDisposition("");
   }
 
   function startNewConversation(event?: React.FormEvent) {
@@ -1744,6 +1846,37 @@ export default function ConversationBoard() {
         </div>
       )}
       <FloatingDialer contactName={matchedDialContact?.name} dialNumber={dialNumber} forwardNumber={forwardNumber} callNotes={callNotes} callDisposition={callDisposition} isOpen={isDialerOpen} isMinimized={isDialerMinimized} isActiveCall={isActiveCall} isHeld={isHeld} isMuted={isMuted} callSid={callSid} fromNumber={selectedFromNumber} onFromNumberChange={setSelectedFromNumber} onClose={() => setIsDialerOpen(false)} onMinimize={() => setIsDialerMinimized((value) => !value)} onStartCall={handleStartCall} onEndCall={handleEndCall} onHoldCall={handleHoldCall} onMuteCall={handleMuteCall} onForwardCall={handleForwardCall} onSaveCallNotes={handleSaveCallNotes} onNotesChange={setCallNotes} onDispositionChange={setCallDisposition} onDialNumberChange={setDialNumber} onForwardNumberChange={setForwardNumber} />
+
+      {showDispositionModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl">
+            <div className="border-b border-gray-100 px-5 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Call Disposition</h3>
+              <p className="mt-0.5 text-sm text-gray-500">Select the outcome of this call</p>
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto px-5 py-4">
+              <div className="grid grid-cols-2 gap-2">
+                {CALL_DISPOSITIONS.map((d) => (
+                  <button key={d} type="button" onClick={() => setCallDisposition(d)} className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition ${callDisposition === d ? "border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200" : "border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50"}`}>
+                    <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${getDispositionColor(d)}`} />
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4">
+                <label className="text-xs font-bold uppercase tracking-wide text-gray-500">Notes (optional)</label>
+                <textarea value={callNotes} onChange={(e) => setCallNotes(e.target.value)} className="mt-1 min-h-[72px] w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100" placeholder="Add call notes..." />
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+              <button type="button" onClick={skipDisposition} className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-500 transition hover:bg-gray-100">Skip</button>
+              <button type="button" onClick={handleSubmitDisposition} disabled={!callDisposition || dispositionSaving} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                {dispositionSaving ? "Saving..." : "Save Disposition"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ export interface ConversationMessage {
   jobId?: string;
   recordingUrl?: string;
   line?: string;
+  disposition?: string;
 }
 
 export interface ConversationContact {
