@@ -110,12 +110,10 @@ export default function CrmDashboardPage() {
       }).catch(() => {});
     });
 
-    // Supplemental cache-event listeners: if the CrmShell's central hub
-    // refreshes data before this page's own subscription fires, we still
-    // pick up the update instantly.
-    function onCrewCache() { void refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {}); }
-    function onInvoiceCache() { void refreshInvoices<InvoiceSnap>().then((data) => { if (mounted) setInvoices(data); }).catch(() => {}); }
-    function onProposalCache() { void refreshProposals<ProposalSnap>().then((data) => { if (mounted) setProposals(data.filter((p) => !p.deletedAt)); }).catch(() => {}); }
+    // Cache-event listeners read already-updated cache — no re-fetch needed.
+    function onCrewCache() { const c = getCachedCrewData(); if (c && mounted) setJobs(c.jobs); }
+    function onInvoiceCache() { const c = getCachedInvoices<InvoiceSnap>(); if (c && mounted) setInvoices(c); }
+    function onProposalCache() { const c = getCachedProposals<ProposalSnap>(); if (c && mounted) setProposals(c.filter((p) => !p.deletedAt)); }
     window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
     window.addEventListener(CACHE_EVENTS.proposals, onProposalCache);

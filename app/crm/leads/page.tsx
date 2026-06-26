@@ -890,9 +890,8 @@ export default function LeadsPage() {
       }).catch(() => {});
     });
     function onCrewCache() {
-      void refreshCrewData().then((data) => {
-        if (mounted) { setJobs(data.jobs.map(normalizeJob)); setJobNotes(data.notes); }
-      }).catch(() => {});
+      const cached = getCachedCrewData();
+      if (cached && mounted) { setJobs(cached.jobs.map(normalizeJob)); setJobNotes(cached.notes); }
     }
     window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     return () => {
