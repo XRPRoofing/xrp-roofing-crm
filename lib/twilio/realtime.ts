@@ -49,6 +49,7 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     // direction, and recording URL.
     if (!updateRow.body) delete updateRow.body;
     if (!updateRow.recording_url) delete updateRow.recording_url;
+    if (!updateRow.conversation_id) delete updateRow.conversation_id;
     delete updateRow.direction;
     delete updateRow.created_at;
 
