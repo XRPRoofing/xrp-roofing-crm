@@ -392,7 +392,9 @@ function EditableDetailRow({ label, value, onChange }: { label: string; value: s
 }
 
 function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
+  const d = value.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) return d.slice(1);
+  return d;
 }
 
 function getTwilioLinePhone(event: TwilioConversationEvent): string {
@@ -684,7 +686,12 @@ function upsertConversationFromEvent(current: ConversationRecord[], event: Twili
   }
   const effectiveMessage = isSuppressed ? null : message;
 
-  const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => item.id !== effectiveMessage.id), effectiveMessage].slice(-50) : nextConversation.messages;
+  const nextMessages = effectiveMessage ? [...nextConversation.messages.filter((item) => {
+    if (item.id === effectiveMessage.id) return false;
+    // Replace optimistic outbound message when server confirmation arrives
+    if (event.messageSid && item.direction === "outbound" && effectiveMessage.direction === "outbound" && item.body === effectiveMessage.body && !item.id.startsWith("SM")) return false;
+    return true;
+  }), effectiveMessage].slice(-50) : nextConversation.messages;
   const channels = Array.from(new Set([...nextConversation.channels, channel]));
 
   const nextCallSids = event.callSid && !nextConversation.callSids?.includes(event.callSid)
@@ -1430,7 +1437,7 @@ export default function ConversationBoard() {
         to: destination,
         body: bodyText || " ",
         from: fromNumber,
-        conversationId: matchedDialContact ? active?.id : undefined,
+        conversationId: active?.id || getConversationIdForPhone(destination),
         mediaUrl: mediaUrls,
       });
       setMessageText("");

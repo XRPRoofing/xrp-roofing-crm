@@ -3,7 +3,9 @@ import { addUniqueCrmNotification } from "@/lib/crm-notifications";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 
 function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
+  const d = value.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) return d.slice(1);
+  return d;
 }
 
 function formatPhoneIdentity(value: string) {
