@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createCallRecordingInsights } from "@/lib/twilio/recording-insights";
 import { normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
-import { publishConversationEvent } from "@/lib/twilio/realtime";
+import { publishConversationEvent, lookupCallEventByCallSid } from "@/lib/twilio/realtime";
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   let isDialActionCallback = false;
@@ -24,12 +26,34 @@ export async function POST(req: NextRequest) {
     console.log("[Twilio Call Status] Event stored", { callSid: event.callSid, recordingSid: event.recordingSid, status: event.status, storeResult });
 
     if (event.recordingUrl) {
-      console.log("[Twilio Recording] Recording completed callback received", { callSid: event.callSid, recordingSid: event.recordingSid, recordingUrl: event.recordingUrl });
+      // Recording callbacks (especially from conferences) may lack From/To.
+      // Resolve them from the original call event so the recording is
+      // associated with the correct conversation.
+      let recFrom = event.from;
+      let recTo = event.to;
+      let recDirection = event.direction;
+      let recConversationId = event.conversationId;
+
+      if ((!recFrom || !recTo) && event.callSid) {
+        const original = await lookupCallEventByCallSid(event.callSid);
+        if (original) {
+          recFrom = recFrom || original.from;
+          recTo = recTo || original.to;
+          recDirection = original.direction;
+          recConversationId = recConversationId || original.conversationId || undefined;
+        }
+      }
+
+      console.log("[Twilio Recording] Recording completed callback received", { callSid: event.callSid, recordingSid: event.recordingSid, recordingUrl: event.recordingUrl, from: recFrom, to: recTo });
       await publishConversationEvent({
         ...event,
         id: `${event.id}-recording-available`,
         type: "call_recording",
         status: "processing",
+        from: recFrom,
+        to: recTo,
+        direction: recDirection,
+        conversationId: recConversationId,
         body: "Call recording saved. Transcript and summary are processing.",
         recordingUrl: event.recordingUrl,
         payload: {
@@ -45,14 +69,20 @@ export async function POST(req: NextRequest) {
             callSid: event.callSid,
             recordingSid: event.recordingSid,
             recordingUrl: event.recordingUrl,
-            from: event.from,
-            to: event.to,
-            direction: event.direction,
+            from: recFrom,
+            to: recTo,
+            direction: recDirection,
             payload: event.payload,
           });
           if (insights) {
             console.log("[Twilio Recording] Publishing transcript and summary", { callSid: insights.callSid, recordingSid: insights.recordingSid });
-            await publishConversationEvent(insights);
+            await publishConversationEvent({
+              ...insights,
+              from: recFrom,
+              to: recTo,
+              direction: recDirection,
+              conversationId: recConversationId,
+            });
           }
         } catch (error) {
           await publishConversationEvent({
@@ -60,6 +90,10 @@ export async function POST(req: NextRequest) {
             id: `${event.id}-recording-summary-failed`,
             type: "call_recording",
             status: "failed",
+            from: recFrom,
+            to: recTo,
+            direction: recDirection,
+            conversationId: recConversationId,
             body: error instanceof Error ? `Recording saved, but summary failed: ${error.message}` : "Recording saved, but summary failed.",
             recordingSid: event.recordingSid,
             recordingUrl: event.recordingUrl,
