@@ -235,8 +235,8 @@ export default function DashboardHeroActions() {
       const newJob: Lead = {
         id: `J-${Date.now()}`,
         name: jobForm.name.trim(),
-        email: jobForm.email.trim() || "crm@xrproofing.com",
-        phone: jobForm.phone.trim() || "(602) 555-0000",
+        email: jobForm.email.trim() || "",
+        phone: jobForm.phone.trim() || "",
         address: jobForm.address.trim() || "Address pending",
         city: "",
         stage: "new_lead",

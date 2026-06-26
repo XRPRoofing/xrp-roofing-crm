@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, ListChecks, Mail, MapPin, MessageSquare, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, Link2, ListChecks, Mail, MapPin, MessageSquare, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, Users, X } from "lucide-react";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
@@ -19,7 +19,10 @@ import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { getCachedCrewData, getCachedProposals, getCachedInvoices, refreshCrewData, refreshProposals, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { upsertProposalRecord } from "@/lib/proposal-sync";
+import { upsertInvoiceRecord } from "@/lib/invoice-sync";
+import { getCachedCrewData, getCachedProposals, getCachedInvoices, getCachedCustomers, refreshCrewData, refreshProposals, refreshInvoices, refreshCustomers, CACHE_EVENTS } from "@/lib/data-cache";
+import type { Customer } from "@/types/crm";
 import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
@@ -477,6 +480,14 @@ export default function LeadsPage() {
     callNotes: "",
   });
 
+  // Client identification: suggest existing customers as user types name
+  const [customerSuggestions, setCustomerSuggestions] = useState<Customer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Link-document picker state for job card
+  const [showLinkPicker, setShowLinkPicker] = useState<"proposal" | "invoice" | null>(null);
+
   const PHOTO_CHECKLIST_ITEMS = [
     "Front of house",
     "Roof overview (full)",
@@ -502,6 +513,7 @@ export default function LeadsPage() {
   const closeJobCard = useCallback(() => {
     flushPendingUpdates();
     setSelectedJobId(null);
+    setShowLinkPicker(null);
     jobCardHashRef.current = false;
     const url = new URL(window.location.href);
     url.searchParams.delete("job");
@@ -558,6 +570,57 @@ export default function LeadsPage() {
       const name = (meta?.full_name || meta?.name || data.session.user.email?.split("@")[0] || "Office") as string;
       setCurrentUserName(name);
     }).catch(() => {});
+  }, []);
+
+  // Ensure customer data is loaded for client identification suggestions
+  useEffect(() => {
+    void refreshCustomers().catch(() => {});
+  }, []);
+
+  // Search existing customers as user types in the name field
+  function handleNameChange(value: string) {
+    setForm((prev) => ({ ...prev, name: value }));
+    if (value.trim().length < 2) {
+      setCustomerSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const customers = getCachedCustomers<Customer>() ?? [];
+    const query = value.toLowerCase().trim();
+    const matches = customers.filter((c) => {
+      if (!c.name) return false;
+      return c.name.toLowerCase().includes(query) ||
+        (c.phone && c.phone.includes(query)) ||
+        (c.email && c.email.toLowerCase().includes(query)) ||
+        (c.propertyAddress && c.propertyAddress.toLowerCase().includes(query));
+    }).slice(0, 5);
+    setCustomerSuggestions(matches);
+    setShowSuggestions(matches.length > 0);
+  }
+
+  function selectCustomer(customer: Customer) {
+    const address = customer.propertyAddress?.split(",")[0]?.trim() || "";
+    setForm((prev) => ({
+      ...prev,
+      name: customer.name,
+      email: customer.email || prev.email,
+      phone: customer.phone || prev.phone,
+      address: address || prev.address,
+      roofType: customer.roofDetails || prev.roofType,
+    }));
+    setShowSuggestions(false);
+    setCustomerSuggestions([]);
+  }
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Load the selected job's saved files (photos + documents) from the shared
@@ -673,6 +736,65 @@ export default function LeadsPage() {
     if (existing) requestOpenInvoice(existing.id);
     else requestCreateInvoice(jobToBoardPayload(job));
     openBoardFromJob("/crm/invoices");
+  }
+
+  // Get linked proposals for a job
+  function getLinkedProposals(jobId: string): ProposalSnap[] {
+    const cached = getCachedProposals<ProposalSnap>();
+    const proposals = cached ?? [];
+    return proposals.filter((p) => p.job?.id === jobId && !p.deletedAt);
+  }
+
+  // Get linked invoices for a job
+  function getLinkedInvoices(jobId: string): InvoiceSnap[] {
+    const cached = getCachedInvoices<InvoiceSnap>();
+    const invoices = cached ?? [];
+    return invoices.filter((inv) => inv.jobReference === jobId && !inv.isDeleted);
+  }
+
+  // Get unlinked proposals (not connected to any job)
+  function getUnlinkedProposals(): (ProposalSnap & { customerName?: string; address?: string; total?: number })[] {
+    const cached = getCachedProposals<ProposalSnap & { customerName?: string; address?: string; total?: number }>();
+    const proposals = cached ?? [];
+    return proposals.filter((p) => !p.job?.id && !p.deletedAt);
+  }
+
+  // Get unlinked invoices (not connected to any job)
+  function getUnlinkedInvoices(): InvoiceSnap[] {
+    const cached = getCachedInvoices<InvoiceSnap>();
+    const invoices = cached ?? [];
+    return invoices.filter((inv) => !inv.jobReference && !inv.isDeleted);
+  }
+
+  // Link a proposal to the selected job
+  function linkProposalToJob(proposalId: string, jobId: string) {
+    const cached = getCachedProposals<ProposalSnap & Record<string, unknown>>();
+    const proposal = cached?.find((p) => p.id === proposalId);
+    if (!proposal) return;
+    const updated = { ...proposal, job: { id: jobId } };
+    void upsertProposalRecord(updated as { id: string } & Record<string, unknown>).catch(() => {});
+    setProposalStatusMap((prev) => ({ ...prev, [jobId]: proposal.status }));
+    setShowLinkPicker(null);
+    void refreshProposals<ProposalSnap>().then((proposals) => {
+      const map: Record<string, string> = {};
+      for (const p of proposals) {
+        if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
+      }
+      setProposalStatusMap(map);
+    }).catch(() => {});
+  }
+
+  // Link an invoice to the selected job
+  function linkInvoiceToJob(invoiceId: string, jobId: string) {
+    const cached = getCachedInvoices<InvoiceSnap & Record<string, unknown>>();
+    const invoice = cached?.find((inv) => inv.id === invoiceId);
+    if (!invoice) return;
+    const updated = { ...invoice, jobReference: jobId };
+    void upsertInvoiceRecord(updated as { id: string } & Record<string, unknown>).catch(() => {});
+    const status = getInvoiceDisplayStatus(invoice);
+    setInvoiceStatusMap((prev) => ({ ...prev, [jobId]: status }));
+    setShowLinkPicker(null);
+    void refreshInvoices<InvoiceSnap>().catch(() => {});
   }
 
   const filteredJobs = useMemo(() => {
@@ -912,8 +1034,8 @@ export default function LeadsPage() {
     const newJob: Lead = {
       id: `J-${Date.now()}`,
       name: form.name,
-      email: form.email || "crm@xrproofing.com",
-      phone: form.phone || "(602) 555-0000",
+      email: form.email || "",
+      phone: form.phone || "",
       address: form.address || "Address pending",
       city: getCityFromAddress(form.address),
       stage: "new_lead",
@@ -1085,10 +1207,23 @@ export default function LeadsPage() {
               <div className="p-4 space-y-3">
                 <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600"><User className="h-3.5 w-3.5" />Customer Info</p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1">
+                  <div className="relative grid gap-1" ref={suggestionsRef}>
                     <span className="text-xs font-bold text-gray-500">Full Name <span className="text-orange-400">*</span></span>
-                    <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. John Smith" />
-                  </label>
+                    <input required value={form.name} onChange={(e) => handleNameChange(e.target.value)} onFocus={() => { if (customerSuggestions.length > 0) setShowSuggestions(true); }} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. John Smith" autoComplete="off" />
+                    {showSuggestions && customerSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-white shadow-lg">
+                        <p className="border-b border-gray-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-blue-600"><Users className="mb-0.5 mr-1 inline h-3 w-3" />Existing Customers</p>
+                        {customerSuggestions.map((c) => (
+                          <button key={c.id} type="button" onClick={() => selectCustomer(c)} className="flex w-full flex-col gap-0.5 border-b border-gray-50 px-3 py-2 text-left transition hover:bg-blue-50">
+                            <span className="text-sm font-bold text-gray-800">{c.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {[c.propertyAddress, c.phone, c.email].filter(Boolean).join(" · ") || "No contact info"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <label className="grid gap-1">
                     <span className="text-xs font-bold text-gray-500">Phone Number</span>
                     <div className="relative">
@@ -1417,14 +1552,120 @@ export default function LeadsPage() {
                   <p className="mt-2 text-xs font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button type="button" onClick={() => openEstimateForJob(selectedJob)} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                    <DollarSign className="h-5 w-5" />Estimate
-                  </button>
-                  <button type="button" onClick={() => openInvoiceForJob(selectedJob)} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                    <CheckCircle2 className="h-5 w-5" />Invoice
-                  </button>
-                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:col-span-2">
+                {/* Linked Documents */}
+                <div className="rounded-lg border border-gray-200 bg-white">
+                  <div className="flex items-center justify-between border-b border-gray-100 p-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><Link2 className="h-4 w-4" />Linked Documents</div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* Linked Proposals/Estimates */}
+                    {(() => {
+                      const linked = getLinkedProposals(selectedJob.id);
+                      return linked.length > 0 ? (
+                        <div className="space-y-2">
+                          {linked.map((p) => (
+                            <button key={p.id} type="button" onClick={() => { requestOpenEstimate(p.id); openBoardFromJob("/crm/proposals"); }} className="flex w-full items-center justify-between rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-left transition hover:bg-purple-100">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-purple-600" />
+                                <span className="text-sm font-bold text-purple-800">Estimate</span>
+                              </div>
+                              <span className="rounded-full bg-purple-200 px-2 py-0.5 text-xs font-bold text-purple-700">{p.status}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* Linked Invoices */}
+                    {(() => {
+                      const linked = getLinkedInvoices(selectedJob.id);
+                      return linked.length > 0 ? (
+                        <div className="space-y-2">
+                          {linked.map((inv) => (
+                            <button key={inv.id} type="button" onClick={() => { requestOpenInvoice(inv.id); openBoardFromJob("/crm/invoices"); }} className="flex w-full items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-left transition hover:bg-emerald-100">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                <span className="text-sm font-bold text-emerald-800">Invoice{inv.clientName ? ` — ${inv.clientName}` : ""}</span>
+                              </div>
+                              <span className="rounded-full bg-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-700">{getInvoiceDisplayStatus(inv)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    {/* No linked documents message */}
+                    {getLinkedProposals(selectedJob.id).length === 0 && getLinkedInvoices(selectedJob.id).length === 0 && (
+                      <p className="text-xs font-semibold text-gray-400">No proposals or invoices linked to this job yet.</p>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-gray-100">
+                      <button type="button" onClick={() => openEstimateForJob(selectedJob)} className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                        <Plus className="h-4 w-4" />{getLinkedProposals(selectedJob.id).length > 0 ? "Open Estimate" : "New Estimate"}
+                      </button>
+                      <button type="button" onClick={() => openInvoiceForJob(selectedJob)} className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                        <Plus className="h-4 w-4" />{getLinkedInvoices(selectedJob.id).length > 0 ? "Open Invoice" : "New Invoice"}
+                      </button>
+                    </div>
+
+                    {/* Link existing documents */}
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "proposal" ? null : "proposal")} className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
+                        <Link2 className="h-3.5 w-3.5" />Link Existing Estimate
+                      </button>
+                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "invoice" ? null : "invoice")} className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
+                        <Link2 className="h-3.5 w-3.5" />Link Existing Invoice
+                      </button>
+                    </div>
+
+                    {/* Link picker dropdown */}
+                    {showLinkPicker === "proposal" && (() => {
+                      const unlinked = getUnlinkedProposals();
+                      return (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-600">Select an estimate to link</p>
+                          {unlinked.length === 0 ? (
+                            <p className="text-xs text-gray-500">No unlinked estimates found.</p>
+                          ) : (
+                            <div className="max-h-40 space-y-1 overflow-y-auto">
+                              {unlinked.map((p) => (
+                                <button key={p.id} type="button" onClick={() => linkProposalToJob(p.id, selectedJob.id)} className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left transition hover:bg-blue-100">
+                                  <span className="text-sm font-semibold text-gray-700">{p.customerName || p.id}</span>
+                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{p.status}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {showLinkPicker === "invoice" && (() => {
+                      const unlinked = getUnlinkedInvoices();
+                      return (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-600">Select an invoice to link</p>
+                          {unlinked.length === 0 ? (
+                            <p className="text-xs text-gray-500">No unlinked invoices found.</p>
+                          ) : (
+                            <div className="max-h-40 space-y-1 overflow-y-auto">
+                              {unlinked.map((inv) => (
+                                <button key={inv.id} type="button" onClick={() => linkInvoiceToJob(inv.id, selectedJob.id)} className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left transition hover:bg-blue-100">
+                                  <span className="text-sm font-semibold text-gray-700">{inv.clientName || inv.id}</span>
+                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{getInvoiceDisplayStatus(inv)}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
                     <History className="h-5 w-5" />Activity History
                   </button>
                 </div>
