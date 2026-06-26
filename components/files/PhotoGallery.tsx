@@ -336,18 +336,28 @@ function LightboxViewer({
   );
 }
 
+const FILTER_TABS: { value: PhotoType | "All"; label: string; color: string; activeColor: string }[] = [
+  { value: "All", label: "All", color: "text-slate-500", activeColor: "bg-[#0A3D91] text-white" },
+  { value: "Before", label: "Before", color: "text-blue-600", activeColor: "bg-blue-600 text-white" },
+  { value: "Progress", label: "Progress", color: "text-orange-500", activeColor: "bg-orange-500 text-white" },
+  { value: "After", label: "After", color: "text-emerald-600", activeColor: "bg-emerald-600 text-white" },
+];
+
 export default function PhotoGallery({
   photos,
   activeFilter,
+  onFilterChange,
   onEditPhoto,
 }: {
   photos: GalleryPhoto[];
   activeFilter?: PhotoType | "General";
+  onFilterChange?: (filter: PhotoType | "All") => void;
   onEditPhoto?: (photo: GalleryPhoto) => void;
 }) {
   const [lightboxPool, setLightboxPool] = useState<GalleryPhoto[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  const [internalFilter, setInternalFilter] = useState<PhotoType | "All">("All");
 
   // Selected photo index for Before/After comparison slots
   const [selectedBeforeIdx, setSelectedBeforeIdx] = useState(0);
@@ -355,14 +365,27 @@ export default function PhotoGallery({
   const [savingComparison, setSavingComparison] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // "General" or undefined → show all photos; otherwise filter by type
-  const filtered = !activeFilter || activeFilter === "General" || activeFilter === "Job Photo"
-    ? photos
-    : photos.filter((p) => p.photoType === activeFilter);
+  // Determine active filter — external prop takes priority if provided
+  const currentFilter = activeFilter === "General" || activeFilter === "Job Photo"
+    ? "All"
+    : (activeFilter as PhotoType | undefined) ?? internalFilter;
 
-  const beforePhotos = photos.filter((p) => p.photoType === "Before");
-  const afterPhotos  = photos.filter((p) => p.photoType === "After");
-  const showComparison = (activeFilter === "Before" || activeFilter === "After") && beforePhotos.length > 0 && afterPhotos.length > 0;
+  // Chronological sort — oldest first
+  const sorted = [...photos].sort((a, b) => {
+    const ta = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+    const tb = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+    return ta - tb;
+  });
+
+  // "All" → show all photos; otherwise filter by type
+  const filtered = currentFilter === "All"
+    ? sorted
+    : sorted.filter((p) => p.photoType === currentFilter);
+
+  const beforePhotos = sorted.filter((p) => p.photoType === "Before");
+  const afterPhotos  = sorted.filter((p) => p.photoType === "After");
+  const progressPhotos = sorted.filter((p) => p.photoType === "Progress");
+  const showComparison = (currentFilter === "Before" || currentFilter === "After" || currentFilter === "All") && beforePhotos.length > 0 && afterPhotos.length > 0;
 
   // Clamp indices when photos change
   const safeBeforeIdx = Math.min(selectedBeforeIdx, Math.max(0, beforePhotos.length - 1));
@@ -449,8 +472,77 @@ export default function PhotoGallery({
     }
   }, [safeBeforeIdx, safeAfterIdx]);
 
+  const handleFilterChange = useCallback((f: PhotoType | "All") => {
+    setInternalFilter(f);
+    onFilterChange?.(f);
+  }, [onFilterChange]);
+
   return (
     <>
+      {/* Filter tabs */}
+      <div className="mb-4 flex items-center gap-1.5 overflow-x-auto">
+        {FILTER_TABS.map((tab) => {
+          const tabCount = tab.value === "All" ? photos.length
+            : tab.value === "Before" ? beforePhotos.length
+            : tab.value === "Progress" ? progressPhotos.length
+            : afterPhotos.length;
+          const isActive = currentFilter === tab.value;
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => handleFilterChange(tab.value)}
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black uppercase tracking-wide transition active:scale-95 ${
+                isActive ? tab.activeColor : `bg-slate-100 ${tab.color} hover:bg-slate-200`
+              }`}
+            >
+              {tab.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"}`}>
+                {tabCount}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Before / After sections when viewing All */}
+      {currentFilter === "All" && (beforePhotos.length > 0 || afterPhotos.length > 0) && (
+        <div className="mb-5 space-y-3">
+          {beforePhotos.length > 0 && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-white">Before</span>
+                <span className="text-xs font-bold text-slate-400">{beforePhotos.length} photo{beforePhotos.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {beforePhotos.map((photo, idx) => (
+                  <button key={photo.id} type="button" onClick={() => openLightbox(beforePhotos, idx)} className="shrink-0 overflow-hidden rounded-xl border border-blue-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.dataUrl} alt={photo.name} className="h-24 w-32 object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {afterPhotos.length > 0 && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-white">After</span>
+                <span className="text-xs font-bold text-slate-400">{afterPhotos.length} photo{afterPhotos.length !== 1 ? "s" : ""}</span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {afterPhotos.map((photo, idx) => (
+                  <button key={photo.id} type="button" onClick={() => openLightbox(afterPhotos, idx)} className="shrink-0 overflow-hidden rounded-xl border border-emerald-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.dataUrl} alt={photo.name} className="h-24 w-32 object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Before / After stacked comparison (CompanyCam style) */}
       {showComparison && activeBefore && activeAfter && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-[#0f172a]">
@@ -546,11 +638,12 @@ export default function PhotoGallery({
 
       {/* Photo grid */}
       {filtered.length === 0 ? (
-        <p className="py-10 text-center text-sm font-semibold text-slate-400">No {activeFilter && activeFilter !== "General" ? activeFilter : ""} photos yet.</p>
+        <p className="py-10 text-center text-sm font-semibold text-slate-400">No {currentFilter !== "All" ? currentFilter : ""} photos yet.</p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {filtered.map((photo, index) => {
             const type = (photo.photoType || "Job Photo") as PhotoType;
+            const timeStr = formatUploadedAt(photo.uploadedAt);
             return (
               <div key={photo.id} className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                 <button type="button" onClick={() => openLightbox(filtered, index)} className="relative block w-full" aria-label={`Open ${photo.name}`}>
@@ -561,7 +654,10 @@ export default function PhotoGallery({
                   </span>
                 </button>
                 <div className="flex items-center justify-between gap-1 px-2 py-2">
-                  <p className="min-w-0 truncate text-[10px] font-bold text-slate-500">{photo.uploadedBy ?? "Office"}</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-bold text-slate-500">{photo.uploadedBy ?? "Office"}</p>
+                    {timeStr && <p className="truncate text-[9px] text-slate-400">{timeStr}</p>}
+                  </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {onEditPhoto && photo.dataUrl && (
                       <button type="button" onClick={() => onEditPhoto(photo)} className="rounded-full bg-orange-50 p-1.5 text-orange-600 hover:bg-orange-100" title="Edit / Note">

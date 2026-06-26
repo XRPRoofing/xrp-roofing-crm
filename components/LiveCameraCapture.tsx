@@ -5,7 +5,8 @@
  * Full-screen camera overlay using getUserMedia — CompanyCam-style UI.
  * - Keeps camera live after each shot (no OS confirmation screen)
  * - Auto-saves immediately on capture
- * - Zoom pills: 0.5× / 1× (optical zoom via video track constraints)
+ * - Flash control: Off / On / Auto (torch via video track)
+ * - Zoom: 0.5× / 1× / 2× pills + pinch-to-zoom gesture on mobile
  * - HIDDEN / IMAGE / OUTLINE view-mode tab bar
  * - "Photo Saved" toast + running count
  * - Thumbnail strip of captured photos
@@ -14,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, ChevronRight, Info, X } from "lucide-react";
+import { Camera, CheckCircle2, ChevronRight, Info, X, Zap, ZapOff } from "lucide-react";
 
 export type CapturedPhoto = {
   dataUrl: string;
@@ -22,6 +23,11 @@ export type CapturedPhoto = {
 };
 
 type ViewMode = "HIDDEN" | "IMAGE" | "OUTLINE";
+type FlashMode = "off" | "on" | "auto";
+type ZoomLevel = 0.5 | 1 | 2;
+
+const FLASH_LABELS: Record<FlashMode, string> = { off: "Off", on: "On", auto: "Auto" };
+const ZOOM_LEVELS: ZoomLevel[] = [0.5, 1, 2];
 
 type Props = {
   label: string;           // e.g. "Before", "After", "Progress"
@@ -44,9 +50,17 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const [camError, setCamError] = useState(false);
-  const [zoom, setZoom] = useState<0.5 | 1>(1);
+  const [zoom, setZoom] = useState<ZoomLevel>(1);
+  const [flashMode, setFlashMode] = useState<FlashMode>("off");
+  const [flashSupported, setFlashSupported] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("IMAGE");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pinch-to-zoom state
+  const pinchStartDistance = useRef<number | null>(null);
+  const pinchStartZoom = useRef<number>(1);
+  const zoomRangeRef = useRef<{ min: number; max: number }>({ min: 1, max: 1 });
+  const currentHwZoom = useRef<number>(1);
 
   const startCamera = useCallback(async () => {
     try {
@@ -58,6 +72,15 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => setReady(true);
+      }
+      // Detect flash (torch) support
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        const caps = track.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean; zoom?: { min: number; max: number } }) | undefined;
+        if (caps?.torch) setFlashSupported(true);
+        if (caps?.zoom) {
+          zoomRangeRef.current = { min: caps.zoom.min ?? 1, max: caps.zoom.max ?? 1 };
+        }
       }
     } catch {
       setCamError(true);
@@ -79,10 +102,64 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     if (caps?.zoom) {
       const min = caps.zoom.min ?? 1;
       const max = caps.zoom.max ?? 1;
-      const target = zoom === 0.5 ? min : Math.min(1, max);
+      zoomRangeRef.current = { min, max };
+      let target: number;
+      if (zoom === 0.5) target = min;
+      else if (zoom === 2) target = Math.min(max, min * 4);
+      else target = Math.min(min * 2, max);
+      target = Math.max(min, Math.min(target, max));
+      currentHwZoom.current = target;
       void track.applyConstraints({ advanced: [{ zoom: target } as MediaTrackConstraintSet] }).catch(() => {});
     }
   }, [zoom]);
+
+  // Apply flash (torch) via video track constraint
+  useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !flashSupported) return;
+    const torchOn = flashMode === "on";
+    void track.applyConstraints({ advanced: [{ torch: torchOn } as MediaTrackConstraintSet] }).catch(() => {});
+  }, [flashMode, flashSupported]);
+
+  // Pinch-to-zoom handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDistance.current = Math.sqrt(dx * dx + dy * dy);
+      pinchStartZoom.current = currentHwZoom.current;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDistance.current !== null) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const scale = dist / pinchStartDistance.current;
+      const { min, max } = zoomRangeRef.current;
+      const newZoom = Math.max(min, Math.min(max, pinchStartZoom.current * scale));
+      currentHwZoom.current = newZoom;
+
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (track) {
+        void track.applyConstraints({ advanced: [{ zoom: newZoom } as MediaTrackConstraintSet] }).catch(() => {});
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (pinchStartDistance.current !== null) {
+      pinchStartDistance.current = null;
+      // Snap to nearest zoom level pill
+      const { min, max } = zoomRangeRef.current;
+      const zoomFraction = max > min ? (currentHwZoom.current - min) / (max - min) : 0;
+      if (zoomFraction < 0.15) setZoom(0.5);
+      else if (zoomFraction > 0.5) setZoom(2);
+      else setZoom(1);
+    }
+  }, []);
 
   const capture = useCallback(() => {
     const video = videoRef.current;
@@ -121,6 +198,17 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(false), 1800);
 
+    // Flash auto mode: briefly fire torch for capture if ambient is low
+    if (flashMode === "auto" && flashSupported) {
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (track) {
+        void track.applyConstraints({ advanced: [{ torch: true } as MediaTrackConstraintSet] }).catch(() => {});
+        setTimeout(() => {
+          void track.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] }).catch(() => {});
+        }, 400);
+      }
+    }
+
     // Compress full-res in background, then save — camera stays ready
     savingCount.current += 1;
     setSavingDisplay(savingCount.current);
@@ -150,7 +238,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
       savingCount.current -= 1;
       setSavingDisplay(savingCount.current);
     });
-  }, [label, onCapture]);
+  }, [label, onCapture, flashMode, flashSupported]);
 
   // Hardware shutter button via volume keys / Enter
   useEffect(() => {
@@ -162,6 +250,14 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   }, [capture]);
 
   const totalCount = existingCount + count;
+
+  const cycleFlash = useCallback(() => {
+    setFlashMode((current) => {
+      if (current === "off") return "on";
+      if (current === "on") return "auto";
+      return "off";
+    });
+  }, []);
 
   // Fallback: getUserMedia not supported
   if (camError) {
@@ -177,7 +273,12 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-black">
       {/* Camera viewfinder */}
-      <div className="relative flex-1 overflow-hidden">
+      <div
+        className="relative flex-1 overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
@@ -206,9 +307,21 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
             <ChevronRight className="h-4 w-4 shrink-0 text-white/70" />
           </button>
 
-          <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm active:scale-95">
-            <Info className="h-5 w-5" />
-          </button>
+          {/* Flash toggle */}
+          {flashSupported ? (
+            <button
+              type="button"
+              onClick={cycleFlash}
+              className="flex h-9 items-center gap-1 rounded-full bg-black/40 px-3 text-white backdrop-blur-sm active:scale-95"
+            >
+              {flashMode === "off" ? <ZapOff className="h-4 w-4" /> : <Zap className="h-4 w-4 text-yellow-400" />}
+              <span className="text-[10px] font-black uppercase">{FLASH_LABELS[flashMode]}</span>
+            </button>
+          ) : (
+            <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm active:scale-95">
+              <Info className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {/* "Photo Saved" toast */}
@@ -266,20 +379,16 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
       <div className="flex flex-col items-center gap-3 bg-black pb-safe px-6 pt-3 pb-4">
         {/* Zoom pills */}
         <div className="flex items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => setZoom(0.5)}
-            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 0.5 ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"}`}
-          >
-            .5×
-          </button>
-          <button
-            type="button"
-            onClick={() => setZoom(1)}
-            className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === 1 ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"}`}
-          >
-            1×
-          </button>
+          {ZOOM_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setZoom(level)}
+              className={`rounded-full px-4 py-1.5 text-xs font-black transition ${zoom === level ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"}`}
+            >
+              {level === 0.5 ? ".5" : level}×
+            </button>
+          ))}
         </div>
 
         {/* Shutter button */}
