@@ -11,6 +11,7 @@ import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConv
 import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
 import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
+import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime } from "@/lib/arizona-time";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
@@ -1421,6 +1422,7 @@ export default function ConversationBoard() {
       setIsHeld(false);
       setIsMuted(false);
       setTwilioNotice("Browser call connected. Your microphone is linked to Twilio.");
+      void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || destination, actor: "Office", action: "Outbound call placed", details: `Called ${destination}${callerId ? ` from ${callerId}` : ""}`, module: "Calls" }).catch(() => {});
       call.on("accept", () => {
         const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
         if (sid) setCallSid(sid);
@@ -1473,6 +1475,8 @@ export default function ConversationBoard() {
     setIsHeld(false);
     setIsMuted(false);
     setTwilioNotice("Incoming call connected");
+    const callerPhone = incomingCall.parameters?.From || incomingFrom;
+    void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || callerPhone, actor: "Office", action: "Incoming call answered", details: `Answered call from ${callerPhone}`, module: "Calls" }).catch(() => {});
   }
 
   function handleDeclineIncomingCall() {
@@ -1585,6 +1589,7 @@ export default function ConversationBoard() {
       setMessageText("");
       setPendingMedia([]);
       setTwilioNotice(`SMS ${message.status}`);
+      void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || destination, actor: "Office", action: "SMS sent", details: `Sent to ${destination}: ${(bodyText || "[media]").slice(0, 120)}`, module: "SMS" }).catch(() => {});
     } catch (error) {
       setMediaUploading(false);
       setTwilioNotice(error instanceof Error ? error.message : "SMS could not be sent");
@@ -1620,6 +1625,7 @@ export default function ConversationBoard() {
     try {
       await saveCallNotes({ callSid: sid, conversationId: active.id, notes: callNotes.trim(), disposition: callDisposition });
       setTwilioNotice("Disposition saved");
+      void logCrewActivity({ jobId: active.id || "", jobName: active.contact.name || active.contact.phone, actor: "Office", action: `Call disposition: ${callDisposition}`, details: callNotes.trim() || callDisposition, module: "Calls" }).catch(() => {});
     } catch {
       setTwilioNotice("Disposition could not be saved");
     }

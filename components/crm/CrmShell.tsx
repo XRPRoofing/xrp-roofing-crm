@@ -22,6 +22,7 @@ import { subscribeToCustomerRecords, loadCustomerRecords } from "@/lib/customer-
 import { subscribeToTaskUpdates } from "@/lib/task-sync";
 import { deleteNotificationFromSupabase, loadNotificationsFromSupabase, markNotificationsReadInSupabase, subscribeToNotifications } from "@/lib/notification-sync";
 import { refreshCrewData, refreshInvoices, refreshProposals, refreshCustomers, getCachedCustomers } from "@/lib/data-cache";
+import { logCrewActivity } from "@/lib/crew-activity";
 import type { Customer } from "@/types/crm";
 
 const navigation = [
@@ -497,6 +498,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       setGlobalIncomingMuted(false);
       setGlobalIncomingCaller({ name: incoming.parameters?.From || "Unknown", phone: incoming.parameters?.From || "" });
       setGlobalIncomingTwilioNumber(incoming.parameters?.To || "");
+      void logCrewActivity({ jobId: "", jobName: incoming.parameters?.From || "Unknown", actor: "Office", action: "Incoming call answered", details: `Answered call from ${incoming.parameters?.From || "Unknown"}`, module: "Calls" }).catch(() => {});
 
       callChannelRef.current?.postMessage({ type: "answered" });
     } catch {
@@ -535,9 +537,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setGlobalIncomingMuted(next);
   }
 
-  function handleIncomingCallSaveNotes(notes: string, disposition: string, _info: CallerInfo) {
+  function handleIncomingCallSaveNotes(notes: string, disposition: string, info: CallerInfo) {
     const callSid = incomingCallRef.current?.parameters?.CallSid || "";
     void saveCallNotes({ callSid, notes, disposition }).catch(() => {});
+    if (disposition) void logCrewActivity({ jobId: "", jobName: info.name || info.phone || "Unknown", actor: "Office", action: `Call disposition: ${disposition}`, details: notes || disposition, module: "Calls" }).catch(() => {});
   }
 
   function handleIncomingCallCreateLead(info: CallerInfo) {
@@ -602,6 +605,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setPostCallSaving(true);
     try {
       await saveCallNotes({ callSid: postCallSid, notes: postCallNotes.trim(), disposition: postCallDisposition });
+      void logCrewActivity({ jobId: "", jobName: globalIncomingCaller?.name || "Unknown", actor: "Office", action: `Call disposition: ${postCallDisposition}`, details: postCallNotes.trim() || postCallDisposition, module: "Calls" }).catch(() => {});
     } catch {}
     setPostCallSaving(false);
     closePostCallDisposition();
