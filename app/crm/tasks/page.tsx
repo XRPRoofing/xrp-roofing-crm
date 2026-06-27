@@ -19,6 +19,7 @@ import {
 } from "@/lib/office-tasks";
 import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates, upsertTaskToSupabase } from "@/lib/task-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
+import { logCrewActivity } from "@/lib/crew-activity";
 
 function fmt(iso: string) {
   if (!iso) return "";
@@ -137,6 +138,7 @@ export default function TasksPage() {
     if (!deleteTaskTarget) return;
     deleteOfficeTask(deleteTaskTarget.id);
     void deleteTaskFromSupabase(deleteTaskTarget.id);
+    void logCrewActivity({ jobId: deleteTaskTarget.jobId || deleteTaskTarget.id, jobName: deleteTaskTarget.customerName, actor: "Office", action: "Task deleted", details: deleteTaskTarget.title, module: "Jobs" }).catch(() => {});
     setSelectedTask(null);
     setTasks((current) => current.filter((t) => t.id !== deleteTaskTarget.id));
     setShowDeleteConfirm(false);
@@ -147,6 +149,7 @@ export default function TasksPage() {
     if (!window.confirm(`Archive task for "${task.customerName}"? It will be hidden from the board.`)) return;
     archiveOfficeTask(task.id);
     void upsertTaskToSupabase({ ...task, archived: true });
+    void logCrewActivity({ jobId: task.jobId || task.id, jobName: task.customerName, actor: "Office", action: "Task archived", details: task.title, module: "Jobs" }).catch(() => {});
     setSelectedTask(null);
     setTasks((current) => current.filter((t) => t.id !== task.id));
   }
@@ -157,7 +160,10 @@ export default function TasksPage() {
     setTasks(fresh);
     if (selectedTask?.id === taskId) setSelectedTask((prev) => prev ? { ...prev, status } : null);
     const moved = fresh.find((t) => t.id === taskId);
-    if (moved) void upsertTaskToSupabase(moved);
+    if (moved) {
+      void upsertTaskToSupabase(moved);
+      void logCrewActivity({ jobId: moved.jobId || moved.id, jobName: moved.customerName, actor: "Office", action: `Task moved to ${status}`, details: moved.title, module: "Jobs" }).catch(() => {});
+    }
   }
 
   function handleDrop(status: OfficeTaskStatus) {
@@ -175,6 +181,7 @@ export default function TasksPage() {
   function submitSatisfaction() {
     if (!satModal || !satResult) return;
     recordCustomerSatisfaction(satModal.id, satResult === "yes", satNotes);
+    void logCrewActivity({ jobId: satModal.jobId || satModal.id, jobName: satModal.customerName, actor: "Office", action: `Satisfaction: ${satResult === "yes" ? "Satisfied" : "Not Satisfied"}`, details: satNotes || (satResult === "yes" ? "Customer is satisfied" : "Customer is not satisfied"), module: "Jobs" }).catch(() => {});
     if (satResult === "yes") {
       recordReviewRequestSent(satModal.id, true, true);
       addTaskTimelineEntry(satModal.id, "Review Request Sent via SMS + Email", undefined, "System");
@@ -205,6 +212,7 @@ export default function TasksPage() {
     const existing = readOfficeTasks();
     saveOfficeTasks([task, ...existing]);
     void upsertTaskToSupabase(task);
+    void logCrewActivity({ jobId: task.jobId || task.id, jobName: task.customerName, actor: "Office", action: "Task created", details: task.title, module: "Jobs" }).catch(() => {});
     setTasks(readOfficeTasks());
     setShowNewTask(false);
     setNewTitle("");
