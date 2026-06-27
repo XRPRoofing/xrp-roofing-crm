@@ -1118,8 +1118,8 @@ export default function ConversationBoard() {
       if (activeConversationId === conversation.id) {
         setActiveConversationId("");
       }
-    } catch (error) {
-      console.error("[Conversation Delete]", error);
+    } catch {
+      // Delete failed — UI will stay consistent since optimistic update wasn't applied
     }
   }
 
@@ -1792,8 +1792,8 @@ export default function ConversationBoard() {
           const res = await fetch("/api/twilio/recording/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callSid: evt.callSid, recordingSid: evt.recordingSid }) });
           if (!res.ok) throw new Error("Delete failed");
           setCallInsights((current) => current.filter((ci) => ci.callSid !== evt.callSid));
-        } catch (error) {
-          console.error("[Recording Delete]", error);
+        } catch {
+          // Delete failed
         }
       }} />
 

@@ -26,7 +26,6 @@ async function handleTwiml(req: NextRequest, formData: FormData) {
     const client = getTwilioClient();
     if (client) {
       const callerId = resolveFromNumber(callerIdParam);
-      console.log(`[twilio:twiml] to=${to} callerId=${callerId} (requested=${callerIdParam ?? "undefined"}) callSid=${callSid}`);
       const customerTwiml = buildConferenceCustomerTwiml(confName, callbackUrl);
       client.calls.create({
         to,

@@ -41,7 +41,6 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
   // The Messaging Service automatically selects the correct number from its
   // sender pool (linked to the 10DLC campaign).
   if (messagingServiceSid) {
-    console.log(`[twilio:sms] to=${payload.to} messagingService=${messagingServiceSid} (requested from=${payload.from ?? "undefined"})`);
     return client.messages.create({
       to: payload.to,
       messagingServiceSid,
@@ -51,7 +50,6 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
     });
   }
 
-  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
   return client.messages.create({
     to: payload.to,
     from: fromNumber,
@@ -86,7 +84,6 @@ export async function createOutboundCall(payload: TwilioCallPayload, callbackUrl
 
   const statusCallback = callbackUrl || process.env.TWILIO_CALL_STATUS_WEBHOOK_URL;
   const fromNumber = resolveFromNumber(payload.from);
-  console.log(`[twilio:call] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
 
   return client.calls.create({
     to: payload.to,

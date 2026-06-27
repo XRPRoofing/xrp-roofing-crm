@@ -97,13 +97,11 @@ export function resolveFromNumber(requestedFrom?: string): string {
 
   const normalized = toE164(requestedFrom);
   if (!normalized) {
-    console.warn(`[twilio:resolveFromNumber] invalid/empty from value "${requestedFrom}", falling back to ${fallback.label} (${fallback.number})`);
     return fallback.number;
   }
 
   const match = lines.find((line) => line.number === normalized);
   if (match) return match.number;
 
-  console.warn(`[twilio:resolveFromNumber] "${requestedFrom}" (normalized: ${normalized}) does not match any configured line, falling back to ${fallback.label} (${fallback.number})`);
   return fallback.number;
 }

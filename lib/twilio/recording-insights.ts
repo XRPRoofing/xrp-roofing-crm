@@ -84,13 +84,9 @@ async function summarizeTranscript(transcript: string) {
 export async function createCallRecordingInsights(input: RecordingInsightsInput): Promise<TwilioConversationEvent | null> {
   if (!input.recordingUrl) return null;
 
-  console.log("[Twilio Recording] Downloading recording", { callSid: input.callSid, recordingSid: input.recordingSid, recordingUrl: input.recordingUrl });
   const recordingBlob = await downloadRecording(input.recordingUrl);
-  console.log("[Twilio Recording] Recording downloaded", { callSid: input.callSid, recordingSid: input.recordingSid, size: recordingBlob.size });
   const transcript = await transcribeRecording(recordingBlob);
-  console.log("[Twilio Recording] Transcript generated", { callSid: input.callSid, recordingSid: input.recordingSid, transcriptLength: transcript.length });
   const summary = transcript ? await summarizeTranscript(transcript) : "Transcript unavailable.";
-  console.log("[Twilio Recording] Summary generated", { callSid: input.callSid, recordingSid: input.recordingSid, summaryLength: summary.length });
 
   return {
     id: crypto.randomUUID(),

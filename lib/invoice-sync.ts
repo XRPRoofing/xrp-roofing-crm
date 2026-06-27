@@ -155,7 +155,6 @@ export async function upsertInvoiceRecord(invoice: Record<string, unknown> & { i
     .upsert(row, { onConflict: "id" });
     
   if (error) {
-    console.error("Failed to upsert invoice:", error);
     // Fallback to old API for backward compatibility
     try {
       await fetch("/api/invoices/share", {
@@ -180,7 +179,6 @@ export async function deleteInvoiceRecord(id: string): Promise<void> {
   const { error } = await supabase.from(invoicesTable).delete().eq("id", id);
   
   if (error) {
-    console.error("Failed to delete invoice:", error);
     // Fallback to old API
     try {
       await fetch(`/api/invoices/share?id=${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -207,7 +205,6 @@ export async function loadAllInvoices<T extends { id: string; isDeleted?: boolea
     .order("updated_at", { ascending: false });
     
   if (error) {
-    console.error("Failed to load invoices:", error);
     // Fallback to old API
     try {
       const response = await fetch("/api/invoices/share", { cache: "no-store" });

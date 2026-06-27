@@ -148,7 +148,6 @@ export async function POST(req: NextRequest) {
     // The invoice was never published to invoice_shares (or under a different
     // id). Don't lose the payment silently — notify the office using the data
     // Stripe gave us, then ack so Stripe doesn't retry forever.
-    console.warn(`[stripe-webhook] ${eventType} for unknown invoice ${invoiceId} — sending fallback notification`);
     if (successEvents.has(eventType)) {
       const fallbackAmount = Number(object.amount_total ?? object.amount_received ?? object.amount_paid ?? object.amount ?? 0) / 100;
       const fallbackMeta = (object.metadata as Record<string, unknown> | undefined) || {};

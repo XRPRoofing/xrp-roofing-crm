@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     after(async () => {
       const event = normalizeTwilioWebhookEvent("call_status", formData);
 
-      const results = await Promise.allSettled([
+      await Promise.allSettled([
         sendIncomingCallPushNotification(event.from),
         publishConversationEvent({
           ...event,
@@ -36,13 +36,6 @@ export async function POST(req: NextRequest) {
           payload: { ...event.payload, ivrSelection: digit, ivrDepartment: department },
         }),
       ]);
-
-      const [pushResult, convResult] = results;
-      if (pushResult.status === "fulfilled" && pushResult.value.sent === 0 && pushResult.value.reason) {
-        console.warn("[menu] push notification skipped:", pushResult.value.reason);
-      }
-      if (pushResult.status === "rejected") console.error("[menu] push failed:", pushResult.reason);
-      if (convResult.status === "rejected") console.error("[menu] publishConversationEvent failed:", convResult.reason);
     });
   }
 

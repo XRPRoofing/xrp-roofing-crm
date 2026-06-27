@@ -34,17 +34,7 @@ export async function POST(req: NextRequest) {
     const event = normalizeTwilioWebhookEvent("call_status", formData);
     isDialActionCallback = formData.has("DialCallStatus");
 
-    console.log("[Twilio Call Status] Webhook received", {
-      callSid: event.callSid,
-      recordingSid: event.recordingSid,
-      status: event.status,
-      hasRecordingUrl: Boolean(event.recordingUrl),
-      isDialActionCallback,
-      payloadKeys: Array.from(formData.keys()),
-    });
-
-    const storeResult = await publishConversationEvent(event);
-    console.log("[Twilio Call Status] Event stored", { callSid: event.callSid, recordingSid: event.recordingSid, status: event.status, storeResult });
+    await publishConversationEvent(event);
 
     if (event.recordingUrl) {
       // Recording callbacks (especially from conferences) may lack From/To.
@@ -65,7 +55,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log("[Twilio Recording] Recording completed callback received", { callSid: event.callSid, recordingSid: event.recordingSid, recordingUrl: event.recordingUrl, from: recFrom, to: recTo });
       await publishConversationEvent({
         ...event,
         id: `${event.id}-recording-available`,
@@ -96,7 +85,6 @@ export async function POST(req: NextRequest) {
             payload: event.payload,
           });
           if (insights) {
-            console.log("[Twilio Recording] Publishing transcript and summary", { callSid: insights.callSid, recordingSid: insights.recordingSid });
             await publishConversationEvent({
               ...insights,
               from: recFrom,
@@ -174,7 +162,6 @@ export async function POST(req: NextRequest) {
           },
           createdAt: new Date().toISOString(),
         });
-        console.log("[Twilio Call Status] Fallback summary published", { callSid: event.callSid, status: effectiveStatus });
       }
     }
 

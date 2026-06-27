@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
       if (client && config.accountSid) {
         try {
           await client.recordings(parsed.recordingSid).remove();
-        } catch (error) {
-          console.warn("[Recording Delete] Twilio deletion failed (may already be deleted):", error instanceof Error ? error.message : error);
+        } catch {
+          // Twilio deletion may fail if already deleted — safe to ignore
         }
       }
     }
