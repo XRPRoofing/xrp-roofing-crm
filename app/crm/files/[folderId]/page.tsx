@@ -6,13 +6,14 @@ import { useParams } from "next/navigation";
 import { ArrowLeft, Calendar, Camera, Check, ClipboardList, Copy, FileText, FolderOpen, Lock, Share2, UploadCloud, X } from "lucide-react";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { buildFoldersFromCrew, type CrmFileFolder } from "@/lib/crm-files";
-import { addJobPhotos, loadJobPhotos, subscribeToCrewData } from "@/lib/crew-sync";
+import { addJobPhotos, deleteJobPhoto, loadJobPhotos, subscribeToCrewData, updateJobPhotoType } from "@/lib/crew-sync";
 import { ensureManualFolderJob, loadManualFolders, manualFoldersUpdatedEvent } from "@/lib/manual-folders";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { refreshCrewData } from "@/lib/data-cache";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { azDateTime, azDate } from "@/lib/arizona-time";
 import PhotoGallery, { type GalleryPhoto } from "@/components/files/PhotoGallery";
+import type { JobPhotoType } from "@/lib/crew-sync";
 import PhotoAnnotator, { type AnnotatedResult, type AnnotatorImage } from "@/components/crm/PhotoAnnotator";
 
 function formatDate(value: string) {
@@ -31,7 +32,7 @@ export default function FolderGalleryPage() {
   const [error, setError] = useState("");
   const [annotatorImages, setAnnotatorImages] = useState<AnnotatorImage[] | null>(null);
   const [annotatorKey, setAnnotatorKey] = useState(0);
-  const editTargetRef = useRef<{ photoType: GalleryPhoto["photoType"] } | null>(null);
+  const editTargetRef = useRef<{ photoId: string; photoType: GalleryPhoto["photoType"] } | null>(null);
   const [activePhotoType, setActivePhotoType] = useState<"Before" | "Progress" | "After" | "Job Photo" | "General">("General");
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -130,11 +131,11 @@ export default function FolderGalleryPage() {
     }
   }, [folder, refresh, ensureBackingJob]);
 
-  // Open the markup editor for an existing photo. Saving produces a NEW flattened
-  // image (drawing + note baked in) added back into this same folder.
+  // Open the markup editor for an existing photo. Saving replaces the
+  // original with the annotated version (same type, new flattened image).
   const editPhoto = useCallback((photo: GalleryPhoto) => {
     if (!photo.dataUrl) return;
-    editTargetRef.current = { photoType: photo.photoType };
+    editTargetRef.current = { photoId: photo.id, photoType: photo.photoType };
     setAnnotatorKey((key) => key + 1);
     setAnnotatorImages([{ name: photo.name, dataUrl: photo.dataUrl }]);
   }, []);
@@ -147,6 +148,10 @@ export default function FolderGalleryPage() {
     setError("");
     try {
       await ensureBackingJob();
+      // Delete the original photo and add the annotated version
+      if (target?.photoId && !target.photoId.startsWith("local-")) {
+        try { await deleteJobPhoto(target.photoId); } catch { /* ignore if already gone */ }
+      }
       await addJobPhotos(folder.jobId, results.map((result) => ({
         photoType: (target?.photoType as "Before" | "Progress" | "After" | "Job Photo") || "Job Photo",
         name: result.name,
@@ -252,7 +257,19 @@ export default function FolderGalleryPage() {
             <section className="rounded-[2rem] border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center text-gray-500">No photos in this folder yet. Use <span className="font-bold text-gray-700">Camera</span> or <span className="font-bold text-gray-700">Upload</span> above to add some.</section>
           ) : (
             <section className="rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm">
-              <PhotoGallery photos={photos} activeFilter={activePhotoType} onEditPhoto={editPhoto} />
+              <PhotoGallery
+                photos={photos}
+                activeFilter={activePhotoType}
+                onEditPhoto={editPhoto}
+                onChangePhotoType={async (photo, newType) => {
+                  try {
+                    await updateJobPhotoType(photo.id, newType as JobPhotoType);
+                    await refresh();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Failed to change photo type.");
+                  }
+                }}
+              />
             </section>
           )}
         </>
