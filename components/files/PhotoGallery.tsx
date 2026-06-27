@@ -3,10 +3,18 @@
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Camera, ChevronLeft, ChevronRight, Copy, Download, FileText,
+  Camera, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText,
   ImageDown, Info, Map, MessageCircle, Pencil, Share2,
   Shield, Smartphone, Star, Tag, X,
 } from "lucide-react";
+
+type PhotoTypeOption = "Before" | "Progress" | "After" | "Job Photo";
+const PHOTO_TYPE_OPTIONS: { value: PhotoTypeOption; label: string; color: string }[] = [
+  { value: "Before", label: "Before", color: "bg-blue-600" },
+  { value: "Progress", label: "Progress", color: "bg-orange-500" },
+  { value: "After", label: "After", color: "bg-emerald-600" },
+  { value: "Job Photo", label: "General", color: "bg-slate-700" },
+];
 
 export type GalleryPhoto = {
   id: string;
@@ -90,6 +98,7 @@ function LightboxViewer({
   onNav,
   onEdit,
   onDownload,
+  onChangeType,
 }: {
   photo: GalleryPhoto;
   pool: GalleryPhoto[];
@@ -98,8 +107,10 @@ function LightboxViewer({
   onNav: (i: number) => void;
   onEdit?: (photo: GalleryPhoto) => void;
   onDownload: (photo: GalleryPhoto) => void;
+  onChangeType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
 }) {
   const [showMore, setShowMore] = useState(false);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   function showToast(msg: string) {
@@ -178,10 +189,47 @@ function LightboxViewer({
           </button>
         )}
 
-        {/* Photo type badge — top right */}
-        <span className={`absolute right-3 top-3 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white ${badge}`}>
-          {badgeLabel}
-        </span>
+        {/* Photo type badge — top right (tap to change type) */}
+        {onChangeType ? (
+          <div className="absolute right-3 top-3 z-10">
+            <button
+              type="button"
+              onClick={() => setShowTypeMenu((v) => !v)}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white ${badge} hover:opacity-90 active:scale-95`}
+            >
+              {badgeLabel}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showTypeMenu && (
+              <div className="absolute right-0 top-8 z-20 min-w-[140px] overflow-hidden rounded-lg bg-gray-900/95 shadow-2xl backdrop-blur-sm">
+                {PHOTO_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChangeType(photo, opt.value);
+                      setShowTypeMenu(false);
+                      showToast(`Changed to ${opt.label}`);
+                    }}
+                    className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-bold text-white hover:bg-white/10 ${
+                      photo.photoType === opt.value ? "bg-white/15" : ""
+                    }`}
+                  >
+                    <span className={`h-2.5 w-2.5 rounded-full ${opt.color}`} />
+                    {opt.label}
+                    {photo.photoType === opt.value && (
+                      <svg className="ml-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className={`absolute right-3 top-3 rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white ${badge}`}>
+            {badgeLabel}
+          </span>
+        )}
 
         {/* Expand icon — top right corner */}
         <button
@@ -343,16 +391,102 @@ const FILTER_TABS: { value: PhotoType | "All"; label: string; color: string; act
   { value: "After", label: "After", color: "text-emerald-600", activeColor: "bg-emerald-600 text-white" },
 ];
 
+function PhotoGridCard({ photo, onOpen, onEditPhoto, onChangePhotoType }: {
+  photo: GalleryPhoto;
+  onOpen: () => void;
+  onEditPhoto?: (photo: GalleryPhoto) => void;
+  onChangePhotoType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
+}) {
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const type = (photo.photoType || "Job Photo") as PhotoType;
+  const timeStr = formatUploadedAt(photo.uploadedAt);
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <button type="button" onClick={onOpen} className="relative block w-full" aria-label={`Open ${photo.name}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo.dataUrl} alt={photo.name} className="h-40 w-full object-cover transition group-hover:scale-105" />
+      </button>
+      {/* Photo type badge — tappable to change */}
+      <div className="absolute bottom-12 right-2 z-10">
+        {onChangePhotoType ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowTypeMenu((v) => !v)}
+              className={`flex items-center gap-0.5 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white ${TYPE_BADGE[type] ?? "bg-slate-700"} hover:opacity-90 active:scale-95`}
+            >
+              {TYPE_LABEL[type] ?? type}
+              <ChevronDown className="h-2.5 w-2.5" />
+            </button>
+            {showTypeMenu && (
+              <div className="absolute bottom-7 right-0 z-20 min-w-[120px] overflow-hidden rounded-lg bg-gray-900/95 shadow-2xl backdrop-blur-sm">
+                {PHOTO_TYPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => { onChangePhotoType(photo, opt.value); setShowTypeMenu(false); }}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[10px] font-bold text-white hover:bg-white/10 ${photo.photoType === opt.value ? "bg-white/15" : ""}`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${opt.color}`} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <span className={`rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white ${TYPE_BADGE[type] ?? "bg-slate-700"}`}>
+            {TYPE_LABEL[type] ?? type}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-1 px-2 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold text-slate-500">{photo.uploadedBy ?? "Office"}</p>
+          {timeStr && <p className="truncate text-[9px] text-slate-400">{timeStr}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {onEditPhoto && photo.dataUrl && (
+            <button type="button" onClick={() => onEditPhoto(photo)} className="rounded-full bg-orange-50 p-1.5 text-orange-600 hover:bg-orange-100" title="Edit / Note">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button type="button" onClick={() => downloadPhoto(photo)} className="rounded-full bg-slate-100 p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700" title="Download">
+            <Download className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhotoGrid({ photos, onOpen, onEditPhoto, onChangePhotoType }: {
+  photos: GalleryPhoto[];
+  onOpen: (pool: GalleryPhoto[], index: number) => void;
+  onEditPhoto?: (photo: GalleryPhoto) => void;
+  onChangePhotoType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {photos.map((photo, index) => (
+        <PhotoGridCard key={photo.id} photo={photo} onOpen={() => onOpen(photos, index)} onEditPhoto={onEditPhoto} onChangePhotoType={onChangePhotoType} />
+      ))}
+    </div>
+  );
+}
+
 export default function PhotoGallery({
   photos,
   activeFilter,
   onFilterChange,
   onEditPhoto,
+  onChangePhotoType,
 }: {
   photos: GalleryPhoto[];
   activeFilter?: PhotoType | "General";
   onFilterChange?: (filter: PhotoType | "All") => void;
   onEditPhoto?: (photo: GalleryPhoto) => void;
+  onChangePhotoType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
 }) {
   const [lightboxPool, setLightboxPool] = useState<GalleryPhoto[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -640,39 +774,7 @@ export default function PhotoGallery({
       {filtered.length === 0 ? (
         <p className="py-10 text-center text-sm font-semibold text-slate-400">No {currentFilter !== "All" ? currentFilter : ""} photos yet.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((photo, index) => {
-            const type = (photo.photoType || "Job Photo") as PhotoType;
-            const timeStr = formatUploadedAt(photo.uploadedAt);
-            return (
-              <div key={photo.id} className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-                <button type="button" onClick={() => openLightbox(filtered, index)} className="relative block w-full" aria-label={`Open ${photo.name}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.dataUrl} alt={photo.name} className="h-40 w-full object-cover transition group-hover:scale-105" />
-                  <span className={`absolute bottom-2 right-2 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-white ${TYPE_BADGE[type] ?? "bg-slate-700"}`}>
-                    {TYPE_LABEL[type] ?? type}
-                  </span>
-                </button>
-                <div className="flex items-center justify-between gap-1 px-2 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[10px] font-bold text-slate-500">{photo.uploadedBy ?? "Office"}</p>
-                    {timeStr && <p className="truncate text-[9px] text-slate-400">{timeStr}</p>}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {onEditPhoto && photo.dataUrl && (
-                      <button type="button" onClick={() => onEditPhoto(photo)} className="rounded-full bg-orange-50 p-1.5 text-orange-600 hover:bg-orange-100" title="Edit / Note">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button type="button" onClick={() => downloadPhoto(photo)} className="rounded-full bg-slate-100 p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700" title="Download">
-                      <Download className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <PhotoGrid photos={filtered} onOpen={openLightbox} onEditPhoto={onEditPhoto} onChangePhotoType={onChangePhotoType} />
       )}
 
       {/* Fullscreen lightbox */}
@@ -685,6 +787,7 @@ export default function PhotoGallery({
           onNav={showAt}
           onEdit={onEditPhoto}
           onDownload={downloadPhoto}
+          onChangeType={onChangePhotoType}
         />
       )}
 

@@ -568,8 +568,9 @@ export default function PhotoAnnotator({
             className="flex-1 bg-transparent text-sm font-semibold text-white placeholder:text-gray-500 outline-none"
           />
           <button type="button" onClick={handleSave} disabled={!ready}
-            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 disabled:opacity-40">
-            {index + 1 < images.length ? "Next" : "Save"}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-700 active:scale-95 disabled:opacity-40">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-5 w-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            {index + 1 < images.length ? "Save & Next" : "Save"}
           </button>
         </div>
       </div>
