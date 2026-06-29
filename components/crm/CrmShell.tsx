@@ -477,7 +477,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         setGlobalIncomingHeld(false);
         incomingCallRef.current = null;
         callChannelRef.current?.postMessage({ type: "ended" });
-        if (endedSid && pathnameRef.current !== "/crm/conversations") { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
+        if (endedSid) { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
       });
       incoming.on("error", () => {
         setGlobalActiveIncomingCall(false);
@@ -526,7 +526,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setGlobalIncomingMuted(false);
     setGlobalIncomingHeld(false);
     callChannelRef.current?.postMessage({ type: "ended" });
-    if (endedSid && pathnameRef.current !== "/crm/conversations") { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
+    if (endedSid) { setPostCallSid(endedSid); setShowPostCallDisposition(true); }
   }
 
   function handleMuteGlobalIncomingCall() {
@@ -596,7 +596,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   // Disposition modal handlers (shared by incoming calls + global dialer)
   function handleDialerCallEnd(sid: string) {
-    if (pathnameRef.current === "/crm/conversations") return; // ConversationBoard has its own modal
     setPostCallSid(sid);
     setShowPostCallDisposition(true);
   }
