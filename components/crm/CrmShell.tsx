@@ -215,6 +215,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         voiceDeviceRef.current = device;
         device.on("incoming", (call) => {
           const incoming = call as BrowserVoiceCall;
+          // Prevent duplicate popups — ignore if a call is already ringing or active
+          if (incomingCallRef.current) {
+            try { incoming.reject(); } catch {}
+            return;
+          }
           const phone = incoming.parameters?.From || "Unknown number";
           incomingCallRef.current = incoming;
           setGlobalIncomingCall({ name: phone, phone });
@@ -778,6 +783,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           onMute={handleMuteGlobalIncomingCall}
           onHold={handleHoldGlobalIncomingCall}
           onTransfer={handleTransferGlobalIncomingCall}
+          onSendDtmf={(digit: string) => {
+            const call = incomingCallRef.current;
+            if (!call) return;
+            const c = call as unknown as { sendDigits?: (d: string) => void };
+            c.sendDigits?.(digit);
+          }}
           onSaveNotes={handleIncomingCallSaveNotes}
           onCreateLead={handleIncomingCallCreateLead}
           onSchedule={handleIncomingCallSchedule}
