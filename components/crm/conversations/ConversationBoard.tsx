@@ -1405,12 +1405,21 @@ export default function ConversationBoard() {
   // Incoming call transfer removed — CrmShell FloatingCallCard owns active incoming call state.
 
   // Device is now owned by CrmShell and shared via VoiceDeviceContext.
-  // Mark inbound as ready if the shared device exists.
+  // Poll until the shared device is registered (CrmShell registers it async).
   useEffect(() => {
     if (sharedDevice?.deviceRef.current) {
-      setInboundReady(true);
-      setTwilioNotice("Ready for inbound calls");
+      setInboundReady(true); // eslint-disable-line react-hooks/set-state-in-effect
+      setTwilioNotice("Ready for inbound calls"); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
     }
+    const id = setInterval(() => {
+      if (sharedDevice?.deviceRef.current) {
+        setInboundReady(true);
+        setTwilioNotice("Ready for inbound calls");
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
   }, [sharedDevice]);
 
   async function handleStartCall() {
