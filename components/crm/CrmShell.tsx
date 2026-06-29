@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { controlCall, createBrowserVoiceDevice, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, getVoiceToken, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
@@ -115,6 +115,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       router.prefetch(item.href);
     }
 
+    // Pre-warm the Twilio Voice SDK bundle so it's cached before the first call
+    void import("@twilio/voice-sdk").catch(() => {});
+
     if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
       setUserRole("admin");
       setCheckingAuth(false);
@@ -211,7 +214,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           });
         });
         device.on("unregistered", () => {
-          void device.register().catch(() => undefined);
+          void getVoiceToken("crm-agent")
+            .then(({ token }) => { device.updateToken?.(token); return device.register(); })
+            .catch(() => undefined);
         });
         await device.register();
       } catch {

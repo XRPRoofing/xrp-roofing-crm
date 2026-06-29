@@ -2,11 +2,6 @@
 
 import React from "react";
 
-function toTelHref(phone: string): string {
-  const digits = phone.replace(/[^\d+]/g, "");
-  return digits ? `tel:${digits}` : "";
-}
-
 const linkStyle: React.CSSProperties = { color: "inherit", textDecoration: "inherit" };
 
 export function PhoneLink({
@@ -21,18 +16,29 @@ export function PhoneLink({
   const display = value || fallback || "";
   if (!value) return <>{display}</>;
 
-  const href = toTelHref(value);
-  if (!href) return <>{display}</>;
+  const digits = value.replace(/[^\d+]/g, "");
+  if (!digits) return <>{display}</>;
 
   return (
-    <a
-      href={href}
+    <span
+      role="button"
+      tabIndex={0}
       className={className}
-      style={linkStyle}
-      onClick={(e) => e.stopPropagation()}
+      style={{ ...linkStyle, cursor: "pointer" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } }));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } }));
+        }
+      }}
     >
       {display}
-    </a>
+    </span>
   );
 }
 
@@ -154,15 +160,26 @@ export function linkifyContactInfo(text: string): React.ReactNode {
       const telDigits = part.replace(/[^\d+]/g, "");
       if (telDigits) {
         return (
-          <a
+          <span
             key={i}
-            href={`tel:${telDigits}`}
-            style={linkStyle}
+            role="button"
+            tabIndex={0}
+            style={{ ...linkStyle, cursor: "pointer" }}
             className="underline decoration-dotted underline-offset-2 hover:opacity-80"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: telDigits } }));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: telDigits } }));
+              }
+            }}
           >
             {part}
-          </a>
+          </span>
         );
       }
     }
