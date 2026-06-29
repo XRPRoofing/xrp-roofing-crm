@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -59,6 +59,19 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("xrp-sidebar-collapsed") === "true";
+    }
+    return false;
+  });
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("xrp-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userRole, setUserRole] = useState("admin");
   const [currentUserId, setCurrentUserId] = useState("");
@@ -835,12 +848,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-gray-200 bg-white transition-all duration-200 lg:translate-x-0 ${collapsed ? "lg:w-[68px]" : "lg:w-64"} w-64 ${open ? "translate-x-0" : "-translate-x-full"}`}>
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-gray-100 px-5">
           <Link href={isCrewUser ? "/crm/crew" : "/crm"} className="flex items-center gap-3" onClick={() => setOpen(false)}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">XR</span>
-            <span className="text-base font-bold text-gray-900">XRP Roofing</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">XR</span>
+            <span className={`text-base font-bold text-gray-900 transition-opacity duration-200 ${collapsed ? "lg:hidden" : ""}`}>XRP Roofing</span>
           </Link>
           <button onClick={() => setOpen(false)} className="ml-auto rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 lg:hidden">
             <X className="h-5 w-5" />
@@ -859,14 +872,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className={`group flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
+                  title={collapsed ? item.label : undefined}
+                  className={`group relative flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"} ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
                 >
                   <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"}`} />
-                  <span className="flex-1">{item.label}</span>
+                  <span className={`flex-1 transition-opacity duration-200 ${collapsed ? "lg:hidden" : ""}`}>{item.label}</span>
                   {showChatBadge && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>
+                    <span className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold text-white ${collapsed ? "lg:absolute lg:-right-0.5 lg:-top-0.5 lg:h-4 lg:min-w-4 lg:px-1" : ""}`}>{unreadTeamChatCount}</span>
                   )}
-                  {active && !showChatBadge && <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />}
+                  {active && !showChatBadge && <span className={`h-1.5 w-1.5 rounded-full bg-blue-600 ${collapsed ? "lg:absolute lg:-right-0.5 lg:-top-0.5" : ""}`} />}
                 </Link>
               );
             })}
@@ -875,18 +889,26 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
         {/* Sidebar Footer */}
         <div className="border-t border-gray-100 px-3 py-3">
-          <button onClick={() => { logout(); setOpen(false); }} className="flex w-full items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
+          <button onClick={() => { logout(); setOpen(false); }} title={collapsed ? "Log out" : undefined} className={`flex w-full items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
             <LogOut className="h-[18px] w-[18px] text-gray-400" />
-            <span>Log out</span>
+            <span className={`transition-opacity duration-200 ${collapsed ? "lg:hidden" : ""}`}>Log out</span>
           </button>
         </div>
+
+        {/* Collapse toggle (desktop only) */}
+        <button
+          onClick={toggleCollapsed}
+          className="absolute -right-3 top-20 z-50 hidden h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition hover:bg-gray-50 hover:text-gray-700 lg:flex"
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
       </aside>
 
       {/* Mobile Overlay */}
       {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-x-clip lg:pl-64">
+      <div className={`flex min-w-0 flex-1 flex-col overflow-x-clip transition-all duration-200 ${collapsed ? "lg:pl-[68px]" : "lg:pl-64"}`}>
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
