@@ -44,6 +44,10 @@ type PublicProposal = {
   depositPaidAt?: string;
   depositPaidAmount?: number;
   depositPaymentMethod?: string;
+  viewCount?: number;
+  firstViewedAt?: string;
+  lastViewedAt?: string;
+  declinedAt?: string;
 };
 
 type PackageOption = {
@@ -132,10 +136,21 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }, [proposal.packages]);
   const selectedPackage = packages[selectedOption];
 
+  // Track proposal views — increment view count and update timestamps.
+  // Never overwrite Signed/Won/Declined status with Viewed.
   useEffect(() => {
-    if (proposal.status === "Won") return;
-    void updateSharedProposal(proposal.id, { status: "Viewed", viewedAt: new Date().toISOString() });
-  }, [proposal.id, proposal.status]);
+    const s = initialProposal.status;
+    if (s === "Won" || s === "Signed" || s === "Signed Offline" || s === "Declined") return;
+    const now = new Date().toISOString();
+    const currentCount = initialProposal.viewCount || 0;
+    const updates: Record<string, unknown> = {
+      status: "Viewed",
+      viewCount: currentCount + 1,
+      lastViewedAt: now,
+    };
+    if (!initialProposal.firstViewedAt) updates.firstViewedAt = now;
+    void updateSharedProposal(initialProposal.id, updates);
+  }, [initialProposal.id, initialProposal.status, initialProposal.viewCount, initialProposal.firstViewedAt]);
 
   const refreshProposal = useCallback(async () => {
     try {
@@ -611,7 +626,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                 <button type="button" disabled={!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-lg bg-slate-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Accept &amp; Sign Proposal</button>
                 {notice && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
                 <div className="mt-4 text-center">
-                  <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined" })); } catch { setDeclining(false); } }} className="text-xs text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
+                  <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined", declinedAt: new Date().toISOString() })); } catch { setDeclining(false); } }} className="text-xs text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
                 </div>
               </div>
             </section>
