@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   GripVertical,
@@ -122,12 +122,13 @@ export default function FloatingCallCard({
     notes: "",
   });
 
-  // Match existing customer
-  const matchedCustomer = customers?.find((c) => {
+  // Match existing customer (memoized to avoid re-scanning on every timer tick)
+  const matchedCustomer = useMemo(() => {
     const callerDigits = caller.phone.replace(/\D/g, "");
-    const customerDigits = c.phone.replace(/\D/g, "");
-    return callerDigits.length >= 10 && customerDigits.length >= 10 && callerDigits.slice(-10) === customerDigits.slice(-10);
-  });
+    if (callerDigits.length < 10) return undefined;
+    const last10 = callerDigits.slice(-10);
+    return customers?.find((c) => c.phone.replace(/\D/g, "").slice(-10) === last10);
+  }, [caller.phone, customers]);
 
   const lineLabel = twilioNumber ? getLineLabelForNumber(twilioNumber) : "";
 

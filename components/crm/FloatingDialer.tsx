@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   GripVertical,
@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@/lib/twilio/client";
-import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { Customer } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
@@ -196,67 +195,55 @@ export default function FloatingDialer({
     }
   }, [open, initialDialNumber, initialCallerId]);
 
-  const findContactName = useCallback((phone: string): string | undefined => {
-    const digits = phone.replace(/\D/g, "");
-    return customers.find((c) => c.phone.replace(/\D/g, "") === digits)?.name;
+  // Build a phone→name lookup map so contact resolution is O(1) instead of scanning the array
+  const phoneLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of customers) {
+      const digits = c.phone?.replace(/\D/g, "");
+      if (digits) map.set(digits, c.name);
+    }
+    return map;
   }, [customers]);
 
-  // Load recents when tab opens
-  useEffect(() => {
-    if (activeTab === "recents" && recents.length === 0) {
-      setRecentsLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
-      listConversationEvents(50)
-        .then((events) => {
-          const callEvents = events.filter(
-            (e: TwilioConversationEvent) => e.type === "incoming_call" || (e.type === "call_status" && e.direction)
-          );
-          const seen = new Set<string>();
-          const recent: RecentCall[] = [];
-          for (const ev of callEvents) {
-            const phone = ev.direction === "inbound" ? ev.from : ev.to;
-            if (!phone || seen.has(phone)) continue;
-            seen.add(phone);
-            recent.push({
-              id: ev.id,
-              phone,
-              name: findContactName(phone),
-              direction: ev.direction || "inbound",
-              time: ev.createdAt,
-            });
-            if (recent.length >= 20) break;
-          }
-          setRecents(recent);
-        })
-        .catch(() => {})
-        .finally(() => setRecentsLoading(false));
-    }
-  }, [activeTab, recents.length, findContactName]);
+  const findContactName = useCallback((phone: string): string | undefined => {
+    return phoneLookup.get(phone.replace(/\D/g, ""));
+  }, [phoneLookup]);
 
-  // Load missed calls when tab opens
+  // Pre-fetch recents + missed in a single API call on first open so both tabs
+  // are ready before the user clicks them. The flag prevents duplicate fetches.
+  const prefetchedRef = useRef(false);
   useEffect(() => {
-    if (activeTab === "missed" && missedCalls.length === 0) {
-      setMissedLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
-      listConversationEvents(200)
-        .then((events) => {
-          const missed: MissedCall[] = [];
-          for (const ev of events) {
-            if (getTwilioCallOutcomeLabel(ev) !== "Missed call") continue;
-            const phone = ev.from || ev.to || "";
-            if (!phone) continue;
-            missed.push({
-              id: ev.id,
-              phone,
-              name: findContactName(phone),
-              time: ev.createdAt,
-            });
-            if (missed.length >= 50) break;
+    if (!open || prefetchedRef.current) return;
+    prefetchedRef.current = true;
+    setRecentsLoading(true);
+    setMissedLoading(true);
+    listConversationEvents(200)
+      .then((events) => {
+        // Build recents from call events
+        const seen = new Set<string>();
+        const recent: RecentCall[] = [];
+        const missed: MissedCall[] = [];
+        for (const ev of events) {
+          // Recents: any call event
+          if (recent.length < 20 && (ev.type === "incoming_call" || (ev.type === "call_status" && ev.direction))) {
+            const phone = ev.direction === "inbound" ? ev.from : ev.to;
+            if (phone && !seen.has(phone)) {
+              seen.add(phone);
+              recent.push({ id: ev.id, phone, name: findContactName(phone), direction: ev.direction || "inbound", time: ev.createdAt });
+            }
           }
-          setMissedCalls(missed);
-        })
-        .catch(() => {})
-        .finally(() => setMissedLoading(false));
-    }
-  }, [activeTab, missedCalls.length, findContactName]);
+          // Missed: filter for missed call outcome
+          if (missed.length < 50 && getTwilioCallOutcomeLabel(ev) === "Missed call") {
+            const phone = ev.from || ev.to || "";
+            if (phone) missed.push({ id: ev.id, phone, name: findContactName(phone), time: ev.createdAt });
+          }
+        }
+        setRecents(recent);
+        setMissedCalls(missed);
+      })
+      .catch(() => {})
+      .finally(() => { setRecentsLoading(false); setMissedLoading(false); });
+  }, [open, findContactName]);
 
   // -------------------------------------------------------------------------
   // Drag handlers
@@ -322,7 +309,8 @@ export default function FloatingDialer({
       setIsMuted(false);
       setCallerTag(null);
       // Log the outbound call to activity history
-      const matchedCustomer = customers.find((c) => c.phone?.replace(/[^\d+]/g, "") === destination.replace(/[^\d+]/g, ""));
+      const destDigits = destination.replace(/\D/g, "");
+      const matchedCustomer = customers.find((c) => c.phone?.replace(/\D/g, "") === destDigits);
       void logCrewActivity({
         jobId: matchedCustomer?.id || "",
         jobName: matchedCustomer?.name || destination,
