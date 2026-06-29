@@ -143,9 +143,8 @@ function formatEventTimeRange(event: CalendarEvent): string {
   return `${fmt.format(new Date(event.start_time))} – ${fmt.format(new Date(event.end_time))}`;
 }
 
-function telHref(phone: string) {
-  const cleaned = (phone || "").replace(/[^\d+]/g, "");
-  return cleaned ? `tel:${cleaned}` : "";
+function hasPhone(phone: string) {
+  return !!(phone || "").replace(/[^\d+]/g, "");
 }
 
 function getWeekStart(date: Date): Date {
@@ -1694,7 +1693,7 @@ export default function CalendarPage() {
                   <Phone className="h-5 w-5 text-gray-400" />
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
-                    {telHref(selectedEvent.customer_phone) && (
+                    {hasPhone(selectedEvent.customer_phone) && (
                       <>
                         <button
                           type="button"
@@ -1809,7 +1808,7 @@ export default function CalendarPage() {
                   <Phone className="h-5 w-5 text-gray-400" />
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-700">{selectedEvent.customer_phone}</span>
-                    {telHref(selectedEvent.customer_phone) && (
+                    {hasPhone(selectedEvent.customer_phone) && (
                       <>
                         <button
                           type="button"
@@ -2009,7 +2008,7 @@ export default function CalendarPage() {
                         className="flex-1 rounded-lg bg-gray-100 px-4 py-3 outline-none"
                         placeholder="Phone number"
                       />
-                      {telHref(editForm.customer_phone) && (
+                      {hasPhone(editForm.customer_phone) && (
                         <button
                           type="button"
                           onClick={() => {
@@ -2023,7 +2022,7 @@ export default function CalendarPage() {
                           Call
                         </button>
                       )}
-                      {telHref(editForm.customer_phone) && (
+                      {hasPhone(editForm.customer_phone) && (
                         <button
                           type="button"
                           onClick={() =>
