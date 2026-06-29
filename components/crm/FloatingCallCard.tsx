@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  ExternalLink,
   GripVertical,
   Hash,
   MapPin,
@@ -21,6 +22,7 @@ import {
 import type { Customer } from "@/types/crm";
 import { getLineLabelForNumber } from "@/lib/twilio/numbers";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import Link from "next/link";
 
 export type CallCardState = "ringing" | "active" | "held";
 
@@ -101,12 +103,25 @@ export default function FloatingCallCard({
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Panels
-  const [showNotes, setShowNotes] = useState(false);
+  // Panels — auto-open notes when call becomes active
+  const [showNotes, setShowNotes] = useState(state !== "ringing");
   const [showSchedule, setShowSchedule] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
+
+  // Entrance animation
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { requestAnimationFrame(() => setMounted(true)); }, []);
+
+  // Open notes when transitioning from ringing to active
+  const prevStateRef = useRef(state);
+  useEffect(() => {
+    if (prevStateRef.current === "ringing" && (state === "active" || state === "held")) {
+      setShowNotes(true);
+    }
+    prevStateRef.current = state;
+  }, [state]);
 
   // Call data
   const [callNotes, setCallNotes] = useState("");
@@ -224,7 +239,7 @@ export default function FloatingCallCard({
     return (
       <div
         ref={containerRef}
-        className="fixed z-[9999] w-80 overflow-hidden rounded-2xl border border-green-200 bg-white shadow-2xl"
+        className={`fixed z-[9999] w-80 overflow-hidden rounded-2xl border border-green-200 bg-white shadow-2xl transition-all duration-300 ${mounted ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
         style={{ left: position.x, top: position.y, cursor: isDragging ? "grabbing" : undefined }}
       >
         <div
@@ -258,6 +273,14 @@ export default function FloatingCallCard({
               <PhoneOff className="h-3.5 w-3.5" />Decline
             </button>
           </div>
+          {matchedCustomer && (
+            <Link
+              href={`/crm/customers?customer=${encodeURIComponent(matchedCustomer.id)}`}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+            >
+              <ExternalLink className="h-3 w-3" />View Customer Profile
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -267,7 +290,7 @@ export default function FloatingCallCard({
   return (
     <div
       ref={containerRef}
-      className="fixed z-[9999] w-[370px] overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-2xl"
+      className={`fixed z-[9999] w-[370px] overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-2xl transition-all duration-300 ${mounted ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
       style={{ left: position.x, top: position.y, cursor: isDragging ? "grabbing" : undefined }}
     >
       {/* Header - Draggable */}
@@ -296,7 +319,11 @@ export default function FloatingCallCard({
           </div>
           <div className="flex items-center gap-1.5">
             {lineLabel && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${lineLabel === "Partner Referral" ? "bg-purple-50 text-purple-600" : "bg-gray-100 text-gray-500"}`}>{lineLabel}</span>}
-            {matchedCustomer && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">Customer</span>}
+            {matchedCustomer && (
+              <Link href={`/crm/customers?customer=${encodeURIComponent(matchedCustomer.id)}`} className="flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 transition hover:bg-blue-200">
+                Customer <ExternalLink className="h-2.5 w-2.5" />
+              </Link>
+            )}
             {!matchedCustomer && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">New</span>}
           </div>
         </div>
