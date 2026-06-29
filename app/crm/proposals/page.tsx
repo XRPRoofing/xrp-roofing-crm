@@ -77,6 +77,9 @@ type Proposal = {
   smsSentFrom?: string;
   smsSentToPhone?: string;
   viewedAt?: string;
+  viewCount?: number;
+  firstViewedAt?: string;
+  lastViewedAt?: string;
   followUpSentAt?: string;
   followUpSmsSentAt?: string;
   followUpSentVia?: string;
@@ -690,6 +693,31 @@ export default function ProposalsPage() {
       const deletedIds = permanentlyDeletedIdsRef.current;
       const softDeletedIds = locallyDeletedIdsRef.current;
       const filtered = server.filter((proposal) => !deletedIds.has(proposal.id));
+
+      // Detect status changes and log activity
+      const prev = prevProposalsRef.current;
+      for (const updated of filtered) {
+        const old = prev.find((p) => p.id === updated.id);
+        if (!old) continue;
+        const label = updated.proposalNumber ? `Proposal #${updated.proposalNumber}` : updated.address || "Proposal";
+        // Status changed
+        if (old.status !== updated.status) {
+          if (updated.status === "Won" || updated.status === "Signed") {
+            void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.signedBy || updated.customerName || "Customer", action: "Proposal signed", details: `${label} signed by ${updated.signedBy || updated.customerName || "customer"}`, module: "Proposal" });
+          } else if (updated.status === "Declined") {
+            void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.customerName || "Customer", action: "Proposal declined", details: `${label} declined by customer`, module: "Proposal" });
+          } else if (updated.status === "Viewed" || updated.status === "Approved") {
+            void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.customerName || "Customer", action: "Proposal viewed", details: `${label} viewed${(updated.viewCount || 0) > 1 ? ` (view #${updated.viewCount})` : ""}`, module: "Proposal" });
+          }
+        } else if ((updated.viewCount || 0) > (old.viewCount || 0)) {
+          // View count increased without status change (already Viewed → viewed again)
+          void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.customerName || "Customer", action: "Proposal viewed again", details: `${label} viewed again (view #${updated.viewCount})`, module: "Proposal" });
+        }
+        if (!old.depositPaidAt && updated.depositPaidAt) {
+          void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.customerName || "Customer", action: "Deposit paid", details: `$${(updated.depositPaidAmount || 0).toLocaleString()} deposit paid on ${label}`, module: "Proposal" });
+        }
+      }
+
       setProposals((current) => {
         const serverIds = new Set(filtered.map((proposal) => proposal.id));
         const localOnly = current.filter((proposal) => !serverIds.has(proposal.id) && !deletedIds.has(proposal.id));
@@ -1699,7 +1727,7 @@ export default function ProposalsPage() {
           </div>
           {/* Row 2 — action buttons, scrollable on mobile */}
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status}</span>
+            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status === "Viewed" || activeProposal.status === "Approved" ? `Viewed${(activeProposal.viewCount || 0) > 1 ? ` (${activeProposal.viewCount})` : ""}` : activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Save</button>
             <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
@@ -1717,6 +1745,17 @@ export default function ProposalsPage() {
             )}
           </div>
         </div>
+
+        {/* View Tracking Info */}
+        {activeProposal.viewCount && activeProposal.viewCount > 0 && (
+          <div className="border-b border-orange-100 bg-orange-50 px-4 py-3 print:hidden">
+            <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 text-xs text-gray-600">
+              <span className="font-bold text-orange-700">Views: {activeProposal.viewCount}</span>
+              {activeProposal.firstViewedAt && <span>First viewed: {azDateTime(activeProposal.firstViewedAt)}</span>}
+              {activeProposal.lastViewedAt && <span>Last viewed: {azDateTime(activeProposal.lastViewedAt)}</span>}
+            </div>
+          </div>
+        )}
 
         {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
           <div className="border-b border-blue-200 bg-blue-50 px-4 py-4 print:hidden">
@@ -2959,7 +2998,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.proposalNumber ? `#${proposal.proposalNumber} — ` : ""}{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : "Viewed"}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : `Viewed${(proposal.viewCount || 0) > 1 ? ` ${proposal.viewCount} times` : ""}`}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.lastViewedAt ? `Last viewed ${azDateTime(proposal.lastViewedAt)}` : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
               </div>
             </div>
             </button>
@@ -2971,7 +3010,7 @@ export default function ProposalsPage() {
                   <p className={`mt-1 text-xs font-bold ${proposal.depositPaidAt ? "text-emerald-600" : "text-orange-600"}`}>{proposal.depositPaidAt ? "✓ Deposit Paid" : "Deposit Due"}</p>
                 )}
               </div>
-              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : proposal.status === "Declined" ? "bg-red-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
+              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : proposal.status === "Declined" ? "bg-red-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" || proposal.status === "Viewed" ? `Viewed${(proposal.viewCount || 0) > 1 ? ` (${proposal.viewCount})` : ""}` : proposal.status}</span>
               <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
               <span className="text-xl font-bold text-gray-500">⋯</span>
             </div>
