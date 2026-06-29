@@ -39,6 +39,11 @@ type PublicProposal = {
     best?: string | { scope?: string; price?: number };
   };
   brochures?: { name: string; dataUrl: string; type: string }[];
+  depositType?: "percentage" | "fixed";
+  depositValue?: number;
+  depositPaidAt?: string;
+  depositPaidAmount?: number;
+  depositPaymentMethod?: string;
 };
 
 type PackageOption = {
@@ -104,8 +109,20 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const isAccepted = proposal.status === "Won";
   const isDeclined = proposal.status === "Declined";
   const [declining, setDeclining] = useState(false);
+  const [depositLoading, setDepositLoading] = useState<"card" | "ach" | null>(null);
+  const [depositError, setDepositError] = useState("");
 
   const showPackages = proposal.showPackages !== false;
+
+  // Calculate deposit amount
+  const depositAmount = useMemo(() => {
+    if (!proposal.depositType || !proposal.depositValue || !proposal.total) return 0;
+    if (proposal.depositType === "percentage") return Math.round(proposal.total * proposal.depositValue / 100);
+    return proposal.depositValue;
+  }, [proposal.depositType, proposal.depositValue, proposal.total]);
+
+  const depositPaid = Boolean(proposal.depositPaidAt);
+  const remainingBalance = (proposal.total || 0) - (proposal.depositPaidAmount || 0);
 
   const packages = useMemo(() => {
     const good = normalizePackage(proposal.packages?.good);
@@ -209,6 +226,59 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     setNotice("Thank you! Your proposal has been accepted and signed.");
     await updateSharedProposal(proposal.id, updates);
   }
+
+  async function handlePayDeposit(paymentMethod: "card" | "ach") {
+    if (!depositAmount || depositPaid) return;
+    setDepositLoading(paymentMethod);
+    setDepositError("");
+
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: proposal.id,
+          invoiceNumber: proposal.proposalNumber || proposal.id,
+          amount: depositAmount,
+          paymentMethod,
+          customerEmail: proposal.customerEmail || "customer@example.com",
+          successUrl: `${window.location.origin}/proposal/${encodeURIComponent(proposal.id)}?deposit=paid`,
+          cancelUrl: `${window.location.origin}/proposal/${encodeURIComponent(proposal.id)}?deposit=cancelled`,
+        }),
+      });
+
+      const data = await response.json().catch(() => null) as { checkoutUrl?: string; error?: string } | null;
+
+      if (!response.ok || !data?.checkoutUrl) {
+        throw new Error(data?.error || "Unable to start payment. Please contact XRP Roofing.");
+      }
+
+      window.location.assign(data.checkoutUrl);
+    } catch (err) {
+      setDepositError(err instanceof Error ? err.message : "Unable to start payment. Please contact XRP Roofing.");
+      setDepositLoading(null);
+    }
+  }
+
+  // Check for deposit payment success on URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("deposit") !== "paid") return;
+    if (initialProposal.depositPaidAt) return;
+    const amount = initialProposal.depositType === "percentage"
+      ? Math.round((initialProposal.total || 0) * (initialProposal.depositValue || 0) / 100)
+      : (initialProposal.depositValue || 0);
+    if (amount <= 0) return;
+    const paidAt = new Date().toISOString();
+    const updates = { depositPaidAt: paidAt, depositPaidAmount: amount, depositPaymentMethod: "card" };
+    const id = initialProposal.id;
+    const timer = setTimeout(() => {
+      setProposal((p) => ({ ...p, ...updates }));
+      updateSharedProposal(id, updates);
+      window.history.replaceState({}, "", window.location.pathname);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialProposal.id, initialProposal.depositPaidAt, initialProposal.depositType, initialProposal.depositValue, initialProposal.total]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-5 text-slate-950 sm:px-4 sm:py-8">
@@ -323,6 +393,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             <div className="md:text-right">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-700">Total price</p>
               <p className="mt-1 text-4xl font-black text-blue-700">{currency(proposal.total)}</p>
+              {depositAmount > 0 && (
+                <p className="mt-2 text-sm font-bold text-slate-600">Deposit due upon signing: {currency(depositAmount)}{proposal.depositType === "percentage" ? ` (${proposal.depositValue}%)` : ""}</p>
+              )}
             </div>
           </section>
 
@@ -408,6 +481,59 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
 
                 <p className="mt-8 text-xs leading-5 text-slate-500">By signing this document you agree to the statement of works provided by XRP Roofing and in accordance with any terms described within.</p>
               </div>
+
+              {/* Deposit section */}
+              {depositAmount > 0 && (
+                <div className="mx-auto mt-8 max-w-2xl border-t border-slate-200 pt-6">
+                  <div className="rounded-lg bg-slate-50 p-5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Total Amount</span>
+                      <span className="font-bold text-slate-900">{currency(proposal.total)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Deposit Requested{proposal.depositType === "percentage" ? ` (${proposal.depositValue}%)` : ""}</span>
+                      <span className="font-bold text-slate-900">{currency(depositAmount)}</span>
+                    </div>
+                    {depositPaid && (
+                      <>
+                        <div className="mt-2 flex items-center justify-between text-sm">
+                          <span className="text-emerald-700">Deposit Paid</span>
+                          <span className="font-bold text-emerald-700">{currency(proposal.depositPaidAmount)}</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                          <span>Paid on {azDate(proposal.depositPaidAt!)}</span>
+                          <span>{proposal.depositPaymentMethod === "ach" ? "Bank Transfer" : "Card"}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-sm">
+                      <span className="font-bold text-slate-700">Remaining Balance</span>
+                      <span className="font-bold text-slate-900">{currency(depositPaid ? remainingBalance : (proposal.total || 0) - depositAmount)}</span>
+                    </div>
+                  </div>
+
+                  {/* Pay Deposit buttons */}
+                  {!depositPaid && (
+                    <div className="mt-4 space-y-3">
+                      <button type="button" onClick={() => handlePayDeposit("card")} disabled={Boolean(depositLoading)} className="block w-full rounded-lg bg-blue-600 px-5 py-3.5 text-center text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                        {depositLoading === "card" ? "Opening secure checkout..." : `Pay Deposit — ${currency(depositAmount)} by Card`}
+                      </button>
+                      <button type="button" onClick={() => handlePayDeposit("ach")} disabled={Boolean(depositLoading)} className="block w-full rounded-lg bg-slate-700 px-5 py-3.5 text-center text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+                        {depositLoading === "ach" ? "Opening secure checkout..." : `Pay Deposit — ${currency(depositAmount)} by Bank Transfer (ACH)`}
+                      </button>
+                      <p className="text-center text-xs text-slate-500">Secure payment powered by Stripe</p>
+                      {depositError && <p className="rounded-lg bg-red-50 p-3 text-xs font-bold text-red-700">{depositError}</p>}
+                    </div>
+                  )}
+
+                  {depositPaid && (
+                    <div className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-center">
+                      <p className="text-sm font-bold text-emerald-700">✓ Deposit paid successfully</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {notice && <p className="mx-auto mt-4 max-w-md rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
           ) : isDeclined ? (

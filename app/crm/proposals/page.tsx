@@ -83,6 +83,12 @@ type Proposal = {
   followUpStepCompleted?: number;
   followUpStepSentAt?: string[];
   declinedAt?: string;
+  depositType?: "percentage" | "fixed";
+  depositValue?: number;
+  depositPaidAt?: string;
+  depositPaidAmount?: number;
+  depositPaymentMethod?: string;
+  depositStripeSessionId?: string;
 };
 
 type InspectionPhoto = {
@@ -608,6 +614,8 @@ export default function ProposalsPage() {
     showPackages: true,
     inspectionPhotos: defaultInspectionPhotos,
     packages: defaultPackages,
+    depositType: "" as "" | "percentage" | "fixed",
+    depositValue: "",
   });
 
   const [previewExpandedScopes, setPreviewExpandedScopes] = useState<Record<string, boolean>>({});
@@ -1158,6 +1166,8 @@ export default function ProposalsPage() {
       showPackages: proposal.showPackages !== false,
       inspectionPhotos: normalizeInspectionPhotos(proposal.inspectionPhotos),
       packages: normalizePackages(proposal.packages),
+      depositType: proposal.depositType || "",
+      depositValue: proposal.depositValue ? String(proposal.depositValue) : "",
     });
     setEditorBrochures(proposal.brochures || []);
     setIsPreviewing(false);
@@ -1209,6 +1219,8 @@ export default function ProposalsPage() {
       inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
       packages: normalizePackages(editorForm.packages),
       brochures: editorBrochures.length > 0 ? editorBrochures : undefined,
+      depositType: editorForm.depositType || undefined,
+      depositValue: Number(editorForm.depositValue) || undefined,
       updatedBy: currentUserName,
       ...extraFields,
     };
@@ -1819,6 +1831,29 @@ export default function ProposalsPage() {
                 <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
                 {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
               </label>
+              {/* Deposit Request */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Deposit Request</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <select value={editorForm.depositType} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, depositType: event.target.value as "" | "percentage" | "fixed" })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100">
+                    <option value="">No deposit</option>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed amount ($)</option>
+                  </select>
+                  {editorForm.depositType && (
+                    <input type="number" value={editorForm.depositValue} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, depositValue: event.target.value })} placeholder={editorForm.depositType === "percentage" ? "e.g. 50" : "e.g. 2500"} className="w-32 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100" />
+                  )}
+                </div>
+                {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
+                  <p className="mt-2 text-xs font-semibold text-gray-600">
+                    Deposit: ${(editorForm.depositType === "percentage" ? (Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    {editorForm.depositType === "percentage" && ` (${editorForm.depositValue}% of $${Number(editorForm.total).toLocaleString()})`}
+                  </p>
+                )}
+                {activeProposal?.depositPaidAt && (
+                  <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
+                )}
+              </div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Customer notes
                 <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
@@ -2052,6 +2087,12 @@ export default function ProposalsPage() {
                       <div className="text-left md:text-right">
                         <p className="text-sm font-bold text-gray-600">Total Price</p>
                         <p className="mt-1 text-4xl font-bold text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</p>
+                        {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
+                          <p className="mt-2 text-sm font-semibold text-gray-600">
+                            Deposit Due: ${(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString()}
+                            {editorForm.depositType === "percentage" && ` (${editorForm.depositValue}%)`}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2137,6 +2178,30 @@ export default function ProposalsPage() {
                     </div>
 
                     <p className="mt-8 text-xs leading-5 text-gray-500">By signing this document you agree to the statement of works provided by XRP Roofing and in accordance with any terms described within.</p>
+
+                    {/* Deposit summary for PDF */}
+                    {activeProposal?.depositType && Number(activeProposal.depositValue) > 0 && (
+                      <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Total Amount</span>
+                          <span className="font-bold text-gray-900">${(activeProposal.total || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Deposit Requested{activeProposal.depositType === "percentage" ? ` (${activeProposal.depositValue}%)` : ""}</span>
+                          <span className="font-bold text-gray-900">${(activeProposal.depositType === "percentage" ? Math.round((activeProposal.total || 0) * (activeProposal.depositValue || 0) / 100) : (activeProposal.depositValue || 0)).toLocaleString()}</span>
+                        </div>
+                        {activeProposal.depositPaidAt && (
+                          <div className="mt-2 flex items-center justify-between text-sm">
+                            <span className="text-emerald-700">Deposit Paid ({azDate(activeProposal.depositPaidAt)})</span>
+                            <span className="font-bold text-emerald-700">${(activeProposal.depositPaidAmount || 0).toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 text-sm">
+                          <span className="font-bold text-gray-700">Remaining Balance</span>
+                          <span className="font-bold text-gray-900">${((activeProposal.total || 0) - (activeProposal.depositPaidAmount || 0)).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
                   </div>
@@ -2836,6 +2901,9 @@ export default function ProposalsPage() {
               <div className="text-right">
                 <p className="font-bold text-gray-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
                 <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
+                {proposal.depositType && proposal.depositValue && proposal.depositValue > 0 && (
+                  <p className={`mt-1 text-xs font-bold ${proposal.depositPaidAt ? "text-emerald-600" : "text-orange-600"}`}>{proposal.depositPaidAt ? "✓ Deposit Paid" : "Deposit Due"}</p>
+                )}
               </div>
               <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : proposal.status === "Declined" ? "bg-red-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" ? "Viewed" : proposal.status}</span>
               <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
