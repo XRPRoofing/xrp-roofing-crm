@@ -169,7 +169,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }, [proposal.id]);
 
   useEffect(() => {
-    const POLL_INTERVAL = 10_000;
+    const POLL_INTERVAL = 30_000;
     const timer = window.setInterval(refreshProposal, POLL_INTERVAL);
 
     const onVisible = () => {

@@ -89,11 +89,12 @@ export async function deleteCalendarEvent(id: string): Promise<boolean> {
   }
 }
 
-// Real-time subscription via Supabase
+// Real-time subscription via Supabase (debounced to prevent cascade re-fetches)
 const calendarListeners = new Set<(events: CalendarEvent[]) => void>();
 let calendarChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
 let lastTimeMin: string | undefined;
 let lastTimeMax: string | undefined;
+let calendarDebounce: ReturnType<typeof setTimeout> | null = null;
 
 export function subscribeToCalendarUpdates(
   onUpdate: (events: CalendarEvent[]) => void,
@@ -114,9 +115,14 @@ export function subscribeToCalendarUpdates(
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: TABLE },
-          async () => {
-            const events = await loadCalendarEvents(lastTimeMin, lastTimeMax);
-            calendarListeners.forEach((cb) => cb(events));
+          () => {
+            // Debounce: batch rapid-fire updates into a single re-fetch
+            if (calendarDebounce) clearTimeout(calendarDebounce);
+            calendarDebounce = setTimeout(async () => {
+              calendarDebounce = null;
+              const events = await loadCalendarEvents(lastTimeMin, lastTimeMax);
+              calendarListeners.forEach((cb) => cb(events));
+            }, 500);
           }
         )
         .subscribe();
@@ -133,6 +139,7 @@ export function subscribeToCalendarUpdates(
         createClient().removeChannel(calendarChannel);
       } catch { /* ignore */ }
       calendarChannel = null;
+      if (calendarDebounce) { clearTimeout(calendarDebounce); calendarDebounce = null; }
     }
   };
 }

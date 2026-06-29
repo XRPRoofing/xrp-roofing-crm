@@ -169,23 +169,37 @@ export async function loadRecentActivities(limit = 100): Promise<CrewActivity[]>
   }
 }
 
+// Shared singleton channel for crew activity — prevents duplicate channels
+// when the Jobs page remounts.
+const activityListeners = new Set<() => void>();
+let activityChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 /** Subscribe to real-time activity log changes from Supabase. */
 export function subscribeToCrewActivities(onUpdate: () => void): () => void {
   if (!hasSupabaseConfig()) return () => {};
 
-  try {
-    const supabase = createClient();
-    const channel = supabase
-      .channel("crew-activity-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE }, () => {
-        onUpdate();
-      })
-      .subscribe();
+  activityListeners.add(onUpdate);
 
-    return () => {
-      try { supabase.removeChannel(channel); } catch { /* ignore */ }
-    };
-  } catch {
-    return () => {};
+  if (!activityChannel) {
+    try {
+      const supabase = createClient();
+      activityChannel = supabase
+        .channel("crew-activity-realtime-shared")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE }, () => {
+          activityListeners.forEach((cb) => cb());
+        })
+        .subscribe();
+    } catch {
+      activityChannel = null;
+      return () => {};
+    }
   }
+
+  return () => {
+    activityListeners.delete(onUpdate);
+    if (activityListeners.size === 0 && activityChannel) {
+      try { createClient().removeChannel(activityChannel); } catch { /* ignore */ }
+      activityChannel = null;
+    }
+  };
 }

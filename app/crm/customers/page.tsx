@@ -451,8 +451,13 @@ export default function CustomersPage() {
   useEffect(() => {
     let mounted = true;
     void listConversationEvents().then((events) => { if (mounted) setConversationEvents(events); }).catch(() => {});
-    const unsubscribe = subscribeToConversationEvents(() => {
-      void listConversationEvents().then((events) => { if (mounted) setConversationEvents(events); }).catch(() => {});
+    const unsubscribe = subscribeToConversationEvents((evt) => {
+      if (!mounted) return;
+      setConversationEvents((prev) => {
+        const exists = prev.find((e) => e.id === evt.id);
+        if (exists) return prev.map((e) => e.id === evt.id ? evt : e);
+        return [evt, ...prev];
+      });
     });
     return () => {
       mounted = false;

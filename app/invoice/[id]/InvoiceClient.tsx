@@ -68,7 +68,7 @@ const statusBadgeClass: Record<DerivedStatus, string> = {
   "Partially Paid": "bg-orange-100 text-orange-700",
 };
 
-const POLL_INTERVAL_MS = 10000;
+const POLL_INTERVAL_MS = 30_000;
 
 export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
