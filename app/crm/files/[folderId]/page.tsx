@@ -117,19 +117,38 @@ export default function FolderGalleryPage() {
     try {
       await ensureBackingJob();
       const dataUrls = await Promise.all(list.map((file) => compressImageToDataUrl(file)));
-      await addJobPhotos(folder.jobId, dataUrls.map((dataUrl, index) => ({
+      const photoPayloads = dataUrls.map((dataUrl, index) => ({
         photoType,
         name: list[index].name || `photo-${Date.now()}-${index + 1}.jpg`,
         dataUrl,
         uploadedBy: "Office",
-      })));
-      await refresh();
+      }));
+      await addJobPhotos(folder.jobId, photoPayloads);
+      // Optimistic update: show new photos instantly without reloading all crew data.
+      // The realtime subscription will reconcile with server-assigned IDs.
+      const now = new Date().toISOString();
+      const newFiles = photoPayloads.map((p, i) => ({
+        id: `optimistic-${Date.now()}-${i}`,
+        name: p.name,
+        dataUrl: p.dataUrl,
+        uploadedAt: now,
+        uploadedBy: p.uploadedBy,
+        photoType: p.photoType as "Before" | "Progress" | "After" | "Job Photo",
+        jobId: folder.jobId,
+        jobName: folder.customerName,
+      }));
+      setFolder((prev) => prev ? { ...prev, files: [...prev.files, ...newFiles] } : prev);
+      setImagesById((prev) => {
+        const next = { ...prev };
+        newFiles.forEach((f) => { next[f.id] = f.dataUrl; });
+        return next;
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Failed to add photos.");
     } finally {
       setUploading(false);
     }
-  }, [folder, refresh, ensureBackingJob]);
+  }, [folder, ensureBackingJob]);
 
   // Open the markup editor for an existing photo. Saving replaces the
   // original with the annotated version (same type, new flattened image).
@@ -152,17 +171,41 @@ export default function FolderGalleryPage() {
       if (target?.photoId && !target.photoId.startsWith("local-")) {
         try { await deleteJobPhoto(target.photoId); } catch { /* ignore if already gone */ }
       }
-      await addJobPhotos(folder.jobId, results.map((result) => ({
-        photoType: (target?.photoType as "Before" | "Progress" | "After" | "Job Photo") || "Job Photo",
+      const photoType = (target?.photoType as "Before" | "Progress" | "After" | "Job Photo") || "Job Photo";
+      const photoPayloads = results.map((result) => ({
+        photoType,
         name: result.name,
         dataUrl: result.dataUrl,
         uploadedBy: "Office",
-      })));
-      await refresh();
+      }));
+      await addJobPhotos(folder.jobId, photoPayloads);
+      // Optimistic update: replace deleted photo with annotated version instantly.
+      const now = new Date().toISOString();
+      const newFiles = photoPayloads.map((p, i) => ({
+        id: `optimistic-${Date.now()}-${i}`,
+        name: p.name,
+        dataUrl: p.dataUrl,
+        uploadedAt: now,
+        uploadedBy: p.uploadedBy,
+        photoType: p.photoType as "Before" | "Progress" | "After" | "Job Photo",
+        jobId: folder.jobId,
+        jobName: folder.customerName,
+      }));
+      setFolder((prev) => {
+        if (!prev) return prev;
+        const filtered = target?.photoId ? prev.files.filter((f) => f.id !== target.photoId) : prev.files;
+        return { ...prev, files: [...filtered, ...newFiles] };
+      });
+      setImagesById((prev) => {
+        const next = { ...prev };
+        if (target?.photoId) delete next[target.photoId];
+        newFiles.forEach((f) => { next[f.id] = f.dataUrl; });
+        return next;
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Failed to save edited photo.");
     }
-  }, [folder, refresh, ensureBackingJob]);
+  }, [folder, ensureBackingJob]);
 
   const photos = useMemo<GalleryPhoto[]>(
     () =>

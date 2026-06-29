@@ -297,7 +297,8 @@ export default function CrewWorkflowPage() {
 
     try {
       await addJobPhotos(job.id, items.map((item) => ({ photoType: type, name: item.name, dataUrl: item.dataUrl, uploadedBy })));
-      await refresh();
+      // Load only the affected job's photos instead of refreshing all crew data.
+      // The realtime subscription will reconcile the full dataset in the background.
       if (job.id === selectedJobId) {
         setSelectedPhotos(await loadJobPhotos(job.id));
       }

@@ -46,7 +46,7 @@ function TaskBadge({ isManual }: { isManual?: boolean }) {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<OfficeTask[]>(() => readOfficeTasks());
-  const [loading, setLoading] = useState(() => readOfficeTasks().length === 0);
+  const [loading, setLoading] = useState(() => tasks.length === 0);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<OfficeTaskStatus | null>(null);
   const [filterType, setFilterType] = useState<TaskTypeFilter>("all");
@@ -187,7 +187,7 @@ export default function TasksPage() {
       addTaskTimelineEntry(satModal.id, "Review Request Sent via SMS + Email", undefined, "System");
     }
     setSatModal(null);
-    refresh();
+    setTasks(readOfficeTasks());
   }
 
   function createManualTask() {
@@ -440,7 +440,7 @@ export default function TasksPage() {
                       </button>
                     )}
                     {status === "Review Request" && !task.reviewRequestSentAt && !task.isManual && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); setTasks(readOfficeTasks()); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
                         <Zap className="mr-1 inline h-3 w-3" />Send Review Request
                       </button>
                     )}
@@ -548,14 +548,14 @@ export default function TasksPage() {
 
             {/* Review request CTA */}
             {selectedTask.status === "Review Request" && !selectedTask.reviewRequestSentAt && !selectedTask.isManual && (
-              <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); refresh(); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
+              <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); setTasks(readOfficeTasks()); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
                 <Zap className="mr-2 inline h-4 w-4" />Send Review Request (SMS + Email)
               </button>
             )}
 
             {/* Review received CTA */}
             {selectedTask.status === "Review Request" && selectedTask.reviewRequestSentAt && !selectedTask.reviewSubmitted && !selectedTask.isManual && (
-              <button type="button" onClick={() => { moveTask(selectedTask.id, "Review Received"); refresh(); setSelectedTask(null); }} className="mt-2 w-full rounded-lg border border-blue-300 bg-blue-50 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100">
+              <button type="button" onClick={() => { moveTask(selectedTask.id, "Review Received"); setSelectedTask(null); }} className="mt-2 w-full rounded-lg border border-blue-300 bg-blue-50 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100">
                 <Star className="mr-2 inline h-4 w-4" />Mark Review Received
               </button>
             )}

@@ -1267,6 +1267,7 @@ export default function ConversationBoard() {
       setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
       setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
       scrollMessageBoardToBottom();
+      lastConversationRefreshRef.current = Date.now();
     }).catch((error) => {
       if (mounted) setTwilioNotice(error instanceof Error ? `Call history sync issue: ${error.message}` : "Call history sync issue");
     });
@@ -1278,10 +1279,14 @@ export default function ConversationBoard() {
 
   // Re-fetch events when the browser tab regains focus to catch anything
   // missed while the tab was in the background (covers cross-device sync
-  // and dropped real-time connections).
+  // and dropped real-time connections). Skips reload if data was refreshed
+  // recently (within 30 s) to avoid redundant API calls on quick tab switches.
+  const lastConversationRefreshRef = useRef(0);
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastConversationRefreshRef.current < 30_000) return;
+      lastConversationRefreshRef.current = Date.now();
       Promise.all([listConversationEvents(), listConversationReadStates(), loadLiveCustomers(), loadContactEdits()]).then(([events, readStates, liveCustomers, savedEdits]) => {
         liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
         contactEditsRef.current = savedEdits;
@@ -1300,16 +1305,21 @@ export default function ConversationBoard() {
   }, []);
 
   // Refresh relative timestamps ("3 min ago") every 60 seconds so they
-  // stay accurate without a page reload.
+  // stay accurate without a page reload. Only creates new objects when
+  // the formatted text actually changes to avoid unnecessary re-renders.
   useEffect(() => {
     const interval = setInterval(() => {
-      setConversations((current: ConversationRecord[]) =>
-        current.map((conversation) =>
-          conversation.lastActivityIso
-            ? { ...conversation, lastActivityAt: formatActivityTime(conversation.lastActivityIso) }
-            : conversation
-        )
-      );
+      setConversations((current: ConversationRecord[]) => {
+        let changed = false;
+        const next = current.map((conversation) => {
+          if (!conversation.lastActivityIso) return conversation;
+          const fresh = formatActivityTime(conversation.lastActivityIso);
+          if (fresh === conversation.lastActivityAt) return conversation;
+          changed = true;
+          return { ...conversation, lastActivityAt: fresh };
+        });
+        return changed ? next : current;
+      });
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
@@ -1317,6 +1327,7 @@ export default function ConversationBoard() {
   useEffect(() => {
     try {
       return subscribeToConversationEvents((event: TwilioConversationEvent) => {
+        lastConversationRefreshRef.current = Date.now();
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
         addTwilioCrmNotification(event);
         setConversations((current: ConversationRecord[]) => {
