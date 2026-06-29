@@ -365,59 +365,50 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           )}
 
           {isAccepted ? (
-            <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm sm:p-8">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-2xl text-white">✓</div>
-              <p className="mt-4 text-center text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted &amp; Signed</p>
-              <h2 className="mt-2 text-center text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.printedName || proposal.customerName || "valued customer"}!</h2>
-              <p className="mx-auto mt-3 max-w-xl text-center text-sm font-semibold leading-6 text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly to schedule the work.</p>
+            <section className="bg-white px-6 py-8 sm:px-10">
+              <div className="mx-auto max-w-2xl text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-xl text-white">✓</div>
+                <p className="mt-3 text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted &amp; Signed</p>
+                <p className="mt-2 text-sm text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly.</p>
+              </div>
 
-              {/* Professional e-signature block */}
-              <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+              {/* Document-style signature block */}
+              <div className="mx-auto mt-8 max-w-2xl border-t border-slate-300 pt-8">
                 {/* Customer signature row */}
-                <div className="grid gap-6 sm:grid-cols-[1fr_180px]">
+                <div className="grid gap-8 sm:grid-cols-[1fr_160px]">
                   <div>
-                    <div className="min-h-[80px] border-b-2 border-slate-800 pb-2">
-                      {proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={100} unoptimized className="max-h-[72px] w-auto object-contain" /> : <span className="text-2xl font-bold italic text-slate-900">{proposal.signedBy}</span>}
+                    <div className="min-h-[60px] border-b border-slate-800 pb-1">
+                      {proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={400} height={90} unoptimized className="max-h-[56px] w-auto object-contain" /> : <span className="text-2xl italic text-slate-900">{proposal.signedBy}</span>}
                     </div>
-                    <p className="mt-2 text-base font-bold text-slate-900">{proposal.printedName || proposal.signedBy || proposal.customerName}</p>
+                    <p className="mt-1 text-sm text-slate-700">{proposal.printedName || proposal.signedBy || proposal.customerName}</p>
                   </div>
-                  <div>
-                    <div className="flex h-full flex-col justify-end">
-                      <div className="border-b-2 border-slate-800 pb-2">
-                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
-                      </div>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
-                      <div className="mt-3 border-b-2 border-slate-800 pb-2">
-                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azTime(proposal.signedAt) : azTime(new Date())} AZ</p>
-                      </div>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Time Signed</p>
+                  <div className="flex flex-col justify-end">
+                    <div className="border-b border-slate-800 pb-1">
+                      <p className="text-sm text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
                     </div>
+                    <p className="mt-1 text-xs text-slate-500">Date</p>
                   </div>
                 </div>
 
                 {/* XRP Roofing representative signature */}
-                <div className="mt-8 grid gap-6 border-t border-slate-200 pt-6 sm:grid-cols-[1fr_180px]">
+                <div className="mt-10 grid gap-8 sm:grid-cols-[1fr_160px]">
                   <div>
-                    <div className="border-b-2 border-slate-800 pb-2">
+                    <div className="border-b border-slate-800 pb-1">
                       <p className="font-serif text-2xl italic text-slate-900">Jonathan Gonzalez</p>
                     </div>
-                    <p className="mt-2 text-base font-bold text-slate-900">Jonathan Gonzalez, XRP Roofing</p>
+                    <p className="mt-1 text-sm text-slate-700">Jonathan Gonzalez, XRP Roofing</p>
                   </div>
-                  <div>
-                    <div className="flex h-full flex-col justify-end">
-                      <div className="border-b-2 border-slate-800 pb-2">
-                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
-                      </div>
-                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Date</p>
+                  <div className="flex flex-col justify-end">
+                    <div className="border-b border-slate-800 pb-1">
+                      <p className="text-sm text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
                     </div>
+                    <p className="mt-1 text-xs text-slate-500">Date</p>
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-2 text-center">
-                  <p className="text-xs font-bold text-emerald-700">Status: <span className="uppercase">Signed</span> — {proposal.signedAt ? azDateTime(proposal.signedAt) : azDateTime(new Date())} Arizona Time</p>
-                </div>
+                <p className="mt-8 text-xs leading-5 text-slate-500">By signing this document you agree to the statement of works provided by XRP Roofing and in accordance with any terms described within.</p>
               </div>
-              {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-center text-sm font-bold text-emerald-800">{notice}</p>}
+              {notice && <p className="mx-auto mt-4 max-w-md rounded-lg bg-emerald-50 px-4 py-3 text-center text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
           ) : isDeclined ? (
             <section className="rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-6 text-center shadow-sm sm:p-8">
@@ -431,58 +422,71 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               </div>
             </section>
           ) : (
-            <section className="rounded-2xl border-2 border-blue-200 bg-white p-5 sm:p-6">
-              <div className="flex items-center gap-2">
-                <svg viewBox="0 0 20 20" className="h-5 w-5 fill-blue-600" aria-hidden="true"><path d="M13.6 2.4a2 2 0 0 1 2.8 0l1.2 1.2a2 2 0 0 1 0 2.8L8.2 16.8l-4.6 1 1-4.6 9-9z" /></svg>
-                <h2 className="text-base font-black text-[#0A3D91]">Accept &amp; sign your proposal</h2>
-              </div>
-              <label className="mt-4 flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">
-                <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300" />
-                <span>I have reviewed the proposal and agree to the Terms &amp; Conditions.</span>
-              </label>
-
-              {/* Signature mode tabs */}
-              <div className="mt-5">
-                <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-                  <button type="button" onClick={() => setSignMode("draw")} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${signMode === "draw" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Draw Signature</button>
-                  <button type="button" onClick={() => setSignMode("type")} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${signMode === "type" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Type Signature</button>
+            <section className="bg-white px-6 py-8 sm:px-10">
+              {/* Document-style signature section */}
+              <div className="mx-auto max-w-2xl border-t border-slate-300 pt-8">
+                {/* Company representative signature (always visible) */}
+                <div className="grid gap-8 sm:grid-cols-[1fr_160px]">
+                  <div>
+                    <div className="border-b border-slate-800 pb-1">
+                      <p className="font-serif text-2xl italic text-slate-900">Jonathan Gonzalez</p>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-700">Jonathan Gonzalez, XRP Roofing</p>
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <div className="border-b border-slate-800 pb-1">
+                      <p className="text-sm text-slate-900">{azDate(new Date())}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">Date</p>
+                  </div>
                 </div>
 
-                {signMode === "draw" ? (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sign below</p>
-                      <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="rounded-lg px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">Clear</button>
-                    </div>
-                    <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-40 w-full touch-none rounded-xl border-2 border-dashed border-slate-300 bg-slate-50" />
-                    <p className="mt-1 text-xs text-slate-400">Draw your signature with your finger or mouse.</p>
-                  </div>
-                ) : (
-                  <div className="mt-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Type your signature</p>
-                    <input type="text" value={typedSignature} onChange={(e) => setTypedSignature(e.target.value)} placeholder="Type your full name" className="mt-2 w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-3xl font-semibold italic text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white" />
-                    {typedSignature.trim() && (
-                      <div className="mt-3 flex items-center justify-center rounded-lg bg-slate-50 p-4">
-                        <p className="font-serif text-2xl italic text-slate-800">{typedSignature}</p>
+                {/* Customer signature area */}
+                <div className="mt-10">
+                  <div className="grid gap-8 sm:grid-cols-[1fr_160px]">
+                    <div>
+                      {/* Signature mode tabs */}
+                      <div className="mb-3 flex items-center gap-2">
+                        <button type="button" onClick={() => setSignMode("draw")} className={`rounded px-3 py-1 text-xs font-bold transition ${signMode === "draw" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:text-slate-700"}`}>Draw</button>
+                        <button type="button" onClick={() => setSignMode("type")} className={`rounded px-3 py-1 text-xs font-bold transition ${signMode === "type" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:text-slate-700"}`}>Type</button>
+                        {signMode === "draw" && signatureDataUrl && (
+                          <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="ml-auto text-xs font-bold text-blue-600 hover:text-blue-800">Clear</button>
+                        )}
                       </div>
-                    )}
+
+                      {signMode === "draw" ? (
+                        <div className="border-b border-slate-800">
+                          <canvas ref={signatureCanvasRef} width={720} height={180} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="h-[60px] w-full touch-none bg-transparent" />
+                        </div>
+                      ) : (
+                        <div className="border-b border-slate-800 pb-1">
+                          <input type="text" value={typedSignature} onChange={(e) => setTypedSignature(e.target.value)} placeholder="Type your full name" className="w-full border-0 bg-transparent px-0 font-serif text-2xl italic text-slate-900 outline-none placeholder:text-slate-300" />
+                        </div>
+                      )}
+                      <input type="text" value={printedName} onChange={(e) => setPrintedName(e.target.value)} placeholder="Full printed name" className="mt-1 w-full border-0 bg-transparent px-0 text-sm text-slate-700 outline-none placeholder:text-slate-400" />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <div className="border-b border-slate-800 pb-1">
+                        <p className="text-sm text-slate-400">—</p>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">Date</p>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Printed name field */}
-              <div className="mt-5">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Full Printed Name
-                  <input type="text" value={printedName} onChange={(e) => setPrintedName(e.target.value)} placeholder="Enter your full legal name" className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                <p className="mt-8 text-xs leading-5 text-slate-500">By signing this document you agree to the statement of works provided by XRP Roofing and in accordance with any terms described within.</p>
+
+                {/* Agreement and submit */}
+                <label className="mt-6 flex items-start gap-3 text-sm text-slate-700">
+                  <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
+                  <span>I have reviewed the proposal and agree to the Terms &amp; Conditions.</span>
                 </label>
-              </div>
 
-              <button type="button" disabled={!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept &amp; Sign Proposal</button>
-              {(!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()) ? <p className="mt-2 text-center text-xs font-semibold text-slate-400">Check the agreement, add your signature, and enter your printed name to sign.</p> : null}
-              {notice && <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
-              <div className="mt-6 border-t border-slate-200 pt-4 text-center">
-                <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined" })); } catch { setDeclining(false); } }} className="text-sm font-semibold text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
+                <button type="button" disabled={!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-lg bg-slate-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Accept &amp; Sign Proposal</button>
+                {notice && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
+                <div className="mt-4 text-center">
+                  <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined" })); } catch { setDeclining(false); } }} className="text-xs text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
+                </div>
               </div>
             </section>
           )}

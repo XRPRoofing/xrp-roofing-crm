@@ -2093,52 +2093,50 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-8 rounded-lg border border-gray-200 p-6">
-                    <label className="hidden print:hidden">
-                      <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-1 h-4 w-4 rounded border-gray-300" />
-                      <span>I agree to the Terms and Conditions</span>
-                    </label>
-                    <p className="hidden text-sm font-bold text-gray-700 print:block">By signing below, I agree to the Terms and Conditions outlined above.</p>
+                  <div className="mt-8 border-t border-gray-300 pt-8">
+                    {/* Customer notes */}
+                    <div className="mb-8 print:hidden">
+                      <p className="text-xs text-gray-500">Customer notes</p>
+                      <div className="mt-1 min-h-[48px] rounded border border-gray-200 p-2" />
+                    </div>
 
                     {/* Customer signature row */}
-                    <div className="mt-6 grid gap-6 md:grid-cols-[1fr_180px]">
+                    <div className="grid gap-8 md:grid-cols-[1fr_160px]">
                       <div>
-                        <div className="min-h-[72px] border-b-2 border-gray-800 pb-2">
+                        <div className="min-h-[60px] border-b border-gray-800 pb-1">
                           {(activeProposal.signatureData || activeProposal.signatureDataUrl) ? (
-                            <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={90} unoptimized className="max-h-[64px] w-auto object-contain" />
+                            <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={80} unoptimized className="max-h-[56px] w-auto object-contain" />
                           ) : (
-                            <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="w-full border-0 bg-transparent px-0 text-2xl font-semibold italic text-gray-900 outline-none placeholder:text-gray-300 print:py-4" placeholder="Type full legal name" />
+                            <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="w-full border-0 bg-transparent px-0 font-serif text-2xl italic text-gray-900 outline-none placeholder:text-gray-300 print:py-3" placeholder="Type full legal name" />
                           )}
                         </div>
-                        <p className="mt-2 text-sm font-bold text-gray-900">{activeProposal.printedName || activeProposal.signedBy || activeProposal.customerName || ""}</p>
+                        <p className="mt-1 text-sm text-gray-700">{activeProposal.printedName || activeProposal.signedBy || activeProposal.customerName || ""}</p>
                       </div>
                       <div className="flex flex-col justify-end">
-                        <div className="border-b-2 border-gray-800 pb-2">
-                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : ""}</p>
+                        <div className="border-b border-gray-800 pb-1">
+                          <p className="text-sm text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : ""}</p>
                         </div>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Date Signed</p>
-                        <div className="mt-3 border-b-2 border-gray-800 pb-2">
-                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azTime(activeProposal.signedAt) + " AZ" : ""}</p>
-                        </div>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Time Signed</p>
+                        <p className="mt-1 text-xs text-gray-500">Date</p>
                       </div>
                     </div>
 
                     {/* XRP Roofing representative signature */}
-                    <div className="mt-8 grid gap-6 border-t border-gray-200 pt-6 md:grid-cols-[1fr_180px]">
+                    <div className="mt-10 grid gap-8 md:grid-cols-[1fr_160px]">
                       <div>
-                        <div className="border-b-2 border-gray-800 pb-2">
+                        <div className="border-b border-gray-800 pb-1">
                           <p className="font-serif text-2xl italic text-gray-900">Jonathan Gonzalez</p>
                         </div>
-                        <p className="mt-2 text-sm font-bold text-gray-900">Jonathan Gonzalez, XRP Roofing</p>
+                        <p className="mt-1 text-sm text-gray-700">Jonathan Gonzalez, XRP Roofing</p>
                       </div>
                       <div className="flex flex-col justify-end">
-                        <div className="border-b-2 border-gray-800 pb-2">
-                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : azDate(new Date())}</p>
+                        <div className="border-b border-gray-800 pb-1">
+                          <p className="text-sm text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : azDate(new Date())}</p>
                         </div>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Date</p>
+                        <p className="mt-1 text-xs text-gray-500">Date</p>
                       </div>
                     </div>
+
+                    <p className="mt-8 text-xs leading-5 text-gray-500">By signing this document you agree to the statement of works provided by XRP Roofing and in accordance with any terms described within.</p>
 
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
                   </div>
