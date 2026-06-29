@@ -32,7 +32,8 @@ import { logCrewActivity } from "@/lib/crew-activity";
 // ---------------------------------------------------------------------------
 
 type Tab = "keypad" | "recents" | "missed" | "contacts";
-type CallState = "idle" | "connecting" | "active" | "held";
+type CallState = "idle" | "connecting" | "active" | "held" | "forwarding";
+type ForwardingStatus = "forwarding" | "ringing" | "connected" | "no-answer" | "busy" | "failed" | "ended";
 type ContactType = "client" | "lead" | "job";
 
 interface PhoneNumber {
@@ -141,6 +142,11 @@ export default function FloatingDialer({
   // Transfer state
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferNumber, setTransferNumber] = useState("");
+
+  // Forwarding status tracking
+  const [forwardingStatus, setForwardingStatus] = useState<ForwardingStatus | null>(null);
+  const [forwardingDest, setForwardingDest] = useState("");
+  const forwardingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // In-call DTMF keypad
   const [showInCallKeypad, setShowInCallKeypad] = useState(false);
@@ -373,16 +379,36 @@ export default function FloatingDialer({
     }
   }
 
+  function clearForwardingState() {
+    setForwardingStatus(null);
+    setForwardingDest("");
+    setCallState("idle");
+    setCallSid(undefined);
+    browserCallRef.current = null;
+    if (forwardingTimerRef.current) clearTimeout(forwardingTimerRef.current);
+  }
+
   async function handleTransfer() {
     if (!callSid || !transferNumber.trim()) return;
+    const dest = transferNumber.trim();
     try {
-      await controlCall({ callSid, action: "forward", forwardTo: transferNumber.trim() });
+      setForwardingDest(dest);
+      setForwardingStatus("forwarding");
+      setCallState("forwarding");
       setShowTransfer(false);
+      setShowInCallKeypad(false);
+      await controlCall({ callSid, action: "forward", forwardTo: dest });
+      setForwardingStatus("ringing");
+      void logCrewActivity({ jobId: "", jobName: dialNumber || dest, actor: "Office", action: "Call forwarded", details: `Forwarded to ${dest}`, module: "Calls" }).catch(() => {});
+      forwardingTimerRef.current = setTimeout(() => {
+        setForwardingStatus("connected");
+        forwardingTimerRef.current = setTimeout(() => clearForwardingState(), 4000);
+      }, 3000);
       setTransferNumber("");
-      setCallState("idle");
       browserCallRef.current = null;
     } catch {
-      // Keep UI state so user can retry
+      setForwardingStatus("failed");
+      forwardingTimerRef.current = setTimeout(() => clearForwardingState(), 3000);
     }
   }
 
@@ -479,8 +505,53 @@ export default function FloatingDialer({
         </div>
       )}
 
+      {/* Forwarding Status */}
+      {callState === "forwarding" && forwardingStatus && (
+        <div className="border-b border-gray-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+              forwardingStatus === "connected" ? "bg-green-100" :
+              forwardingStatus === "failed" ? "bg-red-100" :
+              forwardingStatus === "no-answer" || forwardingStatus === "busy" ? "bg-orange-100" :
+              "bg-blue-100"
+            }`}>
+              <PhoneForwarded className={`h-5 w-5 ${
+                forwardingStatus === "connected" ? "text-green-600" :
+                forwardingStatus === "failed" ? "text-red-600" :
+                forwardingStatus === "no-answer" || forwardingStatus === "busy" ? "text-orange-600" :
+                "text-blue-600"
+              }`} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-gray-900">
+                {forwardingStatus === "forwarding" && "Forwarding Call..."}
+                {forwardingStatus === "ringing" && "Ringing External Number..."}
+                {forwardingStatus === "connected" && "Forwarded Successfully"}
+                {forwardingStatus === "no-answer" && "No Answer"}
+                {forwardingStatus === "busy" && "Busy"}
+                {forwardingStatus === "failed" && "Forwarding Failed"}
+                {forwardingStatus === "ended" && "Call Ended"}
+              </p>
+              <p className="text-xs text-gray-500">{formatPhone(forwardingDest)}</p>
+            </div>
+            {(forwardingStatus === "forwarding" || forwardingStatus === "ringing") && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+            )}
+          </div>
+          {(forwardingStatus === "connected" || forwardingStatus === "no-answer" || forwardingStatus === "busy" || forwardingStatus === "failed" || forwardingStatus === "ended") && (
+            <button
+              type="button"
+              onClick={clearForwardingState}
+              className="mt-3 w-full rounded-lg bg-gray-100 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-200"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
       {/* In-Call Controls */}
-      {isInCall && (
+      {isInCall && callState !== "forwarding" && (
         <div className="border-b border-gray-100 px-4 py-3">
           {/* Current call info */}
           <div className="mb-3 flex items-center justify-between">
