@@ -23,6 +23,7 @@ export const lockedProposalFields = [
   "signedBy",
   "signatureData",
   "signatureDataUrl",
+  "printedName",
   "packages",
 ] as const;
 

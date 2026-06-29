@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { azDate } from "@/lib/arizona-time";
+import { azDate, azDateTime } from "@/lib/arizona-time";
 
 type PublicProposal = {
   id: string;
@@ -25,6 +25,7 @@ type PublicProposal = {
   signedBy?: string;
   signatureDataUrl?: string;
   signatureData?: string;
+  printedName?: string;
   acceptedPackage?: "good" | "better" | "best";
   acceptedPackageName?: string;
   acceptedPrice?: number;
@@ -95,6 +96,9 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [isSigning, setIsSigning] = useState(false);
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [notice, setNotice] = useState("");
+  const [signMode, setSignMode] = useState<"draw" | "type">("draw");
+  const [typedSignature, setTypedSignature] = useState("");
+  const [printedName, setPrintedName] = useState(initialProposal.customerName || "");
   const [termsOpen, setTermsOpen] = useState(false);
   const [expandedScopes, setExpandedScopes] = useState<Record<string, boolean>>({});
   const isAccepted = proposal.status === "Won";
@@ -158,12 +162,32 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   }
 
   async function handleSignProposal() {
-    if (!agreementAccepted || !signatureDataUrl) return;
+    const hasDrawSignature = signMode === "draw" && signatureDataUrl;
+    const hasTypeSignature = signMode === "type" && typedSignature.trim();
+    if (!agreementAccepted || (!hasDrawSignature && !hasTypeSignature) || !printedName.trim()) return;
 
     const signedAt = new Date().toISOString();
     const finalPrice = showPackages ? selectedPackage.price : (proposal.total || 0);
-    // Lock the accepted record: package, name, price and signature become the
-    // immutable source of truth. These are never recalculated from templates.
+
+    // For typed signature, generate a data URL from canvas rendering
+    let finalSignatureUrl = signatureDataUrl;
+    if (signMode === "type" && typedSignature.trim()) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 220;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 720, 220);
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "italic 56px Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(typedSignature.trim(), 360, 110);
+      }
+      finalSignatureUrl = canvas.toDataURL("image/png");
+    }
+
     const updates = {
       selectedOption: showPackages ? selectedOption : undefined,
       acceptedPackage: showPackages ? selectedOption : undefined,
@@ -173,9 +197,10 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
       status: "Won",
       signedAt,
       acceptedAt: signedAt,
-      signedBy: proposal.customerName || "Customer",
-      signatureDataUrl,
-      signatureData: signatureDataUrl,
+      signedBy: printedName.trim(),
+      printedName: printedName.trim(),
+      signatureDataUrl: finalSignatureUrl,
+      signatureData: finalSignatureUrl,
       proposalVersion: proposal.proposalVersion ?? 1,
       locked: true,
     };
@@ -342,14 +367,24 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           {isAccepted ? (
             <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 text-center shadow-sm sm:p-8">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-2xl text-white">✓</div>
-              <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.customerName || "valued customer"}!</h2>
+              <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted &amp; Signed</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.printedName || proposal.customerName || "valued customer"}!</h2>
               <p className="mx-auto mt-3 max-w-xl text-sm font-semibold leading-6 text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly to schedule the work.</p>
-              <div className="mx-auto mt-5 max-w-md rounded-xl border border-emerald-200 bg-white p-4 text-left">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Signed by</p>
-                <div className="mt-1 text-xl font-bold italic text-slate-900">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-1 max-h-20 w-full object-contain" /> : proposal.signedBy}</div>
-                <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-slate-500">Date signed</p>
-                <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
+              <div className="mx-auto mt-5 max-w-md rounded-xl border border-emerald-200 bg-white p-5 text-left">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Customer Signature</p>
+                <div className="mt-1">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-1 max-h-20 w-full object-contain" /> : <span className="text-xl font-bold italic text-slate-900">{proposal.signedBy}</span>}</div>
+                <div className="mt-4 border-t border-emerald-100 pt-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Printed Name</p>
+                  <p className="mt-1 text-lg font-bold text-slate-900">{proposal.printedName || proposal.signedBy || proposal.customerName}</p>
+                </div>
+                <div className="mt-4 border-t border-emerald-100 pt-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Date &amp; Time Signed (Arizona Time)</p>
+                  <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? azDateTime(proposal.signedAt) : azDateTime(new Date())}</p>
+                </div>
+                <div className="mt-4 border-t border-emerald-100 pt-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Status</p>
+                  <p className="mt-1 inline-block rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">Signed</p>
+                </div>
               </div>
               {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
@@ -374,16 +409,46 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
                 <input type="checkbox" checked={agreementAccepted} onChange={(event) => setAgreementAccepted(event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300" />
                 <span>I have reviewed the proposal and agree to the Terms &amp; Conditions.</span>
               </label>
-              <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sign below</p>
-                  <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="rounded-lg px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">Clear</button>
+
+              {/* Signature mode tabs */}
+              <div className="mt-5">
+                <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+                  <button type="button" onClick={() => setSignMode("draw")} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${signMode === "draw" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Draw Signature</button>
+                  <button type="button" onClick={() => setSignMode("type")} className={`flex-1 rounded-md px-4 py-2 text-sm font-bold transition ${signMode === "type" ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Type Signature</button>
                 </div>
-                <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(event.clientX - rect.left, event.clientY - rect.top); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(event.clientX - rect.left, event.clientY - rect.top); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-40 w-full touch-none rounded-xl border-2 border-dashed border-slate-300 bg-slate-50" />
-                <p className="mt-1 text-xs text-slate-400">Draw your signature with your finger or mouse.</p>
+
+                {signMode === "draw" ? (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Sign below</p>
+                      <button type="button" onClick={() => { const canvas = signatureCanvasRef.current; const context = canvas?.getContext("2d"); if (!canvas || !context) return; context.clearRect(0, 0, canvas.width, canvas.height); setSignatureDataUrl(""); }} className="rounded-lg px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-50">Clear</button>
+                    </div>
+                    <canvas ref={signatureCanvasRef} width={720} height={220} onPointerDown={(event) => { const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineWidth = 3; context.lineCap = "round"; context.strokeStyle = "#0f172a"; context.beginPath(); context.moveTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); setIsSigning(true); }} onPointerMove={(event) => { if (!isSigning) return; const canvas = signatureCanvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const context = canvas.getContext("2d"); if (!context) return; context.lineTo(((event.clientX - rect.left) / rect.width) * canvas.width, ((event.clientY - rect.top) / rect.height) * canvas.height); context.stroke(); }} onPointerUp={() => { const canvas = signatureCanvasRef.current; if (!canvas) return; setIsSigning(false); setSignatureDataUrl(canvas.toDataURL("image/png")); }} onPointerLeave={() => setIsSigning(false)} className="mt-2 h-40 w-full touch-none rounded-xl border-2 border-dashed border-slate-300 bg-slate-50" />
+                    <p className="mt-1 text-xs text-slate-400">Draw your signature with your finger or mouse.</p>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Type your signature</p>
+                    <input type="text" value={typedSignature} onChange={(e) => setTypedSignature(e.target.value)} placeholder="Type your full name" className="mt-2 w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-3xl font-semibold italic text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white" />
+                    {typedSignature.trim() && (
+                      <div className="mt-3 flex items-center justify-center rounded-lg bg-slate-50 p-4">
+                        <p className="font-serif text-2xl italic text-slate-800">{typedSignature}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button type="button" disabled={!agreementAccepted || !signatureDataUrl} onClick={handleSignProposal} className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept &amp; Sign Proposal</button>
-              {!agreementAccepted || !signatureDataUrl ? <p className="mt-2 text-center text-xs font-semibold text-slate-400">Check the box and add your signature to enable signing.</p> : null}
+
+              {/* Printed name field */}
+              <div className="mt-5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Full Printed Name
+                  <input type="text" value={printedName} onChange={(e) => setPrintedName(e.target.value)} placeholder="Enter your full legal name" className="mt-2 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                </label>
+              </div>
+
+              <button type="button" disabled={!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()} onClick={handleSignProposal} className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">Accept &amp; Sign Proposal</button>
+              {(!agreementAccepted || (signMode === "draw" ? !signatureDataUrl : !typedSignature.trim()) || !printedName.trim()) ? <p className="mt-2 text-center text-xs font-semibold text-slate-400">Check the agreement, add your signature, and enter your printed name to sign.</p> : null}
               {notice && <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</p>}
               <div className="mt-6 border-t border-slate-200 pt-4 text-center">
                 <button type="button" disabled={declining} onClick={async () => { setDeclining(true); try { await fetch(`/api/proposals/decline?id=${encodeURIComponent(proposal.id)}`); setProposal((p) => ({ ...p, status: "Declined" })); } catch { setDeclining(false); } }} className="text-sm font-semibold text-slate-400 transition hover:text-red-500 disabled:opacity-50">{declining ? "Processing..." : "Decline Proposal"}</button>
