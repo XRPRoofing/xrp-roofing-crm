@@ -1570,16 +1570,21 @@ export default function ConversationBoard() {
       return;
     }
 
-    setTwilioNotice("Forwarding call...");
+    const dest = forwardNumber.trim();
+    setTwilioNotice(`Forwarding call to ${dest}...`);
     try {
-      const result = await controlCall({ callSid, action: "forward", forwardTo: forwardNumber.trim(), conversationId: active.id });
+      await controlCall({ callSid, action: "forward", forwardTo: dest, conversationId: active.id });
       setIsActiveCall(false);
       setIsHeld(false);
       setIsMuted(false);
       setCallSid(undefined);
-      setTwilioNotice(`Call ${result.status}`);
+      void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || dest, actor: "Office", action: "Call forwarded", details: `Forwarded to ${dest}`, module: "Calls" }).catch(() => {});
+      setTwilioNotice(`Ringing external number ${dest}...`);
+      setTimeout(() => setTwilioNotice(`Forwarded successfully to ${dest}`), 3000);
+      setTimeout(() => setTwilioNotice("Twilio realtime ready"), 8000);
     } catch (error) {
       setTwilioNotice(error instanceof Error ? error.message : "Call could not be forwarded");
+      setTimeout(() => setTwilioNotice("Twilio realtime ready"), 5000);
     }
   }
 

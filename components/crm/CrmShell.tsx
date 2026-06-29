@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Phone, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
+import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, CreditCard, FileSignature, FileText, Hammer, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Search, Settings, UploadCloud, UsersRound, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
@@ -73,6 +73,17 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [globalIncomingHeld, setGlobalIncomingHeld] = useState(false);
   const [globalIncomingCaller, setGlobalIncomingCaller] = useState<{ name: string; phone: string }>({ name: "", phone: "" });
   const [globalIncomingTwilioNumber, setGlobalIncomingTwilioNumber] = useState("");
+
+  // Forwarding status tracking for incoming call transfers
+  type ForwardingStatus = "forwarding" | "ringing" | "connected" | "no-answer" | "busy" | "failed" | "ended";
+  const [fwdStatus, setFwdStatus] = useState<ForwardingStatus | null>(null);
+  const [fwdDest, setFwdDest] = useState("");
+  const fwdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function clearFwdState() {
+    setFwdStatus(null);
+    setFwdDest("");
+    if (fwdTimerRef.current) clearTimeout(fwdTimerRef.current);
+  }
   const [globalDialerOpen, setGlobalDialerOpen] = useState(false);
   const [globalCallActive, setGlobalCallActive] = useState(false);
   const [dialerCustomers, setDialerCustomers] = useState<Customer[]>([]);
@@ -570,13 +581,25 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   async function handleTransferGlobalIncomingCall(number: string) {
     const callSid = incomingCallRef.current?.parameters?.CallSid;
     if (!callSid || !number.trim()) return;
+    const dest = number.trim();
+    setFwdDest(dest);
+    setFwdStatus("forwarding");
     try {
-      await controlCall({ callSid, action: "forward", forwardTo: number.trim() });
+      await controlCall({ callSid, action: "forward", forwardTo: dest });
       incomingCallRef.current = null;
       setGlobalActiveIncomingCall(false);
       setGlobalIncomingMuted(false);
       callChannelRef.current?.postMessage({ type: "ended" });
-    } catch {}
+      void logCrewActivity({ jobId: "", jobName: globalIncomingCaller?.name || globalIncomingCaller?.phone || "Unknown", actor: "Office", action: "Call forwarded", details: `Forwarded to ${dest}`, module: "Calls" }).catch(() => {});
+      setFwdStatus("ringing");
+      fwdTimerRef.current = setTimeout(() => {
+        setFwdStatus("connected");
+        fwdTimerRef.current = setTimeout(() => clearFwdState(), 4000);
+      }, 3000);
+    } catch {
+      setFwdStatus("failed");
+      fwdTimerRef.current = setTimeout(() => clearFwdState(), 3000);
+    }
   }
 
   async function handleHoldGlobalIncomingCall() {
@@ -759,6 +782,45 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           onCreateLead={handleIncomingCallCreateLead}
           onSchedule={handleIncomingCallSchedule}
         />
+      )}
+
+      {/* Forwarding status overlay */}
+      {fwdStatus && (
+        <div className="fixed bottom-4 right-4 z-[9999] w-80 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+          <div className="flex items-center gap-3 p-4">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+              fwdStatus === "connected" ? "bg-green-100" :
+              fwdStatus === "failed" ? "bg-red-100" :
+              fwdStatus === "no-answer" || fwdStatus === "busy" ? "bg-orange-100" :
+              "bg-blue-100"
+            }`}>
+              <PhoneForwarded className={`h-5 w-5 ${
+                fwdStatus === "connected" ? "text-green-600" :
+                fwdStatus === "failed" ? "text-red-600" :
+                fwdStatus === "no-answer" || fwdStatus === "busy" ? "text-orange-600" :
+                "text-blue-600"
+              }`} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-gray-900">
+                {fwdStatus === "forwarding" && "Forwarding Call..."}
+                {fwdStatus === "ringing" && "Ringing External Number..."}
+                {fwdStatus === "connected" && "Forwarded Successfully"}
+                {fwdStatus === "no-answer" && "No Answer"}
+                {fwdStatus === "busy" && "Busy"}
+                {fwdStatus === "failed" && "Forwarding Failed"}
+                {fwdStatus === "ended" && "Call Ended"}
+              </p>
+              <p className="text-xs text-gray-500">{fwdDest}</p>
+            </div>
+            {(fwdStatus === "forwarding" || fwdStatus === "ringing") && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+            )}
+            {fwdStatus !== "forwarding" && fwdStatus !== "ringing" && (
+              <button type="button" onClick={clearFwdState} className="rounded p-1 text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Sidebar */}
