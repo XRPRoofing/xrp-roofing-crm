@@ -7,7 +7,7 @@ import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { subscribeToCrewData, leadToJobRecord, upsertJobRecord, updateJobRecord } from "@/lib/crew-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
-import { azDateTime, azDate } from "@/lib/arizona-time";
+import { azDateTime, azDate, azTime } from "@/lib/arizona-time";
 import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
@@ -2099,24 +2099,47 @@ export default function ProposalsPage() {
                       <span>I agree to the Terms and Conditions</span>
                     </label>
                     <p className="hidden text-sm font-bold text-gray-700 print:block">By signing below, I agree to the Terms and Conditions outlined above.</p>
-                    <div className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_180px]">
+
+                    {/* Customer signature row */}
+                    <div className="mt-6 grid gap-6 md:grid-cols-[1fr_180px]">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Client Signature</p>
-                        {(activeProposal.signatureData || activeProposal.signatureDataUrl) ? (
-                          <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} unoptimized className="mt-2 max-h-20 w-full rounded-lg border border-gray-200 object-contain p-2 print:rounded-none print:border-0 print:border-b-2 print:border-gray-400" />
-                        ) : (
-                          <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-5 text-2xl font-semibold italic outline-none print:rounded-none print:border-0 print:border-b-2 print:border-gray-400 print:py-8" placeholder="Type full legal name" />
-                        )}
+                        <div className="min-h-[72px] border-b-2 border-gray-800 pb-2">
+                          {(activeProposal.signatureData || activeProposal.signatureDataUrl) ? (
+                            <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={90} unoptimized className="max-h-[64px] w-auto object-contain" />
+                          ) : (
+                            <input value={typedSignature} onChange={(event) => setTypedSignature(event.target.value)} className="w-full border-0 bg-transparent px-0 text-2xl font-semibold italic text-gray-900 outline-none placeholder:text-gray-300 print:py-4" placeholder="Type full legal name" />
+                          )}
+                        </div>
+                        <p className="mt-2 text-sm font-bold text-gray-900">{activeProposal.printedName || activeProposal.signedBy || activeProposal.customerName || ""}</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Printed Name</p>
-                        <p className="mt-2 px-4 py-5 text-lg font-bold text-gray-900 print:border-b-2 print:border-gray-400 print:py-8">{activeProposal.printedName || activeProposal.signedBy || activeProposal.customerName || ""}</p>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 print:border-0 print:bg-transparent">
-                        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Date &amp; Time (AZ)</p>
-                        <p className="mt-3 font-bold text-blue-700">{activeProposal.signedAt ? azDateTime(activeProposal.signedAt) : azDate(new Date())}</p>
+                      <div className="flex flex-col justify-end">
+                        <div className="border-b-2 border-gray-800 pb-2">
+                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : ""}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Date Signed</p>
+                        <div className="mt-3 border-b-2 border-gray-800 pb-2">
+                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azTime(activeProposal.signedAt) + " AZ" : ""}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Time Signed</p>
                       </div>
                     </div>
+
+                    {/* XRP Roofing representative signature */}
+                    <div className="mt-8 grid gap-6 border-t border-gray-200 pt-6 md:grid-cols-[1fr_180px]">
+                      <div>
+                        <div className="border-b-2 border-gray-800 pb-2">
+                          <p className="font-serif text-2xl italic text-gray-900">Jonathan Gonzalez</p>
+                        </div>
+                        <p className="mt-2 text-sm font-bold text-gray-900">Jonathan Gonzalez, XRP Roofing</p>
+                      </div>
+                      <div className="flex flex-col justify-end">
+                        <div className="border-b-2 border-gray-800 pb-2">
+                          <p className="text-sm font-bold text-gray-900">{activeProposal.signedAt ? azDate(activeProposal.signedAt) : azDate(new Date())}</p>
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">Date</p>
+                      </div>
+                    </div>
+
                     <button type="button" disabled={!agreementAccepted || !typedSignature.trim()} onClick={handleAcceptProposal} className="hidden print:hidden">Accept & Sign Proposal</button>
                   </div>
                 )}

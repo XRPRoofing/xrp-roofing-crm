@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { azDate, azDateTime } from "@/lib/arizona-time";
+import { azDate, azDateTime, azTime } from "@/lib/arizona-time";
 
 type PublicProposal = {
   id: string;
@@ -365,28 +365,59 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           )}
 
           {isAccepted ? (
-            <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 text-center shadow-sm sm:p-8">
+            <section className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm sm:p-8">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-2xl text-white">✓</div>
-              <p className="mt-4 text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted &amp; Signed</p>
-              <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.printedName || proposal.customerName || "valued customer"}!</h2>
-              <p className="mx-auto mt-3 max-w-xl text-sm font-semibold leading-6 text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly to schedule the work.</p>
-              <div className="mx-auto mt-5 max-w-md rounded-xl border border-emerald-200 bg-white p-5 text-left">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Customer Signature</p>
-                <div className="mt-1">{proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={120} unoptimized className="mt-1 max-h-20 w-full object-contain" /> : <span className="text-xl font-bold italic text-slate-900">{proposal.signedBy}</span>}</div>
-                <div className="mt-4 border-t border-emerald-100 pt-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Printed Name</p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">{proposal.printedName || proposal.signedBy || proposal.customerName}</p>
+              <p className="mt-4 text-center text-[11px] font-black uppercase tracking-[0.28em] text-emerald-700">Proposal Accepted &amp; Signed</p>
+              <h2 className="mt-2 text-center text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Thank you, {proposal.printedName || proposal.customerName || "valued customer"}!</h2>
+              <p className="mx-auto mt-3 max-w-xl text-center text-sm font-semibold leading-6 text-slate-600">Your proposal has been signed successfully. XRP Roofing has been notified and will contact you shortly to schedule the work.</p>
+
+              {/* Professional e-signature block */}
+              <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
+                {/* Customer signature row */}
+                <div className="grid gap-6 sm:grid-cols-[1fr_180px]">
+                  <div>
+                    <div className="min-h-[80px] border-b-2 border-slate-800 pb-2">
+                      {proposal.signatureDataUrl ? <Image src={proposal.signatureDataUrl} alt="Customer signature" width={420} height={100} unoptimized className="max-h-[72px] w-auto object-contain" /> : <span className="text-2xl font-bold italic text-slate-900">{proposal.signedBy}</span>}
+                    </div>
+                    <p className="mt-2 text-base font-bold text-slate-900">{proposal.printedName || proposal.signedBy || proposal.customerName}</p>
+                  </div>
+                  <div>
+                    <div className="flex h-full flex-col justify-end">
+                      <div className="border-b-2 border-slate-800 pb-2">
+                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
+                      </div>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Date Signed</p>
+                      <div className="mt-3 border-b-2 border-slate-800 pb-2">
+                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azTime(proposal.signedAt) : azTime(new Date())} AZ</p>
+                      </div>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Time Signed</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 border-t border-emerald-100 pt-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Date &amp; Time Signed (Arizona Time)</p>
-                  <p className="mt-1 font-bold text-slate-700">{proposal.signedAt ? azDateTime(proposal.signedAt) : azDateTime(new Date())}</p>
+
+                {/* XRP Roofing representative signature */}
+                <div className="mt-8 grid gap-6 border-t border-slate-200 pt-6 sm:grid-cols-[1fr_180px]">
+                  <div>
+                    <div className="border-b-2 border-slate-800 pb-2">
+                      <p className="font-serif text-2xl italic text-slate-900">Jonathan Gonzalez</p>
+                    </div>
+                    <p className="mt-2 text-base font-bold text-slate-900">Jonathan Gonzalez, XRP Roofing</p>
+                  </div>
+                  <div>
+                    <div className="flex h-full flex-col justify-end">
+                      <div className="border-b-2 border-slate-800 pb-2">
+                        <p className="text-base font-bold text-slate-900">{proposal.signedAt ? azDate(proposal.signedAt) : azDate(new Date())}</p>
+                      </div>
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Date</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 border-t border-emerald-100 pt-4">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Status</p>
-                  <p className="mt-1 inline-block rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">Signed</p>
+
+                <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-2 text-center">
+                  <p className="text-xs font-bold text-emerald-700">Status: <span className="uppercase">Signed</span> — {proposal.signedAt ? azDateTime(proposal.signedAt) : azDateTime(new Date())} Arizona Time</p>
                 </div>
               </div>
-              {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-sm font-bold text-emerald-800">{notice}</p>}
+              {notice && <p className="mx-auto mt-4 max-w-md rounded-xl bg-emerald-100 px-4 py-3 text-center text-sm font-bold text-emerald-800">{notice}</p>}
             </section>
           ) : isDeclined ? (
             <section className="rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 to-white p-6 text-center shadow-sm sm:p-8">
