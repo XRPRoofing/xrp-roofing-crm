@@ -1429,7 +1429,7 @@ export default function LeadsPage() {
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Phone
                   <div className="flex items-center gap-1">
                     <input value={selectedJob.phone} onChange={(event) => updateJob(selectedJob.id, { phone: event.target.value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
-                    {selectedJob.phone && <a href={`tel:${selectedJob.phone.replace(/[^\d+]/g, "")}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></a>}
+                    {selectedJob.phone && <button type="button" onClick={() => { const digits = selectedJob.phone.replace(/[^\d+]/g, ""); if (digits) window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } })); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></button>}
                     {selectedJob.phone && <button onClick={() => setSmsTarget({ phone: selectedJob.phone, name: selectedJob.name })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
                   </div>
                 </label>
