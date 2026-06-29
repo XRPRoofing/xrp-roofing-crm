@@ -1253,18 +1253,36 @@ export default function ProposalsPage() {
     const selected = emailTemplates.find((t) => t.id === savedTemplateId) || emailTemplates[0];
 
     setSendForm({
-      toName: name,
-      toEmail: savedProposal.customerEmail || savedProposal.job?.email || "info@xrproofing.com",
+      toName: name || savedProposal.job?.name || "Customer",
+      toEmail: savedProposal.customerEmail || savedProposal.job?.email || "",
       ccRecipients: savedProposal.ccRecipients || "",
       emailTemplateId: savedTemplateId,
-      subject: savedProposal.sendSubject || applyEmailTemplateVars(selected.subject, name),
-      message: savedProposal.sendMessage || applyEmailTemplateVars(selected.message, name),
+      subject: savedProposal.sendSubject || applyEmailTemplateVars(selected.subject, name || "Customer"),
+      message: savedProposal.sendMessage || applyEmailTemplateVars(selected.message, name || "Customer"),
     });
     setShowSendModal(true);
   }
 
   async function handleSendProposal() {
     if (!activeProposal) return;
+
+    // Client-side validation before calling the API
+    if (!sendForm.toName.trim()) {
+      setSendNotice("Please enter the recipient name.");
+      return;
+    }
+    if (!sendForm.toEmail.trim() || !sendForm.toEmail.includes("@")) {
+      setSendNotice("Please enter a valid recipient email address.");
+      return;
+    }
+    if (!sendForm.subject.trim()) {
+      setSendNotice("Please enter a subject line.");
+      return;
+    }
+    if (!sendForm.message.trim()) {
+      setSendNotice("Please enter a message.");
+      return;
+    }
 
     setSendingProposal(true);
     setSendNotice("");
@@ -1320,10 +1338,13 @@ export default function ProposalsPage() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => null) as { error?: string } | null;
+        const data = await response.json().catch(() => null) as { error?: string; details?: { path?: string[] }[] } | null;
         const serverError = typeof data?.error === "string" ? data.error : "Unable to send proposal email";
         if (serverError === "Email service is not configured") {
           setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
+        } else if (serverError === "Invalid proposal email data") {
+          const missingFields = data?.details?.map((d) => d.path?.join(".")).filter(Boolean).join(", ") || "required fields";
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Missing or invalid: ${missingFields}. Please check the recipient name, email, subject, and message fields.\n\nProposal link: ${proposalLink}` });
         } else {
           setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `${serverError}\n\nProposal link: ${proposalLink}` });
         }
@@ -2249,7 +2270,7 @@ export default function ProposalsPage() {
                       </div>
                     </div>
                   </div>
-                  {sendNotice && <p className="whitespace-pre-line rounded-lg bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
+                  {sendNotice && <p className="whitespace-pre-line rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{sendNotice}</p>}
                 </div>
               </div>
               <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
