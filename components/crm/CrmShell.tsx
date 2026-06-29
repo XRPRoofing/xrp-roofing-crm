@@ -277,9 +277,6 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
-
   useEffect(() => {
     if (!currentUserId) return;
 
