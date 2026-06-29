@@ -24,6 +24,8 @@ import { upsertInvoiceRecord } from "@/lib/invoice-sync";
 import { getCachedCrewData, getCachedProposals, getCachedInvoices, getCachedCustomers, refreshCrewData, refreshProposals, refreshInvoices, refreshCustomers, CACHE_EVENTS } from "@/lib/data-cache";
 import type { Customer } from "@/types/crm";
 import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
+import { useSaveToast } from "@/components/crm/SaveToast";
+import { handlePhoneChange } from "@/lib/format-phone";
 
 type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
 
@@ -434,6 +436,7 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
 }
 
 export default function LeadsPage() {
+  const { showSaveToast, SaveToastUI } = useSaveToast();
   const [jobs, setJobs] = useState<Lead[]>(() => (getCachedCrewData()?.jobs ?? []).map(normalizeJob));
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
@@ -973,6 +976,7 @@ export default function LeadsPage() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const pending = pendingUpdatesRef.current;
     pendingUpdatesRef.current = {};
+    if (Object.keys(pending).length > 0) showSaveToast("Job saved");
     Object.entries(pending).forEach(([id, patch]) => {
       void updateJobRecord(id, patch).catch(() => {});
       // Log meaningful field updates to activity history
@@ -1057,6 +1061,7 @@ export default function LeadsPage() {
 
     setJobs((currentJobs) => [newJob, ...currentJobs]);
     void upsertJobRecord(leadToJobRecord(newJob)).catch(() => {});
+    showSaveToast("Job created");
     void logCrewActivity({
       jobId: newJob.id,
       jobName: newJob.name,
@@ -1232,7 +1237,7 @@ export default function LeadsPage() {
                     <span className="text-xs font-bold text-gray-500">Phone Number</span>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" />
+                      <input type="tel" inputMode="tel" value={form.phone} onChange={(e) => { const el = e.target; const { formatted, cursorPos } = handlePhoneChange(el.value, form.phone, el.selectionStart); setForm({ ...form, phone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="(602) 555-0123" />
                     </div>
                   </label>
                   <label className="grid gap-1 sm:col-span-2">
@@ -1806,6 +1811,7 @@ export default function LeadsPage() {
           }).catch(() => {});
         }
       }} />}
+      <SaveToastUI />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { subscribeToCrewData, leadToJobRecord, upsertJobRecord, updateJobRecord } from "@/lib/crew-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime, azDate, azTime } from "@/lib/arizona-time";
+import { useSaveToast } from "@/components/crm/SaveToast";
+import { handlePhoneChange } from "@/lib/format-phone";
 import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
@@ -425,6 +427,7 @@ const initialProposalTemplates: ProposalTemplate[] = [
 ];
 
 export default function ProposalsPage() {
+  const { showSaveToast, SaveToastUI } = useSaveToast();
   const [currentUserName, setCurrentUserName] = useState("CRM User");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
 
@@ -1230,6 +1233,7 @@ export default function ProposalsPage() {
 
     const updatedProposal = saveActiveProposal();
     setActiveProposal(updatedProposal);
+    showSaveToast("Proposal saved");
   }
 
   function saveActiveProposal(extraFields?: Partial<Proposal>) {
@@ -1835,7 +1839,7 @@ export default function ProposalsPage() {
                     placeholder="Start typing address..."
                     className="mt-2 !rounded-lg !py-2 !text-xs text-gray-600"
                   />
-                  <input value={editorForm.customerPhone} onChange={(event) => setEditorForm({ ...editorForm, customerPhone: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none" placeholder="Customer phone" />
+                  <input value={editorForm.customerPhone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editorForm.customerPhone, el.selectionStart); setEditorForm({ ...editorForm, customerPhone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none" placeholder="Customer phone" />
                   <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
                 </div>
                 <button className="text-gray-400">•••</button>
@@ -3049,6 +3053,7 @@ export default function ProposalsPage() {
           </div>
         </div>
       )}
+      <SaveToastUI />
     </div>
   );
 }

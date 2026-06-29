@@ -27,6 +27,8 @@ import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
+import { useSaveToast } from "@/components/crm/SaveToast";
+import { handlePhoneChange } from "@/lib/format-phone";
 
 type InvoiceStatus = "Draft" | "Sent" | "Viewed" | "Pending" | "Due Soon" | "Overdue" | "Partially Paid" | "Paid" | "Paid Mail Check" | "Voided";
 type PaymentMethod = "Cash" | "Check" | "Bank Transfer" | "Credit Card" | "Zelle" | "Stripe ACH" | "Stripe Card";
@@ -623,6 +625,7 @@ function MobileInvoiceList({
 }
 
 export default function InvoicesPage() {
+  const { showSaveToast, SaveToastUI } = useSaveToast();
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
     // Always start with cached data for instant display, then upgrade from Supabase.
     const cached = readStoredInvoices();
@@ -1149,6 +1152,7 @@ export default function InvoicesPage() {
     if (amount <= 0) return;
     const payment: Payment = { ...paymentForm, amount, offline };
     updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, `${offline ? "Offline payment" : "Manual payment"} recorded: ${currency(amount)}`);
+    showSaveToast("Payment saved");
     if (selectedInvoice.jobReference) {
       void logCrewActivity({
         jobId: selectedInvoice.jobReference,
@@ -1816,7 +1820,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         </label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Phone
           <div className="flex items-center gap-1 mt-1.5">
-            <input disabled={!editable} value={invoice.phone} onChange={(event) => onChange({ ...invoice, phone: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Phone" />
+            <input disabled={!editable} value={invoice.phone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, invoice.phone, el.selectionStart); onChange({ ...invoice, phone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Phone" />
             {invoice.phone && <button type="button" onClick={() => { const digits = invoice.phone.replace(/[^\d+]/g, ""); if (digits) window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } })); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></button>}
             {invoice.phone && <button type="button" onClick={() => setSmsTarget({ phone: invoice.phone, name: invoice.clientName })} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
           </div>
@@ -2784,6 +2788,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         </div>
       )}
       {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
+      <SaveToastUI />
     </div>
   );
 }

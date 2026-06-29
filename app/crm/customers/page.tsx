@@ -19,6 +19,8 @@ import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
 import { getCachedCrewData, getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { useSaveToast } from "@/components/crm/SaveToast";
+import { handlePhoneChange } from "@/lib/format-phone";
 
 const customersStorageKey = "xrp-crm-customers";
 const jobsStorageKey = "xrp-crm-jobs-board";
@@ -250,6 +252,7 @@ function statusTone(status?: string) {
 }
 
 export default function CustomersPage() {
+  const { showSaveToast, SaveToastUI } = useSaveToast();
   const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => {
     if (typeof window === "undefined") return [];
     return getCachedCustomers<Customer>() ?? readRawLocalCustomers();
@@ -570,6 +573,7 @@ export default function CustomersPage() {
     const result = await upsertCustomerRecord(edited);
     setCustomersError(result.ok ? null : result.error ?? "Unable to save customer.");
     await syncFromServer(edited.id, true);
+    showSaveToast(isNew ? "Customer created" : "Customer saved");
     void logCrewActivity({
       jobId: edited.id,
       jobName: edited.name,
@@ -746,7 +750,7 @@ export default function CustomersPage() {
                     <form onSubmit={handleSaveCustomer} className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
                       <input required value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Customer name" />
                       <input type="email" value={editForm.email} onChange={(event) => setEditForm({ ...editForm, email: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Email" />
-                      <input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
+                      <input value={editForm.phone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editForm.phone, el.selectionStart); setEditForm({ ...editForm, phone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Phone" />
                       <input value={editForm.status} onChange={(event) => setEditForm({ ...editForm, status: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none" placeholder="Status" />
                       <AddressAutocomplete
                         value={editForm.propertyAddress}
@@ -920,6 +924,7 @@ export default function CustomersPage() {
         </div>
       )}
       {smsTarget && <QuickSmsModal phone={smsTarget.phone} name={smsTarget.name} onClose={() => setSmsTarget(null)} />}
+      <SaveToastUI />
     </div>
   );
 }
