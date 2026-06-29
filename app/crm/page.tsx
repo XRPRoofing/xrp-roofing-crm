@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
@@ -9,9 +9,17 @@ import {
   CalendarCheck,
   DollarSign,
   ExternalLink,
+  FileText,
   MailOpen,
+  MessageSquare,
   PenLine,
+  Phone,
+  PhoneIncoming,
+  PhoneMissed,
+  PhoneOutgoing,
   TrendingUp,
+  UserCheck,
+  UserPlus,
   UserX,
 } from "lucide-react";
 
@@ -20,9 +28,11 @@ const DashboardHeroActions = dynamic(() => import("@/components/crm/dashboard/Da
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
-import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshInvoices, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedCustomers, getCachedInvoices, getCachedProposals, refreshCrewData, refreshCustomers, refreshInvoices, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import type { Lead } from "@/types/crm";
+import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 
 const COMPLETED_STAGES = new Set(["completed", "paid"]);
 
@@ -78,6 +88,9 @@ export default function CrmDashboardPage() {
   const [jobs,      setJobs]      = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
   const [proposals, setProposals] = useState<ProposalSnap[]>(() => (getCachedProposals<ProposalSnap>() ?? []).filter((p) => !p.deletedAt));
   const [invoices,  setInvoices]  = useState<InvoiceSnap[]>(() => getCachedInvoices<InvoiceSnap>() ?? []);
+  const [customers, setCustomers] = useState<{ id: string; createdAt?: string }[]>(() => getCachedCustomers<{ id: string; createdAt?: string }>() ?? []);
+  const [events,    setEvents]    = useState<TwilioConversationEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [syncDot,   setSyncDot]   = useState(false);
 
   useEffect(() => {
@@ -90,6 +103,12 @@ export default function CrmDashboardPage() {
     void refreshProposals<ProposalSnap>().then((data) => {
       if (mounted) setProposals(data.filter((p) => !p.deletedAt));
     }).catch(() => {});
+    void refreshCustomers<{ id: string; createdAt?: string }>().then((data) => {
+      if (mounted) setCustomers(data);
+    }).catch(() => {});
+    void listConversationEvents(2000).then((data) => {
+      if (mounted) { setEvents(data); setEventsLoading(false); }
+    }).catch(() => { if (mounted) setEventsLoading(false); });
 
     const unsubCrew = subscribeToCrewData(() => {
       setSyncDot(true);
@@ -110,22 +129,34 @@ export default function CrmDashboardPage() {
       }).catch(() => {});
     });
 
+    const unsubEvents = subscribeToConversationEvents((evt) => {
+      if (mounted) setEvents((prev) => {
+        const exists = prev.find((e) => e.id === evt.id);
+        if (exists) return prev.map((e) => e.id === evt.id ? evt : e);
+        return [evt, ...prev];
+      });
+    });
+
     // Cache-event listeners read already-updated cache — no re-fetch needed.
     function onCrewCache() { const c = getCachedCrewData(); if (c && mounted) setJobs(c.jobs); }
     function onInvoiceCache() { const c = getCachedInvoices<InvoiceSnap>(); if (c && mounted) setInvoices(c); }
     function onProposalCache() { const c = getCachedProposals<ProposalSnap>(); if (c && mounted) setProposals(c.filter((p) => !p.deletedAt)); }
+    function onCustomerCache() { const c = getCachedCustomers<{ id: string; createdAt?: string }>(); if (c && mounted) setCustomers(c); }
     window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
     window.addEventListener(CACHE_EVENTS.proposals, onProposalCache);
+    window.addEventListener(CACHE_EVENTS.customers, onCustomerCache);
 
     return () => {
       mounted = false;
       unsubCrew();
       unsubInvoices();
       unsubProposals();
+      unsubEvents();
       window.removeEventListener(CACHE_EVENTS.crew, onCrewCache);
       window.removeEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
       window.removeEventListener(CACHE_EVENTS.proposals, onProposalCache);
+      window.removeEventListener(CACHE_EVENTS.customers, onCustomerCache);
     };
   }, []);
 
@@ -133,7 +164,81 @@ export default function CrmDashboardPage() {
     void refreshCrewData().then((d) => setJobs(d.jobs)).catch(() => {});
     void refreshInvoices<InvoiceSnap>().then((data) => setInvoices(data)).catch(() => {});
     void refreshProposals<ProposalSnap>().then((data) => setProposals(data.filter((p) => !p.deletedAt))).catch(() => {});
+    void refreshCustomers<{ id: string; createdAt?: string }>().then((data) => setCustomers(data)).catch(() => {});
   });
+
+  /* ── Widget computed data ────────────────────────────────────────── */
+
+  const todayStr = useMemo(() => new Date().toLocaleDateString("en-CA"), []);
+  const isToday = useCallback((dateStr?: string) => {
+    if (!dateStr) return false;
+    return dateStr.startsWith(todayStr);
+  }, [todayStr]);
+
+  const callMetrics = useMemo(() => {
+    const todayEvents = events.filter((e) => (e.type === "incoming_call" || e.type === "call_status") && isToday(e.createdAt));
+    const callEvents = todayEvents.filter((e) => e.type === "incoming_call" || (e.type === "call_status" && e.direction));
+    const uniqueCalls = new Map<string, TwilioConversationEvent>();
+    for (const e of callEvents) {
+      const key = e.callSid || e.id;
+      if (!uniqueCalls.has(key) || e.createdAt > (uniqueCalls.get(key)!.createdAt)) {
+        uniqueCalls.set(key, e);
+      }
+    }
+    const calls = Array.from(uniqueCalls.values());
+    const incoming = calls.filter((e) => e.direction === "inbound").length;
+    const outgoing = calls.filter((e) => e.direction === "outbound").length;
+    const missed = calls.filter((e) => e.direction === "inbound" && (e.status === "no-answer" || e.status === "busy" || e.status === "missed")).length;
+    return { total: calls.length, incoming, outgoing, missed };
+  }, [events, isToday]);
+
+  const messageMetrics = useMemo(() => {
+    const smsEvents = events.filter((e) => e.type === "incoming_sms");
+    const todaySms = smsEvents.filter((e) => isToday(e.createdAt));
+    const recentConversations = new Set(smsEvents.slice(0, 50).map((e) => e.conversationId).filter(Boolean));
+    return { unreadSms: todaySms.length, recentConversations: recentConversations.size };
+  }, [events, isToday]);
+
+  const jobMetrics = useMemo(() => {
+    const todayJobs = jobs.filter((j) => j.dueDate && j.dueDate === todayStr);
+    const scheduled = jobs.filter((j) => j.stage === "scheduled").length;
+    const inProgress = jobs.filter((j) => j.stage === "in_progress").length;
+    const completed = jobs.filter((j) => COMPLETED_STAGES.has(j.stage)).length;
+    const overdue = jobs.filter((j) => {
+      if (COMPLETED_STAGES.has(j.stage)) return false;
+      if (!j.dueDate) return false;
+      return j.dueDate < todayStr;
+    }).length;
+    return { today: todayJobs.length, scheduled, inProgress, completed, overdue };
+  }, [jobs, todayStr]);
+
+  const revenueMetrics = useMemo(() => {
+    const paidInvs = invoices.filter(invoicePaid);
+    const monthRevenue = paidInvs.reduce((s, i) => s + invoiceTotal(i), 0);
+    const outstanding = invoices.filter((i) => i.status !== "Draft" && i.status !== "Voided" && !invoicePaid(i)).reduce((s, i) => {
+      const total = invoiceTotal(i);
+      const paid = (i.payments || []).reduce((ps, p) => ps + p.amount, 0);
+      return s + (total - paid);
+    }, 0);
+    const paidCount = paidInvs.length;
+    const pendingCount = invoices.filter((i) => i.status !== "Draft" && i.status !== "Voided" && !invoicePaid(i)).length;
+    return { monthRevenue, outstanding, paidCount, pendingCount };
+  }, [invoices]);
+
+  const proposalMetrics = useMemo(() => {
+    const draft = proposals.filter((p) => p.status === "Draft").length;
+    const viewed = proposals.filter((p) => p.viewedAt && !p.signedAt && p.status !== "Declined").length;
+    const declined = proposals.filter((p) => p.status === "Declined").length;
+    const won = proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length;
+    return { draft, viewed, declined, won };
+  }, [proposals]);
+
+  const quickOverview = useMemo(() => {
+    const newLeads = jobs.filter((j) => j.stage === "new_lead").length;
+    const activeCustomers = customers.length;
+    const upcomingAppointments = jobs.filter((j) => j.inspectionDate && j.inspectionDate >= todayStr).length;
+    return { newLeads, activeCustomers, upcomingAppointments };
+  }, [jobs, customers, todayStr]);
 
   /* ── Computed metrics ────────────────────────────────────────────── */
 
@@ -288,6 +393,99 @@ export default function CrmDashboardPage() {
           </div>
           <p className="mt-2 text-2xl font-bold text-gray-900">{totalRevenue > 0 ? formatUsd(totalRevenue) : "$0"}</p>
           <p className="text-xs text-gray-400">from paid invoices</p>
+        </div>
+      </section>
+
+      {/* ── Detailed Widgets ─────────────────────────────────────────── */}
+      <section className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Calls Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><Phone className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Calls Today</h3>
+          </div>
+          {eventsLoading ? (
+            <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><Phone className="h-3.5 w-3.5" />Total Calls</span><span className="text-sm font-semibold text-gray-800">{callMetrics.total}</span></div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneIncoming className="h-3.5 w-3.5" />Incoming</span><span className="text-sm font-semibold text-gray-800">{callMetrics.incoming}</span></div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneOutgoing className="h-3.5 w-3.5" />Outgoing</span><span className="text-sm font-semibold text-gray-800">{callMetrics.outgoing}</span></div>
+              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneMissed className="h-3.5 w-3.5 text-red-400" />Missed</span><span className={`text-sm font-semibold ${callMetrics.missed > 0 ? "text-red-600" : "text-gray-800"}`}>{callMetrics.missed}</span></div>
+            </div>
+          )}
+        </div>
+
+        {/* Jobs Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Briefcase className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Jobs</h3>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Today&apos;s Jobs</span><span className="text-sm font-semibold text-gray-800">{jobMetrics.today}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Scheduled</span><span className="text-sm font-semibold text-gray-800">{jobMetrics.scheduled}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">In Progress</span><span className="text-sm font-semibold text-blue-600">{jobMetrics.inProgress}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Completed</span><span className="text-sm font-semibold text-green-600">{jobMetrics.completed}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Overdue</span><span className={`text-sm font-semibold ${jobMetrics.overdue > 0 ? "text-red-600" : "text-gray-800"}`}>{jobMetrics.overdue}</span></div>
+          </div>
+        </div>
+
+        {/* Revenue Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600"><DollarSign className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Revenue</h3>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Total Collected</span><span className="text-sm font-semibold text-green-600">{formatUsd(revenueMetrics.monthRevenue)}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Outstanding</span><span className={`text-sm font-semibold ${revenueMetrics.outstanding > 0 ? "text-orange-600" : "text-gray-800"}`}>{formatUsd(revenueMetrics.outstanding)}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Paid Invoices</span><span className="text-sm font-semibold text-gray-800">{revenueMetrics.paidCount}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Pending Invoices</span><span className={`text-sm font-semibold ${revenueMetrics.pendingCount > 0 ? "text-orange-600" : "text-gray-800"}`}>{revenueMetrics.pendingCount}</span></div>
+          </div>
+        </div>
+
+        {/* Messages Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600"><MessageSquare className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Messages</h3>
+          </div>
+          {eventsLoading ? (
+            <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between"><span className="text-sm text-gray-500">SMS Today</span><span className={`text-sm font-semibold ${messageMetrics.unreadSms > 0 ? "text-purple-600" : "text-gray-800"}`}>{messageMetrics.unreadSms}</span></div>
+              <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Active Conversations</span><span className="text-sm font-semibold text-gray-800">{messageMetrics.recentConversations}</span></div>
+            </div>
+          )}
+        </div>
+
+        {/* Proposals Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><FileText className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Proposals</h3>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Draft</span><span className="text-sm font-semibold text-gray-800">{proposalMetrics.draft}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Viewed</span><span className="text-sm font-semibold text-blue-600">{proposalMetrics.viewed}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Declined</span><span className={`text-sm font-semibold ${proposalMetrics.declined > 0 ? "text-red-600" : "text-gray-800"}`}>{proposalMetrics.declined}</span></div>
+            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Won (Signed)</span><span className="text-sm font-semibold text-green-600">{proposalMetrics.won}</span></div>
+          </div>
+        </div>
+
+        {/* Quick Overview Widget */}
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600"><TrendingUp className="h-4 w-4" /></span>
+            <h3 className="text-sm font-semibold text-gray-800">Quick Overview</h3>
+          </div>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><UserPlus className="h-3.5 w-3.5" />New Leads</span><span className={`text-sm font-semibold ${quickOverview.newLeads > 0 ? "text-orange-600" : "text-gray-800"}`}>{quickOverview.newLeads}</span></div>
+            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><UserCheck className="h-3.5 w-3.5" />Active Customers</span><span className="text-sm font-semibold text-gray-800">{quickOverview.activeCustomers}</span></div>
+            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><CalendarCheck className="h-3.5 w-3.5" />Upcoming Inspections</span><span className="text-sm font-semibold text-gray-800">{quickOverview.upcomingAppointments}</span></div>
+          </div>
         </div>
       </section>
 
