@@ -278,7 +278,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!currentUserId || pathname === "/crm/team-chat") return;
+    if (!currentUserId) return;
 
     const supabase = createClient();
     const channel = supabase
@@ -287,6 +287,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: teamChatTableName, filter: `room_id=eq.${teamChatRoomId}` },
         (payload) => {
+          if (pathnameRef.current === "/crm/team-chat") return;
           const nextMessage = payload.new as TeamChatMessage;
           if (nextMessage.user_id !== currentUserId) {
             incrementTeamChatUnreadCount();
@@ -306,7 +307,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId, pathname]);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (pathname === "/crm/team-chat") {

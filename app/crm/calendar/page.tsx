@@ -513,7 +513,13 @@ export default function CalendarPage() {
         ? ((gcalResult.events || []) as GoogleCalendarEvent[]).map(mapGoogleEvent)
         : [];
 
-      setEvents([...crmEvents, ...gcalEvents]);
+      // Merge: preserve optimistic entries that haven't been confirmed yet
+      setEvents((prev) => {
+        const optimistic = prev.filter((e) => e.id.startsWith("optimistic-"));
+        const realIds = new Set(crmEvents.map((e) => e.title + e.start_time));
+        const pendingOptimistic = optimistic.filter((o) => !realIds.has(o.title + o.start_time));
+        return [...crmEvents, ...gcalEvents, ...pendingOptimistic];
+      });
     } catch {
       setError("Unable to load calendar events.");
     } finally {
@@ -530,7 +536,7 @@ export default function CalendarPage() {
     void loadEvents();
   });
 
-  // Real-time subscription
+  // Real-time subscription — merges updates without replacing optimistic entries
   useEffect(() => {
     const mc2 = azParts(monthCursor);
     const timeMin = azNoon(mc2.year, mc2.month - 1, 1).toISOString();
@@ -540,7 +546,15 @@ export default function CalendarPage() {
       (updated) =>
         setEvents((prev) => {
           const gcalEvents = prev.filter((e) => isGoogleEvent(e));
-          return [...updated, ...gcalEvents];
+          // Remove any optimistic entries that now have real counterparts
+          const optimistic = prev.filter((e) => e.id.startsWith("optimistic-"));
+          const merged = [...updated];
+          // Keep optimistic events only if no real event matches them yet
+          for (const opt of optimistic) {
+            const hasReal = updated.some((u) => u.title === opt.title && u.start_time === opt.start_time);
+            if (!hasReal) merged.push(opt);
+          }
+          return [...merged, ...gcalEvents];
         }),
       timeMin,
       timeMax,
@@ -602,12 +616,25 @@ export default function CalendarPage() {
     try {
       const startTime = `${form.date}T${form.startTime}:00`;
       const endTime = `${form.date}T${form.endTime}:00`;
+      const startISO = new Date(startTime + "-07:00").toISOString();
+      const endISO = new Date(endTime + "-07:00").toISOString();
 
-      const result = await createCalendarEvent({
+      // Duplicate prevention: check if an event with same title + start already exists
+      const duplicate = events.find((ev) => ev.title === form.title && ev.start_time === startISO && ev.customer_name === form.customer_name);
+      if (duplicate) {
+        setError("This event already exists on the calendar.");
+        setSaving(false);
+        return;
+      }
+
+      // Optimistic UI: insert placeholder event immediately so calendar updates instantly
+      const optimisticId = `optimistic-${Date.now()}`;
+      const optimisticEvent: CalendarEvent = {
+        id: optimisticId,
         title: form.title,
         description: form.description,
-        start_time: new Date(startTime + "-07:00").toISOString(),
-        end_time: new Date(endTime + "-07:00").toISOString(),
+        start_time: startISO,
+        end_time: endISO,
         all_day: false,
         location: form.location,
         color: form.color,
@@ -616,49 +643,17 @@ export default function CalendarPage() {
         customer_phone: form.customer_phone,
         job_kind: form.job_kind,
         created_by: form.assigned_to,
-      });
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setEvents((prev) => [...prev, optimisticEvent]);
 
-      if (!result) {
-        setError("Unable to create event.");
-        return;
-      }
-
-      // Sync to Google Calendar (best-effort)
-      if (googleConnected) {
-        try {
-          await fetch("/api/google-calendar/events", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: form.title,
-              name: form.customer_name || form.title,
-              address: form.location || "N/A",
-              jobKind: form.job_kind || "Other",
-              phone: form.customer_phone,
-              date: form.date,
-              startTime: form.startTime,
-              endTime: form.endTime,
-              notes: form.description,
-              guestEmails: form.guestEmails,
-            }),
-          });
-        } catch {
-          // Google sync failed but CRM event was saved
-        }
-      }
-
-      setStatusMessage("Event created successfully.");
-      broadcastCrmUpdate();
+      // Close modal and reset form immediately for instant feel
+      setNewScheduleOpen(false);
       setCreateSuccess(true);
       setTimeout(() => setCreateSuccess(false), 4000);
-      void logCrewActivity({
-        jobId: result.id || "",
-        jobName: form.title,
-        actor: TEAM_MEMBERS.find((m) => m.id === form.assigned_to)?.name || form.assigned_to,
-        action: "Calendar event created",
-        details: `${form.title} — ${form.customer_name || "No customer"} on ${form.date}`,
-        module: "Calendar",
-      });
+      setStatusMessage("Event created successfully.");
+      const savedForm = { ...form };
       setForm({
         title: "",
         customer_name: "",
@@ -673,8 +668,62 @@ export default function CalendarPage() {
         assigned_to: TEAM_MEMBERS[0].id,
         guestEmails: "",
       });
-      setNewScheduleOpen(false);
-      await loadEvents();
+
+      // Save to database in background
+      const result = await createCalendarEvent({
+        title: savedForm.title,
+        description: savedForm.description,
+        start_time: startISO,
+        end_time: endISO,
+        all_day: false,
+        location: savedForm.location,
+        color: savedForm.color,
+        assigned_to: savedForm.assigned_to,
+        customer_name: savedForm.customer_name,
+        customer_phone: savedForm.customer_phone,
+        job_kind: savedForm.job_kind,
+        created_by: savedForm.assigned_to,
+      });
+
+      if (!result) {
+        // Rollback optimistic update
+        setEvents((prev) => prev.filter((ev) => ev.id !== optimisticId));
+        setError("Unable to create event.");
+        return;
+      }
+
+      // Replace optimistic event with real one (real-time subscription will also fire)
+      setEvents((prev) => prev.map((ev) => ev.id === optimisticId ? result : ev));
+
+      // Sync to Google Calendar (best-effort, non-blocking)
+      if (googleConnected) {
+        void fetch("/api/google-calendar/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: savedForm.title,
+            name: savedForm.customer_name || savedForm.title,
+            address: savedForm.location || "N/A",
+            jobKind: savedForm.job_kind || "Other",
+            phone: savedForm.customer_phone,
+            date: savedForm.date,
+            startTime: savedForm.startTime,
+            endTime: savedForm.endTime,
+            notes: savedForm.description,
+            guestEmails: savedForm.guestEmails,
+          }),
+        }).catch(() => {});
+      }
+
+      broadcastCrmUpdate();
+      void logCrewActivity({
+        jobId: result.id || "",
+        jobName: savedForm.title,
+        actor: TEAM_MEMBERS.find((m) => m.id === savedForm.assigned_to)?.name || savedForm.assigned_to,
+        action: "Calendar event created",
+        details: `${savedForm.title} — ${savedForm.customer_name || "No customer"} on ${savedForm.date}`,
+        module: "Calendar",
+      });
     } catch {
       setError("Unable to create event.");
     } finally {
@@ -693,12 +742,35 @@ export default function CalendarPage() {
     try {
       const startTime = `${editForm.date}T${editForm.startTime}:00`;
       const endTime = `${editForm.date}T${editForm.endTime}:00`;
+      const startISO = new Date(startTime + "-07:00").toISOString();
+      const endISO = new Date(endTime + "-07:00").toISOString();
+
+      // Optimistic UI: update event in place immediately
+      const optimisticUpdated: CalendarEvent = {
+        ...selectedEvent,
+        title: editForm.title,
+        description: editForm.description,
+        start_time: startISO,
+        end_time: endISO,
+        location: editForm.location,
+        color: editForm.color,
+        assigned_to: editForm.assigned_to,
+        customer_name: editForm.customer_name,
+        customer_phone: editForm.customer_phone,
+        job_kind: editForm.job_kind,
+        updated_at: new Date().toISOString(),
+      };
+      const prevEvents = events;
+      setEvents((prev) => prev.map((ev) => ev.id === selectedEvent.id ? optimisticUpdated : ev));
+      setSelectedEvent(null);
+      setEditMode(false);
+      setStatusMessage("Event updated successfully.");
 
       const result = await updateCalendarEvent(selectedEvent.id, {
         title: editForm.title,
         description: editForm.description,
-        start_time: new Date(startTime + "-07:00").toISOString(),
-        end_time: new Date(endTime + "-07:00").toISOString(),
+        start_time: startISO,
+        end_time: endISO,
         location: editForm.location,
         color: editForm.color,
         assigned_to: editForm.assigned_to,
@@ -708,11 +780,14 @@ export default function CalendarPage() {
       });
 
       if (!result) {
+        // Rollback
+        setEvents(prevEvents);
         setError("Unable to update event.");
         return;
       }
 
-      setStatusMessage("Event updated successfully.");
+      // Replace with server response
+      setEvents((prev) => prev.map((ev) => ev.id === selectedEvent.id ? result : ev));
       broadcastCrmUpdate();
       void logCrewActivity({
         jobId: selectedEvent.id,
@@ -722,9 +797,6 @@ export default function CalendarPage() {
         details: `Updated "${editForm.title}" — ${editForm.customer_name || "No customer"}`,
         module: "Calendar",
       });
-      setSelectedEvent(null);
-      setEditMode(false);
-      await loadEvents();
     } catch {
       setError("Unable to update event.");
     } finally {
@@ -738,25 +810,32 @@ export default function CalendarPage() {
     setError("");
 
     try {
-      const ok = await deleteCalendarEvent(selectedEvent.id);
-      if (!ok) {
-        setError("Unable to delete event.");
-        return;
-      }
-      setStatusMessage("Event deleted.");
-      broadcastCrmUpdate();
-      void logCrewActivity({
-        jobId: selectedEvent.id,
-        jobName: selectedEvent.title || "Untitled",
-        actor: selectedEvent.assigned_to || "Unknown",
-        action: "Calendar event deleted",
-        details: `Deleted "${selectedEvent.title || "Untitled"}" — ${selectedEvent.customer_name || "No customer"}`,
-        module: "Calendar",
-      });
+      // Optimistic UI: remove event immediately
+      const prevEvents = events;
+      const deletedEvent = selectedEvent;
+      setEvents((prev) => prev.filter((ev) => ev.id !== deletedEvent.id));
       setSelectedEvent(null);
       setEditMode(false);
       setDeleteConfirmOpen(false);
-      await loadEvents();
+      setStatusMessage("Event deleted.");
+
+      const ok = await deleteCalendarEvent(deletedEvent.id);
+      if (!ok) {
+        // Rollback
+        setEvents(prevEvents);
+        setError("Unable to delete event.");
+        return;
+      }
+
+      broadcastCrmUpdate();
+      void logCrewActivity({
+        jobId: deletedEvent.id,
+        jobName: deletedEvent.title || "Untitled",
+        actor: deletedEvent.assigned_to || "Unknown",
+        action: "Calendar event deleted",
+        details: `Deleted "${deletedEvent.title || "Untitled"}" — ${deletedEvent.customer_name || "No customer"}`,
+        module: "Calendar",
+      });
     } catch {
       setError("Unable to delete event.");
     } finally {

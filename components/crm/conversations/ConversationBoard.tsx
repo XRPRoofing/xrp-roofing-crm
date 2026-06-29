@@ -1389,19 +1389,6 @@ export default function ConversationBoard() {
   }, []);
 
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setConversations((current: ConversationRecord[]) =>
-        current.map((conversation: ConversationRecord) =>
-          conversation.lastActivityIso
-            ? { ...conversation, lastActivityAt: formatActivityTime(conversation.lastActivityIso) }
-            : conversation
-        )
-      );
-    }, 60_000);
-    return () => window.clearInterval(id);
-  }, []);
-
   // Incoming call transfer removed — CrmShell FloatingCallCard owns active incoming call state.
 
   // Device is now owned by CrmShell and shared via VoiceDeviceContext.

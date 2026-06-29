@@ -112,6 +112,7 @@ export async function deleteTaskFromSupabase(taskId: string): Promise<void> {
 
 const taskListeners = new Set<(tasks: OfficeTask[]) => void>();
 let taskChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+let taskDebounce: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Subscribe to realtime INSERT/UPDATE/DELETE on `office_tasks`. Uses a shared
@@ -127,9 +128,14 @@ export function subscribeToTaskUpdates(onUpdate: (tasks: OfficeTask[]) => void):
       const supabase = createClient();
       taskChannel = supabase
         .channel("office-tasks-realtime-shared")
-        .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, async () => {
-          const tasks = await loadTasksFromSupabase();
-          taskListeners.forEach((cb) => cb(tasks));
+        .on("postgres_changes", { event: "*", schema: "public", table: TABLE }, () => {
+          // Debounce: batch rapid task changes into one re-fetch
+          if (taskDebounce) clearTimeout(taskDebounce);
+          taskDebounce = setTimeout(async () => {
+            taskDebounce = null;
+            const tasks = await loadTasksFromSupabase();
+            taskListeners.forEach((cb) => cb(tasks));
+          }, 500);
         })
         .subscribe();
     } catch {
@@ -143,6 +149,7 @@ export function subscribeToTaskUpdates(onUpdate: (tasks: OfficeTask[]) => void):
     if (taskListeners.size === 0 && taskChannel) {
       try { createClient().removeChannel(taskChannel); } catch { /* ignore */ }
       taskChannel = null;
+      if (taskDebounce) { clearTimeout(taskDebounce); taskDebounce = null; }
     }
   };
 }

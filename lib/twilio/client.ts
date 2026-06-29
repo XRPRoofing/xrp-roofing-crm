@@ -149,58 +149,81 @@ export async function listConversationEvents(limit = 1000) {
   return data?.events || [];
 }
 
+// Shared singleton channel for conversation events — prevents duplicate
+// channels when multiple components subscribe (CrmShell, Dashboard, Customers,
+// ConversationBoard all listen to the same table).
+const conversationEventListeners = new Set<(event: TwilioConversationEvent) => void>();
+let conversationEventChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 export function subscribeToConversationEvents(onEvent: (event: TwilioConversationEvent) => void) {
-  const supabase = createClient();
-  // Unique channel name per subscriber: the Supabase singleton client keys
-  // channels by name, so reusing a fixed name across pages (Conversations +
-  // Customers) returns the already-subscribed channel and throws
-  // "cannot add postgres_changes callbacks ... after subscribe()".
-  //
-  // Listen for both INSERT and UPDATE so that upserted events (e.g. a
-  // call_status update for the same call) are reflected in real time.
-  const channel = supabase
-    .channel(`crm-conversation-events-${Math.random().toString(36).slice(2)}`)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "conversation_events" },
-      (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        onEvent(mapConversationEventRow(row));
-      }
-    )
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "conversation_events" },
-      (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        onEvent(mapConversationEventRow(row));
-      }
-    )
-    .subscribe();
+  conversationEventListeners.add(onEvent);
+
+  if (!conversationEventChannel) {
+    const supabase = createClient();
+    conversationEventChannel = supabase
+      .channel("crm-conversation-events-shared")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "conversation_events" },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const mapped = mapConversationEventRow(row);
+          conversationEventListeners.forEach((cb) => cb(mapped));
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "conversation_events" },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const mapped = mapConversationEventRow(row);
+          conversationEventListeners.forEach((cb) => cb(mapped));
+        }
+      )
+      .subscribe();
+  }
 
   return () => {
-    supabase.removeChannel(channel);
+    conversationEventListeners.delete(onEvent);
+    if (conversationEventListeners.size === 0 && conversationEventChannel) {
+      createClient().removeChannel(conversationEventChannel);
+      conversationEventChannel = null;
+    }
   };
 }
 
 
+// Shared singleton channel for conversation read states
+const readStateListeners = new Set<(conversationId: string, readAt: string) => void>();
+let readStateChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+
 export function subscribeToConversationReadStates(onRead: (conversationId: string, readAt: string) => void) {
-  const supabase = createClient();
-  const channel = supabase
-    .channel(`crm-conversation-read-states-${Math.random().toString(36).slice(2)}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "conversation_read_states" },
-      (payload) => {
-        const row = (payload.new || {}) as Record<string, unknown>;
-        if (!row.conversation_id) return;
-        onRead(String(row.conversation_id), row.read_at ? String(row.read_at) : new Date().toISOString());
-      }
-    )
-    .subscribe();
+  readStateListeners.add(onRead);
+
+  if (!readStateChannel) {
+    const supabase = createClient();
+    readStateChannel = supabase
+      .channel("crm-conversation-read-states-shared")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversation_read_states" },
+        (payload) => {
+          const row = (payload.new || {}) as Record<string, unknown>;
+          if (!row.conversation_id) return;
+          const cid = String(row.conversation_id);
+          const rat = row.read_at ? String(row.read_at) : new Date().toISOString();
+          readStateListeners.forEach((cb) => cb(cid, rat));
+        }
+      )
+      .subscribe();
+  }
 
   return () => {
-    supabase.removeChannel(channel);
+    readStateListeners.delete(onRead);
+    if (readStateListeners.size === 0 && readStateChannel) {
+      createClient().removeChannel(readStateChannel);
+      readStateChannel = null;
+    }
   };
 }
 
