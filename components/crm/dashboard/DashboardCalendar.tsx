@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { azNoon, azParts, AZ_TZ } from "@/lib/arizona-time";
+import { loadCalendarEvents, subscribeToCalendarUpdates, type CalendarEvent as CrmCalEvent } from "@/lib/calendar-sync";
 
 type CalendarEvent = {
   id: string;
@@ -100,6 +101,7 @@ export default function DashboardCalendar() {
   }, [events]);
 
   useEffect(() => {
+    let mounted = true;
     async function fetchEvents() {
       setLoading(true);
       try {
@@ -108,20 +110,63 @@ export default function DashboardCalendar() {
         const timeMin = azNoon(sp.year, sp.month, sp.day).toISOString();
         const timeMax = azNoon(ep.year, ep.month, ep.day + 1).toISOString();
 
-        const res = await fetch(
-          `/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
-        );
-        const data = (await res.json()) as { connected?: boolean; events?: CalendarEvent[] };
+        // Fetch Google Calendar and CRM events in parallel
+        const [gcalRes, crmEvents] = await Promise.all([
+          fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`)
+            .then((r) => r.json())
+            .catch(() => ({ connected: false, events: [] })),
+          loadCalendarEvents(timeMin, timeMax).catch(() => []),
+        ]);
+
+        if (!mounted) return;
+        const data = gcalRes as { connected?: boolean; events?: CalendarEvent[] };
         setConnected(Boolean(data.connected));
-        setEvents(data.events || []);
+
+        // Map CRM events to the same shape as Google Calendar events
+        const mappedCrm: CalendarEvent[] = (crmEvents as CrmCalEvent[]).map((ce) => ({
+          id: `crm:${ce.id}`,
+          summary: ce.title,
+          start: { dateTime: ce.start_time },
+          end: { dateTime: ce.end_time },
+          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
+        }));
+
+        setEvents([...(data.events || []), ...mappedCrm]);
       } catch {
-        setConnected(false);
-        setEvents([]);
+        if (mounted) { setConnected(false); setEvents([]); }
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
     void fetchEvents();
+    return () => { mounted = false; };
+  }, [weekDays]);
+
+  // Real-time subscription for CRM calendar events
+  useEffect(() => {
+    const sp = azParts(weekDays[0]);
+    const ep = azParts(weekDays[6]);
+    const timeMin = azNoon(sp.year, sp.month, sp.day).toISOString();
+    const timeMax = azNoon(ep.year, ep.month, ep.day + 1).toISOString();
+
+    const unsubscribe = subscribeToCalendarUpdates(
+      (updated) => {
+        const mappedCrm: CalendarEvent[] = updated.map((ce) => ({
+          id: `crm:${ce.id}`,
+          summary: ce.title,
+          start: { dateTime: ce.start_time },
+          end: { dateTime: ce.end_time },
+          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
+        }));
+        setEvents((prev) => {
+          const nonCrm = prev.filter((e) => !e.id.startsWith("crm:"));
+          return [...nonCrm, ...mappedCrm];
+        });
+      },
+      timeMin,
+      timeMax,
+    );
+    return unsubscribe;
   }, [weekDays]);
 
   return (
