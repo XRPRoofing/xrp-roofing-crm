@@ -1825,69 +1825,69 @@ export default function ProposalsPage() {
           </div>
         )}
 
-        <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[280px_1fr]"}`} id="proposal-print-area">
+        <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[300px_1fr]"}`} id="proposal-print-area">
           {!isPreviewing && (
-          <aside className="border-r border-gray-200 bg-white p-4">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <aside className="overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-5">
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Customer</p>
-                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-blue-700 outline-none" />
+                <div className="flex-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Customer</p>
+                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
                   <AddressAutocomplete
                     value={editorForm.address}
                     onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
                     placeholder="Start typing address..."
-                    className="mt-2 !rounded-lg !py-2 !text-xs text-gray-600"
+                    className="mt-2 !rounded-md !py-2 !text-sm text-gray-600"
                   />
-                  <input value={editorForm.customerPhone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editorForm.customerPhone, el.selectionStart); setEditorForm({ ...editorForm, customerPhone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 outline-none" placeholder="Customer phone" />
-                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-blue-700 outline-none" placeholder="Customer email" />
+                  <input value={editorForm.customerPhone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editorForm.customerPhone, el.selectionStart); setEditorForm({ ...editorForm, customerPhone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Phone" />
+                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Email" />
                 </div>
-                <button className="text-gray-400">•••</button>
+                <button className="text-gray-300 hover:text-gray-500 transition">•••</button>
               </div>
             </div>
-            <button className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-sm font-bold text-blue-700">View job details</button>
-            <div className="mt-5">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Proposal template</p>
-              <div className="space-y-2">
+            <button className="mt-3 w-full rounded-md border border-gray-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-blue-600 transition hover:bg-blue-50">View job details</button>
+            <div className="mt-6">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Template</p>
+              <div className="space-y-1.5">
                 {templates.map((template) => (
-                  <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-lg p-3 text-left ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-300" : "bg-gray-50"}`}>
-                    <span className="block text-sm font-bold text-blue-700">{template.label}</span>
-                    <span className="mt-1 block text-xs font-semibold text-gray-500">{template.description}</span>
+                  <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-md px-3 py-2.5 text-left transition ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-200" : "bg-white border border-gray-200 hover:border-gray-300"}`}>
+                    <span className={`block text-sm font-medium ${editorForm.template === template.id ? "text-blue-700" : "text-gray-700"}`}>{template.label}</span>
+                    <span className="mt-0.5 block text-xs text-gray-400">{template.description}</span>
                   </button>
                 ))}
               </div>
             </div>
-            <div className="mt-5 space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                Proposal title
-                <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+            <div className="mt-6 space-y-4">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Title
+                <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                Proposal summary
-                <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-20 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Summary
+                <textarea value={editorForm.summary} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, summary: event.target.value }); }} className="mt-1.5 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Cover photo URL
-                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" placeholder="/images/logo.jpeg" />
+                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="/images/logo.jpeg" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Cover text
-                <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+                <textarea value={editorForm.coverText} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, coverText: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                Scope
-                <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-2 min-h-40 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Scope of work
+                <textarea value={editorForm.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, scope: event.target.value }); }} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-1.5 min-h-[8rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Total
-                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
-                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
+                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
+                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-amber-600">🔒 Locked at the signed amount</span>}
               </label>
               {/* Deposit Request trigger */}
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-md border border-gray-200 bg-white p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Deposit Request</p>
-                  <button type="button" onClick={() => { if (!editorForm.depositType) setEditorForm({ ...editorForm, depositType: "percentage" }); setShowDepositModal(true); }} disabled={isProposalLocked(activeProposal)} className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">{editorForm.depositType ? "Edit" : "Configure"}</button>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Deposit Request</p>
+                  <button type="button" onClick={() => { if (!editorForm.depositType) setEditorForm({ ...editorForm, depositType: "percentage" }); setShowDepositModal(true); }} disabled={isProposalLocked(activeProposal)} className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">{editorForm.depositType ? "Edit" : "Configure"}</button>
                 </div>
                 {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
                   <p className="mt-2 text-sm font-semibold text-gray-700">
@@ -1901,21 +1901,21 @@ export default function ProposalsPage() {
                   <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
                 )}
               </div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Customer notes
-                <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-2 min-h-24 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+                <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Terms and conditions
-                <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-2 min-h-32 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none" />
+                <textarea value={editorForm.terms} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, terms: event.target.value }); }} className="mt-1.5 min-h-[5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
             </div>
-            <div className="mt-5">
+            <div className="mt-6">
               {/* Good / Better / Best toggle */}
-              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
                 <div>
-                  <p className="text-sm font-bold text-blue-700">Good / Better / Best</p>
-                  <p className="text-xs font-semibold text-gray-500">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
+                  <p className="text-sm font-medium text-gray-700">Good / Better / Best</p>
+                  <p className="text-xs text-gray-400">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
                 </div>
                 <button
                   type="button"
@@ -1925,76 +1925,76 @@ export default function ProposalsPage() {
                   <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editorForm.showPackages ? "translate-x-5" : "translate-x-0.5"}`} />
                 </button>
               </label>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Proposal sections</p>
-              <div className="space-y-2">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Sections</p>
+              <div className="space-y-1.5">
                 {proposalSections.filter((section) => editorForm.showPackages || !["BEST", "BETTER", "GOOD"].includes(section)).map((section) => (
-                  <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-lg px-4 py-3 text-left text-sm font-bold ${section === activeSection ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "bg-gray-50 text-gray-600"}`}>
+                  <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-md px-3 py-2.5 text-left text-sm transition ${section === activeSection ? "bg-blue-50 font-medium text-blue-700 ring-1 ring-blue-200" : "bg-white font-normal text-gray-600 border border-gray-200 hover:border-gray-300"}`}>
                     {section}
                   </button>
                 ))}
               </div>
-              <button className="mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-center text-xl font-light text-blue-700">+</button>
+              <button className="mt-3 w-full rounded-md border border-dashed border-gray-300 bg-white px-4 py-2.5 text-center text-lg text-gray-400 transition hover:border-blue-300 hover:text-blue-600">+</button>
             </div>
           </aside>
           )}
 
-          <main className="p-6 print:p-0">
+          <main className="bg-gray-50/30 p-6 print:bg-white print:p-0">
             <div className="mx-auto max-w-[760px] print:max-w-none">
-              <p className="mb-5 text-center text-sm font-bold text-gray-700 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
-              <div className={`min-h-[900px] rounded-[2rem] border bg-white p-8 shadow-xl shadow-gray-200 print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-300" : editorForm.template === "insurance" ? "border-blue-300" : "border-gray-200"}`}>
-                <div className="grid gap-6 rounded-lg border border-gray-200 bg-gray-50 p-6 md:grid-cols-2">
+              <p className="mb-4 text-center text-sm font-medium text-gray-500 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
+              <div className={`min-h-[900px] rounded-2xl border bg-white p-8 shadow-sm print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-200" : editorForm.template === "insurance" ? "border-blue-200" : "border-gray-200"}`}>
+                <div className="grid gap-6 rounded-lg border border-gray-100 bg-gray-50/80 p-6 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Client Info</p>
-                    <p className="mt-3 text-xl font-bold text-blue-700">{editorForm.customerName}</p>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{editorForm.address}</p>
-                    {editorForm.customerPhone && <p className="mt-2 text-sm font-bold text-gray-700">{editorForm.customerPhone}</p>}
-                    {editorForm.customerEmail && <p className="mt-1 text-sm font-bold text-blue-700">{editorForm.customerEmail}</p>}
+                    <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-gray-400">Client</p>
+                    <p className="mt-3 text-lg font-semibold text-gray-800">{editorForm.customerName}</p>
+                    <p className="mt-1.5 text-sm leading-6 text-gray-500">{editorForm.address}</p>
+                    {editorForm.customerPhone && <p className="mt-1.5 text-sm text-gray-600">{editorForm.customerPhone}</p>}
+                    {editorForm.customerEmail && <p className="mt-1 text-sm text-blue-600">{editorForm.customerEmail}</p>}
                   </div>
                   <div className="border-t border-gray-200 pt-6 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">Prepared By</p>
-                    <p className="mt-3 text-xl font-bold text-blue-700">XRP Roofing</p>
-                    <p className="mt-2 text-sm font-bold text-gray-700">Jonathan Gonzalez</p>
-                    <p className="mt-2 text-sm text-gray-600">(623) 300-8097</p>
-                    <p className="mt-1 text-sm text-blue-700">info@xrproofing.com</p>
-                    <p className="mt-1 text-sm text-gray-600">xrproofing.com</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-gray-400">Prepared by</p>
+                    <p className="mt-3 text-lg font-semibold text-gray-800">XRP Roofing</p>
+                    <p className="mt-1.5 text-sm text-gray-600">Jonathan Gonzalez</p>
+                    <p className="mt-1.5 text-sm text-gray-500">(623) 300-8097</p>
+                    <p className="mt-1 text-sm text-blue-600">info@xrproofing.com</p>
+                    <p className="mt-1 text-sm text-gray-500">xrproofing.com</p>
                   </div>
                 </div>
 
-                <div className="my-8 text-center">
+                <div className="my-10 text-center">
                   {isPreviewing ? (
-                    <h1 className={`text-3xl font-bold tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-blue-700"}`}>ROOFING PROPOSAL</h1>
+                    <h1 className={`text-2xl font-semibold tracking-tight ${editorForm.template === "premium" ? "text-orange-600" : "text-gray-800"}`}>ROOFING PROPOSAL</h1>
                   ) : (
-                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-3xl font-bold tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-blue-700"}`} />
+                    <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className={`w-full border-none bg-transparent p-0 text-center text-2xl font-semibold tracking-tight outline-none ${editorForm.template === "premium" ? "text-orange-600" : "text-gray-800"}`} />
                   )}
-                  <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wider">
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">{activeProposal.proposalNumber ? `#${activeProposal.proposalNumber}` : `ID ${activeProposal.id}`}</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">Issued {azDate(new Date())}</span>
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">{activeProposal.status}</span>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 text-xs font-medium uppercase tracking-wider">
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-500">{activeProposal.proposalNumber ? `#${activeProposal.proposalNumber}` : `ID ${activeProposal.id}`}</span>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-500">Issued {azDate(new Date())}</span>
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-600">{activeProposal.status}</span>
                   </div>
                 </div>
 
                 {(isPreviewing || activeSection === "Cover") && (
-                  <div className="mt-8 rounded-lg bg-gray-50 p-8 text-center">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Cover page</p>
-                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-lg bg-white object-contain shadow-sm" />
-                    <p className="mt-5 text-3xl font-bold text-blue-700">{editorForm.title}</p>
-                    <p className="mt-4 text-lg font-bold text-gray-700">{editorForm.customerName}</p>
-                    <p className="mt-2 text-sm text-gray-500">{editorForm.address}</p>
+                  <div className="mt-10 rounded-lg bg-gray-50/80 p-8 text-center">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Cover</p>
+                    <Image src={editorForm.coverPhoto || "/images/logo.jpeg"} alt="Proposal cover" width={220} height={130} className="mx-auto mt-5 max-h-36 w-auto rounded-lg bg-white object-contain" />
+                    <p className="mt-6 text-2xl font-semibold text-gray-800">{editorForm.title}</p>
+                    <p className="mt-3 text-base font-medium text-gray-600">{editorForm.customerName}</p>
+                    <p className="mt-1.5 text-sm text-gray-400">{editorForm.address}</p>
                     {isPreviewing ? (
-                      <p className="mx-auto mt-6 max-w-xl whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.coverText}</p>
+                      <p className="mx-auto mt-6 max-w-xl whitespace-pre-line text-sm leading-7 text-gray-500">{editorForm.coverText}</p>
                     ) : (
-                      <textarea value={editorForm.coverText} onChange={(event) => setEditorForm({ ...editorForm, coverText: event.target.value })} className="mx-auto mt-6 min-h-28 w-full max-w-xl resize-none rounded-lg border border-gray-200 bg-white px-4 py-3 text-center text-sm leading-7 text-gray-600 outline-none" />
+                      <textarea value={editorForm.coverText} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, coverText: event.target.value }); }} className="mx-auto mt-6 min-h-[5rem] w-full max-w-xl resize-none rounded-md border border-gray-200 bg-white px-4 py-3 text-center text-sm leading-7 text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
                     )}
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Inspection Photos") && (
-                  <div className={`mt-8 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Inspection Photos</p>
+                  <div className={`mt-10 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Inspection Photos</p>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       {normalizeInspectionPhotos(editorForm.inspectionPhotos).map((photo, index) => (
-                        <div key={photo.label} className={`rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
-                          <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-lg bg-white text-sm font-bold text-gray-500">
+                        <div key={photo.label} className={`rounded-lg border border-dashed border-gray-200 bg-gray-50/50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
+                          <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-lg bg-white text-sm text-gray-400">
                             {photo.image ? (
                               <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-52 w-full object-cover" />
                             ) : (
@@ -2005,11 +2005,11 @@ export default function ProposalsPage() {
                             photo.note && <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">{photo.note}</p>
                           ) : (
                             <>
-                              <label className="mt-3 block rounded-lg bg-blue-50 px-4 py-3 text-center text-sm font-bold text-blue-700">
+                              <label className="mt-3 block cursor-pointer rounded-md bg-gray-100 px-4 py-2.5 text-center text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600">
                                 Upload photo
                                 <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
                               </label>
-                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-24 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-600 outline-none" placeholder={`${photo.label} notes`} />
+                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder={`${photo.label} notes`} />
                             </>
                           )}
                         </div>
@@ -2019,49 +2019,49 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-8 grid gap-6 md:grid-cols-2">
-                    <div className="rounded-lg bg-gray-50 p-5">
-                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Prepared for</p>
-                      <p className="mt-2 text-lg font-bold text-blue-700">{editorForm.customerName}</p>
-                      <p className="mt-1 text-sm leading-6 text-gray-600">{editorForm.address}</p>
+                  <div className="mt-10 grid gap-6 md:grid-cols-2">
+                    <div className="rounded-lg bg-gray-50/80 p-5">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Prepared for</p>
+                      <p className="mt-2 text-base font-semibold text-gray-800">{editorForm.customerName}</p>
+                      <p className="mt-1 text-sm leading-6 text-gray-500">{editorForm.address}</p>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-5">
-                      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Proposal summary</p>
+                    <div className="rounded-lg bg-gray-50/80 p-5">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Summary</p>
                       {isPreviewing ? (
-                        <p className="mt-2 text-sm leading-6 text-gray-600">{editorForm.summary}</p>
+                        <p className="mt-2 text-sm leading-6 text-gray-500">{editorForm.summary}</p>
                       ) : (
-                        <textarea value={editorForm.summary} onChange={(event) => setEditorForm({ ...editorForm, summary: event.target.value })} className="mt-2 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-6 text-gray-600 outline-none" />
+                        <textarea value={editorForm.summary} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, summary: event.target.value }); }} className="mt-2 min-h-[4rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-6 text-gray-600 outline-none" />
                       )}
                     </div>
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Estimate") && (
-                  <div className="mt-8">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Description of Work</p>
-                    <div className="mt-4 border-y border-gray-300 py-5">
+                  <div className="mt-10">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Scope of Work</p>
+                    <div className="mt-4 border-y border-gray-200 py-6">
                       {isPreviewing ? (
                         <>
-                          <p className="whitespace-pre-line text-sm leading-7 text-gray-700">{editorForm.scope}</p>
-                          <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700">{editorForm.notes}</p>
+                          <p className="whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.scope}</p>
+                          {editorForm.notes && <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.notes}</p>}
                         </>
                       ) : (
                         <>
-                          <textarea value={editorForm.scope} onChange={(event) => setEditorForm({ ...editorForm, scope: event.target.value })} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="min-h-96 w-full resize-y border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
-                          <textarea value={editorForm.notes} onChange={(event) => setEditorForm({ ...editorForm, notes: event.target.value })} className="mt-4 min-h-24 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
+                          <textarea value={editorForm.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, scope: event.target.value }); }} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="min-h-[18rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
+                          <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-4 min-h-[4rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" placeholder="Additional notes..." />
                         </>
                       )}
                     </div>
-                    <div className="mt-4 flex justify-between text-sm">
-                      <span className="font-bold text-gray-700">Proposal total</span>
-                      <span className="font-bold text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</span>
+                    <div className="mt-5 flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">Proposal Total</span>
+                      <span className="font-semibold text-gray-800">${(Number(editorForm.total) || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
 
                 {isPreviewing && editorForm.showPackages && (
-                  <div className="mt-8">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Package Options</p>
+                  <div className="mt-10">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Package Options</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-3 print:block print:space-y-4">
                       {(["good", "better", "best"] as const).map((option) => {
                         const packageOption = normalizePackages(editorForm.packages)[option];
@@ -2069,10 +2069,10 @@ export default function ProposalsPage() {
                         const scopeLines = packageOption.scope.split(/\r?\n|✓|•|·|;/).map((l: string) => l.replace(/^[-*✓\s]+/, "").trim()).filter(Boolean);
                         const isScopeExpanded = previewExpandedScopes[option] ?? false;
                         return (
-                          <div key={option} className={`rounded-lg border p-5 print:break-inside-avoid ${selected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-gray-200 bg-white"}`}>
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">{option}</p>
-                            <p className="mt-2 text-xl font-bold uppercase text-blue-700">{option} Package</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-500">Professional roofing option for this project.</p>
+                          <div key={option} className={`rounded-lg border p-5 print:break-inside-avoid ${selected ? "border-blue-400 bg-blue-50/50 shadow-sm" : "border-gray-200 bg-white"}`}>
+                            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400">{option}</p>
+                            <p className="mt-2 text-lg font-semibold capitalize text-gray-800">{option} Package</p>
+                            <p className="mt-1.5 text-sm text-gray-400">Professional roofing option for this project.</p>
                             <div className={`relative mt-5 overflow-hidden print:!max-h-none ${!isScopeExpanded ? "max-h-32" : ""}`}>
                               <ul className="space-y-2">
                                 {scopeLines.map((line: string, i: number) => (
@@ -2087,13 +2087,13 @@ export default function ProposalsPage() {
                               )}
                             </div>
                             {scopeLines.length > 2 && (
-                              <button type="button" onClick={() => setPreviewExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-bold text-blue-600 transition hover:text-blue-800 print:hidden">
+                              <button type="button" onClick={() => setPreviewExpandedScopes((prev) => ({ ...prev, [option]: !prev[option] }))} className="mt-3 flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:text-blue-700 print:hidden">
                                 <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-current transition-transform ${isScopeExpanded ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
                                 {isScopeExpanded ? "Show less" : "See full scope of work"}
                               </button>
                             )}
-                            <p className="mt-5 text-2xl font-bold text-blue-700">${packageOption.price.toLocaleString()}</p>
-                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-lg px-4 py-3 text-sm font-bold print:hidden ${selected ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-700"}`}>{selected ? "Selected Option" : "Select This Option"}</button>
+                            <p className="mt-5 text-xl font-semibold text-gray-800">${packageOption.price.toLocaleString()}</p>
+                            <button type="button" onClick={() => saveActiveProposal({ selectedOption: option, total: packageOption.price })} className={`mt-4 w-full rounded-md px-4 py-2.5 text-sm font-medium print:hidden transition ${selected ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600"}`}>{selected ? "Selected" : "Select"}</button>
                           </div>
                         );
                       })}
@@ -2102,40 +2102,40 @@ export default function ProposalsPage() {
                 )}
 
                 {!isPreviewing && editorForm.showPackages && (["GOOD", "BETTER", "BEST"].includes(activeSection)) && (
-                  <div className="mt-8">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">{activeSection} proposal option</p>
+                  <div className="mt-10">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">{activeSection} package</p>
                     <div className="mt-4 rounded-lg border border-gray-200 p-5">
                       <div className="flex items-center justify-between">
-                        <p className="text-2xl font-bold text-blue-700">{activeSection} Roofing Package</p>
+                        <p className="text-xl font-semibold capitalize text-gray-800">{activeSection.toLowerCase()} Roofing Package</p>
                         {isPreviewing ? (
-                          <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
+                          <span className="rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">${normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price.toLocaleString()}</span>
                         ) : (
-                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; const newPrice = Number(event.target.value) || 0; const newPackages = { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: newPrice } }; setEditorForm({ ...editorForm, packages: newPackages, total: option === "best" ? String(newPrice) : editorForm.total }); }} className="w-32 rounded-full bg-blue-50 px-4 py-2 text-right text-sm font-bold text-blue-700 outline-none" />
+                          <input type="number" value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].price} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; const newPrice = Number(event.target.value) || 0; const newPackages = { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], price: newPrice } }; setEditorForm({ ...editorForm, packages: newPackages, total: option === "best" ? String(newPrice) : editorForm.total }); }} className="w-32 rounded-md border border-gray-200 px-3 py-2 text-right text-sm text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
                         )}
                       </div>
                       {isPreviewing ? (
-                        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-gray-700">{normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope}</p>
+                        <p className="mt-5 whitespace-pre-line text-sm leading-7 text-gray-600">{normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope}</p>
                       ) : (
-                        <textarea value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope} onChange={(event) => { const option = activeSection.toLowerCase() as "good" | "better" | "best"; setEditorForm({ ...editorForm, packages: { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], scope: event.target.value } } }); }} className="mt-5 min-h-64 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-700 outline-none" />
+                        <textarea value={normalizePackages(editorForm.packages)[activeSection.toLowerCase() as "good" | "better" | "best"].scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; const option = activeSection.toLowerCase() as "good" | "better" | "best"; setEditorForm({ ...editorForm, packages: { ...normalizePackages(editorForm.packages), [option]: { ...normalizePackages(editorForm.packages)[option], scope: event.target.value } } }); }} className="mt-5 min-h-[12rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
                       )}
                     </div>
                   </div>
                 )}
 
                 {(isPreviewing || activeSection === "Estimate" || activeSection === "Summary") && (
-                  <div className="mt-8 rounded-lg border border-blue-100 bg-blue-50 p-6">
-                    <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Total Summary</p>
+                  <div className="mt-10 rounded-lg border border-gray-200 bg-gray-50/60 p-6">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Total</p>
                     <div className="mt-3 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                       <div>
-                        {editorForm.showPackages && <p className="text-sm font-bold text-gray-600">Selected Package</p>}
-                        {editorForm.showPackages && <p className="mt-1 text-xl font-bold uppercase text-blue-700">{activeProposal.selectedOption || "best"}</p>}
-                        {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-gray-600">{editorForm.notes}</p>}
+                        {editorForm.showPackages && <p className="text-sm font-medium text-gray-500">Selected Package</p>}
+                        {editorForm.showPackages && <p className="mt-1 text-lg font-semibold capitalize text-gray-800">{activeProposal.selectedOption || "best"}</p>}
+                        {editorForm.notes && <p className="mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-gray-500">{editorForm.notes}</p>}
                       </div>
                       <div className="text-left md:text-right">
-                        <p className="text-sm font-bold text-gray-600">Total Price</p>
-                        <p className="mt-1 text-4xl font-bold text-blue-700">${(Number(editorForm.total) || 0).toLocaleString()}</p>
+                        <p className="text-sm font-medium text-gray-500">Total Price</p>
+                        <p className="mt-1 text-3xl font-semibold text-gray-800">${(Number(editorForm.total) || 0).toLocaleString()}</p>
                         {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
-                          <p className="mt-2 text-sm font-semibold text-gray-600">
+                          <p className="mt-2 text-sm text-gray-500">
                             Deposit Due: ${(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString()}
                             {editorForm.depositType === "percentage" && ` (${editorForm.depositValue}%)`}
                           </p>
@@ -2146,32 +2146,32 @@ export default function ProposalsPage() {
                 )}
 
                 {(isPreviewing || activeSection === "Terms and Conditions") && (
-                  <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
-                    <p className="text-2xl font-bold text-blue-700">Terms and Conditions</p>
+                  <div className="mt-10 rounded-lg border border-gray-100 bg-gray-50/60 p-6">
+                    <p className="text-base font-semibold text-gray-700">Terms and Conditions</p>
                     {isPreviewing ? (
-                      <div className="mt-5 max-h-[28rem] overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 text-sm leading-7 text-gray-700">
+                      <div className="mt-4 max-h-[28rem] overflow-y-auto rounded-md border border-gray-200 bg-white p-5 text-sm leading-7 text-gray-600">
                         {editorForm.terms.split("\n\n").map((section, index) => (
                           <p key={index} className="mb-4 whitespace-pre-line">{section}</p>
                         ))}
                       </div>
                     ) : (
-                      <textarea value={editorForm.terms} onChange={(event) => setEditorForm({ ...editorForm, terms: event.target.value })} className="mt-3 min-h-32 w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
+                      <textarea value={editorForm.terms} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, terms: event.target.value }); }} className="mt-3 min-h-[6rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
                     )}
                   </div>
                 )}
 
                 {editorBrochures.length > 0 && (isPreviewing || activeSection === "Terms and Conditions") && (
-                  <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-6">
-                    <p className="text-2xl font-bold text-blue-700">Product Brochure</p>
+                  <div className="mt-8 rounded-lg border border-gray-100 bg-gray-50/60 p-6">
+                    <p className="text-base font-semibold text-gray-700">Product Brochure</p>
                     <div className="mt-4 space-y-4">
                       {editorBrochures.map((file, index) => (
                         <div key={index}>
                           {file.type.startsWith("image/") ? (
                             <img src={file.dataUrl} alt={file.name} className="w-full rounded-lg" />
                           ) : (
-                            <div className="rounded-lg border border-gray-200 bg-white p-4">
-                              <p className="text-sm font-bold text-gray-700">{file.name}</p>
-                              <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm font-bold text-blue-600 hover:underline">Download {file.name}</a>
+                            <div className="rounded-md border border-gray-200 bg-white p-4">
+                              <p className="text-sm font-medium text-gray-700">{file.name}</p>
+                              <a href={file.dataUrl} download={file.name} className="mt-2 inline-block text-sm text-blue-600 hover:underline">Download {file.name}</a>
                             </div>
                           )}
                         </div>
