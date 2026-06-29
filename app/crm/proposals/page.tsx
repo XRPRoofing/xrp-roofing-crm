@@ -85,6 +85,8 @@ type Proposal = {
   declinedAt?: string;
   depositType?: "percentage" | "fixed";
   depositValue?: number;
+  depositDueDate?: string;
+  depositAddToFuture?: boolean;
   depositPaidAt?: string;
   depositPaidAmount?: number;
   depositPaymentMethod?: string;
@@ -494,6 +496,7 @@ export default function ProposalsPage() {
   const [activeSection, setActiveSection] = useState("Estimate");
   const [showSendModal, setShowSendModal] = useState(false);
   const [showOfflineSignModal, setShowOfflineSignModal] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
   const [offlineSignerName, setOfflineSignerName] = useState("");
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [typedSignature, setTypedSignature] = useState("");
@@ -616,6 +619,8 @@ export default function ProposalsPage() {
     packages: defaultPackages,
     depositType: "" as "" | "percentage" | "fixed",
     depositValue: "",
+    depositDueDate: "",
+    depositAddToFuture: false,
   });
 
   const [previewExpandedScopes, setPreviewExpandedScopes] = useState<Record<string, boolean>>({});
@@ -1168,6 +1173,8 @@ export default function ProposalsPage() {
       packages: normalizePackages(proposal.packages),
       depositType: proposal.depositType || "",
       depositValue: proposal.depositValue ? String(proposal.depositValue) : "",
+      depositDueDate: proposal.depositDueDate || "",
+      depositAddToFuture: proposal.depositAddToFuture || false,
     });
     setEditorBrochures(proposal.brochures || []);
     setIsPreviewing(false);
@@ -1221,6 +1228,8 @@ export default function ProposalsPage() {
       brochures: editorBrochures.length > 0 ? editorBrochures : undefined,
       depositType: editorForm.depositType || undefined,
       depositValue: Number(editorForm.depositValue) || undefined,
+      depositDueDate: editorForm.depositDueDate || undefined,
+      depositAddToFuture: editorForm.depositAddToFuture || undefined,
       updatedBy: currentUserName,
       ...extraFields,
     };
@@ -1831,25 +1840,20 @@ export default function ProposalsPage() {
                 <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
                 {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-bold normal-case tracking-normal text-blue-700">🔒 Locked at the signed amount</span>}
               </label>
-              {/* Deposit Request */}
+              {/* Deposit Request trigger */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Deposit Request</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <select value={editorForm.depositType} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, depositType: event.target.value as "" | "percentage" | "fixed" })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100">
-                    <option value="">No deposit</option>
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed amount ($)</option>
-                  </select>
-                  {editorForm.depositType && (
-                    <input type="number" value={editorForm.depositValue} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, depositValue: event.target.value })} placeholder={editorForm.depositType === "percentage" ? "e.g. 50" : "e.g. 2500"} className="w-32 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none disabled:cursor-not-allowed disabled:bg-gray-100" />
-                  )}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Deposit Request</p>
+                  <button type="button" onClick={() => { if (!editorForm.depositType) setEditorForm({ ...editorForm, depositType: "percentage" }); setShowDepositModal(true); }} disabled={isProposalLocked(activeProposal)} className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">{editorForm.depositType ? "Edit" : "Configure"}</button>
                 </div>
                 {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
-                  <p className="mt-2 text-xs font-semibold text-gray-600">
-                    Deposit: ${(editorForm.depositType === "percentage" ? (Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    {editorForm.depositType === "percentage" && ` (${editorForm.depositValue}% of $${Number(editorForm.total).toLocaleString()})`}
+                  <p className="mt-2 text-sm font-semibold text-gray-700">
+                    {editorForm.depositType === "percentage" ? `${editorForm.depositValue}%` : `$${Number(editorForm.depositValue).toLocaleString()}`} deposit
+                    {" "}= ${(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString()}
+                    {editorForm.depositDueDate && ` · Due ${editorForm.depositDueDate}`}
                   </p>
                 )}
+                {!editorForm.depositType && <p className="mt-2 text-xs text-gray-400">No deposit configured</p>}
                 {activeProposal?.depositPaidAt && (
                   <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
                 )}
@@ -2239,6 +2243,68 @@ export default function ProposalsPage() {
             </div>
           </div>
         )}
+        {/* Deposit Request Modal */}
+        {showDepositModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50">
+            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900">Deposit request</h2>
+                <button type="button" onClick={() => setShowDepositModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
+              </div>
+
+              {/* Estimate total */}
+              <div className="mt-5 flex items-center justify-between">
+                <span className="text-sm text-gray-600">Estimate total</span>
+                <span className="text-sm font-bold text-gray-900">${(Number(editorForm.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+
+              {/* Percent / Fixed tabs */}
+              <div className="mt-5 flex border-b border-gray-200">
+                <button type="button" onClick={() => setEditorForm({ ...editorForm, depositType: "percentage" })} className={`flex-1 pb-2 text-center text-sm font-bold transition ${editorForm.depositType === "percentage" ? "border-b-2 border-red-500 text-gray-900" : "text-gray-400 hover:text-gray-600"}`}>Percent (%)</button>
+                <button type="button" onClick={() => setEditorForm({ ...editorForm, depositType: "fixed" })} className={`flex-1 pb-2 text-center text-sm font-bold transition ${editorForm.depositType === "fixed" ? "border-b-2 border-red-500 text-gray-900" : "text-gray-400 hover:text-gray-600"}`}>Fixed ($)</button>
+              </div>
+
+              {/* Value input */}
+              <div className="mt-5 flex items-center justify-between">
+                <span className="text-sm text-gray-600">{editorForm.depositType === "fixed" ? "Set amount" : "Set percentage"}</span>
+                <input type="number" value={editorForm.depositValue} onChange={(event) => setEditorForm({ ...editorForm, depositValue: event.target.value })} placeholder={editorForm.depositType === "fixed" ? "0" : "0"} className="w-24 border-b border-gray-300 bg-transparent text-right text-sm font-bold text-gray-900 outline-none focus:border-gray-700" />
+              </div>
+
+              {/* Deposit amount (calculated) */}
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-gray-600">Deposit amount</span>
+                <span className="text-sm font-bold text-gray-900">{(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total || 0) * Number(editorForm.depositValue || 0) / 100) : Number(editorForm.depositValue || 0)).toLocaleString()}</span>
+              </div>
+
+              {/* Due date */}
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-gray-600">Due date</span>
+                <input type="date" value={editorForm.depositDueDate} onChange={(event) => setEditorForm({ ...editorForm, depositDueDate: event.target.value })} className="border-b border-gray-300 bg-transparent text-right text-sm font-bold text-gray-900 outline-none focus:border-gray-700" />
+              </div>
+
+              {/* Add to future estimates toggle */}
+              <button type="button" onClick={() => setEditorForm({ ...editorForm, depositAddToFuture: !editorForm.depositAddToFuture })} className="mt-5 flex cursor-pointer items-center gap-3">
+                <div className={`relative h-5 w-9 rounded-full transition ${editorForm.depositAddToFuture ? "bg-teal-500" : "bg-gray-300"}`}>
+                  <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${editorForm.depositAddToFuture ? "translate-x-4" : "translate-x-0.5"}`} />
+                </div>
+                <span className="text-sm text-gray-600">Setting: Add to future estimates</span>
+              </button>
+
+              {/* Deposit amount paid */}
+              <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
+                <span className="text-sm text-gray-600">Deposit amount paid</span>
+                <span className="text-sm font-bold text-gray-900">${(activeProposal?.depositPaidAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 flex items-center gap-4">
+                <button type="button" onClick={() => { saveActiveProposal(); setShowDepositModal(false); }} className="flex-1 rounded-lg bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700">Save</button>
+                <button type="button" onClick={() => { setEditorForm({ ...editorForm, depositType: "", depositValue: "", depositDueDate: "", depositAddToFuture: false }); saveActiveProposal({ depositType: undefined, depositValue: undefined, depositDueDate: undefined, depositAddToFuture: undefined }); setShowDepositModal(false); }} className="text-sm font-bold text-red-500 hover:text-red-700">Cancel this request</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showSendModal && (
           <div className="fixed inset-0 z-50 flex justify-end bg-gray-950/50">
             <div className="flex h-full w-full max-w-[530px] flex-col bg-white shadow-2xl">
