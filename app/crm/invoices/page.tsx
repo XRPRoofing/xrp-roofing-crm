@@ -10,7 +10,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedInvoices, refreshInvoices, getCachedCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -255,16 +255,34 @@ function normalizeProposalPackage(value?: string | ProposalPackageOption): Requi
   return { scope: value.scope || "Approved roofing scope of work", price: Number(value.price || 0) };
 }
 
-function readWonProposals() {
-  if (typeof window === "undefined") return [] as StoredProposal[];
+function readWonProposals(existingInvoices: Invoice[]) {
+  if (typeof window === "undefined") return [] as (StoredProposal & { hasInvoice: boolean })[];
 
   const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-  if (!savedProposals) return [] as StoredProposal[];
+  if (!savedProposals) return [] as (StoredProposal & { hasInvoice: boolean })[];
 
   try {
-    return (JSON.parse(savedProposals) as StoredProposal[]).filter((proposal) => proposal.status === "Won");
+    const proposals = JSON.parse(savedProposals) as StoredProposal[];
+    const crewData = getCachedCrewData();
+    const currentJobs = crewData?.jobs ?? [];
+    const invoicedProposalIds = new Set(existingInvoices.filter((inv) => inv.proposalReference).map((inv) => inv.proposalReference));
+
+    return proposals
+      .filter((proposal) => {
+        if (proposal.status !== "Won") return false;
+        const jobId = proposal.job?.id;
+        if (!jobId) return false;
+        const currentJob = currentJobs.find((j) => j.id === jobId);
+        const stage = currentJob?.stage ?? proposal.job?.stage;
+        return stage === "completed" || stage === "paid";
+      })
+      .map((proposal) => ({ ...proposal, hasInvoice: invoicedProposalIds.has(proposal.id) }))
+      .sort((a, b) => {
+        if (a.hasInvoice !== b.hasInvoice) return a.hasInvoice ? 1 : -1;
+        return (b.signedAt || "").localeCompare(a.signedAt || "");
+      });
   } catch {
-    return [] as StoredProposal[];
+    return [] as (StoredProposal & { hasInvoice: boolean })[];
   }
 }
 
@@ -641,7 +659,7 @@ export default function InvoicesPage() {
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [integrationNotice, setIntegrationNotice] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
-  const [wonProposals, setWonProposals] = useState<StoredProposal[]>(() => readWonProposals());
+  const [wonProposals, setWonProposals] = useState<(StoredProposal & { hasInvoice: boolean })[]>([]);
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
   const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
@@ -1118,7 +1136,7 @@ export default function InvoicesPage() {
   }
 
   function handleStartInvoice() {
-    setWonProposals(readWonProposals());
+    setWonProposals(readWonProposals(invoices));
     setCreateForm(createBlankInvoice(invoices.length));
     setShowCreateModal(true);
   }
@@ -2242,7 +2260,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Signed Proposal or Job <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
+                <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Completed Job <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
                 <select 
                   value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
                   onChange={(event) => handlePrefillFromJob(event.target.value)} 
@@ -2250,13 +2268,13 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 >
                   <option value="">— No proposal (legacy / direct invoice) —</option>
                   {wonProposals.length === 0 ? (
-                    <option value="" disabled>No signed proposals or jobs available</option>
+                    <option value="" disabled>No completed jobs available</option>
                   ) : (
                     wonProposals.map((proposal) => {
                       const pkg = getProposalSelectedPackage(proposal);
                       return (
-                        <option key={proposal.id} value={`proposal:${proposal.id}`}>
-                          {proposal.customerName} • {proposal.title || pkg.scope.substring(0, 30)}... • {currency(pkg.price)}
+                        <option key={proposal.id} value={`proposal:${proposal.id}`} disabled={proposal.hasInvoice}>
+                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.proposalNumber ? `#${proposal.proposalNumber}` : "Won"} • {currency(pkg.price)}{proposal.hasInvoice ? " (invoiced)" : ""}
                         </option>
                       );
                     })
@@ -2264,7 +2282,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 </select>
                 {wonProposals.length === 0 && (
                   <p className="mt-2 text-xs text-gray-500">
-                    No signed proposals or jobs available — you can still create a direct invoice below.
+                    No completed jobs with signed proposals available — you can still create a direct invoice below.
                   </p>
                 )}
               </div>
