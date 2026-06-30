@@ -29,6 +29,7 @@ import type { Customer } from "@/types/crm";
 
 const navigation = [
   { href: "/crm", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
+  { href: "/crm/phone", label: "Phone", shortLabel: "Phone", icon: Phone },
   { href: "/crm/tasks", label: "Tasks", shortLabel: "Tasks", icon: ClipboardList },
   { href: "/crm/conversations", label: "Conversation board", shortLabel: "Messages", icon: MessageSquareText },
   { href: "/crm/team-chat", label: "Team Chat", shortLabel: "Chat", icon: MessageCircle },
