@@ -123,7 +123,7 @@ export function AiWriteButton({
       <button
         type="button"
         onClick={handleClick}
-        className={`inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-100 active:scale-95 ${
+        className={`inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 active:scale-95 ${
           size === "sm" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"
         } ${className}`}
         title="AI Writing Assistant"
@@ -228,7 +228,7 @@ function AiWritingModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-600" />
+            <Sparkles className="h-5 w-5 text-blue-600" />
             <h2 className="text-sm font-bold text-gray-900">AI Writing Assistant</h2>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
@@ -261,7 +261,7 @@ function AiWritingModal({
                       type="button"
                       disabled={loading}
                       onClick={() => runAction(action.instruction)}
-                      className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50"
+                      className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-semibold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
                     >
                       {action.label}
                     </button>
@@ -286,14 +286,14 @@ function AiWritingModal({
                   }
                 }}
                 placeholder='e.g. "Translate to Spanish" or "Make this more persuasive"'
-                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none transition focus:border-purple-300 focus:bg-white"
+                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none transition focus:border-blue-300 focus:bg-white"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={handleCustomSubmit}
                 disabled={loading || !customPrompt.trim()}
-                className="shrink-0 rounded-lg bg-purple-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-purple-700 disabled:opacity-50"
+                className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -302,9 +302,9 @@ function AiWritingModal({
 
           {/* Loading indicator */}
           {loading && (
-            <div className="flex items-center gap-2 rounded-lg border border-purple-100 bg-purple-50 px-4 py-3">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-300 border-t-purple-600" />
-              <span className="text-sm font-semibold text-purple-700">Generating...</span>
+            <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+              <span className="text-sm font-semibold text-blue-700">Generating...</span>
             </div>
           )}
 
@@ -326,8 +326,8 @@ function AiWritingModal({
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-purple-500">AI Generated</p>
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-gray-800 whitespace-pre-wrap">
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-blue-500">AI Generated</p>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-gray-800 whitespace-pre-wrap">
                     {result}
                   </div>
                 </div>
@@ -338,7 +338,7 @@ function AiWritingModal({
                 <button
                   type="button"
                   onClick={() => onReplace(result)}
-                  className="rounded-lg bg-purple-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-purple-700"
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
                 >
                   <Wand2 className="mr-1 inline h-3.5 w-3.5" />
                   Replace Original
@@ -347,7 +347,7 @@ function AiWritingModal({
                   <button
                     type="button"
                     onClick={() => onInsert(result)}
-                    className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 transition hover:bg-purple-100"
+                    className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                   >
                     Insert Below
                   </button>
