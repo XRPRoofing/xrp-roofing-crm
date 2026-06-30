@@ -946,7 +946,8 @@ export default function LeadsPage() {
     const unsubscribe = subscribeToCrewData(() => {
       void refreshCrewData().then((data) => {
         if (mounted) {
-          setJobs(data.jobs.map(normalizeJob));
+          const pending = pendingUpdatesRef.current;
+          setJobs(data.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
           setJobNotes(data.notes);
         }
       }).catch(() => {});
@@ -956,7 +957,11 @@ export default function LeadsPage() {
     });
     function onCrewCache() {
       const cached = getCachedCrewData();
-      if (cached && mounted) { setJobs(cached.jobs.map(normalizeJob)); setJobNotes(cached.notes); }
+      if (cached && mounted) {
+        const pending = pendingUpdatesRef.current;
+        setJobs(cached.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
+        setJobNotes(cached.notes);
+      }
     }
     window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     return () => {
@@ -968,7 +973,8 @@ export default function LeadsPage() {
 
   useAutoRefresh(() => {
     void refreshCrewData().then((data) => {
-      setJobs(data.jobs.map(normalizeJob));
+      const pending = pendingUpdatesRef.current;
+      setJobs(data.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
       setJobNotes(data.notes);
     }).catch(() => {});
     void refreshProposals<ProposalSnap>().then((proposals) => {
