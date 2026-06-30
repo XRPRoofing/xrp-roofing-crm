@@ -184,6 +184,7 @@ type JobRow = {
   completion_notes: string;
   materials_used: string;
   submitted_at: string | null;
+  created_at?: string;
 };
 
 function toStringArray(value: unknown): string[] {
@@ -215,6 +216,7 @@ function rowToJobRecord(row: JobRow): JobRecord {
     lastActivity: row.last_activity,
     nextAction: row.next_action,
     dueDate: row.due_date,
+    createdAt: row.created_at || undefined,
     status: (row.status as CrewJobStatus) || "Assigned",
     assignedCrew: cleanAssignedCrewMembers(toStringArray(row.assigned_crew)),
     scheduleDate: row.schedule_date,
@@ -442,10 +444,10 @@ export async function updateJobRecord(jobId: string, patch: Partial<JobRecord>):
   const keyMap: Record<keyof JobRecord, string> = {
     id: "id", name: "name", email: "email", phone: "phone", address: "address", city: "city",
     stage: "stage", value: "value", assignedTo: "assigned_to", roofType: "roof_type", source: "source",
-    lastActivity: "last_activity", nextAction: "next_action", dueDate: "due_date", status: "status",
-    assignedCrew: "assigned_crew", scheduleDate: "schedule_date", jobScope: "job_scope", jobNotes: "job_notes",
-    completionNotes: "completion_notes", materialsUsed: "materials_used", submittedAt: "submitted_at",
-    inspectionDate: "inspection_date", roofYear: "roof_year", callNotes: "call_notes",
+    lastActivity: "last_activity", nextAction: "next_action", dueDate: "due_date", createdAt: "created_at",
+    status: "status", assignedCrew: "assigned_crew", scheduleDate: "schedule_date", jobScope: "job_scope",
+    jobNotes: "job_notes", completionNotes: "completion_notes", materialsUsed: "materials_used",
+    submittedAt: "submitted_at", inspectionDate: "inspection_date", roofYear: "roof_year", callNotes: "call_notes",
   };
   (Object.keys(patch) as (keyof JobRecord)[]).forEach((key) => {
     const column = keyMap[key];
