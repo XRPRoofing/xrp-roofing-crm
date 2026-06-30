@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Briefcase, CheckSquare, ChevronDown, ChevronRight, Clock, ClipboardList, Filter, Plus, RefreshCw, Star, ThumbsDown, ThumbsUp, Trash2, X, Zap } from "lucide-react";
+import { Archive, Briefcase, CheckSquare, ChevronDown, ChevronRight, Clock, ClipboardList, Filter, MessageSquare, Plus, RefreshCw, Settings, Star, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import {
   addTaskTimelineEntry,
   archiveOfficeTask,
@@ -20,6 +20,10 @@ import {
 import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates, upsertTaskToSupabase } from "@/lib/task-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { sendSms } from "@/lib/twilio/client";
+import { getCachedCrewData } from "@/lib/data-cache";
+import { readAutomationSettings, updateAutomation } from "@/lib/automation-settings";
+import { getTwilioLines } from "@/lib/twilio/numbers";
 
 function fmt(iso: string) {
   if (!iso) return "";
@@ -178,13 +182,81 @@ export default function TasksPage() {
     setSatNotes("");
   }
 
+  // Review Request SMS modal state
+  const [reviewModal, setReviewModal] = useState<OfficeTask | null>(null);
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewPhone, setReviewPhone] = useState("");
+  const [reviewSending, setReviewSending] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSent, setReviewSent] = useState(false);
+  const [showReviewSettings, setShowReviewSettings] = useState(false);
+  const [reviewTemplate, setReviewTemplate] = useState("");
+
+  function getCustomerPhone(task: OfficeTask): string {
+    const crewData = getCachedCrewData();
+    if (!crewData) return "";
+    const job = crewData.jobs.find((j) => j.id === task.jobId);
+    return job?.phone || "";
+  }
+
+  function buildReviewMessage(task: OfficeTask): string {
+    const settings = readAutomationSettings();
+    const template = settings.reviewRequestAfterCompletion.template;
+    return template
+      .replace(/\{customerName\}/g, task.customerName)
+      .replace(/\{address\}/g, task.jobAddress)
+      .replace(/\{reviewLink\}/g, "https://g.page/r/xrproofing/review")
+      .replace(/\{companyName\}/g, "XRP Roofing");
+  }
+
+  function openReviewModal(task: OfficeTask) {
+    const phone = getCustomerPhone(task);
+    setReviewModal(task);
+    setReviewPhone(phone);
+    setReviewMessage(buildReviewMessage(task));
+    setReviewSending(false);
+    setReviewError("");
+    setReviewSent(false);
+  }
+
+  async function sendReviewRequest() {
+    if (!reviewModal || !reviewMessage.trim() || !reviewPhone) return;
+    setReviewSending(true);
+    setReviewError("");
+    try {
+      const lines = getTwilioLines();
+      const fromNumber = lines[0]?.number || "";
+      await sendSms({ to: reviewPhone, body: reviewMessage.trim(), from: fromNumber, jobId: reviewModal.jobId });
+      recordReviewRequestSent(reviewModal.id, true, false);
+      addTaskTimelineEntry(reviewModal.id, "Review Request SMS Sent", reviewMessage.trim().slice(0, 80), "Office");
+      void logCrewActivity({ jobId: reviewModal.jobId || reviewModal.id, jobName: reviewModal.customerName, actor: "Office", action: "Review Request SMS Sent", details: `Sent to ${reviewPhone}`, module: "Jobs" }).catch(() => {});
+      setReviewSent(true);
+      setTasks(readOfficeTasks());
+      setTimeout(() => { setReviewModal(null); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString(), reviewSmsSent: true } : null); }, 1200);
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : "Failed to send SMS");
+    } finally {
+      setReviewSending(false);
+    }
+  }
+
+  function openReviewSettings() {
+    const settings = readAutomationSettings();
+    setReviewTemplate(settings.reviewRequestAfterCompletion.template);
+    setShowReviewSettings(true);
+  }
+
+  function saveReviewTemplate() {
+    updateAutomation("reviewRequestAfterCompletion", { template: reviewTemplate });
+    setShowReviewSettings(false);
+  }
+
   function submitSatisfaction() {
     if (!satModal || !satResult) return;
     recordCustomerSatisfaction(satModal.id, satResult === "yes", satNotes);
     void logCrewActivity({ jobId: satModal.jobId || satModal.id, jobName: satModal.customerName, actor: "Office", action: `Satisfaction: ${satResult === "yes" ? "Satisfied" : "Not Satisfied"}`, details: satNotes || (satResult === "yes" ? "Customer is satisfied" : "Customer is not satisfied"), module: "Jobs" }).catch(() => {});
     if (satResult === "yes") {
-      recordReviewRequestSent(satModal.id, true, true);
-      addTaskTimelineEntry(satModal.id, "Review Request Sent via SMS + Email", undefined, "System");
+      openReviewModal(satModal);
     }
     setSatModal(null);
     setTasks(readOfficeTasks());
@@ -440,8 +512,8 @@ export default function TasksPage() {
                       </button>
                     )}
                     {status === "Review Request" && !task.reviewRequestSentAt && !task.isManual && (
-                      <button type="button" onClick={(e) => { e.stopPropagation(); recordReviewRequestSent(task.id, true, true); addTaskTimelineEntry(task.id, "Review Request Sent (SMS + Email)", undefined, "Office"); setTasks(readOfficeTasks()); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
-                        <Zap className="mr-1 inline h-3 w-3" />Send Review Request
+                      <button type="button" onClick={(e) => { e.stopPropagation(); openReviewModal(task); }} className="mt-2 w-full rounded-lg bg-blue-600 py-1 text-[11px] font-bold text-white hover:bg-blue-700">
+                        <MessageSquare className="mr-1 inline h-3 w-3" />Send Review Request
                       </button>
                     )}
                   </article>
@@ -548,8 +620,8 @@ export default function TasksPage() {
 
             {/* Review request CTA */}
             {selectedTask.status === "Review Request" && !selectedTask.reviewRequestSentAt && !selectedTask.isManual && (
-              <button type="button" onClick={() => { recordReviewRequestSent(selectedTask.id, true, true); addTaskTimelineEntry(selectedTask.id, "Review Request Sent (SMS + Email)", undefined, "Office"); setTasks(readOfficeTasks()); setSelectedTask((prev) => prev ? { ...prev, reviewRequestSentAt: new Date().toISOString() } : null); }} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
-                <Zap className="mr-2 inline h-4 w-4" />Send Review Request (SMS + Email)
+              <button type="button" onClick={() => { openReviewModal(selectedTask); }} className="mt-4 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-700">
+                <MessageSquare className="mr-2 inline h-4 w-4" />Send Review Request SMS
               </button>
             )}
 
@@ -682,10 +754,10 @@ export default function TasksPage() {
 
             {satResult === "yes" && (
               <div className="mt-3 rounded-lg bg-blue-50 p-3 text-xs font-semibold text-blue-700">
-                <p className="font-bold">Will automatically:</p>
+                <p className="font-bold">Next steps:</p>
                 <p className="mt-1">• Move to Review Request</p>
-                <p>• Send Google Review SMS + Email</p>
-                <p>• Log timeline entry</p>
+                <p>• Open Review Request SMS for your confirmation</p>
+                <p>• You can edit the message before sending</p>
               </div>
             )}
             {satResult === "no" && (
@@ -725,6 +797,134 @@ export default function TasksPage() {
             <div className="mt-5 flex gap-3">
               <button onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50">Cancel</button>
               <button onClick={confirmDeleteTask} className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95">Delete Permanently</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Review Request SMS Modal ── */}
+      {reviewModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setReviewModal(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Review Request SMS</p>
+                  <p className="text-xs text-gray-500">To: {reviewModal.customerName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={openReviewSettings} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Template Settings">
+                  <Settings className="h-4 w-4" />
+                </button>
+                <button onClick={() => setReviewModal(null)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="space-y-4 px-5 py-4">
+              {/* Phone */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Recipient Phone</label>
+                <input type="tel" value={reviewPhone} onChange={(e) => setReviewPhone(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400" placeholder="Customer phone number" />
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Message</label>
+                <textarea value={reviewMessage} onChange={(e) => setReviewMessage(e.target.value)} rows={5} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none" placeholder="Review request message..." />
+                <p className="mt-1 text-[11px] text-gray-400">{reviewMessage.length} characters</p>
+              </div>
+
+              {/* Template variables hint */}
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-1">Template Variables</p>
+                <p className="text-xs text-gray-500">{"{customerName}"} · {"{reviewLink}"} · {"{companyName}"} · {"{address}"}</p>
+              </div>
+
+              {/* Error */}
+              {reviewError && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{reviewError}</div>
+              )}
+
+              {/* Success */}
+              {reviewSent && (
+                <div className="rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700">SMS sent successfully! This message will appear in the Conversation Board.</div>
+              )}
+
+              {/* Warning if no phone */}
+              {!reviewPhone && (
+                <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">No phone number found for this customer. Please enter a number above.</div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 border-t border-gray-100 px-5 py-4">
+              <button type="button" onClick={() => setReviewModal(null)} className="flex-1 rounded-lg border border-gray-200 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" disabled={reviewSending || !reviewMessage.trim() || !reviewPhone || reviewSent} onClick={() => { void sendReviewRequest(); }} className="flex-1 rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                {reviewSending ? "Sending..." : "Confirm & Send SMS"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Review Request Settings Modal ── */}
+      {showReviewSettings && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowReviewSettings(false)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <Settings className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Review Request Settings</p>
+                  <p className="text-xs text-gray-500">Customize the default SMS template</p>
+                </div>
+              </div>
+              <button onClick={() => setShowReviewSettings(false)} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="space-y-4 px-5 py-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Default SMS Template</label>
+                <textarea value={reviewTemplate} onChange={(e) => setReviewTemplate(e.target.value)} rows={5} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none" />
+                <p className="mt-1 text-[11px] text-gray-400">{reviewTemplate.length} characters · Changes apply to future review requests only</p>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-xs font-bold text-blue-700 mb-1">Available Variables</p>
+                <div className="grid grid-cols-2 gap-1 text-xs text-blue-600">
+                  <span><code className="rounded bg-blue-100 px-1">{"{customerName}"}</code> — Customer name</span>
+                  <span><code className="rounded bg-blue-100 px-1">{"{reviewLink}"}</code> — Google review URL</span>
+                  <span><code className="rounded bg-blue-100 px-1">{"{companyName}"}</code> — Company name</span>
+                  <span><code className="rounded bg-blue-100 px-1">{"{address}"}</code> — Job address</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs font-bold text-gray-500 mb-1">Preview</p>
+                <p className="text-sm text-gray-700">{reviewTemplate.replace(/\{customerName\}/g, "John Smith").replace(/\{reviewLink\}/g, "https://g.page/r/xrproofing/review").replace(/\{companyName\}/g, "XRP Roofing").replace(/\{address\}/g, "123 Main St")}</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 border-t border-gray-100 px-5 py-4">
+              <button type="button" onClick={() => setShowReviewSettings(false)} className="flex-1 rounded-lg border border-gray-200 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={saveReviewTemplate} className="flex-1 rounded-lg bg-blue-600 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
+                Save Template
+              </button>
             </div>
           </div>
         </div>
