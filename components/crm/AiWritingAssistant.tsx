@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Sparkles, X, RotateCcw, Copy, Check, ChevronDown, ChevronRight, Wand2, Send } from "lucide-react";
+import { useAiChatSafe } from "./AiChatContext";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,13 +99,30 @@ export function AiWriteButton({
   className = "",
   size = "sm",
 }: AiWriteButtonProps) {
+  const chatCtx = useAiChatSafe();
   const [open, setOpen] = useState(false);
+
+  const handleClick = useCallback(() => {
+    if (chatCtx) {
+      // Open the global floating AI Assistant with this field's context
+      chatCtx.setPendingFieldContext({
+        text: getText(),
+        fieldLabel: context,
+        onReplace,
+        onInsert,
+      });
+      chatCtx.openChat();
+    } else {
+      // Fallback: open modal if context is not available
+      setOpen(true);
+    }
+  }, [chatCtx, getText, context, onReplace, onInsert]);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className={`inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 font-bold text-purple-700 transition hover:border-purple-300 hover:bg-purple-100 active:scale-95 ${
           size === "sm" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs"
         } ${className}`}
@@ -114,7 +132,7 @@ export function AiWriteButton({
         AI Assist
       </button>
 
-      {open && (
+      {open && !chatCtx && (
         <AiWritingModal
           initialText={getText()}
           context={context}

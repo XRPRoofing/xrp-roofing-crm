@@ -15,6 +15,8 @@ import { PhoneLink } from "@/components/ContactLinks";
 import { azDateTime } from "@/lib/arizona-time";
 import FloatingCallCard, { type CallerInfo } from "@/components/crm/FloatingCallCard";
 import FloatingDialer from "@/components/crm/FloatingDialer";
+import { AiChatProvider } from "@/components/crm/AiChatContext";
+import { AiFloatingButton, AiChatPanel } from "@/components/crm/AiChatAssistant";
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
@@ -768,6 +770,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <AiChatProvider>
     <div className="flex min-h-screen min-h-[100dvh] overflow-x-hidden bg-gray-50">
       {/* Floating Call Card — ringing */}
       {globalIncomingCall && !isCrewUser && (
@@ -1165,6 +1168,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+      {/* Global AI Assistant */}
+      <AiFloatingButton />
+      <AiChatPanel />
     </div>
+    </AiChatProvider>
   );
 }
