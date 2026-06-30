@@ -145,7 +145,7 @@ export function AiFloatingButton() {
     <button
       type="button"
       onClick={isMinimized ? maximizeChat : openChat}
-      className="fixed bottom-20 right-6 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-all hover:bg-purple-700 hover:scale-105 active:scale-95"
+      className="fixed bottom-20 right-6 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95"
       title="AI Assistant"
     >
       <Sparkles className="h-5 w-5" />
@@ -364,10 +364,10 @@ export function AiChatPanel() {
       >
         <div className="flex items-center gap-2">
           <GripHorizontal className="h-3.5 w-3.5 text-gray-300" />
-          <Sparkles className="h-4 w-4 text-purple-600" />
+          <Sparkles className="h-4 w-4 text-blue-600" />
           <h2 className="text-sm font-bold text-gray-900">AI Assistant</h2>
           {activeFieldContext && (
-            <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700">
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
               {activeFieldContext.fieldLabel || "Field loaded"}
             </span>
           )}
@@ -390,18 +390,18 @@ export function AiChatPanel() {
 
       {/* Pending field context confirmation */}
       {pendingFieldContext && (
-        <div className="shrink-0 border-b border-purple-100 bg-purple-50 px-4 py-3">
-          <p className="mb-2 text-xs font-semibold text-purple-800">
+        <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-4 py-3">
+          <p className="mb-2 text-xs font-semibold text-blue-800">
             Share &ldquo;{pendingFieldContext.fieldLabel || "Current text"}&rdquo; with AI Assistant?
           </p>
-          <p className="mb-2 line-clamp-2 text-xs text-purple-700 opacity-80">
+          <p className="mb-2 line-clamp-2 text-xs text-blue-700 opacity-80">
             {pendingFieldContext.text.slice(0, 120)}{pendingFieldContext.text.length > 120 ? "..." : ""}
           </p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={confirmFieldContext}
-              className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-purple-700"
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700"
             >
               Use Current Text
             </button>
@@ -420,7 +420,7 @@ export function AiChatPanel() {
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {messages.length === 0 && !pendingFieldContext && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Sparkles className="mb-3 h-8 w-8 text-purple-300" />
+            <Sparkles className="mb-3 h-8 w-8 text-blue-300" />
             <p className="text-sm font-semibold text-gray-600">AI Writing Assistant</p>
             <p className="mt-1 text-xs text-gray-400">
               Ask me to help write proposals, emails, SMS messages, or improve any text.
@@ -428,7 +428,7 @@ export function AiChatPanel() {
             <button
               type="button"
               onClick={() => setShowActions(!showActions)}
-              className="mt-3 rounded-md border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 transition hover:bg-purple-100"
+              className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
             >
               Quick Actions
             </button>
@@ -440,7 +440,7 @@ export function AiChatPanel() {
             <div
               className={`max-w-[85%] rounded-lg px-3 py-2 ${
                 msg.role === "user"
-                  ? "bg-purple-600 text-white"
+                  ? "bg-blue-600 text-white"
                   : "border border-gray-100 bg-gray-50 text-gray-800"
               }`}
             >
@@ -455,7 +455,7 @@ export function AiChatPanel() {
                     <button
                       type="button"
                       onClick={() => handleReplace(msg.content)}
-                      className="rounded bg-purple-600 px-2 py-1 text-[10px] font-bold text-white transition hover:bg-purple-700"
+                      className="rounded bg-blue-600 px-2 py-1 text-[10px] font-bold text-white transition hover:bg-blue-700"
                     >
                       <Wand2 className="mr-0.5 inline h-3 w-3" /> Replace
                     </button>
@@ -464,7 +464,7 @@ export function AiChatPanel() {
                     <button
                       type="button"
                       onClick={() => handleInsertBelow(msg.content)}
-                      className="rounded border border-purple-200 bg-purple-50 px-2 py-1 text-[10px] font-bold text-purple-700 transition hover:bg-purple-100"
+                      className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 transition hover:bg-blue-100"
                     >
                       Insert Below
                     </button>
@@ -495,9 +495,9 @@ export function AiChatPanel() {
         {/* Loading indicator */}
         {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-lg border border-purple-100 bg-purple-50 px-3 py-2">
-              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-purple-300 border-t-purple-600" />
-              <span className="text-xs font-semibold text-purple-700">Thinking...</span>
+            <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+              <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600" />
+              <span className="text-xs font-semibold text-blue-700">Thinking...</span>
             </div>
           </div>
         )}
@@ -533,7 +533,7 @@ export function AiChatPanel() {
                       type="button"
                       disabled={loading}
                       onClick={() => handleActionClick(action.instruction)}
-                      className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-semibold text-gray-700 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50"
+                      className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-semibold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
                     >
                       {action.label}
                     </button>
@@ -551,7 +551,7 @@ export function AiChatPanel() {
           <button
             type="button"
             onClick={() => setShowActions(!showActions)}
-            className={`shrink-0 rounded-lg p-2 transition ${showActions ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
+            className={`shrink-0 rounded-lg p-2 transition ${showActions ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
             title="Quick actions"
           >
             <FileText className="h-4 w-4" />
@@ -568,14 +568,14 @@ export function AiChatPanel() {
               }
             }}
             placeholder={activeFieldContext ? "Ask about the loaded text..." : "Type your request..."}
-            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none transition focus:border-purple-300 focus:bg-white"
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none transition focus:border-blue-300 focus:bg-white"
             disabled={loading}
           />
           <button
             type="button"
             onClick={handleSubmit}
             disabled={loading || !input.trim()}
-            className="shrink-0 rounded-lg bg-purple-600 p-2 text-white transition hover:bg-purple-700 disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-blue-600 p-2 text-white transition hover:bg-blue-700 disabled:opacity-50"
             title="Send"
           >
             <Send className="h-4 w-4" />
