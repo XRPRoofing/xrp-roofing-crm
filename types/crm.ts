@@ -22,6 +22,7 @@ export interface Lead {
   inspectionDate?: string;
   roofYear?: string;
   callNotes?: string;
+  createdAt?: string;
 }
 
 export interface Customer {

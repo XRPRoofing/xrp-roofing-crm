@@ -135,6 +135,18 @@ function formatDueDate(value?: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatJobAge(createdAt?: string): string | null {
+  if (!createdAt) return null;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return null;
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0) return "Added Today";
+  if (days === 1) return "Added 1 day ago";
+  return `Added ${days} days ago`;
+}
+
 const LEAD_SOURCES = ["AZR", "Google", "Facebook", "Website", "Referral", "Partner Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Phone Call", "Other"] as const;
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -1446,6 +1458,7 @@ export default function LeadsPage() {
                     const urgency = getUrgency(job);
                     const pStatus = proposalStatusMap[job.id];
                     const iStatus = invoiceStatusMap[job.id];
+                    const ageLabel = formatJobAge(job.createdAt);
                     return (
                       <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2.5 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
                         <div className="flex items-center justify-between gap-1">
@@ -1470,6 +1483,9 @@ export default function LeadsPage() {
                             )}
                           </div>
                         </div>
+                        {ageLabel && (
+                          <p className="mt-1 flex items-center gap-1 text-[10px] leading-tight text-gray-400"><Clock className="h-3 w-3" />{ageLabel}</p>
+                        )}
                       </button>
                     );
                   })}
