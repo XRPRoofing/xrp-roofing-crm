@@ -27,7 +27,7 @@ import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type Cre
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 
-type ProposalSnap = { id: string; job?: { id?: string }; status: string; deletedAt?: string };
+type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
 
 type InvoiceSnap = {
   id: string;
@@ -719,14 +719,24 @@ export default function LeadsPage() {
     }
   }
 
-  // One-click from a Job to its Estimate editor: open the linked estimate if one
-  // exists, otherwise create one from the job and open it (linked by job id).
-  // Prefers the shared data cache (synced across devices) over localStorage.
+  // Pick the most relevant proposal for a job: prefer non-Draft over Draft,
+  // and among same-priority pick the latest (last in array).
+  function getMostRelevantProposal(jobId: string): ProposalSnap | undefined {
+    const cached = getCachedProposals<ProposalSnap>();
+    const proposals = cached ?? [];
+    const linked = proposals.filter((p) => p.job?.id === jobId && !p.deletedAt);
+    if (linked.length === 0) return undefined;
+    const nonDraft = linked.filter((p) => p.status !== "Draft");
+    if (nonDraft.length > 0) return nonDraft[nonDraft.length - 1];
+    return linked[linked.length - 1];
+  }
+
+  // One-click from a Job to its Estimate editor: open the most relevant linked
+  // estimate if one exists, otherwise create one from the job and open it.
+  // Prefers non-Draft proposals, then latest. Uses shared data cache.
   function openEstimateForJob(job: Lead) {
-    const cached = getCachedProposals<{ id: string; job?: { id?: string } }>();
-    const proposals = cached ?? readStored<{ id: string; job?: { id?: string } }>("xrp-crm-proposals");
-    const existing = proposals.find((proposal) => proposal?.job?.id === job.id);
-    if (existing) requestOpenEstimate(existing.id);
+    const best = getMostRelevantProposal(job.id);
+    if (best) requestOpenEstimate(best.id);
     else requestCreateEstimate(jobToBoardPayload(job));
     openBoardFromJob("/crm/proposals");
   }
@@ -757,11 +767,12 @@ export default function LeadsPage() {
     return invoices.filter((inv) => inv.jobReference === jobId && !inv.isDeleted);
   }
 
-  // Get unlinked proposals (not connected to any job)
-  function getUnlinkedProposals(): (ProposalSnap & { customerName?: string; address?: string; total?: number })[] {
-    const cached = getCachedProposals<ProposalSnap & { customerName?: string; address?: string; total?: number }>();
+  // Get all linkable proposals for the picker (excludes deleted; includes
+  // already-linked proposals so users can reassign them to a different job).
+  function getAllLinkableProposals(currentJobId: string): ProposalSnap[] {
+    const cached = getCachedProposals<ProposalSnap>();
     const proposals = cached ?? [];
-    return proposals.filter((p) => !p.job?.id && !p.deletedAt);
+    return proposals.filter((p) => !p.deletedAt && p.job?.id !== currentJobId);
   }
 
   // Get unlinked invoices (not connected to any job)
@@ -782,8 +793,38 @@ export default function LeadsPage() {
     setShowLinkPicker(null);
     void refreshProposals<ProposalSnap>().then((proposals) => {
       const map: Record<string, string> = {};
+      const seen: Record<string, ProposalSnap | undefined> = {};
       for (const p of proposals) {
-        if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
+        if (!p.deletedAt && p.job?.id) {
+          const prev2 = seen[p.job.id];
+          if (!prev2 || (prev2.status === "Draft" && p.status !== "Draft")) {
+            seen[p.job.id] = p;
+            map[p.job.id] = p.status;
+          }
+        }
+      }
+      setProposalStatusMap(map);
+    }).catch(() => {});
+  }
+
+  // Unlink a proposal from its job (remove the job reference)
+  function unlinkProposalFromJob(proposalId: string, jobId: string) {
+    const cached = getCachedProposals<ProposalSnap & Record<string, unknown>>();
+    const proposal = cached?.find((p) => p.id === proposalId);
+    if (!proposal) return;
+    const updated = { ...proposal, job: undefined };
+    void upsertProposalRecord(updated as { id: string } & Record<string, unknown>).catch(() => {});
+    void refreshProposals<ProposalSnap>().then((proposals) => {
+      const map: Record<string, string> = {};
+      const seen: Record<string, ProposalSnap | undefined> = {};
+      for (const p of proposals) {
+        if (!p.deletedAt && p.job?.id) {
+          const prev2 = seen[p.job.id];
+          if (!prev2 || (prev2.status === "Draft" && p.status !== "Draft")) {
+            seen[p.job.id] = p;
+            map[p.job.id] = p.status;
+          }
+        }
       }
       setProposalStatusMap(map);
     }).catch(() => {});
@@ -928,8 +969,15 @@ export default function LeadsPage() {
     let mounted = true;
     function buildMap(proposals: ProposalSnap[]) {
       const map: Record<string, string> = {};
+      const seen: Record<string, ProposalSnap | undefined> = {};
       for (const p of proposals) {
-        if (!p.deletedAt && p.job?.id) map[p.job.id] = p.status;
+        if (!p.deletedAt && p.job?.id) {
+          const prev = seen[p.job.id];
+          if (!prev || (prev.status === "Draft" && p.status !== "Draft") || (prev.status === "Draft" && p.status === "Draft")) {
+            seen[p.job.id] = p;
+            map[p.job.id] = p.status;
+          }
+        }
       }
       if (mounted) setProposalStatusMap(map);
     }
@@ -1573,13 +1621,21 @@ export default function LeadsPage() {
                       return linked.length > 0 ? (
                         <div className="space-y-2">
                           {linked.map((p) => (
-                            <button key={p.id} type="button" onClick={() => { requestOpenEstimate(p.id); openBoardFromJob("/crm/proposals"); }} className="flex w-full items-center justify-between rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-left transition hover:bg-purple-100">
-                              <div className="flex items-center gap-2">
-                                <DollarSign className="h-4 w-4 text-purple-600" />
-                                <span className="text-sm font-bold text-purple-800">Estimate</span>
-                              </div>
-                              <span className="rounded-full bg-purple-200 px-2 py-0.5 text-xs font-bold text-purple-700">{p.status}</span>
-                            </button>
+                            <div key={p.id} className="flex items-center gap-1">
+                              <button type="button" onClick={() => { requestOpenEstimate(p.id); openBoardFromJob("/crm/proposals"); }} className="flex flex-1 items-center justify-between rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-left transition hover:bg-purple-100">
+                                <div className="flex items-center gap-2">
+                                  <DollarSign className="h-4 w-4 text-purple-600" />
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-purple-800">{p.customerName || "Estimate"}{p.proposalNumber ? ` #${p.proposalNumber}` : ""}</span>
+                                    {p.address && <span className="text-[11px] text-purple-600 truncate max-w-[200px]">{p.address}</span>}
+                                  </div>
+                                </div>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${getProposalStatusStyle(p.status)}`}>{p.status}</span>
+                              </button>
+                              <button type="button" onClick={() => unlinkProposalFromJob(p.id, selectedJob.id)} className="shrink-0 rounded-lg border border-gray-200 p-1.5 text-gray-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500" title="Unlink estimate">
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       ) : null;
@@ -1630,18 +1686,22 @@ export default function LeadsPage() {
 
                     {/* Link picker dropdown */}
                     {showLinkPicker === "proposal" && (() => {
-                      const unlinked = getUnlinkedProposals();
+                      const linkable = getAllLinkableProposals(selectedJob.id);
                       return (
                         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-blue-600">Select an estimate to link</p>
-                          {unlinked.length === 0 ? (
-                            <p className="text-xs text-gray-500">No unlinked estimates found.</p>
+                          {linkable.length === 0 ? (
+                            <p className="text-xs text-gray-500">No estimates available to link.</p>
                           ) : (
-                            <div className="max-h-40 space-y-1 overflow-y-auto">
-                              {unlinked.map((p) => (
+                            <div className="max-h-48 space-y-1 overflow-y-auto">
+                              {linkable.map((p) => (
                                 <button key={p.id} type="button" onClick={() => linkProposalToJob(p.id, selectedJob.id)} className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left transition hover:bg-blue-100">
-                                  <span className="text-sm font-semibold text-gray-700">{p.customerName || p.id}</span>
-                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{p.status}</span>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-semibold text-gray-700 truncate">{p.customerName || "Untitled"}{p.proposalNumber ? ` #${p.proposalNumber}` : ""}</span>
+                                    {p.address && <span className="text-[11px] text-gray-500 truncate">{p.address}</span>}
+                                    {p.job?.id && <span className="text-[10px] text-amber-600">Currently linked to another job</span>}
+                                  </div>
+                                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${getProposalStatusStyle(p.status)}`}>{p.status}</span>
                                 </button>
                               ))}
                             </div>
