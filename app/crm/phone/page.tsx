@@ -25,6 +25,7 @@ interface CallRecord {
   callSid: string;
   disposition?: string;
   customerId?: string;
+  tag?: "Forwarded" | "Unknown Caller";
 }
 
 interface ContactRecord {
@@ -78,8 +79,33 @@ function getCallStatusLabel(event: TwilioConversationEvent): string {
   if (s === "failed") return "Failed";
   if (s === "canceled" || s === "cancelled") return "Canceled";
   if (s === "ringing" || s === "queued" || s === "initiated") return "Ringing";
+  if (s === "forwarded" || s === "forward") return "Forwarded";
   if (event.type === "incoming_call" && !event.status) return "Answered";
   return event.status || "Unknown";
+}
+
+function isForwardedCall(event: TwilioConversationEvent): boolean {
+  const s = event.status?.toLowerCase() || "";
+  if (s === "forwarded" || s === "forward") return true;
+  const payload = event.payload || {};
+  if (typeof payload.ForwardedFrom === "string" && payload.ForwardedFrom) return true;
+  if (typeof payload.forwardedFrom === "string" && payload.forwardedFrom) return true;
+  if (typeof payload.Direction === "string" && payload.Direction.toLowerCase().includes("forward")) return true;
+  return false;
+}
+
+function formatPhoneDisplay(phone: string): string {
+  if (!phone) return "";
+  // Strip country code and format as (XXX) XXX-XXXX for US numbers
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  // Return original with + prefix for international
+  return phone.startsWith("+") ? phone : `+${phone}`;
 }
 
 function getStatusColor(status: string): string {
@@ -192,9 +218,29 @@ export default function PhonePage() {
             ? payload.duration
             : 0;
 
+      // Determine display name and tag
+      const forwarded = isForwardedCall(event);
+      let displayName: string;
+      let tag: CallRecord["tag"];
+
+      if (forwarded && !customer && !phone) {
+        displayName = "Forwarded Call";
+        tag = "Forwarded";
+      } else if (forwarded) {
+        displayName = customer?.name || (phone ? formatPhoneDisplay(phone) : "Forwarded Call");
+        tag = "Forwarded";
+      } else if (customer?.name) {
+        displayName = customer.name;
+      } else if (phone) {
+        displayName = formatPhoneDisplay(phone);
+      } else {
+        displayName = "Unknown Caller";
+        tag = "Unknown Caller";
+      }
+
       records.push({
         id: event.id,
-        customerName: customer?.name || (payload.CallerName ? String(payload.CallerName) : phone || "Unknown"),
+        customerName: displayName,
         phone,
         direction: event.direction || "inbound",
         status: getCallStatusLabel(event),
@@ -204,6 +250,7 @@ export default function PhonePage() {
         callSid: event.callSid || "",
         disposition: dispositions[phone] || undefined,
         customerId: customer?.id,
+        tag,
       });
     }
 
@@ -460,8 +507,16 @@ export default function PhonePage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
-                    <p className="text-xs text-gray-500">{call.phone}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
+                      {call.tag === "Forwarded" && (
+                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-purple-50 text-purple-600">Forwarded</span>
+                      )}
+                      {call.tag === "Unknown Caller" && (
+                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-gray-100 text-gray-500">Unknown Caller</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500">{call.phone ? formatPhoneDisplay(call.phone) : "No number"}</p>
                   </div>
 
                   {/* Status */}
