@@ -26,6 +26,7 @@ import type { Customer } from "@/types/crm";
 import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
+import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
 
@@ -1352,10 +1353,10 @@ export default function LeadsPage() {
                     <span className="text-xs font-bold text-gray-500">Next Action</span>
                     <input value={form.nextAction} onChange={(e) => setForm({ ...form, nextAction: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. Schedule inspection" />
                   </label>
-                  <label className="grid gap-1 sm:col-span-2">
-                    <span className="text-xs font-bold text-gray-500">Notes</span>
+                  <div className="grid gap-1 sm:col-span-2">
+                    <div className="flex items-center justify-between"><span className="text-xs font-bold text-gray-500">Notes</span><AiWriteButton getText={() => form.lastActivity} onReplace={(t) => setForm({ ...form, lastActivity: t })} context="job notes for a roofing lead" /></div>
                     <textarea value={form.lastActivity} onChange={(e) => setForm({ ...form, lastActivity: e.target.value })} rows={2} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white resize-none" placeholder="Any additional notes..." />
-                  </label>
+                  </div>
                   {form.callNotes && (
                     <label className="grid gap-1 sm:col-span-2">
                       <span className="text-xs font-bold text-gray-500">Call Notes</span>
@@ -1806,6 +1807,7 @@ export default function LeadsPage() {
                 )}
                 <div className="mt-3 flex gap-2">
                   <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddJobNote(); } }} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note..." />
+                  <AiWriteButton getText={() => noteDraft} onReplace={(t) => setNoteDraft(t)} context="job note for a roofing project" />
                   <button type="button" onClick={() => void handleAddJobNote()} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700">Save</button>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-500"><Clock className="h-4 w-4" /><CalendarDays className="h-4 w-4" />Next: {selectedJob.nextAction || "Review job"} • Due {formatDueDate(selectedJob.dueDate)}</div>
