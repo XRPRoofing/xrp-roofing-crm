@@ -205,9 +205,17 @@ export default function PhonePage() {
 
     const records: CallRecord[] = [];
     for (const [, event] of callMap) {
-      const phone = event.direction === "inbound" ? (event.from || "") : (event.to || "");
-      const customer = matchCustomerByPhone(phone, phoneLookup);
+      // Extract phone from multiple sources — never show "Unknown Caller" if any number exists
       const payload = event.payload || {};
+      let phone = event.direction === "inbound" ? (event.from || "") : (event.to || "");
+      if (!phone) {
+        phone = (typeof payload.From === "string" ? payload.From : "")
+          || (typeof payload.To === "string" ? payload.To : "")
+          || (typeof payload.Caller === "string" ? payload.Caller : "")
+          || (typeof payload.Called === "string" ? payload.Called : "")
+          || (event.from || event.to || "");
+      }
+      const customer = matchCustomerByPhone(phone, phoneLookup);
       const duration = typeof payload.CallDuration === "number"
         ? payload.CallDuration
         : typeof payload.Duration === "number"
