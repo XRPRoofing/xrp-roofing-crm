@@ -1125,7 +1125,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
       {/* Team Chat FAB */}
       {showTeamChatFloatingButton && (
-        <Link href="/crm/team-chat" className={`fixed right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3 ${mobileBottomNav.length > 0 ? "bottom-[72px] lg:bottom-6" : "bottom-6"}`}>
+        <Link href="/crm/team-chat" className={`fixed right-6 z-50 hidden h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 hover:shadow-xl sm:flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-lg sm:px-4 sm:py-3 ${mobileBottomNav.length > 0 ? "bottom-[72px] lg:bottom-6" : "bottom-6"}`}>
           <span className="relative">
             <MessageCircle className="h-5 w-5" />
             {unreadTeamChatCount > 0 && <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">{unreadTeamChatCount}</span>}
