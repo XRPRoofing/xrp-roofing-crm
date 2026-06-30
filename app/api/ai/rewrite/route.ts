@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface ChatMsg {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -9,18 +14,100 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let text: string;
-  let instruction: string;
-  let context: string | undefined;
-
+  let body: Record<string, unknown>;
   try {
-    const body = await req.json();
-    text = body.text;
-    instruction = body.instruction;
-    context = body.context;
+    body = (await req.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
+
+  const mode = (body.mode as string) || "rewrite";
+
+  // -------------------------------------------------------------------------
+  // Chat mode — conversational AI assistant
+  // -------------------------------------------------------------------------
+  if (mode === "chat") {
+    const chatMessages = body.messages as ChatMsg[] | undefined;
+    const userMessage = body.message as string | undefined;
+
+    if (!userMessage && (!chatMessages || chatMessages.length === 0)) {
+      return NextResponse.json(
+        { error: "A 'message' or 'messages' array is required for chat mode" },
+        { status: 400 },
+      );
+    }
+
+    const chatSystemPrompt = [
+      "You are a helpful AI assistant for XRP Roofing, a roofing company based in Arizona.",
+      "You help office staff with writing proposals, emails, SMS messages, notes, and answering questions about roofing.",
+      "Be conversational, helpful, and professional.",
+      "If the user provides text from a CRM field, help them improve it, answer questions about it, or generate new content based on it.",
+      "Use roofing terminology accurately when relevant.",
+      "Format responses with markdown when helpful (bold, lists, paragraphs).",
+      "Keep responses concise but thorough.",
+    ].join("\n");
+
+    const messages: ChatMsg[] = [{ role: "system", content: chatSystemPrompt }];
+
+    if (chatMessages && chatMessages.length > 0) {
+      // Include conversation history (limit to last 20 messages for token budget)
+      const recent = chatMessages.slice(-20);
+      for (const m of recent) {
+        if (m.role === "user" || m.role === "assistant") {
+          messages.push({ role: m.role, content: m.content });
+        }
+      }
+    }
+
+    if (userMessage) {
+      messages.push({ role: "user", content: userMessage });
+    }
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          temperature: 0.7,
+          max_tokens: 2048,
+          messages,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("[AI Chat] OpenAI error:", response.status, errText);
+        return NextResponse.json(
+          { error: "AI service unavailable" },
+          { status: 502 },
+        );
+      }
+
+      const data = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const result = data.choices?.[0]?.message?.content?.trim() || "";
+
+      return NextResponse.json({ result });
+    } catch (err) {
+      console.error("[AI Chat] Unexpected error:", err);
+      return NextResponse.json(
+        { error: "Failed to process AI request" },
+        { status: 500 },
+      );
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Rewrite mode (default) — existing behavior unchanged
+  // -------------------------------------------------------------------------
+  const text = body.text as string;
+  const instruction = body.instruction as string;
+  const context = body.context as string | undefined;
 
   if (!text || !instruction) {
     return NextResponse.json(
