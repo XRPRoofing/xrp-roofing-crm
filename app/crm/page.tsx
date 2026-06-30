@@ -82,27 +82,24 @@ function formatUsd(v: number) {
 export default function CrmDashboardPage() {
   const router = useRouter();
 
-  const [jobs,      setJobs]      = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
-  const [proposals, setProposals] = useState<ProposalSnap[]>(() => (getCachedProposals<ProposalSnap>() ?? []).filter((p) => !p.deletedAt));
-  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>(() => getCachedInvoices<InvoiceSnap>() ?? []);
-  const [customers, setCustomers] = useState<{ id: string; createdAt?: string }[]>(() => getCachedCustomers<{ id: string; createdAt?: string }>() ?? []);
+  const [jobs,      setJobs]      = useState<Lead[]>([]);
+  const [proposals, setProposals] = useState<ProposalSnap[]>([]);
+  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>([]);
+  const [, setCustomers] = useState<{ id: string; createdAt?: string }[]>([]);
   const [events,    setEvents]    = useState<TwilioConversationEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [syncDot,   setSyncDot]   = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    void refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {});
-    void refreshInvoices<InvoiceSnap>().then((data) => {
-      if (mounted) setInvoices(data);
-    }).catch(() => {});
-    void refreshProposals<ProposalSnap>().then((data) => {
-      if (mounted) setProposals(data.filter((p) => !p.deletedAt));
-    }).catch(() => {});
-    void refreshCustomers<{ id: string; createdAt?: string }>().then((data) => {
-      if (mounted) setCustomers(data);
-    }).catch(() => {});
+    Promise.all([
+      refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {}),
+      refreshInvoices<InvoiceSnap>().then((data) => { if (mounted) setInvoices(data); }).catch(() => {}),
+      refreshProposals<ProposalSnap>().then((data) => { if (mounted) setProposals(data.filter((p) => !p.deletedAt)); }).catch(() => {}),
+      refreshCustomers<{ id: string; createdAt?: string }>().then((data) => { if (mounted) setCustomers(data); }).catch(() => {}),
+    ]).finally(() => { if (mounted) setInitialLoading(false); });
     void listConversationEvents(2000).then((data) => {
       if (mounted) { setEvents(data); setEventsLoading(false); }
     }).catch(() => { if (mounted) setEventsLoading(false); });
@@ -328,6 +325,16 @@ export default function CrmDashboardPage() {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-100 text-orange-600"><Zap className="h-3.5 w-3.5" /></span>
           <h2 className="text-sm font-bold text-gray-900">Today&apos;s Priorities</h2>
         </div>
+        {initialLoading ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {[1,2,3,4,5].map((i) => (
+              <div key={i} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2">
+                <div className="h-4 w-4 animate-pulse rounded bg-gray-200" />
+                <div className="flex-1"><div className="h-5 w-8 animate-pulse rounded bg-gray-200" /><div className="mt-1 h-2.5 w-14 animate-pulse rounded bg-gray-100" /></div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <button type="button" onClick={() => router.push("/crm/leads")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
             <UserPlus className="h-4 w-4 shrink-0 text-red-500" />
@@ -365,9 +372,20 @@ export default function CrmDashboardPage() {
             </div>
           </button>
         </div>
+        )}
       </section>
 
       {/* ── KPI Row (6 cards) ────────────────────────────────────────── */}
+      {initialLoading ? (
+        <section className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
+          {[1,2,3,4,5,6].map((i) => (
+            <div key={i} className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+              <div className="h-2.5 w-14 animate-pulse rounded bg-gray-100" />
+              <div className="mt-2 h-6 w-10 animate-pulse rounded bg-gray-200" />
+            </div>
+          ))}
+        </section>
+      ) : (
       <section className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
         <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
           <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Total Jobs</p>
@@ -394,6 +412,7 @@ export default function CrmDashboardPage() {
           <p className={`mt-0.5 text-xl font-bold ${outstandingBalance > 0 ? "text-orange-600" : "text-gray-900"}`}>{outstandingBalance > 0 ? formatUsd(outstandingBalance) : "$0"}</p>
         </div>
       </section>
+      )}
 
       {/* ── Communications (Calls + Messages merged) ─────────────── */}
       <section className="rounded-xl border border-gray-200 bg-white shadow-sm">

@@ -444,9 +444,9 @@ export default function ProposalsPage() {
   }, []);
 
   const [proposalMode, setProposalMode] = useState<"job" | "new">("job");
-  const [jobs, setJobs] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
+  const [jobs, setJobs] = useState<Lead[]>([]);
   const [selectedJobId, setSelectedJobId] = useState("");
-  const [proposals, setProposals] = useState<Proposal[]>(() => getCachedProposals<Proposal>()?.filter((p) => !p.deletedAt) ?? []);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const prevProposalsRef = useRef<Proposal[]>([]);
   const permanentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const locallyDeletedIdsRef = useRef<Set<string>>(new Set());
@@ -3023,7 +3023,15 @@ export default function ProposalsPage() {
           </div>
         ))}
         {filteredProposals.length === 0 && !dataLoaded && (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">Loading proposals…</div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[1,2,3,4,5,6].map((i) => (
+              <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
+                <div className="mt-2 h-3 w-48 animate-pulse rounded bg-gray-100" />
+                <div className="mt-3 h-6 w-20 animate-pulse rounded bg-blue-100" />
+              </div>
+            ))}
+          </div>
         )}
         {filteredProposals.length === 0 && dataLoaded && (
           <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">No proposals match your search.</div>

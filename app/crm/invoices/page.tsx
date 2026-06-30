@@ -627,12 +627,8 @@ function MobileInvoiceList({
 
 export default function InvoicesPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    // Always start with cached data for instant display, then upgrade from Supabase.
-    const cached = readStoredInvoices();
-    if (cached && cached.length > 0) return cached;
-    return hasSupabaseConfig() ? [] : initialInvoices;
-  });
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -883,21 +879,9 @@ export default function InvoicesPage() {
 
 
 
-  // Show cached data instantly, then refresh from Supabase in background
+  // Fetch fresh invoice data before rendering the board.
   useEffect(() => {
     let mounted = true;
-
-    const cached = getCachedInvoices<Invoice>();
-    if (cached && cached.length > 0) {
-      setInvoices(cached);
-    }
-
-    // Initialize unified counter from existing invoice numbers
-    const allInvoices = cached || readStoredInvoices() || invoices;
-    const existingNums = allInvoices
-      .map((inv) => parseUnifiedNumber(inv.invoiceNumber))
-      .filter((n) => !Number.isNaN(n));
-    if (existingNums.length) ensureCounterAtLeast(Math.max(...existingNums) + 1);
 
     async function init() {
       if (hasSupabaseConfig()) {
@@ -906,14 +890,19 @@ export default function InvoicesPage() {
           setInvoices(remoteInvoices);
         }
       } else {
-        // No Supabase: load from localStorage
+        // No Supabase: load from localStorage or fall back to seed data
         const saved = readStoredInvoices();
-        if (saved && mounted) setInvoices(saved);
+        if (mounted) setInvoices(saved && saved.length > 0 ? saved : initialInvoices);
       }
+      // Initialize unified counter from existing invoice numbers
+      const allInvoices = getCachedInvoices<Invoice>() || readStoredInvoices() || [];
+      const existingNums = allInvoices
+        .map((inv) => parseUnifiedNumber(inv.invoiceNumber))
+        .filter((n) => !Number.isNaN(n));
+      if (existingNums.length) ensureCounterAtLeast(Math.max(...existingNums) + 1);
     }
-    void init();
+    void init().finally(() => { if (mounted) setInitialLoading(false); });
     return () => { mounted = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-refresh: when user returns to tab, sync from Supabase (primary source)
@@ -1952,6 +1941,27 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       </div>
 
       {/* ── Desktop: Column board view ── */}
+      {initialLoading ? (
+        <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1,2,3].map((i) => (
+            <section key={i} className="flex flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b p-3 sm:p-4 bg-gray-50">
+                <div><div className="h-4 w-20 animate-pulse rounded bg-gray-200" /><div className="mt-1 h-3 w-14 animate-pulse rounded bg-gray-100" /></div>
+                <div className="h-5 w-16 animate-pulse rounded-full bg-gray-100" />
+              </div>
+              <div className="flex-1 space-y-3 p-3 sm:p-4">
+                {[1,2,3].map((j) => (
+                  <div key={j} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                    <div className="h-4 w-28 animate-pulse rounded bg-gray-200" />
+                    <div className="mt-2 h-3 w-36 animate-pulse rounded bg-gray-100" />
+                    <div className="mt-2 h-5 w-20 animate-pulse rounded bg-blue-100" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
       <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(boardGroups) as Array<keyof typeof boardGroups>).map((stage) => {
           const invoicesInStage = boardGroups[stage];
@@ -2015,6 +2025,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           );
         })}
       </div>
+      )}
 
       {selectedInvoice && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-gray-950/40 p-2 sm:p-4">
