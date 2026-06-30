@@ -186,9 +186,9 @@
     max-width: 100% !important;
   }
 
-  /* Page setup */
+  /* Page setup — tight margins to maximize usable area */
   @page {
-    margin: 0.75in;
+    margin: 0.25in 0.35in;
     size: letter;
   }
 
@@ -204,7 +204,7 @@
     break-inside: auto;
   }
 
-  /* Remove max-height scroll constraints so T&C prints in full */
+  /* Remove max-height scroll constraints so all content prints in full */
   #proposal-print-area [class*="max-h-"] {
     max-height: none !important;
     overflow: visible !important;
@@ -215,57 +215,319 @@
     box-shadow: none !important;
   }
 
-  /* Hide interactive buttons in print */
+  /* Hide interactive buttons / expand toggles in print */
   #proposal-print-area button[class*="Select This"],
   #proposal-print-area button[class*="Selected Option"],
   #proposal-print-area button[class*="Accept"][class*="Sign"] {
     display: none !important;
   }
 
-  /* Package cards: compact styling, no internal breaks */
-  #proposal-print-area .rounded-3xl.border.p-5 {
-    padding: 0.75rem !important;
-    font-size: 0.8rem !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
+  /* ── Global spacing reduction ── */
+
+  /* Reduce the outer padding of the proposal body */
+  #proposal-print-area main {
+    padding: 0 !important;
+  }
+  #proposal-print-area main > div {
+    max-width: none !important;
   }
 
-  #proposal-print-area .rounded-3xl.border.p-5 ul {
+  /* Proposal card: remove decorative chrome, reduce inner padding */
+  #proposal-print-area main > div > div {
+    min-height: 0 !important;
+    padding: 0.1in 0.15in !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Tighten vertical gaps between proposal sections */
+  #proposal-print-area .mt-10 {
+    margin-top: 0.35rem !important;
+  }
+  #proposal-print-area .mt-12 {
+    margin-top: 0.4rem !important;
+  }
+  #proposal-print-area .mt-8 {
     margin-top: 0.25rem !important;
   }
+  #proposal-print-area .space-y-6 > * + * {
+    margin-top: 0.3rem !important;
+  }
+  #proposal-print-area .my-10 {
+    margin-top: 0.3rem !important;
+    margin-bottom: 0.3rem !important;
+  }
 
-  #proposal-print-area .rounded-3xl.border.p-5 li {
+  /* ── Client / Company info block ── */
+  #proposal-print-area .grid.gap-6.rounded-lg.border.border-gray-100 {
+    padding: 0.4rem 0.5rem !important;
+    gap: 0.3rem !important;
+  }
+  #proposal-print-area .grid.gap-6.rounded-lg.border.border-gray-100 p {
+    margin-top: 0.1rem !important;
     font-size: 0.75rem !important;
+    line-height: 1.35 !important;
+  }
+  #proposal-print-area .grid.gap-6.rounded-lg.border.border-gray-100 .text-lg {
+    font-size: 0.8rem !important;
+  }
+
+  /* ── Cover section ── */
+  #proposal-print-area .rounded-lg.bg-gray-50\/80.p-8.text-center {
+    padding: 0.25rem !important;
+  }
+  #proposal-print-area .rounded-lg.bg-gray-50\/80.p-8.text-center img {
+    max-height: 2.2rem !important;
+    margin-top: 0.1rem !important;
+  }
+  #proposal-print-area .rounded-lg.bg-gray-50\/80.p-8.text-center .text-2xl {
+    font-size: 0.85rem !important;
+    margin-top: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-lg.bg-gray-50\/80.p-8.text-center .text-base {
+    margin-top: 0.1rem !important;
+    font-size: 0.65rem !important;
+  }
+
+  /* ── Prepared-for / Summary grid ── */
+  #proposal-print-area .grid.gap-6 .rounded-lg.bg-gray-50\/80.p-5 {
+    padding: 0.3rem 0.5rem !important;
+  }
+  #proposal-print-area .grid.gap-6 .rounded-lg.bg-gray-50\/80.p-5 p {
+    font-size: 0.72rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* ── Scope of work ── */
+  #proposal-print-area .border-y.border-gray-200.py-6 {
+    padding-top: 0.3rem !important;
+    padding-bottom: 0.3rem !important;
+  }
+  #proposal-print-area .border-y.border-gray-200.py-6 p {
+    font-size: 0.72rem !important;
     line-height: 1.4 !important;
-    gap: 0.25rem !important;
   }
 
-  #proposal-print-area .rounded-3xl.border.p-5 li svg {
-    width: 0.75rem !important;
-    height: 0.75rem !important;
+  /* ── Inspection photos — hide empty placeholders in print ── */
+  #proposal-print-area .grid.gap-4.md\:grid-cols-2 .rounded-lg.border.border-dashed {
+    padding: 0.15rem !important;
+  }
+  #proposal-print-area .grid.gap-4.md\:grid-cols-2 .rounded-lg.border.border-dashed .min-h-40 {
+    min-height: 0 !important;
+    height: 0 !important;
+    display: none !important;
+  }
+  #proposal-print-area .grid.gap-4.md\:grid-cols-2 .rounded-lg.border.border-dashed img {
+    max-height: 5rem !important;
+  }
+  #proposal-print-area .grid.gap-4.md\:grid-cols-2 {
+    gap: 0.15rem !important;
+  }
+  /* Hide the entire inspection photos section heading + grid when no images */
+  #proposal-print-area .grid.gap-4.md\:grid-cols-2 .rounded-lg.border.border-dashed:not(:has(img)) {
+    display: none !important;
   }
 
-  /* Terms section: allow flowing across pages, compact text */
-  #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 {
-    break-inside: auto;
-    page-break-inside: auto;
-    padding: 1rem !important;
-  }
-
-  #proposal-print-area .rounded-3xl.border.border-slate-200.bg-slate-50 .rounded-2xl {
-    break-inside: auto;
-    page-break-inside: auto;
-    max-height: none !important;
-    overflow: visible !important;
-    font-size: 0.7rem !important;
-    line-height: 1.5 !important;
-    padding: 0.75rem !important;
-  }
-
-  /* Signature section: keep together on one page */
-  #proposal-print-area .rounded-3xl.border.border-slate-200.p-6:last-of-type {
+  /* ── Package cards (CRM preview): compact styling, no internal breaks ── */
+  #proposal-print-area .rounded-lg.border.p-5 {
+    padding: 0.35rem 0.4rem !important;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 .text-lg {
+    font-size: 0.75rem !important;
+    margin-top: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 .text-xl {
+    font-size: 0.85rem !important;
+    margin-top: 0.2rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 ul {
+    margin-top: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 li {
+    font-size: 0.65rem !important;
+    line-height: 1.25 !important;
+    gap: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 li svg {
+    width: 0.55rem !important;
+    height: 0.55rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 .mt-5 {
+    margin-top: 0.2rem !important;
+  }
+  #proposal-print-area .rounded-lg.border.p-5 .mt-1\.5 {
+    font-size: 0.6rem !important;
+    margin-top: 0.1rem !important;
+  }
+
+  /* ── Package cards (public proposal view — rounded-2xl variant) ── */
+  #proposal-print-area .rounded-2xl.border-2.p-5 {
+    padding: 0.35rem 0.4rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  #proposal-print-area .rounded-2xl.border-2.p-5 .text-3xl {
+    font-size: 0.85rem !important;
+    margin-top: 0.2rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border-2.p-5 ul {
+    margin-top: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border-2.p-5 li {
+    font-size: 0.65rem !important;
+    line-height: 1.25 !important;
+    gap: 0.15rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border-2.p-5 li svg {
+    width: 0.55rem !important;
+    height: 0.55rem !important;
+  }
+
+  /* ── Total / selection section ── */
+  #proposal-print-area .rounded-lg.border.border-gray-200.bg-gray-50\/60.p-6,
+  #proposal-print-area .rounded-2xl.border.border-blue-100.bg-blue-50.p-5 {
+    padding: 0.3rem 0.5rem !important;
+  }
+  #proposal-print-area .text-3xl {
+    font-size: 1rem !important;
+  }
+  #proposal-print-area .text-4xl {
+    font-size: 1.1rem !important;
+  }
+
+  /* ── Terms & Conditions section — 2-column layout for compactness ── */
+  #proposal-print-area .rounded-lg.border.border-gray-100 {
+    padding: 0.3rem 0.4rem !important;
+  }
+  #proposal-print-area .rounded-md.border.border-gray-200.bg-white.p-5 {
+    padding: 0.2rem 0.3rem !important;
+    max-height: none !important;
+    overflow: visible !important;
+    font-size: 0.45rem !important;
+    line-height: 1.25 !important;
+    columns: 2 !important;
+    column-gap: 0.5rem !important;
+  }
+  #proposal-print-area .rounded-md.border.border-gray-200.bg-white.p-5 p {
+    margin-bottom: 0.08rem !important;
+    break-inside: avoid !important;
+  }
+
+  /* Terms — public proposal view (collapsible section) */
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white .border-t.border-slate-200 {
+    max-height: none !important;
+    overflow: visible !important;
+    font-size: 0.5rem !important;
+    line-height: 1.3 !important;
+    padding: 0.3rem 0.4rem !important;
+    columns: 2 !important;
+    column-gap: 0.6rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white .border-t.border-slate-200 p {
+    margin-bottom: 0.1rem !important;
+    break-inside: avoid !important;
+  }
+
+  /* ── Signature block ── */
+  #proposal-print-area .border-t.border-gray-300.pt-8 {
+    padding-top: 0.3rem !important;
+    margin-top: 0.4rem !important;
+  }
+  #proposal-print-area .border-t.border-gray-300.pt-8 .min-h-\[60px\] {
+    min-height: 28px !important;
+  }
+  #proposal-print-area .border-t.border-gray-300.pt-8 .mt-10 {
+    margin-top: 0.3rem !important;
+  }
+  #proposal-print-area .border-t.border-gray-300.pt-8 .mt-8 {
+    margin-top: 0.25rem !important;
+  }
+  #proposal-print-area .border-t.border-gray-300.pt-8 img {
+    max-height: 32px !important;
+  }
+
+  /* ── Footer ── */
+  #proposal-print-area .border-t.border-gray-300.pt-4 {
+    margin-top: 0.3rem !important;
+    padding-top: 0.2rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  /* ── Deposit summary ── */
+  #proposal-print-area .rounded-lg.border.border-gray-200.bg-gray-50.p-4 {
+    padding: 0.4rem 0.6rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* ── Brochure section ── */
+  #proposal-print-area .rounded-lg.border.border-gray-100.bg-gray-50\/60.p-6 img {
+    max-height: 12rem !important;
+    object-fit: contain !important;
+  }
+
+  /* ── Public proposal header ── */
+  #proposal-print-area header {
+    padding: 0.5rem 0.75rem !important;
+  }
+  #proposal-print-area header h1 {
+    font-size: 1rem !important;
+  }
+  #proposal-print-area header .h-11 {
+    height: 1.75rem !important;
+    width: 1.75rem !important;
+  }
+  /* Public proposal — prepared-for strip */
+  #proposal-print-area .grid.gap-4.border-b.border-slate-200.bg-slate-50 {
+    padding: 0.4rem 0.75rem !important;
+    gap: 0.25rem !important;
+  }
+  #proposal-print-area .grid.gap-4.border-b.border-slate-200.bg-slate-50 .text-lg {
+    font-size: 0.85rem !important;
+    margin-top: 0.15rem !important;
+  }
+  /* Public proposal — content spacing */
+  #proposal-print-area .space-y-6.p-4 {
+    padding: 0.5rem 0.75rem !important;
+  }
+  #proposal-print-area .space-y-6.p-4 > * + * {
+    margin-top: 0.6rem !important;
+  }
+  /* Public proposal — project summary card */
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white.p-4 {
+    padding: 0.4rem 0.6rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white.p-4 h2 {
+    font-size: 0.8rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white.p-4 h3 {
+    margin-top: 0.4rem !important;
+    font-size: 0.65rem !important;
+  }
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white.p-4 p {
+    font-size: 0.72rem !important;
+    line-height: 1.45 !important;
+  }
+
+  /* Ensure the terms toggle renders expanded in print */
+  #proposal-print-area .rounded-2xl.border.border-slate-200.bg-white > button {
+    display: none !important;
+  }
+
+  /* Signature section (public view): keep together */
+  #proposal-print-area .bg-white.px-6.py-8 {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Decline section: compact */
+  #proposal-print-area .rounded-2xl.border.border-red-200 {
+    padding: 0.5rem !important;
+  }
+
+  /* Hide gradient fade overlays that obscure scope text */
+  #proposal-print-area .pointer-events-none.absolute {
+    display: none !important;
   }
 }
 
