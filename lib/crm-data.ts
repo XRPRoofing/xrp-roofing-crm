@@ -6,7 +6,6 @@ export const leadStages: { id: LeadStage; label: string }[] = [
   { id: "inspection_complete", label: "Inspection Complete" },
   { id: "estimate_sent", label: "Estimate Sent" },
   { id: "follow_up", label: "Follow Up" },
-  { id: "waiting_approval", label: "Waiting Approval" },
   { id: "approved", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "in_progress", label: "In Progress" },
