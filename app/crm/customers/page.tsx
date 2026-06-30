@@ -45,9 +45,9 @@ function readRawLocalCustomers(): Customer[] {
 function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   return jobs.filter((job) =>
     customer.id === `C-${job.id}` ||
-    job.email === customer.email ||
-    job.phone === customer.phone ||
-    job.name.toLowerCase() === customer.name.toLowerCase()
+    (customer.email && job.email && job.email === customer.email) ||
+    (customer.phone && job.phone && job.phone === customer.phone) ||
+    (customer.name && job.name && job.name.toLowerCase() === customer.name.toLowerCase())
   );
 }
 
