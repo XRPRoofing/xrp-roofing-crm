@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildCrmAssistantPrompt } from "@/lib/ai-crm-knowledge";
 
 interface ChatMsg {
   role: "user" | "assistant" | "system";
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   if (mode === "chat") {
     const chatMessages = body.messages as ChatMsg[] | undefined;
     const userMessage = body.message as string | undefined;
+    const currentPage = body.currentPage as string | undefined;
 
     if (!userMessage && (!chatMessages || chatMessages.length === 0)) {
       return NextResponse.json(
@@ -37,15 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const chatSystemPrompt = [
-      "You are a helpful AI assistant for XRP Roofing, a roofing company based in Arizona.",
-      "You help office staff with writing proposals, emails, SMS messages, notes, and answering questions about roofing.",
-      "Be conversational, helpful, and professional.",
-      "If the user provides text from a CRM field, help them improve it, answer questions about it, or generate new content based on it.",
-      "Use roofing terminology accurately when relevant.",
-      "Format responses with markdown when helpful (bold, lists, paragraphs).",
-      "Keep responses concise but thorough.",
-    ].join("\n");
+    const chatSystemPrompt = buildCrmAssistantPrompt(currentPage);
 
     const messages: ChatMsg[] = [{ role: "system", content: chatSystemPrompt }];
 

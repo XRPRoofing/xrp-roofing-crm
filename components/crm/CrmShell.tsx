@@ -1168,9 +1168,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-      {/* Global AI Assistant */}
-      <AiFloatingButton />
-      <AiChatPanel />
+      {/* Global AI Assistant — admin/office only, hidden from crew users */}
+      {!isCrewUser && <AiFloatingButton />}
+      {!isCrewUser && <AiChatPanel />}
     </div>
     </AiChatProvider>
   );
