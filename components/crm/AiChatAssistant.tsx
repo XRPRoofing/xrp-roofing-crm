@@ -62,15 +62,19 @@ const ACTION_GROUPS: AiActionGroup[] = [
 // AI API call
 // ---------------------------------------------------------------------------
 
+interface ChatHistoryMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+
 async function callAiChat(
-  text: string,
-  instruction: string,
-  context?: string,
+  message: string,
+  history: ChatHistoryMsg[],
 ): Promise<string> {
   const res = await fetch("/api/ai/rewrite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, instruction, context }),
+    body: JSON.stringify({ mode: "chat", message, messages: history }),
   });
 
   if (!res.ok) {
@@ -206,7 +210,17 @@ export function AiChatPanel() {
     async (text: string, instruction?: string) => {
       if (!text.trim() && !instruction) return;
 
-      const userContent = instruction || text;
+      // Build the user message content
+      let userContent: string;
+      if (instruction && activeFieldContext?.text) {
+        // Quick action with field context: include both
+        userContent = `${instruction}\n\nText:\n${activeFieldContext.text}`;
+      } else if (instruction) {
+        userContent = instruction;
+      } else {
+        userContent = text;
+      }
+
       const userMsg: ChatMessage = {
         id: generateId(),
         role: "user",
@@ -219,12 +233,13 @@ export function AiChatPanel() {
       setError("");
 
       try {
-        // Determine the text to process
-        const textToProcess = activeFieldContext?.text || text;
-        const instructionToUse = instruction || text;
-        const contextHint = activeFieldContext?.fieldLabel;
+        // Build conversation history from existing messages
+        const history: ChatHistoryMsg[] = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-        const result = await callAiChat(textToProcess, instructionToUse, contextHint);
+        const result = await callAiChat(userContent, history);
 
         const assistantMsg: ChatMessage = {
           id: generateId(),
@@ -248,7 +263,7 @@ export function AiChatPanel() {
         setLoading(false);
       }
     },
-    [activeFieldContext, addMessage],
+    [activeFieldContext, addMessage, messages],
   );
 
   const handleSubmit = useCallback(() => {
