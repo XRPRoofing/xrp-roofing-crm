@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   Sparkles,
   X,
@@ -70,11 +71,12 @@ interface ChatHistoryMsg {
 async function callAiChat(
   message: string,
   history: ChatHistoryMsg[],
+  currentPage?: string,
 ): Promise<string> {
   const res = await fetch("/api/ai/rewrite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "chat", message, messages: history }),
+    body: JSON.stringify({ mode: "chat", message, messages: history, currentPage }),
   });
 
   if (!res.ok) {
@@ -177,6 +179,7 @@ export function AiChatPanel() {
     dismissFieldContext,
   } = useAiChat();
 
+  const pathname = usePathname();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -239,7 +242,7 @@ export function AiChatPanel() {
           content: m.content,
         }));
 
-        const result = await callAiChat(userContent, history);
+        const result = await callAiChat(userContent, history, pathname);
 
         const assistantMsg: ChatMessage = {
           id: generateId(),
@@ -263,7 +266,7 @@ export function AiChatPanel() {
         setLoading(false);
       }
     },
-    [activeFieldContext, addMessage, messages],
+    [activeFieldContext, addMessage, messages, pathname],
   );
 
   const handleSubmit = useCallback(() => {
