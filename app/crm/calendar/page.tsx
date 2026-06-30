@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import { azNoon, azParts } from "@/lib/arizona-time";
+import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import {
   AlignLeft,
   Briefcase,
@@ -1662,14 +1663,17 @@ export default function CalendarPage() {
                     </option>
                   ))}
                 </select>
-                <textarea
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                  className="min-h-[80px] rounded-lg border border-gray-200 px-4 py-3 outline-none sm:col-span-2"
-                  placeholder="Notes"
-                />
+                <div className="sm:col-span-2">
+                  <div className="mb-1 flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wide text-gray-500">Notes</span><AiWriteButton getText={() => form.description} onReplace={(t) => setForm({ ...form, description: t })} context="calendar event notes for a roofing job" /></div>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm({ ...form, description: e.target.value })
+                    }
+                    className="min-h-[80px] w-full rounded-lg border border-gray-200 px-4 py-3 outline-none"
+                    placeholder="Notes"
+                  />
+                </div>
                 <input
                   type="text"
                   value={form.guestEmails}
@@ -2186,17 +2190,20 @@ export default function CalendarPage() {
                   </label>
                   <div className="grid grid-cols-[28px_1fr] items-start gap-4">
                     <AlignLeft className="mt-3 h-5 w-5 text-gray-500" />
-                    <textarea
-                      value={editForm.description}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          description: e.target.value,
-                        })
-                      }
-                      className="min-h-32 rounded-lg bg-gray-100 px-4 py-3 outline-none"
-                      placeholder="Add description / notes"
-                    />
+                    <div>
+                      <div className="mb-1 flex justify-end"><AiWriteButton getText={() => editForm.description} onReplace={(t) => setEditForm({ ...editForm, description: t })} context="calendar event notes for a roofing job" /></div>
+                      <textarea
+                        value={editForm.description}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            description: e.target.value,
+                          })
+                        }
+                        className="min-h-32 w-full rounded-lg bg-gray-100 px-4 py-3 outline-none"
+                        placeholder="Add description / notes"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

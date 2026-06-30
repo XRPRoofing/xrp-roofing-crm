@@ -22,6 +22,7 @@ import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
 import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "@/lib/unified-numbering";
+import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 
 type Proposal = {
   id: string;
@@ -1862,22 +1863,22 @@ export default function ProposalsPage() {
                 Title
                 <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               </label>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Summary
+              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="flex items-center justify-between"><span>Summary</span><AiWriteButton getText={() => editorForm.summary} onReplace={(t) => setEditorForm({ ...editorForm, summary: t })} onInsert={(t) => setEditorForm({ ...editorForm, summary: editorForm.summary + "\n" + t })} context="proposal summary" /></div>
                 <textarea value={editorForm.summary} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, summary: event.target.value }); }} className="mt-1.5 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
+              </div>
               <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Cover photo URL
                 <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="/images/logo.jpeg" />
               </label>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Cover text
+              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="flex items-center justify-between"><span>Cover text</span><AiWriteButton getText={() => editorForm.coverText} onReplace={(t) => setEditorForm({ ...editorForm, coverText: t })} context="proposal cover text" /></div>
                 <textarea value={editorForm.coverText} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, coverText: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Scope of work
+              </div>
+              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="flex items-center justify-between"><span>Scope of work</span><AiWriteButton getText={() => editorForm.scope} onReplace={(t) => setEditorForm({ ...editorForm, scope: t })} onInsert={(t) => setEditorForm({ ...editorForm, scope: editorForm.scope + "\n" + t })} context="roofing proposal scope of work" /></div>
                 <textarea value={editorForm.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, scope: event.target.value }); }} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-1.5 min-h-[8rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
+              </div>
               <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
                 Total
                 <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
@@ -1901,14 +1902,14 @@ export default function ProposalsPage() {
                   <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
                 )}
               </div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Customer notes
+              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="flex items-center justify-between"><span>Customer notes</span><AiWriteButton getText={() => editorForm.notes} onReplace={(t) => setEditorForm({ ...editorForm, notes: t })} onInsert={(t) => setEditorForm({ ...editorForm, notes: editorForm.notes + "\n" + t })} context="customer notes for a roofing proposal" /></div>
                 <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Terms and conditions
+              </div>
+              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <div className="flex items-center justify-between"><span>Terms and conditions</span><AiWriteButton getText={() => editorForm.terms} onReplace={(t) => setEditorForm({ ...editorForm, terms: t })} context="roofing proposal terms and conditions" /></div>
                 <textarea value={editorForm.terms} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, terms: event.target.value }); }} className="mt-1.5 min-h-[5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
+              </div>
             </div>
             <div className="mt-6">
               {/* Good / Better / Best toggle */}
@@ -2405,6 +2406,7 @@ export default function ProposalsPage() {
                     </div>
                     <textarea required value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-56 w-full border-x border-b border-gray-200 px-5 py-4 text-sm font-normal leading-7 outline-none" />
                   </label>
+                  <div className="flex justify-end -mt-2 mb-2"><AiWriteButton getText={() => sendForm.message} onReplace={(t) => setSendForm({ ...sendForm, message: t })} context="proposal email message to a roofing customer" /></div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="rounded-t-xl bg-gray-200 py-5 text-center">
                       <Image src="/images/logo.jpeg" alt="XRP Roofing" width={112} height={60} className="mx-auto h-auto bg-white" />
@@ -2470,10 +2472,10 @@ export default function ProposalsPage() {
                       </select>
                     </div>
                   )}
-                  <label className="block text-sm font-bold text-gray-900">
-                    Message*
+                  <div className="block text-sm font-bold text-gray-900">
+                    <div className="flex items-center justify-between"><span>Message*</span><AiWriteButton getText={() => smsForm.message} onReplace={(t) => setSmsForm({ ...smsForm, message: t })} context="SMS proposal message to a roofing customer" /></div>
                     <textarea required value={smsForm.message} onChange={(event) => setSmsForm({ ...smsForm, message: event.target.value })} className="mt-3 min-h-56 w-full rounded border border-gray-200 px-5 py-4 text-sm font-normal leading-7 outline-none" placeholder="Type your message to the customer..." />
-                  </label>
+                  </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">Preview — what customer will receive:</p>
                     <div className="rounded-lg bg-white p-4 text-sm leading-7 text-gray-800">
@@ -2878,14 +2880,14 @@ export default function ProposalsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-600">Email message</label>
+                      <div className="flex items-center justify-between"><label className="block text-xs font-bold text-gray-600">Email message</label><AiWriteButton getText={() => step.emailTemplate} onReplace={(t) => updateStep(idx, "emailTemplate", t)} context="follow-up email for a roofing proposal" /></div>
                       <textarea value={step.emailTemplate} onChange={(e) => updateStep(idx, "emailTemplate", e.target.value)} rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
                       <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} for name. &quot;View Proposal&quot; and &quot;Decline Proposal&quot; buttons are added automatically.</p>
                     </div>
 
                     {followUpSmsEnabled && (
                       <div>
-                        <label className="block text-xs font-bold text-gray-600">SMS message</label>
+                        <div className="flex items-center justify-between"><label className="block text-xs font-bold text-gray-600">SMS message</label><AiWriteButton getText={() => step.smsTemplate} onReplace={(t) => updateStep(idx, "smsTemplate", t)} context="follow-up SMS for a roofing proposal" /></div>
                         <textarea value={step.smsTemplate} onChange={(e) => updateStep(idx, "smsTemplate", e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100" />
                         <p className="mt-1 text-xs text-gray-400">Use {'{customerName}'} and {'{proposalLink}'}. Sent to the customer&apos;s phone.</p>
                       </div>

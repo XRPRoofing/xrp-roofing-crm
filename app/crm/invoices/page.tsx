@@ -18,6 +18,7 @@ import { azDateTime, azDate } from "@/lib/arizona-time";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
+import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { sendSms } from "@/lib/twilio/client";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
@@ -1845,8 +1846,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Lead source<select disabled={!editable} value={invoice.leadSource || ""} onChange={(event) => onChange({ ...invoice, leadSource: event.target.value })} className={inputClass}><option value="">—</option>{INVOICE_LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
         <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2">Payment terms<textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2">Warranty notes<textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></label>
+        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2"><div className="flex items-center justify-between"><span>Payment terms</span>{editable && <AiWriteButton getText={() => invoice.paymentTerms} onReplace={(t) => onChange({ ...invoice, paymentTerms: t })} context="invoice payment terms for a roofing project" />}</div><textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></div>
+        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2"><div className="flex items-center justify-between"><span>Warranty notes</span>{editable && <AiWriteButton getText={() => invoice.warrantyNotes} onReplace={(t) => onChange({ ...invoice, warrantyNotes: t })} context="roofing warranty notes" />}</div><textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></div>
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-bold text-blue-700">Line Items</h3>
@@ -2537,7 +2538,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <>
                   <input value={sendForm.subject} onChange={(event) => setSendForm({ ...sendForm, subject: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Email subject line" />
                   <div>
-                    <label className="mb-1 block text-xs font-bold text-gray-500">Message to customer (sent exactly as written)</label>
+                    <div className="mb-1 flex items-center justify-between"><label className="block text-xs font-bold text-gray-500">Message to customer (sent exactly as written)</label><AiWriteButton getText={() => sendForm.message} onReplace={(t) => setSendForm({ ...sendForm, message: t })} context="invoice email message to a roofing customer" /></div>
                     <textarea value={sendForm.message} onChange={(event) => setSendForm({ ...sendForm, message: event.target.value })} className="min-h-40 w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Type your custom message here…" />
                   </div>
                 </>
@@ -2635,7 +2636,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <input disabled value={selectedInvoice.phone} className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-700 outline-none" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-gray-500">Message (editable)</label>
+                <div className="mb-1 flex items-center justify-between"><label className="block text-xs font-bold text-gray-500">Message (editable)</label><AiWriteButton getText={() => smsMessage} onReplace={(t) => setSmsMessage(t)} context="SMS invoice message to a roofing customer" /></div>
                 <textarea value={smsMessage} onChange={(e) => setSmsMessage(e.target.value)} className="min-h-36 w-full rounded-lg border border-gray-200 px-4 py-3 text-base outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100" placeholder="Type your message…" />
               </div>
               <p className="text-xs text-gray-400">{smsMessage.length} characters</p>

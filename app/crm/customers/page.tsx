@@ -7,6 +7,7 @@ import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Imag
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
+import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { leadStages } from "@/lib/crm-data";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -866,7 +867,7 @@ export default function CustomersPage() {
 
               {activeTab === "Notes" && (
                 <section className="rounded-lg border border-gray-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Notes</h3></div>
+                  <div className="flex items-center justify-between"><div className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Notes</h3></div><AiWriteButton getText={() => noteDraft} onReplace={(t) => setNoteDraft(t)} onInsert={(t) => setNoteDraft(noteDraft + "\n" + t)} context="internal customer notes for a roofing company" /></div>
                   <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows={6} className="mt-4 w-full rounded-lg border border-gray-200 p-3 text-sm outline-none" placeholder="Add internal notes about this customer..." />
                   <div className="mt-3 flex items-center gap-2">
                     <button type="button" onClick={() => handleSaveNote(selectedCustomer.id)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Save note</button>
