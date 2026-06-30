@@ -438,7 +438,8 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
 
 export default function LeadsPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
-  const [jobs, setJobs] = useState<Lead[]>(() => (getCachedCrewData()?.jobs ?? []).map(normalizeJob));
+  const [jobs, setJobs] = useState<Lead[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -907,13 +908,8 @@ export default function LeadsPage() {
     migrateStaleDueDates();
     let mounted = true;
 
-    // Show cached data instantly, then refresh in background
-    const cached = getCachedCrewData();
-    if (cached) {
-      setJobs(cached.jobs.map(normalizeJob));
-      setJobNotes(cached.notes);
-    }
-
+    // Always fetch fresh data before rendering the board.
+    // No stale cache is shown — skeleton loaders display until this resolves.
     async function loadJobs() {
       try {
         const data = await refreshCrewData();
@@ -923,7 +919,14 @@ export default function LeadsPage() {
           setJobNotes(data.notes);
         }
       } catch {
-        /* leave jobs empty when the shared store is unavailable */
+        // On failure, fall back to cached data if available
+        const cached = getCachedCrewData();
+        if (cached && mounted) {
+          setJobs(cached.jobs.map(normalizeJob));
+          setJobNotes(cached.notes);
+        }
+      } finally {
+        if (mounted) setInitialLoading(false);
       }
     }
     loadJobs();
@@ -1405,58 +1408,79 @@ export default function LeadsPage() {
       </div>
 
       <div className="mt-3 flex min-h-0 flex-1 gap-3 overflow-x-auto pb-4">
-        {leadStages.map((stage) => {
-          const stageJobs = filteredJobs.filter((job) => job.stage === stage.id);
-          const stageValue = stageJobs.reduce((total, job) => total + job.value, 0);
-          return (
-            <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[17.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-2 shadow-sm">
-              <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
-                <div className="flex items-center justify-between gap-1">
-                  <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
-                  <span className="shrink-0 text-xs font-medium text-gray-400">{stageJobs.length}</span>
-                </div>
-                <p className="mt-0.5 text-xs text-gray-500">{formatMoney(stageValue)}</p>
+        {initialLoading ? (
+          // Skeleton loaders — displayed until fresh data is synchronized
+          leadStages.slice(0, 5).map((stage) => (
+            <section key={stage.id} className="flex w-[17.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-2 shadow-sm">
+              <div className="mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm">
+                <div className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+                <div className="mt-1.5 h-3 w-10 animate-pulse rounded bg-gray-100" />
               </div>
-
-              <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-0.5 pb-1">
-                {stageJobs.map((job) => {
-                  const urgency = getUrgency(job);
-                  const pStatus = proposalStatusMap[job.id];
-                  const iStatus = invoiceStatusMap[job.id];
-                  return (
-                    <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2.5 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="min-w-0 truncate text-xs font-bold leading-tight text-gray-900">{job.name}</p>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded p-0.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3 w-3" /></button>
-                          <GripVertical className="h-3.5 w-3.5 text-gray-300" />
-                        </div>
-                      </div>
-                      <p className="mt-0.5 truncate text-xs leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
-                      <div className="mt-1 flex items-center justify-between gap-1">
-                        <span className="text-sm font-bold leading-none text-blue-700">{formatMoney(job.value)}</span>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {pStatus && (
-                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-3 w-3" />{getProposalStatusLabel(pStatus)}</span>
-                          )}
-                          {iStatus && (
-                            <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getInvoiceStatusStyle(iStatus)}`}><DollarSign className="h-3 w-3" />{iStatus}</span>
-                          )}
-                          {!pStatus && !iStatus && urgency.label !== "On Track" && (
-                            <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-                {stageJobs.length === 0 && (
-                  <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center text-xs font-bold text-gray-400">Drop jobs here</div>
-                )}
+              <div className="space-y-1.5 px-0.5 pb-1">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="rounded-md border border-l-[3px] border-l-gray-200 bg-white px-2.5 py-2 shadow-sm">
+                    <div className="h-3 w-28 animate-pulse rounded bg-gray-200" />
+                    <div className="mt-1.5 h-2.5 w-36 animate-pulse rounded bg-gray-100" />
+                    <div className="mt-2 h-3 w-14 animate-pulse rounded bg-blue-100" />
+                  </div>
+                ))}
               </div>
             </section>
-          );
-        })}
+          ))
+        ) : (
+          leadStages.map((stage) => {
+            const stageJobs = filteredJobs.filter((job) => job.stage === stage.id);
+            const stageValue = stageJobs.reduce((total, job) => total + job.value, 0);
+            return (
+              <section key={stage.id} onDragOver={(event) => event.preventDefault()} onDrop={() => draggedJobId && updateJobStage(draggedJobId, stage.id)} className="flex max-h-[calc(100vh-16rem)] w-[17.5rem] shrink-0 flex-col rounded-lg border border-gray-200 bg-gray-50/90 p-2 shadow-sm">
+                <div className="sticky top-0 z-10 mb-1.5 shrink-0 rounded-md border border-gray-200 bg-white/95 px-2.5 py-2 shadow-sm backdrop-blur">
+                  <div className="flex items-center justify-between gap-1">
+                    <h2 className="truncate text-xs font-semibold uppercase tracking-wide text-blue-700">{stage.label}</h2>
+                    <span className="shrink-0 text-xs font-medium text-gray-400">{stageJobs.length}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-500">{formatMoney(stageValue)}</p>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-0.5 pb-1">
+                  {stageJobs.map((job) => {
+                    const urgency = getUrgency(job);
+                    const pStatus = proposalStatusMap[job.id];
+                    const iStatus = invoiceStatusMap[job.id];
+                    return (
+                      <button key={job.id} type="button" draggable onDragStart={() => setDraggedJobId(job.id)} onDragEnd={() => setDraggedJobId(null)} onClick={() => openJobCard(job.id)} className={`group w-full cursor-grab rounded-md border border-l-[3px] bg-white px-2.5 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md active:cursor-grabbing ${urgency.className}`}>
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="min-w-0 truncate text-xs font-bold leading-tight text-gray-900">{job.name}</p>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); deleteJob(job); }} className="hidden rounded p-0.5 text-gray-300 transition hover:bg-red-50 hover:text-red-500 group-hover:flex" aria-label="Delete job"><Trash2 className="h-3 w-3" /></button>
+                            <GripVertical className="h-3.5 w-3.5 text-gray-300" />
+                          </div>
+                        </div>
+                        <p className="mt-0.5 truncate text-xs leading-tight text-gray-500">{job.address}, {job.city}, AZ</p>
+                        <div className="mt-1 flex items-center justify-between gap-1">
+                          <span className="text-sm font-bold leading-none text-blue-700">{formatMoney(job.value)}</span>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {pStatus && (
+                              <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getProposalStatusStyle(pStatus)}`}><FileText className="h-3 w-3" />{getProposalStatusLabel(pStatus)}</span>
+                            )}
+                            {iStatus && (
+                              <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold leading-none ${getInvoiceStatusStyle(iStatus)}`}><DollarSign className="h-3 w-3" />{iStatus}</span>
+                            )}
+                            {!pStatus && !iStatus && urgency.label !== "On Track" && (
+                              <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold leading-none ${urgency.text}`}><span className={`h-1.5 w-1.5 rounded-full ${urgency.dot}`} />{urgency.label}</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {stageJobs.length === 0 && (
+                    <div className="rounded-md border border-dashed border-gray-300 bg-white p-4 text-center text-xs font-bold text-gray-400">Drop jobs here</div>
+                  )}
+                </div>
+              </section>
+            );
+          })
+        )}
       </div>
 
       {selectedJob && (
