@@ -5,11 +5,9 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
-  Briefcase,
   CalendarCheck,
-  DollarSign,
+  ChevronDown,
   ExternalLink,
-  FileText,
   MailOpen,
   MessageSquare,
   PenLine,
@@ -17,10 +15,9 @@ import {
   PhoneIncoming,
   PhoneMissed,
   PhoneOutgoing,
-  TrendingUp,
-  UserCheck,
   UserPlus,
   UserX,
+  Zap,
 } from "lucide-react";
 
 const DashboardCalendar = dynamic(() => import("@/components/crm/dashboard/DashboardCalendar"), { ssr: false });
@@ -199,19 +196,6 @@ export default function CrmDashboardPage() {
     return { unreadSms: todaySms.length, recentConversations: recentConversations.size };
   }, [events, isToday]);
 
-  const jobMetrics = useMemo(() => {
-    const todayJobs = jobs.filter((j) => j.dueDate && j.dueDate === todayStr);
-    const scheduled = jobs.filter((j) => j.stage === "scheduled").length;
-    const inProgress = jobs.filter((j) => j.stage === "in_progress").length;
-    const completed = jobs.filter((j) => COMPLETED_STAGES.has(j.stage)).length;
-    const overdue = jobs.filter((j) => {
-      if (COMPLETED_STAGES.has(j.stage)) return false;
-      if (!j.dueDate) return false;
-      return j.dueDate < todayStr;
-    }).length;
-    return { today: todayJobs.length, scheduled, inProgress, completed, overdue };
-  }, [jobs, todayStr]);
-
   const revenueMetrics = useMemo(() => {
     const paidInvs = invoices.filter(invoicePaid);
     const monthRevenue = paidInvs.reduce((s, i) => s + invoiceTotal(i), 0);
@@ -225,73 +209,46 @@ export default function CrmDashboardPage() {
     return { monthRevenue, outstanding, paidCount, pendingCount };
   }, [invoices]);
 
-  const proposalMetrics = useMemo(() => {
-    const draft = proposals.filter((p) => p.status === "Draft").length;
-    const viewed = proposals.filter((p) => p.viewedAt && !p.signedAt && p.status !== "Declined").length;
-    const declined = proposals.filter((p) => p.status === "Declined").length;
-    const won = proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length;
-    return { draft, viewed, declined, won };
-  }, [proposals]);
-
-  const quickOverview = useMemo(() => {
-    const newLeads = jobs.filter((j) => j.stage === "new_lead").length;
-    const activeCustomers = customers.length;
-    const upcomingAppointments = jobs.filter((j) => j.inspectionDate && j.inspectionDate >= todayStr).length;
-    return { newLeads, activeCustomers, upcomingAppointments };
-  }, [jobs, customers, todayStr]);
+  const todayPriorities = useMemo(() => {
+    const newLeads = jobs.filter((j) => UNACTIONED_STAGES.has(j.stage)).length;
+    const inspectionsToday = jobs.filter((j) => j.inspectionDate && j.inspectionDate === todayStr).length;
+    const missedCalls = callMetrics.missed;
+    const sentProps = proposals.filter((p) => p.status !== "Draft" && p.sentToEmail);
+    const unsignedProps = sentProps.filter((p) => !p.signedAt && !["Won", "Signed", "Approved"].includes(p.status)).length;
+    const overdueInvs = invoices.filter(invoiceOverdue).length;
+    return { newLeads, inspectionsToday, missedCalls, unsignedProps, overdueInvs };
+  }, [jobs, todayStr, callMetrics.missed, proposals, invoices]);
 
   /* ── Computed metrics ────────────────────────────────────────────── */
 
   const metrics: MetricDef[] = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear  = now.getFullYear();
-
     const unactionedLeads = jobs.filter((j) => UNACTIONED_STAGES.has(j.stage)).length;
 
     const sentProposals     = proposals.filter((p) => p.status !== "Draft" && p.sentToEmail);
-    const unopenedProposals = sentProposals.filter((p) => !p.viewedAt && !p.signedAt);
-    const unsignedProposals = sentProposals.filter((p) => p.viewedAt && !p.signedAt && !["Won", "Signed", "Approved"].includes(p.status));
+    const unsignedProposals = sentProposals.filter((p) => !p.signedAt && !["Won", "Signed", "Approved"].includes(p.status));
 
     const activeInvoices   = invoices.filter((i) => i.status !== "Draft" && i.status !== "Voided" && !invoicePaid(i));
     const overdueInvoices  = activeInvoices.filter(invoiceOverdue);
 
     const followUpJobs = jobs.filter((j) => FOLLOWUP_STAGES.has(j.stage)).length;
 
-    const jobsThisMonth = jobs.filter((j) => {
-      const d = j.dueDate ? new Date(`${j.dueDate}T00:00:00`) : null;
-      if (!d) return false;
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    }).length;
-
-    const unopenedProposalValue = unopenedProposals.reduce((s, p) => s + (p.total || 0), 0);
     const unsignedProposalValue = unsignedProposals.reduce((s, p) => s + (p.total || 0), 0);
     const overdueInvoiceValue   = overdueInvoices.reduce((s, i) => s + invoiceTotal(i), 0);
 
     return [
       {
         id: "unactioned-leads",
-        label: "Unactioned Leads",
-        description: "New leads awaiting first contact",
+        label: "New Leads Not Contacted",
+        description: "Awaiting first contact",
         icon: UserX,
         urgency: "red" as const,
         href: "/crm/leads",
         count: unactionedLeads,
       },
       {
-        id: "unopened-proposals",
-        label: "Unopened Proposals",
-        description: "Sent but not yet viewed",
-        icon: MailOpen,
-        urgency: "orange" as const,
-        href: "/crm/proposals",
-        count: unopenedProposals.length,
-        dollar: unopenedProposalValue,
-      },
-      {
         id: "unsigned-proposals",
         label: "Unsigned Proposals",
-        description: "Viewed but not yet signed",
+        description: "Awaiting signature",
         icon: PenLine,
         urgency: "yellow" as const,
         href: "/crm/proposals",
@@ -317,37 +274,42 @@ export default function CrmDashboardPage() {
         href: "/crm/leads",
         count: followUpJobs,
       },
-      {
-        id: "jobs-this-month",
-        label: "Jobs This Month",
-        description: `Active in ${now.toLocaleString("en-US", { month: "long" })} ${currentYear}`,
-        icon: Briefcase,
-        urgency: "blue" as const,
-        href: "/crm/leads",
-        count: jobsThisMonth,
-      },
     ];
   }, [jobs, proposals, invoices]);
 
   const attentionCount = metrics.filter((m) => m.urgency === "red" || m.urgency === "orange").reduce((s, m) => s + m.count, 0);
 
-  /* Summary stats */
-  const totalRevenue = invoices.filter(invoicePaid).reduce((s, i) => s + invoiceTotal(i), 0);
+  /* Summary stats for KPI row */
+  const totalRevenue = revenueMetrics.monthRevenue;
+  const outstandingBalance = revenueMetrics.outstanding;
   const signedProposals = proposals.filter((p) => ["Won", "Signed", "Approved"].includes(p.status)).length;
-  const activeJobs = jobs.filter((j) => !COMPLETED_STAGES.has(j.stage)).length;
-  const paidInvoiceCount = invoices.filter(invoicePaid).length;
+  const activeLeads = jobs.filter((j) => !COMPLETED_STAGES.has(j.stage)).length;
   const sentProposalCount = proposals.filter((p) => p.status !== "Draft").length;
 
+  /* ── Collapsible section state (localStorage-persisted) ──────── */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("crm-dash-collapsed") || "{}"); } catch { return {}; }
+  });
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem("crm-dash-collapsed", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 sm:gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4">
       {/* ── Welcome Header ──────────────────────────────────────────── */}
-      <section className="rounded-xl border border-gray-200 bg-white/95 px-5 py-5 shadow-sm backdrop-blur-sm sm:px-7 sm:py-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-xl border border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-gray-900 sm:text-xl">
+            <h1 className="text-base font-bold text-gray-900 sm:text-lg">
               Good morning, XRP Roofing team
             </h1>
-            <p className="mt-0.5 text-sm text-gray-500">
+            <p className="mt-0.5 text-xs text-gray-500">
               {attentionCount > 0 ? `${attentionCount} items need attention` : "All caught up — no urgent items"}
               {syncDot && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs text-blue-600">
@@ -360,173 +322,183 @@ export default function CrmDashboardPage() {
         </div>
       </section>
 
-      {/* ── Summary Stats Row ───────────────────────────────────────── */}
-      <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Briefcase className="h-4 w-4" /></span>
-            <span className="text-xs font-medium text-gray-500">Total Jobs</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{jobs.length}</p>
-          <p className="text-xs text-gray-400">{activeJobs} active</p>
+      {/* ── Today Priorities ─────────────────────────────────────────── */}
+      <section className="rounded-xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 px-4 py-3 shadow-sm">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-100 text-orange-600"><Zap className="h-3.5 w-3.5" /></span>
+          <h2 className="text-sm font-bold text-gray-900">Today&apos;s Priorities</h2>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600"><PenLine className="h-4 w-4" /></span>
-            <span className="text-xs font-medium text-gray-500">Proposals</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{proposals.length}</p>
-          <p className="text-xs text-gray-400">{signedProposals} signed &middot; {sentProposalCount} sent</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600"><DollarSign className="h-4 w-4" /></span>
-            <span className="text-xs font-medium text-gray-500">Invoices</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{invoices.length}</p>
-          <p className="text-xs text-gray-400">{paidInvoiceCount} paid</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><TrendingUp className="h-4 w-4" /></span>
-            <span className="text-xs font-medium text-gray-500">Revenue</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{totalRevenue > 0 ? formatUsd(totalRevenue) : "$0"}</p>
-          <p className="text-xs text-gray-400">from paid invoices</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <button type="button" onClick={() => router.push("/crm/leads")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+            <UserPlus className="h-4 w-4 shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className={`text-lg font-bold leading-none ${todayPriorities.newLeads > 0 ? "text-red-600" : "text-gray-800"}`}>{todayPriorities.newLeads}</p>
+              <p className="text-[10px] text-gray-500">New Leads</p>
+            </div>
+          </button>
+          <button type="button" onClick={() => router.push("/crm/calendar")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+            <CalendarCheck className="h-4 w-4 shrink-0 text-blue-500" />
+            <div className="min-w-0">
+              <p className="text-lg font-bold leading-none text-gray-800">{todayPriorities.inspectionsToday}</p>
+              <p className="text-[10px] text-gray-500">Inspections</p>
+            </div>
+          </button>
+          <button type="button" onClick={() => router.push("/crm/conversations")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+            <PhoneMissed className="h-4 w-4 shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className={`text-lg font-bold leading-none ${todayPriorities.missedCalls > 0 ? "text-red-600" : "text-gray-800"}`}>{todayPriorities.missedCalls}</p>
+              <p className="text-[10px] text-gray-500">Missed Calls</p>
+            </div>
+          </button>
+          <button type="button" onClick={() => router.push("/crm/proposals")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+            <PenLine className="h-4 w-4 shrink-0 text-amber-500" />
+            <div className="min-w-0">
+              <p className={`text-lg font-bold leading-none ${todayPriorities.unsignedProps > 0 ? "text-amber-600" : "text-gray-800"}`}>{todayPriorities.unsignedProps}</p>
+              <p className="text-[10px] text-gray-500">Unsigned</p>
+            </div>
+          </button>
+          <button type="button" onClick={() => router.push("/crm/invoices")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+            <div className="min-w-0">
+              <p className={`text-lg font-bold leading-none ${todayPriorities.overdueInvs > 0 ? "text-red-600" : "text-gray-800"}`}>{todayPriorities.overdueInvs}</p>
+              <p className="text-[10px] text-gray-500">Overdue</p>
+            </div>
+          </button>
         </div>
       </section>
 
-      {/* ── Detailed Widgets ─────────────────────────────────────────── */}
-      <section className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Calls Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><Phone className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Calls Today</h3>
-          </div>
-          {eventsLoading ? (
-            <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
-          ) : (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><Phone className="h-3.5 w-3.5" />Total Calls</span><span className="text-sm font-semibold text-gray-800">{callMetrics.total}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneIncoming className="h-3.5 w-3.5" />Incoming</span><span className="text-sm font-semibold text-gray-800">{callMetrics.incoming}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneOutgoing className="h-3.5 w-3.5" />Outgoing</span><span className="text-sm font-semibold text-gray-800">{callMetrics.outgoing}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><PhoneMissed className="h-3.5 w-3.5 text-red-400" />Missed</span><span className={`text-sm font-semibold ${callMetrics.missed > 0 ? "text-red-600" : "text-gray-800"}`}>{callMetrics.missed}</span></div>
-            </div>
-          )}
+      {/* ── KPI Row (6 cards) ────────────────────────────────────────── */}
+      <section className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Total Jobs</p>
+          <p className="mt-0.5 text-xl font-bold text-gray-900">{jobs.length}</p>
         </div>
-
-        {/* Jobs Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Briefcase className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Jobs</h3>
-          </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Today&apos;s Jobs</span><span className="text-sm font-semibold text-gray-800">{jobMetrics.today}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Scheduled</span><span className="text-sm font-semibold text-gray-800">{jobMetrics.scheduled}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">In Progress</span><span className="text-sm font-semibold text-blue-600">{jobMetrics.inProgress}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Completed</span><span className="text-sm font-semibold text-green-600">{jobMetrics.completed}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Overdue</span><span className={`text-sm font-semibold ${jobMetrics.overdue > 0 ? "text-red-600" : "text-gray-800"}`}>{jobMetrics.overdue}</span></div>
-          </div>
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Active Leads</p>
+          <p className="mt-0.5 text-xl font-bold text-gray-900">{activeLeads}</p>
         </div>
-
-        {/* Revenue Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600"><DollarSign className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Revenue</h3>
-          </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Total Collected</span><span className="text-sm font-semibold text-green-600">{formatUsd(revenueMetrics.monthRevenue)}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Outstanding</span><span className={`text-sm font-semibold ${revenueMetrics.outstanding > 0 ? "text-orange-600" : "text-gray-800"}`}>{formatUsd(revenueMetrics.outstanding)}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Paid Invoices</span><span className="text-sm font-semibold text-gray-800">{revenueMetrics.paidCount}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Pending Invoices</span><span className={`text-sm font-semibold ${revenueMetrics.pendingCount > 0 ? "text-orange-600" : "text-gray-800"}`}>{revenueMetrics.pendingCount}</span></div>
-          </div>
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Proposals Sent</p>
+          <p className="mt-0.5 text-xl font-bold text-gray-900">{sentProposalCount}</p>
         </div>
-
-        {/* Messages Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600"><MessageSquare className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Messages</h3>
-          </div>
-          {eventsLoading ? (
-            <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
-          ) : (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between"><span className="text-sm text-gray-500">SMS Today</span><span className={`text-sm font-semibold ${messageMetrics.unreadSms > 0 ? "text-purple-600" : "text-gray-800"}`}>{messageMetrics.unreadSms}</span></div>
-              <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Active Conversations</span><span className="text-sm font-semibold text-gray-800">{messageMetrics.recentConversations}</span></div>
-            </div>
-          )}
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Signed</p>
+          <p className="mt-0.5 text-xl font-bold text-green-600">{signedProposals}</p>
         </div>
-
-        {/* Proposals Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600"><FileText className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Proposals</h3>
-          </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Draft</span><span className="text-sm font-semibold text-gray-800">{proposalMetrics.draft}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Viewed</span><span className="text-sm font-semibold text-blue-600">{proposalMetrics.viewed}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Declined</span><span className={`text-sm font-semibold ${proposalMetrics.declined > 0 ? "text-red-600" : "text-gray-800"}`}>{proposalMetrics.declined}</span></div>
-            <div className="flex items-center justify-between"><span className="text-sm text-gray-500">Won (Signed)</span><span className="text-sm font-semibold text-green-600">{proposalMetrics.won}</span></div>
-          </div>
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Revenue</p>
+          <p className="mt-0.5 text-xl font-bold text-gray-900">{totalRevenue > 0 ? formatUsd(totalRevenue) : "$0"}</p>
         </div>
-
-        {/* Quick Overview Widget */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600"><TrendingUp className="h-4 w-4" /></span>
-            <h3 className="text-sm font-semibold text-gray-800">Quick Overview</h3>
-          </div>
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><UserPlus className="h-3.5 w-3.5" />New Leads</span><span className={`text-sm font-semibold ${quickOverview.newLeads > 0 ? "text-orange-600" : "text-gray-800"}`}>{quickOverview.newLeads}</span></div>
-            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><UserCheck className="h-3.5 w-3.5" />Active Customers</span><span className="text-sm font-semibold text-gray-800">{quickOverview.activeCustomers}</span></div>
-            <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-gray-500"><CalendarCheck className="h-3.5 w-3.5" />Upcoming Inspections</span><span className="text-sm font-semibold text-gray-800">{quickOverview.upcomingAppointments}</span></div>
-          </div>
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Outstanding</p>
+          <p className={`mt-0.5 text-xl font-bold ${outstandingBalance > 0 ? "text-orange-600" : "text-gray-900"}`}>{outstandingBalance > 0 ? formatUsd(outstandingBalance) : "$0"}</p>
         </div>
       </section>
 
-      {/* ── Calendar Shortcut ──────────────────────────────────────── */}
-      <DashboardCalendar />
+      {/* ── Communications (Calls + Messages merged) ─────────────── */}
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => toggleSection("comms")}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-indigo-600"><Phone className="h-3.5 w-3.5" /></span>
+            <h2 className="text-sm font-bold text-gray-900">Communications</h2>
+            {callMetrics.missed > 0 && (
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">{callMetrics.missed} missed</span>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${collapsed["comms"] ? "-rotate-90" : ""}`} />
+        </button>
+        {!collapsed["comms"] && (
+          <div className="border-t border-gray-100 px-4 pb-3 pt-2">
+            {eventsLoading ? (
+              <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneIncoming className="h-3 w-3" />Incoming</span><span className="text-sm font-semibold text-gray-800">{callMetrics.incoming}</span></div>
+                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneOutgoing className="h-3 w-3" />Outgoing</span><span className="text-sm font-semibold text-gray-800">{callMetrics.outgoing}</span></div>
+                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneMissed className="h-3 w-3 text-red-400" />Missed</span><span className={`text-sm font-semibold ${callMetrics.missed > 0 ? "text-red-600" : "text-gray-800"}`}>{callMetrics.missed}</span></div>
+                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><MessageSquare className="h-3 w-3" />SMS Today</span><span className={`text-sm font-semibold ${messageMetrics.unreadSms > 0 ? "text-purple-600" : "text-gray-800"}`}>{messageMetrics.unreadSms}</span></div>
+                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><MailOpen className="h-3 w-3" />Active Convos</span><span className="text-sm font-semibold text-gray-800">{messageMetrics.recentConversations}</span></div>
+                {callMetrics.missed > 0 && (
+                  <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs font-medium text-red-600"><AlertTriangle className="h-3 w-3" />Missed Alerts</span><span className="text-sm font-bold text-red-600">{callMetrics.missed}</span></div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ── Calendar ─────────────────────────────────────────────────── */}
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => toggleSection("calendar")}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600"><CalendarCheck className="h-3.5 w-3.5" /></span>
+            <h2 className="text-sm font-bold text-gray-900">Calendar</h2>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${collapsed["calendar"] ? "-rotate-90" : ""}`} />
+        </button>
+        {!collapsed["calendar"] && (
+          <div className="border-t border-gray-100">
+            <DashboardCalendar />
+          </div>
+        )}
+      </section>
 
       {/* ── Action Items ────────────────────────────────────────────── */}
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">Action Items</h2>
-          <p className="text-xs text-gray-400">Click to view</p>
-        </div>
-        <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          {metrics.map((m) => {
-            const Icon = m.icon;
-            const c = urgencyColor(m.urgency);
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => router.push(m.href)}
-                className={`group flex items-start gap-4 rounded-lg border p-4 text-left transition hover:shadow-md active:scale-[0.98] ${c.border} ${c.bg}`}
-              >
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${c.icon}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className={`text-2xl font-bold leading-none ${c.text}`}>{m.count}</p>
-                    {m.dollar !== undefined && m.dollar > 0 && (
-                      <span className="text-xs font-medium text-gray-500">{formatUsd(m.dollar)}</span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm font-medium text-gray-800">{m.label}</p>
-                  <p className="text-xs text-gray-500">{m.description}</p>
-                </div>
-                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-300 transition group-hover:text-gray-500" />
-              </button>
-            );
-          })}
-        </div>
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => toggleSection("actions")}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-red-50 text-red-600"><AlertTriangle className="h-3.5 w-3.5" /></span>
+            <h2 className="text-sm font-bold text-gray-900">Action Items</h2>
+            {attentionCount > 0 && (
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">{attentionCount}</span>
+            )}
+          </div>
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${collapsed["actions"] ? "-rotate-90" : ""}`} />
+        </button>
+        {!collapsed["actions"] && (
+          <div className="border-t border-gray-100 px-4 pb-3 pt-2">
+            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+              {metrics.map((m) => {
+                const Icon = m.icon;
+                const c = urgencyColor(m.urgency);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => router.push(m.href)}
+                    className={`group flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition hover:shadow-sm active:scale-[0.98] ${c.border} ${c.bg}`}
+                  >
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${c.icon}`}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className={`text-lg font-bold leading-none ${c.text}`}>{m.count}</p>
+                        {m.dollar !== undefined && m.dollar > 0 && (
+                          <span className="text-[10px] font-medium text-gray-500">{formatUsd(m.dollar)}</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs font-medium text-gray-700">{m.label}</p>
+                    </div>
+                    <ExternalLink className="h-3 w-3 shrink-0 text-gray-300 transition group-hover:text-gray-500" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

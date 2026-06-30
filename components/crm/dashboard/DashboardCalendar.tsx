@@ -170,9 +170,9 @@ export default function DashboardCalendar() {
   }, [weekDays]);
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white px-4 py-5 sm:px-6 sm:py-5">
+    <div className="px-4 py-4 sm:px-5">
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-gray-900">{headerDate}</h2>
           <p className="text-sm text-gray-500">Your upcoming events are displayed below</p>
@@ -236,7 +236,7 @@ export default function DashboardCalendar() {
             return (
               <div
                 key={key}
-                className={`min-h-[180px] ${isToday ? "bg-blue-50/40" : "bg-white"}`}
+                className={`min-h-[220px] ${isToday ? "bg-blue-50/40" : "bg-white"}`}
               >
                 {/* Day header */}
                 <div
@@ -256,7 +256,7 @@ export default function DashboardCalendar() {
                 </div>
 
                 {/* Events */}
-                <div className="space-y-1 p-1.5">
+                <div className="space-y-1.5 p-2">
                   {loading ? (
                     <div className="h-5 w-full animate-pulse rounded bg-gray-100" />
                   ) : dayEvents.length === 0 ? null : (
@@ -267,7 +267,7 @@ export default function DashboardCalendar() {
                       return (
                         <div
                           key={ev.id}
-                          className={`cursor-pointer rounded px-1.5 py-1 text-[11px] leading-tight transition hover:opacity-80 ${
+                          className={`cursor-pointer rounded px-2 py-1.5 text-[11px] leading-snug transition hover:opacity-80 ${
                             isMaterial
                               ? "border-l-2 border-orange-400 bg-orange-50 text-orange-800"
                               : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
@@ -296,6 +296,6 @@ export default function DashboardCalendar() {
           })}
         </div>
       )}
-    </section>
+    </div>
   );
 }
