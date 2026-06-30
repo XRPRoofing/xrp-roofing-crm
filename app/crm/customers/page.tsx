@@ -18,13 +18,13 @@ import type { ConversationChannel, ConversationMessage } from "@/types/conversat
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
-import { getCachedCrewData, getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 
 const customersStorageKey = "xrp-crm-customers";
-const jobsStorageKey = "xrp-crm-jobs-board";
+
 
 function readRawLocalCustomers(): Customer[] {
   if (typeof window === "undefined") return [];
@@ -40,16 +40,7 @@ function readRawLocalCustomers(): Customer[] {
 // Real crew jobs power the profile tabs (Jobs / Communication History) and the
 // active-job count on each card. Falls back to an empty list (never demo data)
 // until the live crew dataset loads.
-function getSavedJobs(): Lead[] {
-  const savedJobs = window.localStorage.getItem(jobsStorageKey);
-  if (!savedJobs) return [];
 
-  try {
-    return JSON.parse(savedJobs) as Lead[];
-  } catch {
-    return [];
-  }
-}
 
 function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   return jobs.filter((job) =>
@@ -254,11 +245,9 @@ function statusTone(status?: string) {
 
 export default function CustomersPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
-  const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => {
-    if (typeof window === "undefined") return [];
-    return getCachedCustomers<Customer>() ?? readRawLocalCustomers();
-  });
-  const [jobList, setJobList] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? getSavedJobs());
+  const [savedCustomers, setSavedCustomers] = useState<Customer[]>([]);
+  const [jobList, setJobList] = useState<Lead[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   // Customer board shows ONLY live Supabase customer records (newest first from
   // /api/customers) — never seeded/demo customers derived from jobs.
   const customerList = savedCustomers;
@@ -491,7 +480,9 @@ export default function CustomersPage() {
       }
       setSavedCustomers(result.customers);
     }
-    void init();
+    void init().finally(() => { if (mounted) setInitialLoading(false); });
+
+    void refreshCrewData().then((data) => { if (mounted) setJobList(data.jobs); }).catch(() => {});
 
     const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
     function onCustomerCache() { const c = getCachedCustomers<Customer>(); if (c && mounted) setSavedCustomers(c); }
@@ -689,6 +680,23 @@ export default function CustomersPage() {
         <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white py-3 pl-12 pr-4 outline-none" placeholder="Search by name, phone, email, or property address..." />
       </div>
 
+      {initialLoading ? (
+        <div className="grid gap-3 lg:grid-cols-3 2xl:grid-cols-4">
+          {[1,2,3,4,5,6].map((i) => (
+            <div key={i} className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
+                <div className="h-5 w-16 animate-pulse rounded-full bg-gray-100" />
+              </div>
+              <div className="mt-3 space-y-2">
+                <div className="h-4 w-48 animate-pulse rounded bg-gray-100" />
+                <div className="h-4 w-28 animate-pulse rounded bg-gray-100" />
+              </div>
+              <div className="mt-3 h-9 w-full animate-pulse rounded-lg bg-gray-50" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-3 lg:grid-cols-3 2xl:grid-cols-4">
         {filteredCustomers.map((customer) => {
           const activeJobs = getActiveJobCount(customer, jobList);
@@ -710,6 +718,7 @@ export default function CustomersPage() {
           );
         })}
       </div>
+      )}
 
       {selectedCustomer && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-gray-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
