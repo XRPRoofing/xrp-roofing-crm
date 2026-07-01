@@ -403,7 +403,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black">
+    <div className="fixed inset-0 z-[10000] flex flex-col bg-black">
       {/* Camera viewfinder */}
       <div
         className="relative flex-1 overflow-hidden"

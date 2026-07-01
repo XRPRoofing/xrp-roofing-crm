@@ -597,9 +597,10 @@ async function uploadPhotoToStorage(
   }
 }
 
-/** Decode a `data:<mime>;base64,<payload>` URL into raw bytes, or null if not base64. */
+/** Decode a `data:<mime>;base64,<payload>` URL into raw bytes, or null if not base64.
+ *  Handles optional MIME parameters like codecs: `data:video/webm;codecs=vp9,opus;base64,...` */
 function dataUrlToBytes(dataUrl: string): { mime: string; bytes: Uint8Array } | null {
-  const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl);
+  const match = /^data:([^;,]+)(?:;(?!base64)[^;,]*)*;base64,([\s\S]*)$/.exec(dataUrl);
   if (!match) return null;
   try {
     const mime = match[1];
