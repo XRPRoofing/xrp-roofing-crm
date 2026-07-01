@@ -456,9 +456,35 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
           )}
         </div>
 
+        {/* Photo / Video mode toggle — placed at top so it's visible above mobile nav bars */}
+        <div className="absolute left-1/2 top-14 -translate-x-1/2 z-10">
+          <div className="flex items-center gap-1 rounded-full bg-black/60 p-1 backdrop-blur-sm">
+            <button
+              type="button"
+              disabled={recording}
+              onClick={() => setCaptureMode("photo")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
+                captureMode === "photo" ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"
+              } ${recording ? "opacity-50" : ""}`}
+            >
+              <Camera className="h-3.5 w-3.5" /> Photo
+            </button>
+            <button
+              type="button"
+              disabled={recording}
+              onClick={() => setCaptureMode("video")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
+                captureMode === "video" ? "bg-red-600 text-white" : "text-white/60 hover:text-white"
+              } ${recording ? "opacity-50" : ""}`}
+            >
+              <Video className="h-3.5 w-3.5" /> Video
+            </button>
+          </div>
+        </div>
+
         {/* Recording indicator */}
         {recording && (
-          <div className="absolute left-1/2 top-16 -translate-x-1/2 flex items-center gap-2 rounded-full bg-red-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
+          <div className="absolute left-1/2 top-[6.5rem] -translate-x-1/2 flex items-center gap-2 rounded-full bg-red-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
             <span className="h-3 w-3 animate-pulse rounded-full bg-white" />
             REC {formatTime(recordingTime)}
           </div>
@@ -466,14 +492,14 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
 
         {/* "Photo/Video Saved" toast */}
         {toast && !recording && (
-          <div className="absolute left-1/2 top-16 -translate-x-1/2 flex items-center gap-2 rounded-full bg-emerald-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
+          <div className="absolute left-1/2 top-[6.5rem] -translate-x-1/2 flex items-center gap-2 rounded-full bg-emerald-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
             <CheckCircle2 className="h-4 w-4" /> {captureMode === "video" ? "Video" : "Photo"} Saved
           </div>
         )}
 
         {/* Photo type badge + count */}
         {totalCount > 0 && !recording && (
-          <div className="absolute right-3 top-14 flex flex-col items-end gap-1.5">
+          <div className="absolute right-3 top-[6.5rem] flex flex-col items-end gap-1.5">
             <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-widest text-white ${accentColor}`}>{label}</span>
             <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-black text-white backdrop-blur-sm">
               {totalCount} file{totalCount !== 1 ? "s" : ""}
@@ -567,29 +593,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
           </p>
         )}
 
-        {/* Photo / Video mode toggle */}
-        <div className="flex items-center gap-1 rounded-full bg-black/60 p-1 backdrop-blur-sm">
-          <button
-            type="button"
-            disabled={recording}
-            onClick={() => setCaptureMode("photo")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
-              captureMode === "photo" ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"
-            } ${recording ? "opacity-50" : ""}`}
-          >
-            <Camera className="h-3.5 w-3.5" /> Photo
-          </button>
-          <button
-            type="button"
-            disabled={recording}
-            onClick={() => setCaptureMode("video")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
-              captureMode === "video" ? "bg-red-600 text-white" : "text-white/60 hover:text-white"
-            } ${recording ? "opacity-50" : ""}`}
-          >
-            <Video className="h-3.5 w-3.5" /> Video
-          </button>
-        </div>
+
       </div>
     </div>
   );
