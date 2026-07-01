@@ -3,6 +3,7 @@ import { buildIvrGreetingTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
+import { sendIncomingCallPushNotification } from "@/lib/push-notifications";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
 
@@ -38,6 +39,11 @@ function handleIncomingCall(formData: FormData, req: NextRequest) {
   if (attempt === 0) {
     after(async () => {
       const event = normalizeTwilioWebhookEvent("incoming_call", formData);
+
+      // Send push notification immediately so all devices ring
+      await sendIncomingCallPushNotification(event.from).catch((err) => {
+        console.error("[incoming-call] push notification failed:", err);
+      });
 
       // Publish an incoming_call event so the call appears on the
       // Conversations Board immediately — even if the caller abandons
