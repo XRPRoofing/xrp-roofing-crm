@@ -296,7 +296,8 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
       if (chunks.length === 0) return;
 
       const ext = mimeType.includes("mp4") ? "mp4" : "webm";
-      const blob = new Blob(chunks, { type: mimeType });
+      const baseMime = mimeType.split(";")[0];
+      const blob = new Blob(chunks, { type: baseMime });
       const videoName = `${label.toLowerCase()}-${Date.now()}.${ext}`;
 
       // Generate a thumbnail from the current video frame
