@@ -106,15 +106,7 @@ function formatPhoneDisplay(phone: string): string {
   return phone.startsWith("+") ? phone : `+${phone}`;
 }
 
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "Answered": return "text-green-600 bg-green-50";
-    case "No Answer": case "Busy": case "Canceled": return "text-orange-600 bg-orange-50";
-    case "Failed": return "text-red-600 bg-red-50";
-    case "Ringing": return "text-blue-600 bg-blue-50";
-    default: return "text-gray-600 bg-gray-50";
-  }
-}
+
 
 function getDispositionColor(d: string): string {
   switch (d) {
@@ -516,11 +508,6 @@ export default function PhonePage() {
                     </div>
                     <p className="text-xs text-gray-500">{call.phone ? formatPhoneDisplay(call.phone) : "No number"}</p>
                   </div>
-
-                  {/* Status */}
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${getStatusColor(call.status)}`}>
-                    {call.status}
-                  </span>
 
                   {/* Duration */}
                   <div className="shrink-0 flex items-center gap-1 text-xs text-gray-500">
