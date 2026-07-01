@@ -18,6 +18,7 @@ import {
   addJobPhotos,
   assembleCrewJobs,
   buildOptimisticPhotosFromData,
+  deleteJobPhoto,
   deleteJobRecord,
   ensureSeedJobs,
   joinCrewPresence,
@@ -652,13 +653,27 @@ export default function CrewWorkflowPage() {
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">{Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-20 w-full animate-pulse rounded-lg bg-gray-200" />)}</div>
                 ) : (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">{selectedPhotos.map((photo) => (
-                    <button key={photo.id} type="button" onClick={() => setLabelPickerPhoto(photo)} className="group relative h-20 w-full overflow-hidden rounded-lg">
-                      <Image src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-full w-full object-cover" />
-                      {photo.photoType && photo.photoType !== "Job Photo" && (
-                        <span className={`absolute left-1 top-1 rounded px-1.5 py-0.5 text-[9px] font-black uppercase text-white ${photo.photoType === "Before" ? "bg-blue-600" : photo.photoType === "After" ? "bg-emerald-600" : "bg-orange-500"}`}>{photo.photoType}</span>
-                      )}
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-bold text-white opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">Change Label</span>
-                    </button>
+                    <div key={photo.id} className="group relative h-20 w-full overflow-hidden rounded-lg">
+                      <button type="button" onClick={() => setLabelPickerPhoto(photo)} className="h-full w-full">
+                        <Image src={photo.dataUrl} alt={photo.name || "Crew uploaded completion"} width={400} height={240} loading="lazy" unoptimized className="h-full w-full object-cover" />
+                        {photo.photoType && photo.photoType !== "Job Photo" && (
+                          <span className={`absolute left-1 top-1 rounded px-1.5 py-0.5 text-[9px] font-black uppercase text-white ${photo.photoType === "Before" ? "bg-blue-600" : photo.photoType === "After" ? "bg-emerald-600" : "bg-orange-500"}`}>{photo.photoType}</span>
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-bold text-white opacity-0 transition group-hover:bg-black/30 group-hover:opacity-100">Change Label</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm("Delete this photo?")) return;
+                          await deleteJobPhoto(photo.id);
+                          await refresh();
+                          if (selectedJobId) setSelectedPhotos(await loadJobPhotos(selectedJobId));
+                        }}
+                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ))}</div>
                 )}
                 {!photosLoading && selectedPhotos.length === 0 && <p className="mt-1.5 text-xs font-semibold text-gray-500">No photos uploaded yet.</p>}

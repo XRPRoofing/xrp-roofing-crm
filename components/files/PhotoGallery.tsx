@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText,
   ImageDown, Info, Map, MessageCircle, Pencil, Play, Share2,
-  Shield, Smartphone, Star, Tag, Video, X,
+  Shield, Smartphone, Star, Tag, Trash2, Video, X,
 } from "lucide-react";
 
 type PhotoTypeOption = "Before" | "Progress" | "After" | "Job Photo";
@@ -80,6 +80,7 @@ const MORE_MENU_ITEMS: { icon: React.ReactNode; label: string }[] = [
   { icon: <Download className="h-5 w-5" />, label: "Save to Device" },
   { icon: <Star className="h-5 w-5" />, label: "Set as Cover Photo" },
   { icon: <FileText className="h-5 w-5" />, label: "Create Report" },
+  { icon: <Trash2 className="h-5 w-5 text-red-500" />, label: "Delete" },
 ];
 
 async function sharePhoto(photo: GalleryPhoto) {
@@ -109,6 +110,7 @@ function LightboxViewer({
   onEdit,
   onDownload,
   onChangeType,
+  onDelete,
 }: {
   photo: GalleryPhoto;
   pool: GalleryPhoto[];
@@ -118,9 +120,11 @@ function LightboxViewer({
   onEdit?: (photo: GalleryPhoto) => void;
   onDownload: (photo: GalleryPhoto) => void;
   onChangeType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
+  onDelete?: (photoId: string) => void;
 }) {
   const [showMore, setShowMore] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   function showToast(msg: string) {
@@ -380,11 +384,17 @@ function LightboxViewer({
                       if (win) { win.document.write(`<html><body style="margin:0"><img src="${photo.dataUrl}" style="max-width:100%" onload="window.print()" /></body></html>`); win.document.close(); }
                     } else if (item.label === "Create Report") {
                       showToast("Create Report feature coming soon");
+                    } else if (item.label === "Delete" && onDelete) {
+                      setConfirmDelete(true);
                     }
                   }}
-                  className="flex w-full items-center gap-4 px-6 py-3.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100"
+                  className={`flex w-full items-center gap-4 px-6 py-3.5 text-left text-sm font-semibold hover:bg-slate-50 active:bg-slate-100 ${
+                    item.label === "Delete" ? "text-red-600" : "text-slate-800"
+                  } ${item.label === "Delete" && !onDelete ? "hidden" : ""}`}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                    item.label === "Delete" ? "bg-red-50 text-red-500" : "bg-slate-100 text-slate-700"
+                  }`}>
                     {item.icon}
                   </span>
                   {item.label}
@@ -398,6 +408,37 @@ function LightboxViewer({
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation dialog ── */}
+      {confirmDelete && onDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60" onClick={() => setConfirmDelete(false)}>
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+            <p className="text-lg font-bold text-slate-900">Delete {isVideoFile(photo) ? "video" : "photo"}?</p>
+            <p className="mt-1 text-sm text-slate-500">This will permanently remove this file. This cannot be undone.</p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(photo.id);
+                  setConfirmDelete(false);
+                  if (pool.length <= 1) { onClose(); return; }
+                  if (activeIndex >= pool.length - 1) onNav(activeIndex - 1);
+                }}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -519,12 +560,14 @@ export default function PhotoGallery({
   onFilterChange,
   onEditPhoto,
   onChangePhotoType,
+  onDeletePhoto,
 }: {
   photos: GalleryPhoto[];
   activeFilter?: PhotoType | "General";
   onFilterChange?: (filter: PhotoType | "All") => void;
   onEditPhoto?: (photo: GalleryPhoto) => void;
   onChangePhotoType?: (photo: GalleryPhoto, newType: PhotoTypeOption) => void;
+  onDeletePhoto?: (photoId: string) => void;
 }) {
   const [lightboxPool, setLightboxPool] = useState<GalleryPhoto[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -826,6 +869,7 @@ export default function PhotoGallery({
           onEdit={onEditPhoto}
           onDownload={downloadPhoto}
           onChangeType={onChangePhotoType}
+          onDelete={onDeletePhoto}
         />
       )}
 

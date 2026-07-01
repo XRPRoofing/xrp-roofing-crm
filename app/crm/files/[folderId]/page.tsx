@@ -312,6 +312,14 @@ export default function FolderGalleryPage() {
                     setError(e instanceof Error ? e.message : "Failed to change photo type.");
                   }
                 }}
+                onDeletePhoto={async (photoId) => {
+                  try {
+                    await deleteJobPhoto(photoId);
+                    await refresh();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Failed to delete photo.");
+                  }
+                }}
               />
             </section>
           )}
