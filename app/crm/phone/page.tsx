@@ -216,24 +216,34 @@ export default function PhonePage() {
           || (event.from || event.to || "");
       }
       const customer = matchCustomerByPhone(phone, phoneLookup);
-      const duration = typeof payload.CallDuration === "number"
-        ? payload.CallDuration
-        : typeof payload.Duration === "number"
-          ? payload.Duration
-          : typeof payload.duration === "number"
-            ? payload.duration
-            : 0;
+      // Calculate duration from timestamps if available, else use payload fields
+      let duration = 0;
+      if (payload.StartTime && payload.EndTime) {
+        duration = Math.round((new Date(payload.EndTime as string).getTime() - new Date(payload.StartTime as string).getTime()) / 1000);
+      } else if (payload.start_time && payload.end_time) {
+        duration = Math.round((new Date(payload.end_time as string).getTime() - new Date(payload.start_time as string).getTime()) / 1000);
+      } else if (typeof payload.CallDuration === "number") {
+        duration = payload.CallDuration;
+      } else if (typeof payload.Duration === "number") {
+        duration = payload.Duration;
+      } else if (typeof payload.duration === "number") {
+        duration = payload.duration;
+      }
+      if (duration < 0) duration = 0;
 
       // Determine display name and tag
       const forwarded = isForwardedCall(event);
       let displayName: string;
       let tag: CallRecord["tag"];
 
-      if (forwarded && !customer && !phone) {
-        displayName = "Forwarded Call";
-        tag = "Forwarded";
-      } else if (forwarded) {
-        displayName = customer?.name || (phone ? formatPhoneDisplay(phone) : "Forwarded Call");
+      // For forwarded calls, also try to extract original number
+      const forwardedFrom = forwarded
+        ? (typeof payload.ForwardedFrom === "string" && payload.ForwardedFrom ? payload.ForwardedFrom : "")
+        : "";
+
+      if (forwarded) {
+        const origNumber = forwardedFrom || phone;
+        displayName = customer?.name || (origNumber ? formatPhoneDisplay(origNumber) : "Forwarded Call");
         tag = "Forwarded";
       } else if (customer?.name) {
         displayName = customer.name;
@@ -285,7 +295,15 @@ export default function PhonePage() {
 
     const result: ContactRecord[] = [];
     for (const [phone, data] of phoneMap) {
-      const customerJobs = jobs.filter((j) => j.phone === phone || (data.customer && (j.email === data.customer.email || j.name === data.customer.name)));
+      // Only match jobs by exact normalized phone number — no fuzzy name/email matching
+      const normPhone = phone.replace(/\D/g, "");
+      const norm10 = normPhone.length === 11 && normPhone.startsWith("1") ? normPhone.slice(1) : normPhone;
+      const customerJobs = jobs.filter((j) => {
+        if (!j.phone) return false;
+        const jDigits = j.phone.replace(/\D/g, "");
+        const jNorm = jDigits.length === 11 && jDigits.startsWith("1") ? jDigits.slice(1) : jDigits;
+        return jNorm === norm10 && norm10.length >= 10;
+      });
       result.push({
         id: phone,
         name: data.customer?.name || data.calls[0]?.customerName || phone,
