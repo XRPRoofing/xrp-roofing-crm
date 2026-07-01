@@ -239,6 +239,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           const phone = incoming.parameters?.From || "Unknown number";
           incomingCallRef.current = incoming;
           setGlobalIncomingCall({ name: phone, phone });
+
+
           incoming.on("cancel", () => {
             incomingCallRef.current = null;
             setGlobalIncomingCall(null);
@@ -454,9 +456,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     void deleteNotificationFromSupabase(notificationId);
   }
 
-  // --- Ringtone + vibration when ringing ---
+  // --- Ringtone + vibration + browser notification when ringing ---
   const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
   const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const incomingNotifRef = useRef<InstanceType<typeof Notification> | null>(null);
   useEffect(() => {
     if (globalIncomingCall) {
       const audio = new Audio("/sounds/ringtone.mp3");
@@ -468,17 +471,33 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         navigator.vibrate([300, 200, 300, 200, 300]);
         vibrateTimerRef.current = setInterval(() => navigator.vibrate([300, 200, 300, 200, 300]), 2000);
       }
+      // Browser notification — visible even when CRM tab is not focused
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const n = new Notification("Incoming Call", {
+          body: `Call from ${globalIncomingCall.phone}`,
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
+          tag: "incoming-call",
+          requireInteraction: true,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+        incomingNotifRef.current = n;
+      }
     } else {
       ringtoneAudioRef.current?.pause();
       ringtoneAudioRef.current = null;
       if (vibrateTimerRef.current) { clearInterval(vibrateTimerRef.current); vibrateTimerRef.current = null; }
       navigator.vibrate?.(0);
+      incomingNotifRef.current?.close();
+      incomingNotifRef.current = null;
     }
     return () => {
       ringtoneAudioRef.current?.pause();
       ringtoneAudioRef.current = null;
       if (vibrateTimerRef.current) { clearInterval(vibrateTimerRef.current); vibrateTimerRef.current = null; }
       navigator.vibrate?.(0);
+      incomingNotifRef.current?.close();
+      incomingNotifRef.current = null;
     };
   }, [globalIncomingCall]);
 
