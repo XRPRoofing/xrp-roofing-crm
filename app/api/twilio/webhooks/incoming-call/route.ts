@@ -41,9 +41,11 @@ function handleIncomingCall(formData: FormData, req: NextRequest) {
       const event = normalizeTwilioWebhookEvent("incoming_call", formData);
 
       // Send push notification immediately so all devices ring
-      await sendIncomingCallPushNotification(event.from).catch((err) => {
-        console.error("[incoming-call] push notification failed:", err);
+      const pushResult = await sendIncomingCallPushNotification(event.from).catch((err) => {
+        console.error("[incoming-call] push notification threw:", err);
+        return { sent: 0, reason: String(err) };
       });
+      console.log("[incoming-call] push result:", JSON.stringify(pushResult));
 
       // Publish an incoming_call event so the call appears on the
       // Conversations Board immediately — even if the caller abandons

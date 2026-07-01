@@ -25,14 +25,21 @@ async function subscribeToPush(registration: ServiceWorkerRegistration) {
       });
     }
 
-    // Always re-register with backend to associate user_id with this device
-    await fetch("/api/push/subscribe", {
+    // Send subscription to backend so incoming calls can send push notifications
+    const res = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(subscription),
     });
-  } catch {
-    // Push subscription failed — non-critical, ignore silently
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error("[PwaRegistrar] push subscribe failed:", res.status, body);
+    } else {
+      console.log("[PwaRegistrar] push subscription registered successfully");
+    }
+  } catch (err) {
+    console.error("[PwaRegistrar] push subscription error:", err);
   }
 }
 
