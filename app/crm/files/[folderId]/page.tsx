@@ -282,7 +282,7 @@ export default function FolderGalleryPage() {
               </button>
               <label className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100 ${uploading ? "opacity-60" : ""}`}>
                 <UploadCloud className="h-4 w-4" /> Upload
-                <input type="file" accept="image/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType === "General" ? "Job Photo" : activePhotoType); event.target.value = ""; }} />
+                <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={uploading} onChange={(event) => { void addPhotos(event.target.files, activePhotoType === "General" ? "Job Photo" : activePhotoType); event.target.value = ""; }} />
               </label>
               <button onClick={() => setShowReport(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-orange-50 border border-orange-200 px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-100">
                 <ClipboardList className="h-4 w-4" /> Report

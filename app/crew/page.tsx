@@ -304,7 +304,7 @@ export default function CrewPortalPage() {
                           </button>
                           <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-2 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
                             <UploadCloud className="h-4 w-4" /> Upload
-                            <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
+                            <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={(event) => void handlePhotoUpload(selectedJob, type, event.target.files)} />
                           </label>
                         </div>
                       </div>

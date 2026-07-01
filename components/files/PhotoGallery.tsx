@@ -4,8 +4,8 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText,
-  ImageDown, Info, Map, MessageCircle, Pencil, Share2,
-  Shield, Smartphone, Star, Tag, X,
+  ImageDown, Info, Map, MessageCircle, Pencil, Play, Share2,
+  Shield, Smartphone, Star, Tag, Video, X,
 } from "lucide-react";
 
 type PhotoTypeOption = "Before" | "Progress" | "After" | "Job Photo";
@@ -27,6 +27,16 @@ export type GalleryPhoto = {
 };
 
 type PhotoType = "Before" | "Progress" | "After" | "Job Photo";
+
+/** Check if a gallery item is a video based on name or dataUrl MIME. */
+function isVideoFile(item: { name?: string; dataUrl?: string }): boolean {
+  const name = item.name?.toLowerCase() ?? "";
+  if (/\.(webm|mp4|mov|avi|mkv)$/.test(name)) return true;
+  if (item.dataUrl?.startsWith("data:video/")) return true;
+  const url = item.dataUrl?.toLowerCase() ?? "";
+  if (/\.(webm|mp4|mov)(\?|$)/.test(url)) return true;
+  return false;
+}
 
 function formatUploadedAt(value?: string) {
   if (!value) return null;
@@ -159,7 +169,7 @@ function LightboxViewer({
         </button>
       </div>
 
-      {/* ── Full-screen photo ── */}
+      {/* ── Full-screen photo/video ── */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         {pool.length > 1 && (
           <button
@@ -171,13 +181,24 @@ function LightboxViewer({
           </button>
         )}
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.dataUrl}
-          alt={photo.name}
-          className="max-h-full max-w-full select-none object-contain"
-          draggable={false}
-        />
+        {isVideoFile(photo) ? (
+          /* eslint-disable-next-line jsx-a11y/media-has-caption */
+          <video
+            key={photo.id}
+            src={photo.dataUrl}
+            controls
+            autoPlay
+            className="max-h-full max-w-full select-none object-contain"
+          />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={photo.dataUrl}
+            alt={photo.name}
+            className="max-h-full max-w-full select-none object-contain"
+            draggable={false}
+          />
+        )}
 
         {pool.length > 1 && (
           <button
@@ -403,8 +424,25 @@ function PhotoGridCard({ photo, onOpen, onEditPhoto, onChangePhotoType }: {
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <button type="button" onClick={onOpen} className="relative block w-full" aria-label={`Open ${photo.name}`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.dataUrl} alt={photo.name} className="h-40 w-full object-cover transition group-hover:scale-105" />
+        {isVideoFile(photo) ? (
+          <div className="relative h-40 w-full bg-slate-900">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video src={photo.dataUrl} className="h-full w-full object-cover transition group-hover:scale-105" preload="metadata" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+                <Play className="h-5 w-5 ml-0.5" />
+              </span>
+            </div>
+            <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-black text-white">
+              <Video className="h-3 w-3" /> VIDEO
+            </span>
+          </div>
+        ) : (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photo.dataUrl} alt={photo.name} className="h-40 w-full object-cover transition group-hover:scale-105" />
+          </>
+        )}
       </button>
       {/* Photo type badge — tappable to change */}
       <div className="absolute bottom-12 right-2 z-10">

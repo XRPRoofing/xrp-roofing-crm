@@ -6,22 +6,24 @@
  * - Keeps camera live after each shot (no OS confirmation screen)
  * - Auto-saves immediately on capture
  * - Flash control: Off / On / Auto (torch via video track)
+ * - Video recording: record short clips with audio via MediaRecorder
  * - Zoom: 0.5× / 1× / 2× pills + pinch-to-zoom gesture on mobile
  * - HIDDEN / IMAGE / OUTLINE view-mode tab bar
- * - "Photo Saved" toast + running count
- * - Thumbnail strip of captured photos
+ * - "Photo Saved" / "Video Saved" toast + running count
+ * - Thumbnail strip of captured photos/videos
  * - X button to close
  * Falls back gracefully on devices where getUserMedia is unavailable.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, ChevronRight, Info, X, Zap, ZapOff } from "lucide-react";
+import { Camera, CheckCircle2, ChevronRight, Info, Video, X, Zap, ZapOff } from "lucide-react";
 
 export type CapturedPhoto = {
   dataUrl: string;
   name: string;
 };
 
+type CaptureMode = "photo" | "video";
 type ViewMode = "HIDDEN" | "IMAGE" | "OUTLINE";
 type FlashMode = "off" | "on" | "auto";
 type ZoomLevel = 0.5 | 1 | 2;
@@ -54,6 +56,13 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [flashSupported, setFlashSupported] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("IMAGE");
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("photo");
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pinch-to-zoom state
@@ -91,6 +100,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     void startCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [startCamera]);
 
@@ -240,16 +250,138 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
     });
   }, [label, onCapture, flashMode, flashSupported]);
 
+  // --- Video recording ---
+  const startRecording = useCallback(async () => {
+    const videoStream = streamRef.current;
+    if (!videoStream) return;
+
+    // Get audio stream separately
+    let audioStream: MediaStream | null = null;
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      audioStreamRef.current = audioStream;
+    } catch {
+      // No audio permission — record video-only
+    }
+
+    // Combine video + audio tracks
+    const combinedTracks = [...videoStream.getVideoTracks()];
+    if (audioStream) combinedTracks.push(...audioStream.getAudioTracks());
+    const combinedStream = new MediaStream(combinedTracks);
+
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : MediaRecorder.isTypeSupported("video/webm")
+          ? "video/webm"
+          : "video/mp4";
+
+    const recorder = new MediaRecorder(combinedStream, { mimeType });
+    recordedChunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      // Stop the recording timer
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+
+      // Stop audio stream
+      audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current = null;
+
+      const chunks = recordedChunksRef.current;
+      if (chunks.length === 0) return;
+
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      const blob = new Blob(chunks, { type: mimeType });
+      const videoName = `${label.toLowerCase()}-${Date.now()}.${ext}`;
+
+      // Generate a thumbnail from the current video frame
+      const video = videoRef.current;
+      const thumbCanvas = document.createElement("canvas");
+      thumbCanvas.width = 160;
+      thumbCanvas.height = 90;
+      if (video) {
+        thumbCanvas.getContext("2d")?.drawImage(video, 0, 0, 160, 90);
+      }
+      const thumbUrl = thumbCanvas.toDataURL("image/jpeg", 0.5);
+
+      setCount((c) => c + 1);
+      setThumbs((prev) => [...prev, thumbUrl]);
+      setToast(true);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(false), 1800);
+
+      savingCount.current += 1;
+      setSavingDisplay(savingCount.current);
+
+      const saveVideo = async () => {
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        await Promise.resolve(onCapture({ dataUrl, name: videoName }));
+      };
+
+      void saveVideo().finally(() => {
+        savingCount.current -= 1;
+        setSavingDisplay(savingCount.current);
+      });
+
+      setRecording(false);
+      setRecordingTime(0);
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start(1000); // collect data every second
+    setRecording(true);
+    setRecordingTime(0);
+    recordingTimerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+  }, [label, onCapture]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
   // Hardware shutter button via volume keys / Enter
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void capture(); }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (captureMode === "video") {
+          if (recording) stopRecording(); else void startRecording();
+        } else {
+          void capture();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [capture]);
+  }, [capture, captureMode, recording, startRecording, stopRecording]);
 
   const totalCount = existingCount + count;
+
+  const formatTime = useCallback((seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }, []);
 
   const cycleFlash = useCallback(() => {
     setFlashMode((current) => {
@@ -324,19 +456,27 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
           )}
         </div>
 
-        {/* "Photo Saved" toast */}
-        {toast && (
+        {/* Recording indicator */}
+        {recording && (
+          <div className="absolute left-1/2 top-16 -translate-x-1/2 flex items-center gap-2 rounded-full bg-red-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
+            <span className="h-3 w-3 animate-pulse rounded-full bg-white" />
+            REC {formatTime(recordingTime)}
+          </div>
+        )}
+
+        {/* "Photo/Video Saved" toast */}
+        {toast && !recording && (
           <div className="absolute left-1/2 top-16 -translate-x-1/2 flex items-center gap-2 rounded-full bg-emerald-600/90 px-4 py-2 text-sm font-black text-white backdrop-blur-sm">
-            <CheckCircle2 className="h-4 w-4" /> Photo Saved
+            <CheckCircle2 className="h-4 w-4" /> {captureMode === "video" ? "Video" : "Photo"} Saved
           </div>
         )}
 
         {/* Photo type badge + count */}
-        {totalCount > 0 && (
+        {totalCount > 0 && !recording && (
           <div className="absolute right-3 top-14 flex flex-col items-end gap-1.5">
             <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-widest text-white ${accentColor}`}>{label}</span>
             <span className="rounded-full bg-black/50 px-2.5 py-1 text-xs font-black text-white backdrop-blur-sm">
-              {totalCount} photo{totalCount !== 1 ? "s" : ""}
+              {totalCount} file{totalCount !== 1 ? "s" : ""}
             </span>
           </div>
         )}
@@ -391,40 +531,64 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
           ))}
         </div>
 
-        {/* Shutter button */}
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() => void capture()}
-          className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white shadow-xl transition active:scale-90 active:bg-white/20"
-          aria-label="Take photo"
-        >
-          <span className="h-14 w-14 rounded-full bg-white" />
-        </button>
+        {/* Shutter / Record button */}
+        {captureMode === "video" ? (
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={() => { if (recording) stopRecording(); else void startRecording(); }}
+            className={`flex h-20 w-20 items-center justify-center rounded-full border-4 shadow-xl transition active:scale-90 ${
+              recording ? "border-white bg-black/20" : "border-red-500"
+            }`}
+            aria-label={recording ? "Stop recording" : "Start recording"}
+          >
+            {recording ? (
+              <span className="h-8 w-8 rounded-md bg-red-500" />
+            ) : (
+              <span className="h-14 w-14 rounded-full bg-red-500" />
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={() => void capture()}
+            className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white shadow-xl transition active:scale-90 active:bg-white/20"
+            aria-label="Take photo"
+          >
+            <span className="h-14 w-14 rounded-full bg-white" />
+          </button>
+        )}
 
         {/* Background upload indicator */}
         {savingDisplay > 0 && (
           <p className="text-xs font-bold text-white/70 animate-pulse">
-            Uploading {savingDisplay} photo{savingDisplay !== 1 ? "s" : ""}…
+            Uploading {savingDisplay} file{savingDisplay !== 1 ? "s" : ""}…
           </p>
         )}
 
-        {/* HIDDEN / IMAGE / OUTLINE tab bar */}
-        <div className="flex w-full items-center justify-center gap-0">
-          {(["HIDDEN", "IMAGE", "OUTLINE"] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              className={`flex-1 py-2 text-[11px] font-black uppercase tracking-widest transition ${
-                viewMode === mode
-                  ? "rounded-full bg-[#0A3D91] text-white"
-                  : "text-white/50 hover:text-white"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
+        {/* Photo / Video mode toggle */}
+        <div className="flex items-center gap-1 rounded-full bg-black/60 p-1 backdrop-blur-sm">
+          <button
+            type="button"
+            disabled={recording}
+            onClick={() => setCaptureMode("photo")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
+              captureMode === "photo" ? "bg-[#0A3D91] text-white" : "text-white/60 hover:text-white"
+            } ${recording ? "opacity-50" : ""}`}
+          >
+            <Camera className="h-3.5 w-3.5" /> Photo
+          </button>
+          <button
+            type="button"
+            disabled={recording}
+            onClick={() => setCaptureMode("video")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black transition ${
+              captureMode === "video" ? "bg-red-600 text-white" : "text-white/60 hover:text-white"
+            } ${recording ? "opacity-50" : ""}`}
+          >
+            <Video className="h-3.5 w-3.5" /> Video
+          </button>
         </div>
       </div>
     </div>
