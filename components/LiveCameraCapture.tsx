@@ -394,7 +394,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   // Fallback: getUserMedia not supported
   if (camError) {
     return (
-      <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-4 bg-black p-6">
+      <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-4 bg-black p-6">
         <p className="text-center text-sm font-bold text-white">Camera not available on this device/browser.</p>
         <p className="text-center text-xs text-slate-400">Use the Upload button instead, or open in Chrome/Safari.</p>
         <button type="button" onClick={onClose} className="rounded-2xl bg-white px-6 py-3 text-sm font-black text-slate-900">Close</button>
@@ -403,7 +403,7 @@ export default function LiveCameraCapture({ label, accentColor, onCapture, onClo
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black">
+    <div className="fixed inset-0 z-[10000] flex flex-col bg-black">
       {/* Camera viewfinder */}
       <div
         className="relative flex-1 overflow-hidden"

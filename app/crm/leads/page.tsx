@@ -1897,7 +1897,9 @@ export default function LeadsPage() {
             existingCount={existingCount}
             onCapture={async (photo) => {
               const blob = await fetch(photo.dataUrl).then((r) => r.blob());
-              const file = new File([blob], photo.name, { type: "image/jpeg" });
+              const isVideo = /\.(webm|mp4|mov)$/i.exec(photo.name);
+              const mimeType = isVideo ? `video/${isVideo[1].toLowerCase()}` : "image/jpeg";
+              const file = new File([blob], photo.name, { type: mimeType });
               const dt = new DataTransfer();
               dt.items.add(file);
               await handleJobFileUpload(liveCamera.type, dt.files);
