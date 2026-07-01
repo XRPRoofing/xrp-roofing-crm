@@ -13,19 +13,26 @@ function urlBase64ToUint8Array(base64String: string) {
 
 async function subscribeToPush(registration: ServiceWorkerRegistration) {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publicKey) return;
+  if (!publicKey) {
+    console.warn("[PwaRegistrar] NEXT_PUBLIC_VAPID_PUBLIC_KEY not set — push disabled");
+    return;
+  }
 
   try {
-    let subscription = await registration.pushManager.getSubscription();
-
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+    // Always unsubscribe old subscription and create fresh one to avoid
+    // stale/mismatched VAPID key issues that silently prevent delivery
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      await existing.unsubscribe();
+      console.log("[PwaRegistrar] unsubscribed stale push subscription");
     }
 
-    // Send subscription to backend so incoming calls can send push notifications
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    // Send fresh subscription to backend
     const res = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
