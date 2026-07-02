@@ -470,26 +470,58 @@ export default function PhonePage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gray-50">
       {/* ----------------------------------------------------------------- */}
+      {/* Active call sticky bar (mobile)                                    */}
+      {/* ----------------------------------------------------------------- */}
+      {stats.activeCalls > 0 && (
+        <div className="sticky top-0 z-40 flex items-center justify-between bg-green-600 px-4 py-2.5 text-white lg:hidden">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
+            </span>
+            <div>
+              <p className="text-xs font-bold">Active Call</p>
+              <p className="text-[11px] opacity-80">{stats.activeCalls} call{stats.activeCalls > 1 ? "s" : ""} in progress</p>
+            </div>
+          </div>
+          <Headphones className="h-5 w-5 opacity-80" />
+        </div>
+      )}
+
+      {/* ----------------------------------------------------------------- */}
       {/* Top bar — phone numbers + title                                    */}
       {/* ----------------------------------------------------------------- */}
       <div className="border-b border-gray-200 bg-white px-4 py-3 lg:px-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <Phone className="h-5 w-5" />
+        {/* Desktop header */}
+        <div className="hidden items-center gap-3 lg:flex">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <Phone className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">Phone</h1>
+            <div className="flex items-center gap-3">
+              {twilioLines.map((line) => (
+                <span key={line.key} className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                  {line.label}{" "}
+                  <span className="font-mono text-gray-400">{formatPhoneDisplay(line.number)}</span>
+                </span>
+              ))}
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Phone</h1>
-              <div className="flex items-center gap-3">
-                {twilioLines.map((line) => (
-                  <span key={line.key} className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                    {line.label}{" "}
-                    <span className="font-mono text-gray-400">{formatPhoneDisplay(line.number)}</span>
-                  </span>
-                ))}
+          </div>
+        </div>
+
+        {/* Mobile header — compact with swipeable number pills */}
+        <div className="lg:hidden">
+          <h1 className="text-base font-bold text-gray-900">Phone</h1>
+          <div className="mt-1.5 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {twilioLines.map((line) => (
+              <div key={line.key} className="flex shrink-0 items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-xs font-semibold text-gray-700">{line.label}</span>
+                <span className="font-mono text-[11px] text-gray-400">{formatPhoneDisplay(line.number)}</span>
               </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -500,17 +532,17 @@ export default function PhonePage() {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition lg:px-4 lg:text-sm ${
                 activeTab === tab
                   ? "border-blue-600 text-blue-600"
                   : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
               }`}
             >
-              {tab === "Calls" && <PhoneCall className="mr-1.5 inline h-3.5 w-3.5" />}
-              {tab === "Phone Numbers" && <Phone className="mr-1.5 inline h-3.5 w-3.5" />}
-              {tab === "Call Analytics" && <BarChart3 className="mr-1.5 inline h-3.5 w-3.5" />}
-              {tab === "Blocked Numbers" && <ShieldBan className="mr-1.5 inline h-3.5 w-3.5" />}
-              {tab === "Voicemail" && <Voicemail className="mr-1.5 inline h-3.5 w-3.5" />}
+              {tab === "Calls" && <PhoneCall className="mr-1 inline h-3.5 w-3.5" />}
+              {tab === "Phone Numbers" && <Phone className="mr-1 inline h-3.5 w-3.5" />}
+              {tab === "Call Analytics" && <BarChart3 className="mr-1 inline h-3.5 w-3.5" />}
+              {tab === "Blocked Numbers" && <ShieldBan className="mr-1 inline h-3.5 w-3.5" />}
+              {tab === "Voicemail" && <Voicemail className="mr-1 inline h-3.5 w-3.5" />}
               {tab}
             </button>
           ))}
@@ -523,8 +555,24 @@ export default function PhonePage() {
       <div className="flex-1 overflow-y-auto">
         {activeTab === "Calls" && (
           <div className="flex flex-col">
-            {/* Stats cards */}
-            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-6 lg:px-6">
+            {/* ========== Mobile compact stats ========== */}
+            <div className="grid grid-cols-3 gap-2 p-3 lg:hidden">
+              <div className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">
+                <p className="text-lg font-bold text-red-600">{stats.missed}</p>
+                <p className="text-[10px] font-semibold text-gray-500">Missed</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">
+                <p className="text-lg font-bold text-green-600">{stats.inbound}</p>
+                <p className="text-[10px] font-semibold text-gray-500">Inbound</p>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">
+                <p className="text-lg font-bold text-blue-600">{stats.outbound}</p>
+                <p className="text-[10px] font-semibold text-gray-500">Outbound</p>
+              </div>
+            </div>
+
+            {/* ========== Desktop stats cards ========== */}
+            <div className="hidden grid-cols-6 gap-3 p-4 lg:grid lg:px-6">
               <StatCard icon={PhoneMissed} iconColor="text-red-600" iconBg="bg-red-50" label="Missed Calls" value={stats.missed} />
               <StatCard icon={PhoneIncoming} iconColor="text-green-600" iconBg="bg-green-50" label="Inbound Calls" value={stats.inbound} />
               <StatCard icon={PhoneOutgoing} iconColor="text-blue-600" iconBg="bg-blue-50" label="Outbound Calls" value={stats.outbound} />
@@ -533,15 +581,34 @@ export default function PhonePage() {
               <StatCard icon={PhoneCall} iconColor="text-gray-600" iconBg="bg-gray-100" label="Total Calls" value={stats.total} />
             </div>
 
-            {/* Filter bar */}
-            <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-6">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {/* ========== Mobile search (always visible) ========== */}
+            <div className="px-3 pb-2 lg:hidden">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search customer or phone..."
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ========== Filter bar ========== */}
+            <div className="flex flex-col gap-2 border-b border-gray-200 bg-white px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:px-6 lg:py-3">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide lg:gap-2">
                 {CALL_FILTERS.map((f) => (
                   <button
                     key={f}
                     type="button"
                     onClick={() => setCallFilter(f)}
-                    className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition lg:px-3.5 ${
                       callFilter === f ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
@@ -549,8 +616,9 @@ export default function PhonePage() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1 sm:w-64 sm:flex-none">
+              {/* Desktop search + pagination */}
+              <div className="hidden items-center gap-3 lg:flex">
+                <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -578,19 +646,123 @@ export default function PhonePage() {
               </div>
             </div>
 
-            {/* Call history table */}
-            <div className="overflow-x-auto">
+            {/* ========== Mobile call cards ========== */}
+            <div className="divide-y divide-gray-100 lg:hidden">
+              {paginatedCalls.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <PhoneOff className="h-10 w-10" />
+                  <p className="mt-2 text-sm font-semibold">No calls yet</p>
+                  <p className="text-xs">Start making or receiving calls.</p>
+                </div>
+              )}
+              {paginatedCalls.map((call) => (
+                <div key={call.id} className="bg-white px-4 py-3 active:bg-gray-50">
+                  <div className="flex items-start gap-3">
+                    {/* Direction icon */}
+                    <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                      call.statusColor === "red" ? "bg-red-50" : call.statusColor === "blue" ? "bg-blue-50" : call.statusColor === "orange" ? "bg-orange-50" : "bg-green-50"
+                    }`}>
+                      {call.statusColor === "red" ? (
+                        <PhoneMissed className={`h-5 w-5 text-red-500`} />
+                      ) : call.direction === "inbound" ? (
+                        <ArrowDownLeft className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <ArrowUpRight className="h-5 w-5 text-blue-600" />
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
+                        {call.tag === "Forwarded" && (
+                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-orange-50 text-orange-600">Fwd</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {call.direction === "inbound" ? "Incoming Call" : "Outgoing Call"}
+                        {call.twilioLine ? ` · ${call.twilioLine}` : ""}
+                      </p>
+                      <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {call.duration}
+                        </span>
+                        <span>{call.dateTime}</span>
+                      </div>
+                      {call.disposition && (
+                        <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>
+                          {call.disposition}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Status dot */}
+                    <StatusDot color={call.statusColor} />
+                  </div>
+
+                  {/* Quick action buttons */}
+                  <div className="mt-2.5 flex items-center gap-2 pl-[52px]">
+                    {call.phone && (
+                      <button
+                        type="button"
+                        onClick={() => handleCallBack(call.phone)}
+                        className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 active:bg-green-100"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        Call Back
+                      </button>
+                    )}
+                    {call.customerId && (
+                      <a
+                        href={`/crm/customers?id=${call.customerId}`}
+                        className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 active:bg-blue-100"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Customer
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
+                      className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600 active:bg-gray-200"
+                    >
+                      + Tag
+                    </button>
+                  </div>
+
+                  {/* Mobile disposition picker */}
+                  {showDispositionPicker === call.id && (
+                    <div className="mt-2 ml-[52px] flex flex-wrap gap-1.5">
+                      {LEAD_DISPOSITIONS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => handleDisposition(call.phone, d)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${getDispositionColor(d)} active:opacity-70`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ========== Desktop call history table ========== */}
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500 lg:px-6">Status</th>
+                    <th className="px-6 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">From</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">To</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Duration</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Disposition</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Line</th>
-                    <th className="px-3 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500 lg:pr-6">Quick Action</th>
+                    <th className="pr-6 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Quick Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -609,14 +781,12 @@ export default function PhonePage() {
                       onClick={() => setSelectedCallId(selectedCallId === call.id ? null : call.id)}
                       className={`cursor-pointer transition hover:bg-blue-50/50 ${selectedCallId === call.id ? "bg-blue-50/60" : ""}`}
                     >
-                      {/* Status */}
-                      <td className="px-4 py-3 lg:px-6">
+                      <td className="px-6 py-3">
                         <div className="flex items-center gap-2">
                           <StatusDot color={call.statusColor} />
                           <span className="text-sm font-semibold text-gray-800">{call.status}</span>
                         </div>
                       </td>
-                      {/* From */}
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           {call.direction === "inbound" ? (
@@ -630,22 +800,18 @@ export default function PhonePage() {
                           </div>
                         </div>
                       </td>
-                      {/* To */}
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.to ? formatPhoneDisplay(call.to) : "-"}</p>
                       </td>
-                      {/* Time */}
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.dateTime}</p>
                       </td>
-                      {/* Duration */}
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <Clock className="h-3 w-3 text-gray-400" />
                           {call.duration}
                         </div>
                       </td>
-                      {/* Disposition */}
                       <td className="px-3 py-3">
                         <div className="relative">
                           {call.disposition ? (
@@ -690,12 +856,10 @@ export default function PhonePage() {
                           )}
                         </div>
                       </td>
-                      {/* Line */}
                       <td className="px-3 py-3">
                         <p className="text-xs text-gray-400">{call.twilioLine || "-"}</p>
                       </td>
-                      {/* Quick Actions */}
-                      <td className="px-3 py-3 lg:pr-6">
+                      <td className="pr-6 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           {call.phone && (
                             <button
@@ -741,9 +905,9 @@ export default function PhonePage() {
               </div>
             )}
 
-            {/* Expanded call detail */}
+            {/* Desktop expanded call detail */}
             {selectedCall && (
-              <div className="border-t border-blue-200 bg-blue-50/30 px-4 py-4 lg:px-6">
+              <div className="hidden border-t border-blue-200 bg-blue-50/30 px-6 py-4 lg:block">
                 <div className="flex flex-wrap items-start gap-6">
                   <div>
                     <p className="text-xs font-bold uppercase text-gray-400">Customer</p>
