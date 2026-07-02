@@ -241,19 +241,40 @@ export default function FloatingDialer({
   }, [callState, onCallStateChange]);
 
   // Listen for custom events from Phone page to open SMS / New Job panels
+  // Store pending action so it can be applied after the dialer opens
+  const pendingActionRef = useRef<{ type: "sms" | "job"; phone: string; name?: string } | null>(null);
+
+  useEffect(() => {
+    // If dialer just opened and there's a pending action, execute it
+    if (open && pendingActionRef.current) {
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      setTimeout(() => {
+        if (action.type === "sms") openSmsPanel(action.phone, action.name);
+        else openNewJobForm(action.phone, action.name);
+      }, 50);
+    }
+  }); // runs every render to catch open transitions
+
   useEffect(() => {
     function handleOpenSms(e: Event) {
       const detail = (e as CustomEvent).detail as { phone: string; name?: string } | undefined;
-      if (detail?.phone) {
-        if (!open) window.dispatchEvent(new CustomEvent("crm:open-dialer"));
-        setTimeout(() => openSmsPanel(detail.phone, detail.name), 100);
+      if (!detail?.phone) return;
+      if (open) {
+        openSmsPanel(detail.phone, detail.name);
+      } else {
+        pendingActionRef.current = { type: "sms", phone: detail.phone, name: detail.name };
+        window.dispatchEvent(new CustomEvent("crm:open-dialer"));
       }
     }
     function handleOpenNewJob(e: Event) {
       const detail = (e as CustomEvent).detail as { phone: string; name?: string } | undefined;
-      if (detail?.phone) {
-        if (!open) window.dispatchEvent(new CustomEvent("crm:open-dialer"));
-        setTimeout(() => openNewJobForm(detail.phone, detail.name), 100);
+      if (!detail?.phone) return;
+      if (open) {
+        openNewJobForm(detail.phone, detail.name);
+      } else {
+        pendingActionRef.current = { type: "job", phone: detail.phone, name: detail.name };
+        window.dispatchEvent(new CustomEvent("crm:open-dialer"));
       }
     }
     window.addEventListener("crm:open-sms", handleOpenSms);
