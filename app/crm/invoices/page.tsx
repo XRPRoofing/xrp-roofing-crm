@@ -10,7 +10,7 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { getCachedInvoices, refreshInvoices, getCachedCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -263,21 +263,14 @@ function readWonProposals(existingInvoices: Invoice[]) {
 
   try {
     const proposals = JSON.parse(savedProposals) as StoredProposal[];
-    const crewData = getCachedCrewData();
-    const currentJobs = crewData?.jobs ?? [];
     const invoicedProposalIds = new Set(existingInvoices.filter((inv) => inv.proposalReference).map((inv) => inv.proposalReference));
 
     const wonStatuses = new Set(["Won", "Approved", "Signed", "Signed Offline"]);
 
     return proposals
       .filter((proposal) => {
-        if (!wonStatuses.has(proposal.status)) return false;
-        const jobId = proposal.job?.id;
-        if (!jobId) return true; // include proposals without job link if won
-        const currentJob = currentJobs.find((j) => j.id === jobId);
-        const stage = currentJob?.stage ?? proposal.job?.stage;
-        // Include jobs that are approved, scheduled, in_progress, completed, or paid
-        return stage === "approved" || stage === "scheduled" || stage === "in_progress" || stage === "final_inspection" || stage === "completed" || stage === "paid";
+        // Show ALL proposals with Won/Signed/Approved status regardless of job stage
+        return wonStatuses.has(proposal.status);
       })
       .map((proposal) => ({ ...proposal, hasInvoice: invoicedProposalIds.has(proposal.id) }))
       .sort((a, b) => {
@@ -2297,7 +2290,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                       const pkg = getProposalSelectedPackage(proposal);
                       return (
                         <option key={proposal.id} value={`proposal:${proposal.id}`} disabled={proposal.hasInvoice}>
-                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.proposalNumber ? `#${proposal.proposalNumber}` : proposal.status} • {currency(pkg.price)}{proposal.hasInvoice ? " (invoiced)" : ""}
+                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.status} • ${pkg.price.toLocaleString()}{proposal.hasInvoice ? " (invoiced)" : ""}
                         </option>
                       );
                     })
