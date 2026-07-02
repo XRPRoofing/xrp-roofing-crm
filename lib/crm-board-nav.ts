@@ -22,7 +22,8 @@ export type BoardJobPayload = {
 
 export type BoardIntent =
   | { kind: "open"; id: string }
-  | { kind: "create"; job: BoardJobPayload };
+  | { kind: "create"; job: BoardJobPayload }
+  | { kind: "create-from-proposal"; proposalId: string };
 
 const ESTIMATE_KEY = "crm-board-estimate-intent";
 const INVOICE_KEY = "crm-board-invoice-intent";
@@ -89,4 +90,5 @@ export const takeEstimateIntent = () => takeIntent(ESTIMATE_KEY);
 
 export const requestOpenInvoice = (id: string) => setIntent(INVOICE_KEY, { kind: "open", id });
 export const requestCreateInvoice = (job: BoardJobPayload) => setIntent(INVOICE_KEY, { kind: "create", job });
+export const requestCreateInvoiceFromProposal = (proposalId: string) => setIntent(INVOICE_KEY, { kind: "create-from-proposal", proposalId });
 export const takeInvoiceIntent = () => takeIntent(INVOICE_KEY);

@@ -14,9 +14,9 @@ import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
-import { payloadToLead, takeEstimateIntent, requestCreateInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
+import { payloadToLead, takeEstimateIntent, requestCreateInvoiceFromProposal, requestOpenInvoice } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import { getCachedCrewData, getCachedProposals, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { createClient } from "@/lib/supabase/client";
 import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
@@ -920,7 +920,9 @@ export default function ProposalsPage() {
       if (existing) openProposal(existing);
       return;
     }
-    createEstimateFromLead(payloadToLead(intent.job));
+    if (intent.kind === "create") {
+      createEstimateFromLead(payloadToLead(intent.job));
+    }
   }, [dataLoaded, proposals]);
 
   // Push every local change to the shared store so other devices see it. Diffing
@@ -1754,20 +1756,42 @@ export default function ProposalsPage() {
     setShowResetSignatureConfirm(false);
   }
 
+  function getLinkedInvoiceId(proposalId: string): string | null {
+    type InvRef = { id: string; proposalReference?: string; isDeleted?: boolean };
+    // Check in-memory cache first (populated by CrmShell warm-up)
+    const cached = getCachedInvoices<InvRef>() ?? [];
+    const fromCache = cached.find((inv) => inv.proposalReference === proposalId && !inv.isDeleted);
+    if (fromCache) return fromCache.id;
+    // Fallback to localStorage
+    try {
+      const raw = window.localStorage.getItem("xrp-crm-invoices");
+      if (!raw) return null;
+      const invoices = JSON.parse(raw) as InvRef[];
+      const match = invoices.find((inv) => inv.proposalReference === proposalId && !inv.isDeleted);
+      return match?.id ?? null;
+    } catch { return null; }
+  }
+
   function handleConvertToInvoice() {
     if (!activeProposal) return;
-    const payload: BoardJobPayload = {
-      id: activeProposal.job?.id || activeProposal.id,
-      name: activeProposal.customerName,
-      email: activeProposal.customerEmail || "",
-      phone: activeProposal.customerPhone || "",
-      address: activeProposal.address,
-      city: "",
-      roofType: activeProposal.scope?.split("\n")[0] || "Roofing",
-      value: activeProposal.acceptedPrice ?? activeProposal.total,
-    };
-    requestCreateInvoice(payload);
+    // Prevent duplicate — check if invoice already exists for this proposal
+    const existingId = getLinkedInvoiceId(activeProposal.id);
+    if (existingId) {
+      requestOpenInvoice(existingId);
+      router.push("/crm/invoices");
+      return;
+    }
+    requestCreateInvoiceFromProposal(activeProposal.id);
     router.push("/crm/invoices");
+  }
+
+  function handleViewLinkedInvoice() {
+    if (!activeProposal) return;
+    const existingId = getLinkedInvoiceId(activeProposal.id);
+    if (existingId) {
+      requestOpenInvoice(existingId);
+      router.push("/crm/invoices");
+    }
   }
 
   function handleDuplicateProposal() {
@@ -1837,7 +1861,14 @@ export default function ProposalsPage() {
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
             <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700">🔒 {activeProposal.status}</span>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
-            <button type="button" onClick={handleConvertToInvoice} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Convert To Invoice</button>
+            {getLinkedInvoiceId(activeProposal.id) ? (
+              <>
+                <span className="shrink-0 rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-700">✓ Invoice Created</span>
+                <button type="button" onClick={handleViewLinkedInvoice} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">View Invoice</button>
+              </>
+            ) : (
+              <button type="button" onClick={handleConvertToInvoice} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Convert To Invoice</button>
+            )}
             <button type="button" onClick={handleDuplicateProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Duplicate Proposal</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Resend Email</button>
             <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Resend SMS</button>

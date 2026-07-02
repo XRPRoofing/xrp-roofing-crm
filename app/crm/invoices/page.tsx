@@ -769,14 +769,41 @@ export default function InvoicesPage() {
       pushInvoiceHash();
       return;
     }
-    setInvoices((current) => {
-      const created: Invoice = {
-        ...createInvoiceFromJob(payloadToLead(intent.job), current.length),
-        id: `inv-${Date.now()}`,
-      };
-      setSelectedInvoiceId(created.id);
-      return [created, ...current];
-    });
+    if (intent.kind === "create-from-proposal") {
+      // Look up the proposal from cache/localStorage and create a fully
+      // populated invoice using all proposal fields.
+      const allProposals = readWonProposals([]);
+      const proposal = allProposals.find((p) => p.id === intent.proposalId);
+      if (proposal) {
+        // Prevent duplicate: check if an invoice already references this proposal
+        const existing = invoices.find((inv) => inv.proposalReference === proposal.id && !inv.isDeleted);
+        if (existing) {
+          setSelectedInvoiceId(existing.id);
+          pushInvoiceHash();
+          return;
+        }
+        setInvoices((current) => {
+          const created: Invoice = {
+            ...createInvoiceFromProposal(proposal, current.length),
+            id: `inv-${Date.now()}`,
+          };
+          void upsertInvoiceRecord(created as unknown as Record<string, unknown> & { id: string });
+          setSelectedInvoiceId(created.id);
+          return [created, ...current];
+        });
+      }
+      return;
+    }
+    if (intent.kind === "create") {
+      setInvoices((current) => {
+        const created: Invoice = {
+          ...createInvoiceFromJob(payloadToLead(intent.job), current.length),
+          id: `inv-${Date.now()}`,
+        };
+        setSelectedInvoiceId(created.id);
+        return [created, ...current];
+      });
+    }
   }, []);
 
   // Always sync to localStorage as offline cache / backup for Supabase failures
