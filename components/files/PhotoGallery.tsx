@@ -330,10 +330,16 @@ function LightboxViewer({
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           <span className="text-[10px] font-bold">Approve</span>
         </button>
-        <button type="button" className="flex flex-col items-center gap-1 text-white/70 hover:text-white active:scale-90">
-          <Map className="h-6 w-6" />
-          <span className="text-[10px] font-bold">Map</span>
-        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="flex flex-col items-center gap-1 text-red-400 hover:text-red-300 active:scale-90"
+          >
+            <Trash2 className="h-6 w-6" />
+            <span className="text-[10px] font-bold">Delete</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowMore(true)}
