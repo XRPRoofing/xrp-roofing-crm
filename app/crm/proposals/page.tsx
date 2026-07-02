@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
@@ -14,7 +14,7 @@ import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
-import { payloadToLead, takeEstimateIntent } from "@/lib/crm-board-nav";
+import { payloadToLead, takeEstimateIntent, requestCreateInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { getCachedCrewData, getCachedProposals, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { createClient } from "@/lib/supabase/client";
@@ -472,6 +472,7 @@ export default function ProposalsPage() {
   const [activeProposal, setActiveProposal] = useState<Proposal | null>(null);
   const proposalCardHashRef = useRef(false);
   const proposalSearchParams = useSearchParams();
+  const router = useRouter();
 
   const closeProposalCard = useCallback(() => {
     setActiveProposal(null);
@@ -1224,7 +1225,7 @@ export default function ProposalsPage() {
       depositAddToFuture: proposal.depositAddToFuture || false,
     });
     setEditorBrochures(proposal.brochures || []);
-    setIsPreviewing(false);
+    setIsPreviewing(isProposalLocked(proposal));
     setActiveSection("Estimate");
     setActiveProposal(proposal);
     window.location.hash = "#card";
@@ -1753,6 +1754,62 @@ export default function ProposalsPage() {
     setShowResetSignatureConfirm(false);
   }
 
+  function handleConvertToInvoice() {
+    if (!activeProposal) return;
+    const payload: BoardJobPayload = {
+      id: activeProposal.job?.id || activeProposal.id,
+      name: activeProposal.customerName,
+      email: activeProposal.customerEmail || "",
+      phone: activeProposal.customerPhone || "",
+      address: activeProposal.address,
+      city: "",
+      roofType: activeProposal.scope?.split("\n")[0] || "Roofing",
+      value: activeProposal.acceptedPrice ?? activeProposal.total,
+    };
+    requestCreateInvoice(payload);
+    router.push("/crm/invoices");
+  }
+
+  function handleDuplicateProposal() {
+    if (!activeProposal) return;
+    const duplicated: Proposal = {
+      ...activeProposal,
+      id: `proposal-${Date.now()}`,
+      proposalNumber: `XRP-P-${getNextUnifiedNumber()}`,
+      status: "Draft",
+      locked: false,
+      signedAt: undefined,
+      signedBy: undefined,
+      signatureData: undefined,
+      signatureDataUrl: undefined,
+      printedName: undefined,
+      acceptedAt: undefined,
+      acceptedPackage: undefined,
+      acceptedPackageName: undefined,
+      acceptedPrice: undefined,
+      sentAt: undefined,
+      sentBy: undefined,
+      sentToEmail: undefined,
+      sentViaSms: undefined,
+      smsSentAt: undefined,
+      smsSentBy: undefined,
+      smsSentToPhone: undefined,
+      offlineSignedAt: undefined,
+      offlineSignedBy: undefined,
+      offlineSignatureFile: undefined,
+      offlineSignatureFileName: undefined,
+      viewCount: undefined,
+      firstViewedAt: undefined,
+      lastViewedAt: undefined,
+      viewedAt: undefined,
+      createdAt: new Date().toISOString(),
+    };
+    setProposals((current) => [duplicated, ...current]);
+    void upsertProposalRecord(duplicated as unknown as Parameters<typeof upsertProposalRecord>[0]);
+    openProposal(duplicated);
+    showSaveToast("Proposal duplicated as Draft");
+  }
+
   function handleInspectionPhotoUpload(index: number, file: File | undefined) {
     if (!file) return;
 
@@ -1776,24 +1833,31 @@ export default function ProposalsPage() {
             <div className="hidden text-sm font-semibold text-gray-700 md:block">{editorForm.address}</div>
           </div>
           {/* Row 2 — action buttons, scrollable on mobile */}
+          {isProposalLocked(activeProposal) ? (
           <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{activeProposal.status === "Viewed" || activeProposal.status === "Approved" ? `Viewed${(activeProposal.viewCount || 0) > 1 ? ` (${activeProposal.viewCount})` : ""}` : activeProposal.status}</span>
+            <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700">🔒 {activeProposal.status}</span>
+            <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
+            <button type="button" onClick={handleConvertToInvoice} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Convert To Invoice</button>
+            <button type="button" onClick={handleDuplicateProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Duplicate Proposal</button>
+            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Resend Email</button>
+            <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Resend SMS</button>
+            <label className="shrink-0 cursor-pointer rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">
+              Upload Signed Proposal
+              <input type="file" accept="image/*,.pdf" onChange={(event) => handleUploadSignedDocument(event.target.files?.[0])} className="hidden" />
+            </label>
+          </div>
+          ) : (
+          <div className="flex items-center gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+            <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">{activeProposal.status === "Viewed" || activeProposal.status === "Approved" ? `Viewed${(activeProposal.viewCount || 0) > 1 ? ` (${activeProposal.viewCount})` : ""}` : activeProposal.status}</span>
             <button type="button" onClick={handleSaveProposal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Save</button>
             <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
             <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">{activeProposal.status !== "Draft" ? "Resend Email" : "Send Email"}</button>
             <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">{activeProposal.status !== "Draft" ? "Resend SMS" : "Send SMS"}</button>
-            {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
-              <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 active:scale-95">Mark as Signed Offline</button>
-            )}
-            {(activeProposal.status === "Won" || activeProposal.status === "Signed" || activeProposal.status === "Signed Offline") && (
-              <label className="shrink-0 cursor-pointer rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">
-                Upload Signed Proposal
-                <input type="file" accept="image/*,.pdf" onChange={(event) => handleUploadSignedDocument(event.target.files?.[0])} className="hidden" />
-              </label>
-            )}
+            <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">Mark as Signed Offline</button>
           </div>
+          )}
         </div>
 
         {/* Sent Tracking Info */}
@@ -1811,9 +1875,9 @@ export default function ProposalsPage() {
 
         {/* View Tracking Info */}
         {activeProposal.viewCount && activeProposal.viewCount > 0 && (
-          <div className="border-b border-orange-100 bg-orange-50 px-4 py-3 print:hidden">
+          <div className="border-b border-blue-100 bg-blue-50 px-4 py-3 print:hidden">
             <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 text-xs text-gray-600">
-              <span className="font-bold text-orange-700">Views: {activeProposal.viewCount}</span>
+              <span className="font-bold text-blue-700">Views: {activeProposal.viewCount}</span>
               {activeProposal.firstViewedAt && <span>First viewed: {azDateTime(activeProposal.firstViewedAt)}</span>}
               {activeProposal.lastViewedAt && <span>Last viewed: {azDateTime(activeProposal.lastViewedAt)}</span>}
             </div>
@@ -1848,8 +1912,8 @@ export default function ProposalsPage() {
               </div>
               {(activeProposal.signatureData || activeProposal.signatureDataUrl) && <Image src={(activeProposal.signatureData || activeProposal.signatureDataUrl) as string} alt="Customer signature" width={360} height={110} className="mt-3 max-h-28 w-auto rounded-lg border border-gray-200 bg-white object-contain p-2" />}
               {activeProposal.status === "Signed Offline" && (
-                <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">Signed In Person</p>
+                <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Signed In Person</p>
                   <p className="mt-0.5 text-sm text-gray-700">Signed by: {activeProposal.offlineSignedBy || activeProposal.customerName}</p>
                   {activeProposal.offlineSignedAt && <p className="text-xs text-gray-500">Date: {new Date(activeProposal.offlineSignedAt).toLocaleDateString()} at {new Date(activeProposal.offlineSignedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
                 </div>
