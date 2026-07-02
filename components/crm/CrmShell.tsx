@@ -772,7 +772,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         </aside>
         {/* Skeleton content area */}
         <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
+          <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
             <div className="h-5 w-32 animate-pulse rounded bg-gray-200" />
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
@@ -940,7 +940,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <div className={`flex min-w-0 flex-1 flex-col overflow-x-clip transition-all duration-200 ${collapsed ? "lg:pl-[68px]" : "lg:pl-64"}`}>
         {/* Top Header */}
-        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
+        <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             {/* Hamburger (mobile) */}
             <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden">
