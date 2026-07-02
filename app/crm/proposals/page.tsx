@@ -507,6 +507,11 @@ export default function ProposalsPage() {
   const [showOfflineSignModal, setShowOfflineSignModal] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [offlineSignerName, setOfflineSignerName] = useState("");
+  const [offlineSignMode, setOfflineSignMode] = useState<"draw" | "type">("draw");
+  const [offlineTypedSig, setOfflineTypedSig] = useState("");
+  const offlineSigCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offlineSigDrawingRef = useRef(false);
+  const offlineSigHasDrawnRef = useRef(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [typedSignature, setTypedSignature] = useState("");
   const [showResetSignatureConfirm, setShowResetSignatureConfirm] = useState(false);
@@ -1631,11 +1636,35 @@ export default function ProposalsPage() {
   function handleOpenOfflineSignModal() {
     if (!activeProposal) return;
     setOfflineSignerName(activeProposal.customerName || "");
+    setOfflineSignMode("draw");
+    setOfflineTypedSig("");
+    offlineSigHasDrawnRef.current = false;
     setShowOfflineSignModal(true);
   }
 
   function handleMarkSignedOffline() {
     if (!activeProposal) return;
+
+    // Capture signature data
+    let signatureDataUrl = "";
+    if (offlineSignMode === "draw" && offlineSigCanvasRef.current && offlineSigHasDrawnRef.current) {
+      signatureDataUrl = offlineSigCanvasRef.current.toDataURL("image/png");
+    } else if (offlineSignMode === "type" && offlineTypedSig.trim()) {
+      // Generate image from typed signature using a temporary canvas
+      const tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = 400;
+      tmpCanvas.height = 120;
+      const tmpCtx = tmpCanvas.getContext("2d");
+      if (tmpCtx) {
+        tmpCtx.fillStyle = "#ffffff";
+        tmpCtx.fillRect(0, 0, 400, 120);
+        tmpCtx.font = "italic 36px 'Georgia', serif";
+        tmpCtx.fillStyle = "#1a1a1a";
+        tmpCtx.textBaseline = "middle";
+        tmpCtx.fillText(offlineTypedSig.trim(), 20, 60);
+      }
+      signatureDataUrl = tmpCanvas.toDataURL("image/png");
+    }
 
     const acceptedOption = activeProposal.selectedOption || "best";
     const acceptedPrice = Number(editorForm.total) || activeProposal.total || 0;
@@ -1647,6 +1676,8 @@ export default function ProposalsPage() {
       signedAt,
       signedBy: offlineSignerName.trim() || activeProposal.customerName,
       printedName: offlineSignerName.trim() || activeProposal.customerName,
+      signatureDataUrl: signatureDataUrl || undefined,
+      signatureData: signatureDataUrl || undefined,
       selectedOption: acceptedOption,
       acceptedPackage: acceptedOption,
       acceptedPackageName: acceptedOption.charAt(0).toUpperCase() + acceptedOption.slice(1),
@@ -1815,7 +1846,8 @@ export default function ProposalsPage() {
               {activeProposal.status === "Signed Offline" && (
                 <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">Signed In Person</p>
-                  <p className="mt-0.5 text-sm text-gray-700">This proposal was signed offline (in person) by {activeProposal.offlineSignedBy || activeProposal.customerName}.</p>
+                  <p className="mt-0.5 text-sm text-gray-700">Signed by: {activeProposal.offlineSignedBy || activeProposal.customerName}</p>
+                  {activeProposal.offlineSignedAt && <p className="text-xs text-gray-500">Date: {new Date(activeProposal.offlineSignedAt).toLocaleDateString()} at {new Date(activeProposal.offlineSignedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
                 </div>
               )}
               {activeProposal.offlineSignatureFile && (
@@ -2296,22 +2328,126 @@ export default function ProposalsPage() {
           </main>
         </div>
         {showOfflineSignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50">
-            <div className="w-full max-w-md rounded-lg bg-white p-7 shadow-2xl">
-              <div className="flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-5 pb-3">
                 <h2 className="text-lg font-bold text-gray-900">Mark as Signed Offline</h2>
                 <button type="button" onClick={() => setShowOfflineSignModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
               </div>
-              <p className="mt-3 text-sm text-gray-600">Record that this proposal was signed in person. The proposal will be locked and marked as accepted.</p>
-              <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gray-500">
-                Signed by (customer name)
-                <input value={offlineSignerName} onChange={(event) => setOfflineSignerName(event.target.value)} className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm font-semibold text-blue-700 outline-none focus:border-blue-500" placeholder="Customer full name" />
-              </label>
-              <div className="mt-6 flex items-center gap-3">
-                <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-lg border border-gray-200 px-5 py-3 text-sm font-bold text-gray-600">Cancel</button>
-                <button type="button" onClick={handleMarkSignedOffline} className="flex-1 rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-orange-600">Confirm Signed Offline</button>
+              <div className="px-6 pb-5">
+                <p className="text-sm text-gray-600">Capture the customer&apos;s handwritten signature. The proposal will be locked and marked as accepted.</p>
+
+                {/* Customer Name */}
+                <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                  Customer Full Name (Printed)
+                  <input value={offlineSignerName} onChange={(e) => setOfflineSignerName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-800 outline-none focus:border-blue-500" placeholder="Customer full name" />
+                </label>
+
+                {/* Signature Mode Tabs */}
+                <div className="mt-4 flex rounded-lg border border-gray-200 overflow-hidden">
+                  <button type="button" onClick={() => setOfflineSignMode("draw")} className={`flex-1 px-4 py-2 text-xs font-bold transition ${offlineSignMode === "draw" ? "bg-blue-600 text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}>✏️ Draw Signature</button>
+                  <button type="button" onClick={() => setOfflineSignMode("type")} className={`flex-1 px-4 py-2 text-xs font-bold transition ${offlineSignMode === "type" ? "bg-blue-600 text-white" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}>⌨️ Type Signature</button>
+                </div>
+
+                {/* Draw Mode — Signature Canvas */}
+                {offlineSignMode === "draw" && (
+                  <div className="mt-3">
+                    <div className="relative rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                      <canvas
+                        ref={(el) => {
+                          offlineSigCanvasRef.current = el;
+                          if (el && !el.dataset.inited) {
+                            el.dataset.inited = "1";
+                            const ctx = el.getContext("2d");
+                            if (ctx) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, el.width, el.height); }
+                          }
+                        }}
+                        width={440}
+                        height={140}
+                        className="w-full cursor-crosshair touch-none rounded-lg"
+                        onPointerDown={(e) => {
+                          offlineSigDrawingRef.current = true;
+                          offlineSigHasDrawnRef.current = true;
+                          const canvas = e.currentTarget;
+                          const rect = canvas.getBoundingClientRect();
+                          const ctx = canvas.getContext("2d");
+                          if (!ctx) return;
+                          ctx.beginPath();
+                          ctx.moveTo((e.clientX - rect.left) * (canvas.width / rect.width), (e.clientY - rect.top) * (canvas.height / rect.height));
+                          canvas.setPointerCapture(e.pointerId);
+                        }}
+                        onPointerMove={(e) => {
+                          if (!offlineSigDrawingRef.current) return;
+                          const canvas = e.currentTarget;
+                          const rect = canvas.getBoundingClientRect();
+                          const ctx = canvas.getContext("2d");
+                          if (!ctx) return;
+                          ctx.lineWidth = 2.5;
+                          ctx.lineCap = "round";
+                          ctx.strokeStyle = "#1a1a1a";
+                          ctx.lineTo((e.clientX - rect.left) * (canvas.width / rect.width), (e.clientY - rect.top) * (canvas.height / rect.height));
+                          ctx.stroke();
+                        }}
+                        onPointerUp={() => { offlineSigDrawingRef.current = false; }}
+                        onPointerLeave={() => { offlineSigDrawingRef.current = false; }}
+                      />
+                      <p className="absolute bottom-2 left-3 text-[10px] text-gray-400 pointer-events-none">Sign here using finger or mouse</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const canvas = offlineSigCanvasRef.current;
+                        if (!canvas) return;
+                        const ctx = canvas.getContext("2d");
+                        if (ctx) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+                        offlineSigHasDrawnRef.current = false;
+                      }}
+                      className="mt-2 text-xs font-bold text-red-500 hover:text-red-700"
+                    >
+                      Clear Signature
+                    </button>
+                  </div>
+                )}
+
+                {/* Type Mode */}
+                {offlineSignMode === "type" && (
+                  <div className="mt-3">
+                    <input
+                      value={offlineTypedSig}
+                      onChange={(e) => setOfflineTypedSig(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-4 py-4 text-2xl italic text-gray-800 outline-none focus:border-blue-500"
+                      style={{ fontFamily: "Georgia, serif" }}
+                      placeholder="Type signature here"
+                    />
+                    {offlineTypedSig && (
+                      <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Preview</p>
+                        <p className="text-2xl italic text-gray-800" style={{ fontFamily: "Georgia, serif" }}>{offlineTypedSig}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Date/Time display */}
+                <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
+                  <span>Date: {new Date().toLocaleDateString()}</span>
+                  <span>Time: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="mt-5 flex items-center gap-3">
+                  <button type="button" onClick={() => setShowOfflineSignModal(false)} className="flex-1 rounded-lg border border-gray-200 px-5 py-3 text-sm font-bold text-gray-600">Cancel</button>
+                  <button
+                    type="button"
+                    onClick={handleMarkSignedOffline}
+                    disabled={!offlineSignerName.trim() || (offlineSignMode === "draw" && !offlineSigHasDrawnRef.current) || (offlineSignMode === "type" && !offlineTypedSig.trim())}
+                    className="flex-1 rounded-lg bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm Signed Offline
+                  </button>
+                </div>
+                <p className="mt-3 text-xs text-gray-400">Signature, printed name, date and time will be saved with the proposal.</p>
               </div>
-              <p className="mt-4 text-xs text-gray-500">After confirming, you can upload a photo or PDF of the signed document using the &ldquo;Upload Signed Proposal&rdquo; button.</p>
             </div>
           </div>
         )}
