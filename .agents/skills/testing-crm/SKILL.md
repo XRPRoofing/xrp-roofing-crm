@@ -141,6 +141,45 @@ Each section (Before / Progress / After) has "Take Photo" + "Upload Photo". On d
 
 Uploading to one section increments only that section's count — good regression check (verify the other two stay unchanged).
 
+## Camera video recording & gallery video display
+The `LiveCameraCapture` component supports Photo and Video modes. `PhotoGallery` detects videos via `isVideoFile()` and renders VIDEO badge + play icon on thumbnails, and `<video controls autoPlay>` in the lightbox.
+
+### Testing camera/video locally (no physical camera)
+The VM has no physical camera, so you must inject a fake `getUserMedia` override. The recommended approach:
+
+1. **Create a temporary test page** (e.g. `/app/test-camera/page.tsx`) that renders `LiveCameraCapture` and `PhotoGallery` directly, bypassing the data layer. This is necessary because `normalizeSupabaseUrl()` in `lib/supabase/url.ts` has a hardcoded fallback URL that makes `hasSupabaseConfig()` always return true, so folder pages try to fetch from Supabase instead of localStorage even in local mode.
+
+2. **Fake getUserMedia** — create a canvas stream with `canvas.captureStream(30)` and override `navigator.mediaDevices.getUserMedia`. Key lessons:
+   - Return the **original** canvas stream tracks, NOT cloned tracks. Cloned canvas tracks don't produce data for `MediaRecorder`.
+   - Override `track.stop()` to be a no-op so component cleanup doesn't kill the canvas stream.
+   - Patch `track.getCapabilities()` to return `{ torch: true, zoom: { min: 1, max: 10 } }` to make the flash toggle visible.
+   - For audio, use `AudioContext.createMediaStreamDestination()` with a silent oscillator.
+
+3. **MediaRecorder limitation**: `MediaRecorder` with canvas `captureStream()` may not produce data chunks reliably in headless/CI environments, causing the `onstop` handler to exit early (`if (chunks.length === 0) return`). This means video recording **stop and save** cannot be fully tested end-to-end without a real camera. The recording **start** (timer, stop button, disabled toggle) works fine.
+
+### What CAN be tested locally
+- Photo/Video mode toggle (blue Photo tab ↔ red Video tab)
+- Video mode shutter button (red circle for record, red square for stop)
+- Recording indicator (REC 00:XX with pulsing dot)
+- Mode toggle disabled during recording
+- Photo capture regression (still produces `.jpg`, shows "Photo Saved" toast)
+- Flash control cycling (OFF → ON → AUTO → OFF)
+- Video display in gallery (VIDEO badge + play icon on thumbnails)
+- Video playback in lightbox (`<video>` element with native controls)
+- File upload `accept="image/*,video/*"` attribute on all upload inputs
+
+### What CANNOT be tested locally
+- Video recording stop → save → gallery flow (MediaRecorder doesn't produce chunks from canvas streams)
+- Actual flash/torch hardware control
+- Real camera stream quality, rotation, and compression
+- Video file size and format on real devices
+
+### Key files for camera/video
+- `components/LiveCameraCapture.tsx` — Camera overlay with Photo/Video modes, MediaRecorder, flash control
+- `components/files/PhotoGallery.tsx` — Gallery grid with `isVideoFile()`, VIDEO badge, play icon, lightbox `<video>` player
+- `app/crm/files/[folderId]/page.tsx` — File detail page with Camera button (line ~279)
+- `app/crm/leads/page.tsx`, `app/crew/page.tsx`, `app/crm/crew/page.tsx` — Upload inputs with `accept="image/*,video/*"`
+
 ## Verifying photo compression (PR #13 feature)
 Photos are compressed client-side before save (`lib/image-compress.ts`: longest edge ≤1600px, JPEG q0.7) to fix slow save/load.
 - Generate a realistic large test image (a tiny JPEG won't compress — the code keeps the original if smaller). Use PIL to make a noisy ~10MB 4000×3000 JPEG.
@@ -155,6 +194,25 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 - **Seeding a call_recording locally**: Twilio is off in local mode, so the call card won't render without data. To exercise it, temporarily seed a sample `call_recording` event in the `!result.ok` branch of `app/api/twilio/events/route.ts` (guard with `if (process.env.NEXT_PUBLIC_TEST_FORCE_LOCAL === "1")`, return an `events` array with one `call_status` + one `call_recording` event whose `payload.summary` and `payload.transcript` are set). **Revert this seed before merge** — confirm `git status` is clean. This may move into a proper local fixture later; if so, prefer that over hand-seeding.
 - **Summary generation speed** (the OpenAI prompt + `max_tokens` limit in `lib/twilio/recording-insights.ts`) is server-side and only runs on a real call in production — it can't be timed locally. Test the display/layout changes locally and state the latency caveat honestly.
 - At tablet width (~820px) the board switches to the mobile single-panel layout with the bottom nav; the inbox preview still shows the concise summary. Resize the window with `wmctrl` to test intermediate widths.
+
+## Proposal send flow & status sync
+The proposal send flow (Email and SMS) changes status from Draft → Sent. Key testing points:
+
+### Creating a test proposal
+1. Click "⊕ Proposal" → "New proposal" tab
+2. Fill customer name and email (address field may be disabled without Google Maps API key — use console: `document.querySelector('input[disabled]').removeAttribute('disabled')` to enable it)
+3. Click "Create proposal" → editor opens with Draft status
+
+### Send flow testing
+- **Draft state**: Buttons say "Send Email" / "Send SMS", status badge shows "Draft", no sent tracking bar
+- **After send**: Status changes to "Sent" BEFORE the email API call, so it works even without RESEND_API_KEY. The email send will fail with "Failed to Send Proposal" error locally, but the status change still happens.
+- **Sent state**: Buttons change to "Resend Email" / "Resend SMS", sky-blue tracking bar appears below toolbar showing "Sent via Email", timestamp, sender ("By: CRM User"), and recipient email
+- **Resend modal**: Title changes to "Resend proposal" (email) or "Resend proposal via SMS", buttons say "Resend"/"Resend SMS", a "Previously sent via Email" banner shows previous send details
+- **Confirmation dialog**: Browser `window.confirm()` asks "This proposal has already been sent. Are you sure you want to resend it?" — Cancel prevents resend, OK proceeds
+- **Proposal list**: Shows "Sent via Email by [user] to [email] • [timestamp]" in the description line, with "Sent" status badge
+
+### Activity logging
+`logCrewActivity()` is called on status change to "Sent" with details including the send method (Email/SMS), recipient, and status transition. This requires Supabase to persist — code review only locally.
 
 ## Known limitations when testing locally
 - **Optimistic "instant display" can't be proven in localStorage mode** — local saves are already instant, so optimistic vs normal render look identical. Its real payoff is over slow Supabase sync in production. State this honestly; don't claim the production speed-up was proven locally.

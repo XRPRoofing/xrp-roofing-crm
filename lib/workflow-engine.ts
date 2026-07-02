@@ -3,15 +3,46 @@
 // The engine is invoked by CRM pages when events fire.
 
 export type WorkflowTrigger =
+  // Jobs
   | "job_created"
+  | "job_scheduled"
   | "job_status_changed"
+  | "job_completed"
+  // Proposals
+  | "proposal_created"
   | "proposal_sent"
+  | "proposal_viewed"
   | "proposal_signed"
   | "proposal_not_signed"
+  | "proposal_expired"
+  // Invoices
+  | "invoice_created"
   | "invoice_sent"
+  | "invoice_viewed"
   | "invoice_paid"
+  | "invoice_overdue"
+  // Calls
+  | "call_missed"
+  | "call_incoming"
+  | "call_completed"
+  | "voicemail_received"
+  // Messages
+  | "sms_sent"
+  | "sms_received"
+  | "no_reply"
+  // Customers
+  | "customer_added"
+  | "customer_no_response"
+  // Calendar
   | "calendar_event_moved"
-  | "schedule_updated";
+  | "schedule_updated"
+  | "appointment_created"
+  // Files
+  | "photos_uploaded"
+  | "video_uploaded"
+  // Estimates
+  | "estimate_sent"
+  | "estimate_created";
 
 export type WorkflowConditionField =
   | "schedule_date_exists"
@@ -34,9 +65,13 @@ export type WorkflowActionType =
   | "move_job_to_stage"
   | "create_calendar_event"
   | "send_notification"
+  | "send_sms"
+  | "send_email"
   | "log_activity"
   | "mark_invoice_paid"
-  | "assign_crew";
+  | "assign_crew"
+  | "create_reminder"
+  | "notify_admin";
 
 export type WorkflowAction = {
   type: WorkflowActionType;
@@ -72,17 +107,52 @@ export type WorkflowLogEntry = {
 
 // ── Trigger metadata ─────────────────────────────────────────────────────────
 
-export const TRIGGER_META: Record<WorkflowTrigger, { label: string; description: string; icon: string }> = {
-  job_created:           { label: "Job Created",             description: "When a new job is added to the system",        icon: "➕" },
-  job_status_changed:    { label: "Job Status Changed",      description: "When a job moves to a different stage",         icon: "🔄" },
-  proposal_sent:         { label: "Proposal Sent",           description: "When a proposal is sent to a customer",         icon: "📤" },
-  proposal_signed:       { label: "Proposal Signed",         description: "When a customer signs/approves a proposal",     icon: "✍️" },
-  proposal_not_signed:   { label: "Proposal Not Signed",     description: "When proposal hasn't been signed after X time", icon: "⏰" },
-  invoice_sent:          { label: "Invoice Sent",            description: "When an invoice is sent to a customer",         icon: "📧" },
-  invoice_paid:          { label: "Payment Received",        description: "When customer payment is received",             icon: "💰" },
-  calendar_event_moved:  { label: "Calendar Event Moved",    description: "When a calendar event is dragged to new date",  icon: "📅" },
-  schedule_updated:      { label: "Schedule Updated",        description: "When a job schedule is changed",                icon: "🗓️" },
+export type TriggerCategory = "Jobs" | "Proposals" | "Invoices" | "Calls" | "Messages" | "Customers" | "Calendar" | "Files" | "Estimates";
+
+export const TRIGGER_META: Record<WorkflowTrigger, { label: string; description: string; icon: string; category: TriggerCategory }> = {
+  // Jobs
+  job_created:           { label: "Job Created",             description: "When a new job is added to the system",               icon: "➕", category: "Jobs" },
+  job_scheduled:         { label: "Job Scheduled",           description: "When a job gets a scheduled date/time",               icon: "📅", category: "Jobs" },
+  job_status_changed:    { label: "Job Status Changed",      description: "When a job moves to a different stage",               icon: "🔄", category: "Jobs" },
+  job_completed:         { label: "Job Completed",           description: "When a job is marked as completed",                   icon: "✅", category: "Jobs" },
+  // Proposals
+  proposal_created:      { label: "Proposal Created",        description: "When a new proposal is created",                      icon: "📋", category: "Proposals" },
+  proposal_sent:         { label: "Proposal Sent",           description: "When a proposal is sent to a customer",               icon: "📤", category: "Proposals" },
+  proposal_viewed:       { label: "Proposal Viewed",         description: "When a customer views the proposal",                  icon: "👁️", category: "Proposals" },
+  proposal_signed:       { label: "Proposal Signed",         description: "When a customer signs/approves a proposal",           icon: "✍️", category: "Proposals" },
+  proposal_not_signed:   { label: "Proposal Not Signed",     description: "When proposal hasn't been signed after X time",       icon: "⏰", category: "Proposals" },
+  proposal_expired:      { label: "Proposal Expired",        description: "When a proposal passes its expiration date",          icon: "❌", category: "Proposals" },
+  // Invoices
+  invoice_created:       { label: "Invoice Created",         description: "When a new invoice is generated",                     icon: "🧾", category: "Invoices" },
+  invoice_sent:          { label: "Invoice Sent",            description: "When an invoice is sent to a customer",               icon: "📧", category: "Invoices" },
+  invoice_viewed:        { label: "Invoice Viewed",          description: "When a customer opens the invoice link",              icon: "👁️", category: "Invoices" },
+  invoice_paid:          { label: "Payment Received",        description: "When customer payment is received",                   icon: "💰", category: "Invoices" },
+  invoice_overdue:       { label: "Invoice Overdue",         description: "When an invoice passes its due date unpaid",          icon: "🚨", category: "Invoices" },
+  // Calls
+  call_missed:           { label: "Missed Call",             description: "When an incoming call is missed",                     icon: "📵", category: "Calls" },
+  call_incoming:         { label: "Incoming Call",           description: "When a new call comes in",                            icon: "📞", category: "Calls" },
+  call_completed:        { label: "Call Completed",          description: "When a call ends",                                    icon: "☎️", category: "Calls" },
+  voicemail_received:    { label: "Voicemail Received",      description: "When a voicemail is left",                            icon: "🎤", category: "Calls" },
+  // Messages
+  sms_sent:              { label: "SMS Sent",                description: "When an SMS is sent to a customer",                   icon: "💬", category: "Messages" },
+  sms_received:          { label: "SMS Received",            description: "When a customer sends an SMS",                        icon: "📩", category: "Messages" },
+  no_reply:              { label: "No Reply",                description: "When a customer doesn't respond after X hours",       icon: "🔕", category: "Messages" },
+  // Customers
+  customer_added:        { label: "New Customer Added",      description: "When a new customer is created in the CRM",           icon: "👤", category: "Customers" },
+  customer_no_response:  { label: "Customer No Response",    description: "When a customer hasn't responded for X days",         icon: "😶", category: "Customers" },
+  // Calendar
+  calendar_event_moved:  { label: "Calendar Event Moved",    description: "When a calendar event is dragged to a new date",      icon: "📅", category: "Calendar" },
+  schedule_updated:      { label: "Schedule Updated",        description: "When a job schedule date/time is changed",            icon: "🗓️", category: "Calendar" },
+  appointment_created:   { label: "Appointment Created",     description: "When a new appointment is added to the calendar",     icon: "📆", category: "Calendar" },
+  // Files
+  photos_uploaded:       { label: "Photos Uploaded",         description: "When photos are uploaded to a job",                   icon: "📷", category: "Files" },
+  video_uploaded:        { label: "Video Uploaded",          description: "When a video is uploaded to a job",                   icon: "🎥", category: "Files" },
+  // Estimates
+  estimate_sent:         { label: "Estimate Sent",           description: "When an estimate is sent to a customer",              icon: "📨", category: "Estimates" },
+  estimate_created:      { label: "Estimate Created",        description: "When a new estimate is created",                      icon: "📝", category: "Estimates" },
 };
+
+export const TRIGGER_CATEGORIES: TriggerCategory[] = ["Jobs", "Proposals", "Invoices", "Calls", "Messages", "Customers", "Calendar", "Files", "Estimates"];
 
 export const CONDITION_FIELD_META: Record<WorkflowConditionField, { label: string }> = {
   schedule_date_exists: { label: "Schedule Date Exists" },
@@ -109,9 +179,21 @@ export const ACTION_TYPE_META: Record<WorkflowActionType, { label: string; descr
   },
   send_notification: {
     label: "Send Notification",
-    description: "Send a notification to the team or customer",
+    description: "Send an in-app notification to the team",
     icon: "🔔",
-    paramFields: [{ key: "message", label: "Message", type: "text" }, { key: "recipient", label: "Recipient", type: "select", options: ["office", "assigned_crew", "customer"] }],
+    paramFields: [{ key: "message", label: "Message", type: "text" }, { key: "recipient", label: "Recipient", type: "select", options: ["office", "assigned_crew", "all_admins"] }],
+  },
+  send_sms: {
+    label: "Send SMS",
+    description: "Send an automatic SMS to customer or team",
+    icon: "💬",
+    paramFields: [{ key: "message", label: "SMS Message", type: "text" }, { key: "recipient", label: "Recipient", type: "select", options: ["customer", "office", "assigned_crew"] }],
+  },
+  send_email: {
+    label: "Send Email",
+    description: "Send an automatic email",
+    icon: "📧",
+    paramFields: [{ key: "subject", label: "Subject", type: "text" }, { key: "message", label: "Body", type: "text" }, { key: "recipient", label: "Recipient", type: "select", options: ["customer", "office", "assigned_crew"] }],
   },
   log_activity: {
     label: "Log Activity",
@@ -130,6 +212,18 @@ export const ACTION_TYPE_META: Record<WorkflowActionType, { label: string; descr
     description: "Assign a crew member to the job",
     icon: "👷",
     paramFields: [{ key: "crew", label: "Crew / User", type: "text" }],
+  },
+  create_reminder: {
+    label: "Create Reminder",
+    description: "Create a follow-up reminder after X hours",
+    icon: "⏰",
+    paramFields: [{ key: "message", label: "Reminder Message", type: "text" }, { key: "delay_hours", label: "Delay (hours)", type: "text" }],
+  },
+  notify_admin: {
+    label: "Notify Admin",
+    description: "Send an urgent notification to all admins",
+    icon: "🚨",
+    paramFields: [{ key: "message", label: "Alert Message", type: "text" }],
   },
 };
 
@@ -215,6 +309,63 @@ export const WORKFLOW_TEMPLATES: Omit<WorkflowRule, "id" | "createdAt" | "update
       { type: "log_activity", params: { message: "Auto-moved to Follow Up — proposal unsigned after 3 days" } },
     ],
     enabled: false,
+  },
+  {
+    name: "Missed Call → Auto Text",
+    description: "When a call is missed, automatically send an SMS to the customer",
+    trigger: "call_missed",
+    conditions: [{ field: "always", operator: "exists", value: "" }],
+    actions: [
+      { type: "send_sms", params: { message: "Hi {customerName}, we missed your call. We'll call you back shortly! — XRP Roofing", recipient: "customer" } },
+      { type: "log_activity", params: { message: "Missed call — auto-text sent to customer" } },
+    ],
+    enabled: true,
+  },
+  {
+    name: "Inspection Reminder",
+    description: "When a job is scheduled, create a calendar event and notify crew",
+    trigger: "job_scheduled",
+    conditions: [{ field: "always", operator: "exists", value: "" }],
+    actions: [
+      { type: "create_calendar_event", params: { title: "Inspection — {customerName}", duration: "1" } },
+      { type: "send_notification", params: { message: "New job scheduled: {customerName} at {address}", recipient: "assigned_crew" } },
+    ],
+    enabled: true,
+  },
+  {
+    name: "Invoice Overdue Reminder",
+    description: "When an invoice becomes overdue, notify the office and log it",
+    trigger: "invoice_overdue",
+    conditions: [{ field: "always", operator: "exists", value: "" }],
+    actions: [
+      { type: "notify_admin", params: { message: "Invoice overdue for {customerName}" } },
+      { type: "create_reminder", params: { message: "Follow up on overdue invoice", delay_hours: "24" } },
+      { type: "log_activity", params: { message: "Invoice overdue — reminder created" } },
+    ],
+    enabled: true,
+  },
+  {
+    name: "Photos Uploaded → Notify Admin",
+    description: "When crew uploads photos, notify the admin team",
+    trigger: "photos_uploaded",
+    conditions: [{ field: "always", operator: "exists", value: "" }],
+    actions: [
+      { type: "notify_admin", params: { message: "New photos uploaded for {customerName}" } },
+      { type: "log_activity", params: { message: "Photos uploaded by crew" } },
+    ],
+    enabled: false,
+  },
+  {
+    name: "No Reply 48h → Follow Up",
+    description: "When a customer doesn't respond for 48 hours, move to Follow Up",
+    trigger: "customer_no_response",
+    conditions: [{ field: "days_since_sent", operator: "greater_than", value: "2" }],
+    actions: [
+      { type: "move_job_to_stage", params: { stage: "follow_up" } },
+      { type: "send_notification", params: { message: "No customer response after 48h — moved to Follow Up", recipient: "office" } },
+      { type: "log_activity", params: { message: "Auto-moved to Follow Up — no response after 48h" } },
+    ],
+    enabled: true,
   },
 ];
 
@@ -380,9 +531,13 @@ export function executeWorkflows(
     moveJobToStage?: (jobId: string, stage: string) => void;
     createCalendarEvent?: (title: string, duration: string) => void;
     sendNotification?: (message: string, recipient: string) => void;
+    sendSms?: (message: string, recipient: string) => void;
+    sendEmail?: (subject: string, message: string, recipient: string) => void;
     logActivity?: (message: string) => void;
     markInvoicePaid?: () => void;
     assignCrew?: (crew: string) => void;
+    createReminder?: (message: string, delayHours: string) => void;
+    notifyAdmin?: (message: string) => void;
   },
 ): WorkflowLogEntry[] {
   const rules = readWorkflowRules();
@@ -442,6 +597,30 @@ export function executeWorkflows(
             callbacks.assignCrew(resolvedParams.crew || "");
           }
           actionsExecuted.push(`Assigned crew: ${resolvedParams.crew}`);
+          break;
+        case "send_sms":
+          if (callbacks?.sendSms) {
+            callbacks.sendSms(resolvedParams.message || "", resolvedParams.recipient || "customer");
+          }
+          actionsExecuted.push(`SMS → ${resolvedParams.recipient}`);
+          break;
+        case "send_email":
+          if (callbacks?.sendEmail) {
+            callbacks.sendEmail(resolvedParams.subject || "", resolvedParams.message || "", resolvedParams.recipient || "customer");
+          }
+          actionsExecuted.push(`Email → ${resolvedParams.recipient}`);
+          break;
+        case "create_reminder":
+          if (callbacks?.createReminder) {
+            callbacks.createReminder(resolvedParams.message || "", resolvedParams.delay_hours || "24");
+          }
+          actionsExecuted.push(`Reminder in ${resolvedParams.delay_hours || "24"}h`);
+          break;
+        case "notify_admin":
+          if (callbacks?.notifyAdmin) {
+            callbacks.notifyAdmin(resolvedParams.message || "");
+          }
+          actionsExecuted.push("Admin notified");
           break;
       }
     }
