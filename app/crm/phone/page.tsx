@@ -257,6 +257,8 @@ export default function PhonePage() {
     const callMap = new Map<string, TwilioConversationEvent>();
     for (const e of callEvents) {
       if (!e.callSid) continue;
+      // Skip internal browser-to-Twilio legs (client:crm-agent) — they duplicate the real call
+      if ((e.from || "").startsWith("client:") || (e.to || "").startsWith("client:")) continue;
       const existing = callMap.get(e.callSid);
       if (!existing || new Date(e.createdAt) > new Date(existing.createdAt)) {
         callMap.set(e.callSid, e);
