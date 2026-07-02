@@ -1869,7 +1869,12 @@ export default function ProposalsPage() {
                 <button className="text-gray-300 hover:text-gray-500 transition">•••</button>
               </div>
             </div>
-            <button className="mt-3 w-full rounded-md border border-gray-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-blue-600 transition hover:bg-blue-50">View job details</button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeProposal?.job?.id && (
+                <a href={`/crm/leads?job=${encodeURIComponent(activeProposal.job.id)}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-600 transition hover:bg-blue-50">View Job →</a>
+              )}
+              <a href={`/crm/invoices?proposal=${encodeURIComponent(activeProposal?.id || "")}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-green-600 transition hover:bg-green-50">View Invoice →</a>
+            </div>
             <div className="mt-6">
               <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Template</p>
               <div className="space-y-1.5">
