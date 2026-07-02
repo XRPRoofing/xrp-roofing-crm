@@ -5,9 +5,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   BarChart3,
+  Briefcase,
   Clock,
   ExternalLink,
   Headphones,
+  MessageSquare,
   Phone,
   PhoneCall,
   PhoneIncoming,
@@ -216,6 +218,7 @@ export default function PhonePage() {
   const [blockedNumbers, setBlockedNumbers] = useState<string[]>(() => loadBlockedNumbers());
   const [blockInput, setBlockInput] = useState("");
   const [perPage, setPerPage] = useState(25);
+  const [actionSheetCallId, setActionSheetCallId] = useState<string | null>(null);
 
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
@@ -628,7 +631,7 @@ export default function PhonePage() {
                 </div>
               )}
               {paginatedCalls.map((call) => (
-                <div key={call.id} className="bg-white px-4 py-3 active:bg-gray-50">
+                <div key={call.id} className="bg-white px-4 py-3 active:bg-gray-50" onClick={() => setActionSheetCallId(actionSheetCallId === call.id ? null : call.id)} role="button" tabIndex={0}>
                   <div className="flex items-start gap-3">
                     {/* Direction icon */}
                     <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
@@ -721,6 +724,42 @@ export default function PhonePage() {
                 </div>
               ))}
             </div>
+
+            {/* ========== Mobile Action Bottom Sheet ========== */}
+            {actionSheetCallId && (() => {
+              const sheetCall = paginatedCalls.find((c) => c.id === actionSheetCallId);
+              if (!sheetCall) return null;
+              return (
+                <div className="fixed inset-0 z-50 lg:hidden">
+                  <button type="button" className="absolute inset-0 bg-black/30" onClick={() => setActionSheetCallId(null)} />
+                  <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white pb-6 shadow-2xl">
+                    <div className="mx-auto my-2.5 h-1 w-10 rounded-full bg-gray-300" />
+                    <div className="border-b border-gray-100 px-5 pb-3">
+                      <p className="text-lg font-bold text-gray-900">{sheetCall.customerName}</p>
+                      <p className="text-sm text-gray-400">{sheetCall.phone ? formatPhoneDisplay(sheetCall.phone) : ""}</p>
+                    </div>
+                    <div className="py-1">
+                      {sheetCall.phone && (
+                        <button type="button" onClick={() => { setActionSheetCallId(null); handleCallBack(sheetCall.phone); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
+                          <Phone className="h-5 w-5 text-blue-600" />
+                          <span className="text-base font-semibold text-gray-700">Call {sheetCall.customerName}</span>
+                        </button>
+                      )}
+                      {sheetCall.phone && (
+                        <button type="button" onClick={() => { setActionSheetCallId(null); window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: sheetCall.phone, name: sheetCall.customerName } })); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
+                          <MessageSquare className="h-5 w-5 text-blue-600" />
+                          <span className="text-base font-semibold text-gray-700">Message {sheetCall.customerName}</span>
+                        </button>
+                      )}
+                      <button type="button" onClick={() => { setActionSheetCallId(null); window.dispatchEvent(new CustomEvent("crm:open-new-job", { detail: { phone: sheetCall.phone, name: sheetCall.customerName } })); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
+                        <Briefcase className="h-5 w-5 text-blue-600" />
+                        <span className="text-base font-semibold text-gray-700">New job</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ========== Desktop call history table ========== */}
             <div className="hidden overflow-x-auto lg:block">

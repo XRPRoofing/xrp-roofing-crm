@@ -240,6 +240,30 @@ export default function FloatingDialer({
     onCallStateChange?.(callState !== "idle");
   }, [callState, onCallStateChange]);
 
+  // Listen for custom events from Phone page to open SMS / New Job panels
+  useEffect(() => {
+    function handleOpenSms(e: Event) {
+      const detail = (e as CustomEvent).detail as { phone: string; name?: string } | undefined;
+      if (detail?.phone) {
+        if (!open) window.dispatchEvent(new CustomEvent("crm:open-dialer"));
+        setTimeout(() => openSmsPanel(detail.phone, detail.name), 100);
+      }
+    }
+    function handleOpenNewJob(e: Event) {
+      const detail = (e as CustomEvent).detail as { phone: string; name?: string } | undefined;
+      if (detail?.phone) {
+        if (!open) window.dispatchEvent(new CustomEvent("crm:open-dialer"));
+        setTimeout(() => openNewJobForm(detail.phone, detail.name), 100);
+      }
+    }
+    window.addEventListener("crm:open-sms", handleOpenSms);
+    window.addEventListener("crm:open-new-job", handleOpenNewJob);
+    return () => {
+      window.removeEventListener("crm:open-sms", handleOpenSms);
+      window.removeEventListener("crm:open-new-job", handleOpenNewJob);
+    };
+  }); // intentionally no deps — always latest closures
+
   // Apply initial dial number / caller ID when provided
   useEffect(() => {
     if (open && initialDialNumber) {
@@ -1030,59 +1054,30 @@ export default function FloatingDialer({
                             {formatCallDate(call.time)}
                           </p>
                         )}
-                        <div className="relative flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50">
-                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        <button
+                          type="button"
+                          onClick={() => openActionMenu(call.id)}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-gray-50 active:bg-gray-100"
+                        >
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                             isMissed ? "bg-red-50" : "bg-blue-50"
                           }`}>
-                            {isMissed ? <PhoneMissed className="h-3.5 w-3.5 text-red-500" /> :
-                             call.direction === "inbound" ? <PhoneIncoming className="h-3.5 w-3.5 text-blue-600" /> :
-                             <PhoneOutgoing className="h-3.5 w-3.5 text-blue-600" />}
+                            {isMissed ? <PhoneMissed className="h-4 w-4 text-red-500" /> :
+                             call.direction === "inbound" ? <PhoneIncoming className="h-4 w-4 text-blue-600" /> :
+                             <PhoneOutgoing className="h-4 w-4 text-blue-600" />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className={`truncate text-xs font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
+                            <p className={`truncate text-sm font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
                               {call.name || formatPhone(call.phone)}
                             </p>
-                            <p className="text-[11px] text-gray-400">
+                            <p className="text-xs text-gray-400">
                               {call.direction === "inbound" ? "Incoming" : "Outgoing"}
                               {call.duration ? ` · ${formatDuration(call.duration)}` : ""}
                               {" · "}{formatCallTime(call.time)}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleStartCall(call.phone)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition hover:bg-blue-100"
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openActionMenu(call.id)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                          {/* Action menu dropdown */}
-                          {actionMenuCallId === call.id && (
-                            <>
-                              <button type="button" className="fixed inset-0 z-10" onClick={() => setActionMenuCallId(null)} />
-                              <div className="absolute right-3 top-full z-20 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
-                                <button type="button" onClick={() => { setActionMenuCallId(null); handleStartCall(call.phone); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
-                                  <Phone className="h-4 w-4 text-blue-600" />
-                                  Call {call.name || formatPhone(call.phone)}
-                                </button>
-                                <button type="button" onClick={() => openSmsPanel(call.phone, call.name)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
-                                  <MessageSquare className="h-4 w-4 text-blue-600" />
-                                  Message {call.name || formatPhone(call.phone)}
-                                </button>
-                                <button type="button" onClick={() => openNewJobForm(call.phone, call.name)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
-                                  <Briefcase className="h-4 w-4 text-blue-600" />
-                                  New job
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                          <MoreVertical className="h-4 w-4 shrink-0 text-gray-300" />
+                        </button>
                       </div>
                     );
                   })}
@@ -1160,6 +1155,38 @@ export default function FloatingDialer({
           )}
         </div>
       )}
+
+      {/* ══════════ Action Bottom Sheet ══════════ */}
+      {actionMenuCallId && (() => {
+        const menuCall = recents.find((c) => c.id === actionMenuCallId);
+        if (!menuCall) return null;
+        const displayName = menuCall.name || formatPhone(menuCall.phone);
+        return (
+          <>
+            <button type="button" className="absolute inset-0 z-20 bg-black/20 rounded-2xl" onClick={() => setActionMenuCallId(null)} />
+            <div className="absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-white shadow-2xl">
+              <div className="border-b border-gray-100 px-5 py-3">
+                <p className="text-base font-bold text-gray-900">{displayName}</p>
+                <p className="text-sm text-gray-400">{formatPhone(menuCall.phone)}</p>
+              </div>
+              <div className="py-1">
+                <button type="button" onClick={() => { setActionMenuCallId(null); handleStartCall(menuCall.phone); }} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
+                  <Phone className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-semibold text-gray-700">Call {displayName}</span>
+                </button>
+                <button type="button" onClick={() => openSmsPanel(menuCall.phone, menuCall.name)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
+                  <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-semibold text-gray-700">Message {displayName}</span>
+                </button>
+                <button type="button" onClick={() => openNewJobForm(menuCall.phone, menuCall.name)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-semibold text-gray-700">New job</span>
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* ══════════ SMS Overlay ══════════ */}
       {smsTarget && (
