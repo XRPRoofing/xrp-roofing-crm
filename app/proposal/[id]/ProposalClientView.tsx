@@ -190,7 +190,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
     const packageOption = packages[option];
     setSelectedOption(option);
     setProposal((currentProposal) => ({ ...currentProposal, selectedOption: option, total: packageOption.price }));
-    await updateSharedProposal(proposal.id, { selectedOption: option, total: packageOption.price, status: "Viewed" });
+    await updateSharedProposal(proposal.id, { selectedOption: option, status: "Viewed" });
   }
 
   async function handleSignProposal() {

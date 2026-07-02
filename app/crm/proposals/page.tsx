@@ -1247,11 +1247,12 @@ export default function ProposalsPage() {
     }
   }
 
-  function handleSaveProposal() {
+  async function handleSaveProposal() {
     if (!activeProposal) return;
 
     const updatedProposal = saveActiveProposal();
     setActiveProposal(updatedProposal);
+    if (updatedProposal) await upsertProposalRecord(updatedProposal as unknown as Parameters<typeof upsertProposalRecord>[0]);
     showSaveToast("Proposal saved");
   }
 

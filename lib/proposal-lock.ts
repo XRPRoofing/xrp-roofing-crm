@@ -13,7 +13,6 @@ type ProposalPayload = Record<string, unknown>;
 // Financial / acceptance fields that are frozen once a proposal is signed.
 export const lockedProposalFields = [
   "selectedOption",
-  "total",
   "acceptedPackage",
   "acceptedPackageName",
   "acceptedPrice",
