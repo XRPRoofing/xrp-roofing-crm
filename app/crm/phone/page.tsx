@@ -290,8 +290,7 @@ export default function PhonePage() {
       } else if (phone) {
         displayName = formatPhoneDisplay(phone);
       } else {
-        displayName = "Unknown Caller";
-        tag = "Unknown Caller";
+        continue; // skip calls with no identifiable phone number
       }
 
       const status = getCallStatusLabel(event);
