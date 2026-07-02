@@ -89,6 +89,70 @@ export async function deleteCalendarEvent(id: string): Promise<boolean> {
   }
 }
 
+// Arizona timezone offset (UTC-7 year-round, no DST)
+const AZ_OFFSET = "-07:00";
+
+/**
+ * Build an ISO string from a date + optional time, pinned to Arizona (UTC-7).
+ * If no time is provided, defaults to 09:00.
+ */
+export function toArizonaISO(date: string, time?: string): string {
+  const t = time || "09:00";
+  return new Date(`${date}T${t}:00${AZ_OFFSET}`).toISOString();
+}
+
+// ── Job ↔ Calendar Event linking (localStorage map) ───────────────
+const JOB_CAL_MAP_KEY = "xrp:job-calendar-map";
+
+function readJobCalMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem(JOB_CAL_MAP_KEY) || "{}"); } catch { return {}; }
+}
+
+function writeJobCalMap(map: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(JOB_CAL_MAP_KEY, JSON.stringify(map));
+}
+
+export function linkJobToCalendarEvent(jobId: string, calendarEventId: string) {
+  const map = readJobCalMap();
+  map[jobId] = calendarEventId;
+  writeJobCalMap(map);
+}
+
+export function getCalendarEventIdForJob(jobId: string): string | null {
+  return readJobCalMap()[jobId] || null;
+}
+
+export function unlinkJobFromCalendarEvent(jobId: string) {
+  const map = readJobCalMap();
+  delete map[jobId];
+  writeJobCalMap(map);
+}
+
+/**
+ * Create or update a calendar event for a job.
+ * If the job already has a linked event, it updates it; otherwise creates a new one.
+ * Returns the calendar event ID.
+ */
+export async function syncJobToCalendar(
+  jobId: string,
+  eventData: Omit<CalendarEvent, "id" | "created_at" | "updated_at">,
+): Promise<string | null> {
+  const existingId = getCalendarEventIdForJob(jobId);
+  if (existingId) {
+    const result = await updateCalendarEvent(existingId, eventData);
+    if (result) return result.id;
+    // If update failed (event deleted?), fall through to create
+  }
+  const created = await createCalendarEvent(eventData);
+  if (created) {
+    linkJobToCalendarEvent(jobId, created.id);
+    return created.id;
+  }
+  return null;
+}
+
 // Real-time subscription via Supabase (debounced to prevent cascade re-fetches)
 const calendarListeners = new Set<(events: CalendarEvent[]) => void>();
 let calendarChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;

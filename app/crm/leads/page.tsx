@@ -10,7 +10,7 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobNote, addJobPhotos, deleteJobPhoto, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobNote, type JobPhoto } from "@/lib/crew-sync";
-import { createCalendarEvent } from "@/lib/calendar-sync";
+import { syncJobToCalendar, toArizonaISO } from "@/lib/calendar-sync";
 import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
@@ -1169,15 +1169,13 @@ export default function LeadsPage() {
 
     // Auto-create calendar event if schedule date is provided
     if (form.scheduleDate) {
-      const startDate = form.scheduleTime
-        ? new Date(`${form.scheduleDate}T${form.scheduleTime}:00`)
-        : new Date(`${form.scheduleDate}T09:00:00`);
-      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default duration
-      void createCalendarEvent({
+      const startISO = toArizonaISO(form.scheduleDate, form.scheduleTime || undefined);
+      const endISO = new Date(new Date(startISO).getTime() + 2 * 60 * 60 * 1000).toISOString();
+      void syncJobToCalendar(newJob.id, {
         title: `${form.roofType || "Roofing"} — ${form.name}`,
         description: `${form.roofType || "Roofing"} job for ${form.name}. ${form.lastActivity || ""}`.trim(),
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
+        start_time: startISO,
+        end_time: endISO,
         all_day: !form.scheduleTime,
         location: form.address || "",
         color: "#f97316",
@@ -1639,15 +1637,13 @@ export default function LeadsPage() {
                     if (!dateVal) { alert("Please select a date"); return; }
                     const timeVal = timeEl?.value || "";
                     const crewVal = crewEl?.value || "";
-                    const startDate = timeVal
-                      ? new Date(`${dateVal}T${timeVal}:00`)
-                      : new Date(`${dateVal}T09:00:00`);
-                    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-                    void createCalendarEvent({
+                    const startISO = toArizonaISO(dateVal, timeVal || undefined);
+                    const endISO = new Date(new Date(startISO).getTime() + 2 * 60 * 60 * 1000).toISOString();
+                    void syncJobToCalendar(selectedJob.id, {
                       title: `${selectedJob.roofType || "Roofing"} — ${selectedJob.name}`,
                       description: `${selectedJob.roofType || "Roofing"} job for ${selectedJob.name}`,
-                      start_time: startDate.toISOString(),
-                      end_time: endDate.toISOString(),
+                      start_time: startISO,
+                      end_time: endISO,
                       all_day: !timeVal,
                       location: `${selectedJob.address}, ${selectedJob.city}, AZ`,
                       color: "#f97316",
