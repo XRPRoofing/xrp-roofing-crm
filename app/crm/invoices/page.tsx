@@ -658,6 +658,7 @@ export default function InvoicesPage() {
   const [integrationNotice, setIntegrationNotice] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [wonProposals, setWonProposals] = useState<(StoredProposal & { hasInvoice: boolean })[]>([]);
+  const [proposalSearch, setProposalSearch] = useState("");
   const [paymentForm, setPaymentForm] = useState({ amount: "", date: today, method: "Cash" as PaymentMethod, reference: "", notes: "" });
   const [sendForm, setSendForm] = useState({ template: "Invoice sent", subject: "Your XRP Roofing invoice", message: emailTemplates["Invoice sent"] });
   const [invoiceSendConfirmation, setInvoiceSendConfirmation] = useState<{ type: "success" | "error"; customerName: string; invoiceNumber: string; message: string } | null>(null);
@@ -1146,6 +1147,7 @@ export default function InvoicesPage() {
   function handleStartInvoice() {
     setWonProposals(readWonProposals(invoices));
     setCreateForm(createBlankInvoice(invoices.length));
+    setProposalSearch("");
     setShowCreateModal(true);
     // Also fetch latest proposals from Supabase in background and update list
     if (proposalSyncEnabled()) {
@@ -2283,32 +2285,76 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-gray-500 hover:bg-gray-100">×</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Won Proposal <span className="normal-case font-semibold text-blue-400">(recommended)</span></label>
-                <select 
-                  value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
-                  onChange={(event) => handlePrefillFromJob(event.target.value)} 
-                  className="mt-2 w-full rounded-lg border border-blue-100 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 outline-none"
-                >
-                  <option value="">— No proposal (legacy / direct invoice) —</option>
-                  {wonProposals.length === 0 ? (
-                    <option value="" disabled>No won/signed proposals available</option>
-                  ) : (
-                    wonProposals.map((proposal) => {
-                      const pkg = getProposalSelectedPackage(proposal);
-                      return (
-                        <option key={proposal.id} value={`proposal:${proposal.id}`} disabled={proposal.hasInvoice}>
-                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.status} • ${pkg.price.toLocaleString()}{proposal.hasInvoice ? " (invoiced)" : ""}
-                        </option>
-                      );
-                    })
+              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Won Proposal <span className="normal-case font-semibold text-blue-400">(recommended)</span></label>
+                  {createForm.proposalReference && (
+                    <button type="button" onClick={() => { handlePrefillFromJob(""); setCreateForm(createBlankInvoice(invoices.length)); }} className="text-[10px] font-bold text-red-500 hover:text-red-700">Clear</button>
                   )}
-                </select>
-                {wonProposals.length === 0 && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    No jobs with signed/approved proposals available — you can still create a direct invoice below.
-                  </p>
-                )}
+                </div>
+                {/* Search */}
+                <input
+                  type="text"
+                  value={proposalSearch}
+                  onChange={(e) => setProposalSearch(e.target.value)}
+                  placeholder="Search customer name..."
+                  className="mt-2 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300"
+                />
+                {/* Proposal Cards */}
+                <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+                  {/* Direct invoice option */}
+                  <button
+                    type="button"
+                    onClick={() => { handlePrefillFromJob(""); setCreateForm(createBlankInvoice(invoices.length)); }}
+                    className={`w-full px-3 py-2.5 text-left transition hover:bg-gray-50 ${!createForm.proposalReference ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
+                  >
+                    <p className="text-xs font-bold text-gray-600">— No proposal (direct invoice) —</p>
+                  </button>
+                  {wonProposals.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-xs text-gray-400">No won/signed proposals available</div>
+                  ) : (
+                    wonProposals
+                      .filter((p) => !p.hasInvoice)
+                      .filter((p) => {
+                        if (!proposalSearch.trim()) return true;
+                        const q = proposalSearch.toLowerCase();
+                        return (p.customerName || "").toLowerCase().includes(q) || (p.proposalNumber || "").toString().includes(q);
+                      })
+                      .map((proposal) => {
+                        const pkg = getProposalSelectedPackage(proposal);
+                        const cityMatch = (proposal.address || "").match(/,\s*([^,]+,\s*[A-Z]{2})/);
+                        const city = cityMatch ? cityMatch[1].trim() : (proposal.address || "").split(",").slice(-2).join(",").trim() || "—";
+                        const isSelected = createForm.proposalReference === proposal.id;
+                        return (
+                          <button
+                            type="button"
+                            key={proposal.id}
+                            onClick={() => handlePrefillFromJob(`proposal:${proposal.id}`)}
+                            className={`w-full px-3 py-3 text-left transition hover:bg-blue-50/50 ${isSelected ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-gray-800 truncate">{proposal.customerName}</p>
+                              <span className="shrink-0 text-sm font-bold text-blue-700">${pkg.price.toLocaleString()}</span>
+                            </div>
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-500">
+                              {proposal.proposalNumber && <span>#{proposal.proposalNumber}</span>}
+                              <span>{city}</span>
+                              <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">{proposal.status}</span>
+                            </div>
+                          </button>
+                        );
+                      })
+                  )}
+                  {/* Show already-invoiced at bottom, collapsed */}
+                  {wonProposals.filter((p) => p.hasInvoice).length > 0 && (
+                    <div className="px-3 py-2 bg-gray-50">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Already invoiced</p>
+                      {wonProposals.filter((p) => p.hasInvoice).map((proposal) => (
+                        <p key={proposal.id} className="mt-1 text-[11px] text-gray-400 truncate">✓ {proposal.customerName} — {proposal.proposalNumber ? `#${proposal.proposalNumber}` : proposal.status}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="mt-4">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
             </div>
