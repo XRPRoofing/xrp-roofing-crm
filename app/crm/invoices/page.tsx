@@ -581,7 +581,7 @@ function MobileInvoiceList({
       if (tab === "Overdue") return s === "Overdue";
       // Unpaid = everything that isn't Paid/Voided
       return s !== "Paid" && s !== "Paid Mail Check" && s !== "Voided";
-    });
+    }).sort((a, b) => (b.issueDate || "").localeCompare(a.issueDate || ""));
   }, [invoices, tab, computeStatus]);
 
   const counts = useMemo(() => ({
@@ -996,7 +996,7 @@ export default function InvoicesPage() {
     const query = invoiceSearch.toLowerCase().trim();
     const queryDigits = query.replace(/\D/g, "");
     const queryPhone = queryDigits.length === 11 && queryDigits.startsWith("1") ? queryDigits.slice(1) : queryDigits;
-    return invoices.filter((invoice) => {
+    const matched = invoices.filter((invoice) => {
       const status = getComputedStatus(invoice);
       const matchesFilter =
         invoiceFilter === "All" ||
@@ -1015,6 +1015,8 @@ export default function InvoicesPage() {
       }
       return false;
     });
+    // Sort newest first by issue date
+    return matched.slice().sort((a, b) => (b.issueDate || "").localeCompare(a.issueDate || ""));
   }, [invoiceFilter, invoiceSearch, invoices]);
   const clientHistory = useMemo(() => {
     if (!selectedInvoice) return null;

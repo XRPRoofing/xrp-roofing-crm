@@ -8,18 +8,23 @@ import { useEffect, useInsertionEffect, useRef } from "react";
  * was marked dirty while the tab was in the background, preventing the
  * rapid-fire reloads that previously made the CRM feel unstable.
  */
-const FOCUS_COOLDOWN_MS = 30_000;
+const FOCUS_COOLDOWN_MS = 10_000;
 
 /**
- * Re-run `onRefresh` only when the data is known to be stale:
+ * Background polling interval (ms) — safety net for when Supabase realtime
+ * disconnects or cross-device sync misses an event. Keeps data fresh without
+ * waiting for a tab-focus event.
+ */
+const POLL_INTERVAL_MS = 15_000;
+
+/**
+ * Re-run `onRefresh` when the data is known to be stale:
  *
  *  - cross-tab BroadcastChannel / storage write sets a dirty flag
  *  - returning to the tab (focus / visibilitychange) triggers a refresh
  *    ONLY if dirty OR more than FOCUS_COOLDOWN_MS have elapsed
- *
- * **No polling interval** — data freshness comes from Supabase realtime
- * subscriptions. The hook only fires on genuine staleness, keeping pages
- * stable and free of random refreshes.
+ *  - background polling every POLL_INTERVAL_MS as a safety net for
+ *    cross-device sync (catches missed realtime events)
  */
 export function useAutoRefresh(onRefresh: () => void) {
   const callbackRef = useRef(onRefresh);
@@ -64,12 +69,21 @@ export function useAutoRefresh(onRefresh: () => void) {
       // BroadcastChannel not supported — fall back to storage events only
     }
 
+    // Background polling — safety net for cross-device sync
+    const pollId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        dirty = true;
+        runIfNeeded();
+      }
+    }, POLL_INTERVAL_MS);
+
     return () => {
       window.removeEventListener("focus", runIfNeeded);
       window.removeEventListener("storage", markDirty);
       document.removeEventListener("visibilitychange", onVisible);
       if (bc) { try { bc.close(); } catch { /* ignore */ } }
       if (debounceTimer) clearTimeout(debounceTimer);
+      clearInterval(pollId);
     };
   }, []);
 }
