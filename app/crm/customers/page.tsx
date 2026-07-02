@@ -239,7 +239,7 @@ function statusTone(status?: string) {
   if (["paid", "won", "complete", "completed"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
   if (["progress", "active", "scheduled"].some((token) => value.includes(token))) return "bg-blue-100 text-blue-700";
   if (["overdue", "failed", "void", "lost"].some((token) => value.includes(token))) return "bg-red-100 text-red-700";
-  if (value.includes("new")) return "bg-orange-100 text-orange-700";
+  if (value.includes("new")) return "bg-blue-50 text-blue-600";
   return "bg-gray-100 text-gray-600";
 }
 
@@ -635,16 +635,16 @@ export default function CustomersPage() {
       <div className="sticky top-16 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 pb-2 pt-1 backdrop-blur-sm sm:-mx-5 sm:px-5 sm:pb-3">
         <div className="flex flex-col justify-between gap-2 sm:gap-4 lg:flex-row lg:items-end">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600 sm:text-sm">Customer Records</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-500 sm:text-sm">Customer Records</p>
             <h1 className="text-xl font-bold text-blue-700 sm:text-3xl">Customers ({customerList.length})</h1>
             <p className="crm-board-subtitle mt-1 hidden text-gray-600 sm:mt-2 sm:block">Clean customer timeline tracking. Click any customer to drill into contact details, jobs, roof info, insurance, and files.</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white shadow-sm sm:px-4 sm:py-3"><Plus className="mr-1.5 inline h-4 w-4" />Add customer</button>
+          <button onClick={() => setShowForm(true)} className="w-fit rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 sm:px-4 sm:py-2.5"><Plus className="mr-1.5 inline h-4 w-4" />Add customer</button>
         </div>
       </div>
 
       {customersError && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
           {customersError}
         </div>
       )}
@@ -671,7 +671,7 @@ export default function CustomersPage() {
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
             <button value="save" className="rounded-lg bg-blue-600 px-5 py-3 font-bold text-white">Save customer</button>
-            <button value="add-another" className="rounded-lg bg-orange-500 px-5 py-3 font-bold text-white">Save + add another</button>
+            <button value="add-another" className="rounded-lg bg-blue-500 px-5 py-3 font-bold text-white transition hover:bg-blue-600">Save + add another</button>
           </div>
         </form>
       )}
@@ -702,18 +702,19 @@ export default function CustomersPage() {
         {filteredCustomers.map((customer) => {
           const activeJobs = getActiveJobCount(customer, jobList);
           return (
-            <button key={customer.id} type="button" onClick={() => openCustomer(customer)} className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl">
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="text-lg font-bold leading-tight text-blue-700">{customer.name}</h2>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(customer.status)}`}>{customer.status || "New customer"}</span>
+            <button key={customer.id} type="button" onClick={() => openCustomer(customer)} className="flex h-full flex-col rounded-lg border border-gray-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-bold leading-snug text-gray-900 sm:text-lg">{customer.name}</h2>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(customer.status)}`}>{customer.status || "New customer"}</span>
               </div>
-              <div className="mt-3 space-y-2 text-sm">
-                <p className="flex items-start gap-2 text-gray-700"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><AddressLink value={customer.propertyAddress} fallback="Address pending" /></span></p>
-                <p className="flex items-center gap-2 text-gray-700"><Phone className="h-4 w-4 shrink-0 text-orange-500" /><span className="font-semibold"><PhoneLink value={customer.phone} fallback="No phone on file" /></span>{customer.phone && <button onClick={(e) => { e.stopPropagation(); setSmsTarget({ phone: customer.phone, name: customer.name }); }} className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" /></button>}</p>
+              <div className="mt-2 space-y-1.5 text-sm">
+                <p className="flex items-start gap-2 text-gray-600"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" /><span className="font-medium leading-snug"><AddressLink value={customer.propertyAddress} fallback="Address pending" /></span></p>
+                <p className="flex items-center gap-2 text-gray-600"><Phone className="h-3.5 w-3.5 shrink-0 text-blue-500" /><span className="font-medium"><PhoneLink value={customer.phone} fallback="No phone on file" /></span>{customer.phone && <button onClick={(e) => { e.stopPropagation(); setSmsTarget({ phone: customer.phone, name: customer.name }); }} className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-2.5 w-2.5" /></button>}</p>
+                {customer.email && <p className="flex items-center gap-2 text-gray-600"><Mail className="h-3.5 w-3.5 shrink-0 text-blue-500" /><span className="font-medium"><EmailLink value={customer.email} /></span></p>}
               </div>
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-                <BriefcaseBusiness className="h-4 w-4 text-blue-700" />
-                <span className="text-sm font-bold text-gray-900">{activeJobs} active job{activeJobs === 1 ? "" : "s"}</span>
+              <div className="mt-2 flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5">
+                <BriefcaseBusiness className="h-3.5 w-3.5 text-blue-600" />
+                <span className="text-xs font-bold text-blue-700">{activeJobs} active job{activeJobs === 1 ? "" : "s"}</span>
               </div>
             </button>
           );
@@ -727,7 +728,7 @@ export default function CustomersPage() {
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
               <div className="flex items-start justify-between gap-4 p-5 pb-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Customer profile</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-blue-500">Customer profile</p>
                   <h2 className="mt-1 text-2xl font-bold text-blue-700">{selectedCustomer.name}</h2>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusTone(selectedCustomer.status)}`}>{selectedCustomer.status || "New customer"}</span>
@@ -751,7 +752,7 @@ export default function CustomersPage() {
                     tab === "Communication History" ? selectedCustomerCommunications.length :
                     null;
                   return (
-                    <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === tab ? "border-orange-500 text-orange-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+                    <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
                       {tab}{count ? ` (${count})` : ""}
                     </button>
                   );
@@ -784,13 +785,13 @@ export default function CustomersPage() {
                   ) : (
                     <>
                       <section className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Phone className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Phone Number</p><p className="flex items-center gap-2 font-bold text-gray-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" />{selectedCustomer.phone && <button onClick={() => setSmsTarget({ phone: selectedCustomer.phone, name: selectedCustomer.name })} className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-green-500 px-2.5 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3.5 w-3.5" />SMS</button>}</p></div>
-                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Mail className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Email Address</p><p className="font-bold text-gray-900"><EmailLink value={selectedCustomer.email} fallback="Not provided" /></p></div>
-                        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-orange-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Full Property Address</p><p className="font-bold text-gray-900"><AddressLink value={selectedCustomer.propertyAddress} fallback="Not provided" /></p></div>
+                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Phone className="h-5 w-5 text-blue-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Phone Number</p><p className="flex items-center gap-2 font-bold text-gray-900"><PhoneLink value={selectedCustomer.phone} fallback="Not provided" />{selectedCustomer.phone && <button onClick={() => setSmsTarget({ phone: selectedCustomer.phone, name: selectedCustomer.name })} className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-green-500 px-2.5 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3.5 w-3.5" />SMS</button>}</p></div>
+                        <div className="rounded-lg border border-gray-200 bg-white p-4"><Mail className="h-5 w-5 text-blue-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Email Address</p><p className="font-bold text-gray-900"><EmailLink value={selectedCustomer.email} fallback="Not provided" /></p></div>
+                        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:col-span-2"><MapPin className="h-5 w-5 text-blue-500" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Full Property Address</p><p className="font-bold text-gray-900"><AddressLink value={selectedCustomer.propertyAddress} fallback="Not provided" /></p></div>
                       </section>
                       <section className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Roof details</p><p className="mt-2 font-bold text-gray-900">{selectedCustomer.roofDetails || "Not provided"}</p></div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4"><ShieldCheck className="h-5 w-5 text-orange-600" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Insurance status</p><p className="font-bold text-gray-900">{selectedCustomer.insuranceCarrier || "Not provided"}</p></div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4"><ShieldCheck className="h-5 w-5 text-blue-600" /><p className="mt-2 text-xs font-bold uppercase text-gray-500">Insurance status</p><p className="font-bold text-gray-900">{selectedCustomer.insuranceCarrier || "Not provided"}</p></div>
                       </section>
                     </>
                   )}
