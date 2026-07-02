@@ -923,6 +923,7 @@ export default function LeadsPage() {
   useEffect(() => {
     migrateStaleDueDates();
     let mounted = true;
+    let initialDone = false;
 
     // Always fetch fresh data before rendering the board.
     // No stale cache is shown — skeleton loaders display until this resolves.
@@ -942,7 +943,7 @@ export default function LeadsPage() {
           setJobNotes(cached.notes);
         }
       } finally {
-        if (mounted) setInitialLoading(false);
+        if (mounted) { setInitialLoading(false); initialDone = true; }
       }
     }
     loadJobs();
@@ -960,6 +961,7 @@ export default function LeadsPage() {
       if (jid) void loadJobPhotos(jid).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
     });
     function onCrewCache() {
+      if (!initialDone) return; // skip until initial load completes — prevents stale flash
       const cached = getCachedCrewData();
       if (cached && mounted) {
         const pending = pendingUpdatesRef.current;

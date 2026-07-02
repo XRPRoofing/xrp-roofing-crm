@@ -480,12 +480,13 @@ export default function CustomersPage() {
       }
       setSavedCustomers(result.customers);
     }
-    void init().finally(() => { if (mounted) setInitialLoading(false); });
+    let initialDone = false;
+    void init().finally(() => { if (mounted) { setInitialLoading(false); initialDone = true; } });
 
     void refreshCrewData().then((data) => { if (mounted) setJobList(data.jobs); }).catch(() => {});
 
     const unsubscribe = subscribeToCustomerRecords(refreshCustomers);
-    function onCustomerCache() { const c = getCachedCustomers<Customer>(); if (c && mounted) setSavedCustomers(c); }
+    function onCustomerCache() { if (!initialDone) return; const c = getCachedCustomers<Customer>(); if (c && mounted) setSavedCustomers(c); }
     window.addEventListener(CACHE_EVENTS.customers, onCustomerCache);
     return () => {
       mounted = false;

@@ -93,13 +93,14 @@ export default function CrmDashboardPage() {
 
   useEffect(() => {
     let mounted = true;
+    let initialDone = false;
 
     Promise.all([
       refreshCrewData().then((d) => { if (mounted) setJobs(d.jobs); }).catch(() => {}),
       refreshInvoices<InvoiceSnap>().then((data) => { if (mounted) setInvoices(data); }).catch(() => {}),
       refreshProposals<ProposalSnap>().then((data) => { if (mounted) setProposals(data.filter((p) => !p.deletedAt)); }).catch(() => {}),
       refreshCustomers<{ id: string; createdAt?: string }>().then((data) => { if (mounted) setCustomers(data); }).catch(() => {}),
-    ]).finally(() => { if (mounted) setInitialLoading(false); });
+    ]).finally(() => { if (mounted) { setInitialLoading(false); initialDone = true; } });
     void listConversationEvents(2000).then((data) => {
       if (mounted) { setEvents(data); setEventsLoading(false); }
     }).catch(() => { if (mounted) setEventsLoading(false); });
@@ -131,11 +132,11 @@ export default function CrmDashboardPage() {
       });
     });
 
-    // Cache-event listeners read already-updated cache — no re-fetch needed.
-    function onCrewCache() { const c = getCachedCrewData(); if (c && mounted) setJobs(c.jobs); }
-    function onInvoiceCache() { const c = getCachedInvoices<InvoiceSnap>(); if (c && mounted) setInvoices(c); }
-    function onProposalCache() { const c = getCachedProposals<ProposalSnap>(); if (c && mounted) setProposals(c.filter((p) => !p.deletedAt)); }
-    function onCustomerCache() { const c = getCachedCustomers<{ id: string; createdAt?: string }>(); if (c && mounted) setCustomers(c); }
+    // Cache-event listeners — skip until initial load completes to prevent stale flash.
+    function onCrewCache() { if (!initialDone) return; const c = getCachedCrewData(); if (c && mounted) setJobs(c.jobs); }
+    function onInvoiceCache() { if (!initialDone) return; const c = getCachedInvoices<InvoiceSnap>(); if (c && mounted) setInvoices(c); }
+    function onProposalCache() { if (!initialDone) return; const c = getCachedProposals<ProposalSnap>(); if (c && mounted) setProposals(c.filter((p) => !p.deletedAt)); }
+    function onCustomerCache() { if (!initialDone) return; const c = getCachedCustomers<{ id: string; createdAt?: string }>(); if (c && mounted) setCustomers(c); }
     window.addEventListener(CACHE_EVENTS.crew, onCrewCache);
     window.addEventListener(CACHE_EVENTS.invoices, onInvoiceCache);
     window.addEventListener(CACHE_EVENTS.proposals, onProposalCache);

@@ -804,6 +804,7 @@ export default function InvoicesPage() {
   // without requiring a refresh.
   useEffect(() => {
     let active = true;
+    let initialDone = false;
 
     // Seed with already-paid invoices so we only cascade NEW payments.
     // Merge persisted set (survives page reloads) with current paid invoices.
@@ -850,9 +851,9 @@ export default function InvoicesPage() {
 
     void loadInvoiceShares()
       .then((shares) => {
-        if (active) shares.forEach(applyShare);
+        if (active) { shares.forEach(applyShare); initialDone = true; }
       })
-      .catch(() => {});
+      .catch(() => { initialDone = true; });
 
     const unsubscribe = subscribeToInvoiceShares((share) => {
       if (active) applyShare(share);
@@ -861,6 +862,7 @@ export default function InvoicesPage() {
     // When the CrmShell refreshes the invoice cache (from realtime events on
     // other devices), merge the full data into our local state automatically.
     function onCacheRefresh() {
+      if (!initialDone) return;
       void loadAllInvoices<Invoice>().then((remoteInvoices) => {
         if (!active || remoteInvoices.length === 0) return;
         setInvoices((current) => {

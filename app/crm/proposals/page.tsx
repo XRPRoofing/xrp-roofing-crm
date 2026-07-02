@@ -806,7 +806,6 @@ export default function ProposalsPage() {
       }
 
       const local = retain(readLocalProposals());
-      if (local.length && mounted) setProposals(local);
 
       if (proposalSyncEnabled()) {
         const server = await loadProposalRecords<Proposal>();
@@ -820,6 +819,7 @@ export default function ProposalsPage() {
         setProposals(merged);
       } else if (local.length) {
         prevProposalsRef.current = local;
+        if (mounted) setProposals(local);
       }
 
       // Initialize unified counter from existing proposal numbers
