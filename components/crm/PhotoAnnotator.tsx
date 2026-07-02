@@ -443,7 +443,7 @@ export default function PhotoAnnotator({
   ];
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-black">
+    <div className="fixed inset-0 z-[10000] flex flex-col bg-black">
       {/* Top bar */}
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 text-white">
         <button type="button" onClick={onCancel} className="p-1 text-white hover:opacity-70"><X className="h-6 w-6" /></button>
