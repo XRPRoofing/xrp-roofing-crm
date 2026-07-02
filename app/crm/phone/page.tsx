@@ -61,7 +61,6 @@ const CALL_FILTERS = ["All", "Inbound", "Outbound", "Missed", "Forwarded"] as co
 type CallFilter = (typeof CALL_FILTERS)[number];
 
 const LEAD_DISPOSITIONS = [
-  "New Lead",
   "No Answer",
   "Left Voicemail",
   "Follow Up Required",
@@ -139,8 +138,6 @@ function formatPhoneDisplay(phone: string): string {
 
 function getDispositionColor(d: string): string {
   switch (d) {
-    case "New Lead":
-      return "bg-blue-50 text-blue-700 ring-blue-200";
     case "Appointment Scheduled":
     case "Estimate Scheduled":
     case "Won":

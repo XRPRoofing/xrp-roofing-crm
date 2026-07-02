@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Briefcase,
+  CalendarDays,
   ChevronDown,
   GripVertical,
   Hash,
+  MessageSquare,
   Mic,
   MicOff,
   Minus,
+  MoreVertical,
   Pause,
   Phone,
   PhoneCall,
@@ -28,8 +32,15 @@ import {
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@/lib/twilio/client";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
-import type { Customer } from "@/types/crm";
+import type { Customer, Lead } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { syncJobToCalendar, toArizonaISO } from "@/lib/calendar-sync";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { createManualFolder } from "@/lib/manual-folders";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { sendSms } from "@/lib/twilio/client";
+import { getTwilioLines } from "@/lib/twilio/numbers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -171,6 +182,33 @@ export default function FloatingDialer({
   // Recents filter (All / Missed)
   const [recentsFilter, setRecentsFilter] = useState<"all" | "missed">("all");
   const missedCount = useMemo(() => recents.filter((c) => c.outcome === "Missed call").length, [recents]);
+
+  // Action menu for call items
+  const [actionMenuCallId, setActionMenuCallId] = useState<string | null>(null);
+
+  // SMS modal
+  const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
+  const [smsBody, setSmsBody] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
+
+  // New Job form
+  const [showNewJobForm, setShowNewJobForm] = useState(false);
+  const [newJobPhone, setNewJobPhone] = useState("");
+  const [newJobName, setNewJobName] = useState("");
+  const [newJobForm, setNewJobForm] = useState({
+    name: "",
+    address: "",
+    phone: "",
+    source: "Phone Call",
+    description: "",
+    scheduleDate: "",
+    scheduleStartTime: "",
+    scheduleEndDate: "",
+    scheduleEndTime: "",
+    assignedTo: "",
+  });
+  const [jobCreating, setJobCreating] = useState(false);
 
   // Contact search
   const [contactSearch, setContactSearch] = useState("");
@@ -429,6 +467,132 @@ export default function FloatingDialer({
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
+
+  // ── Open action menu for a recent call ──
+  function openActionMenu(callId: string) {
+    setActionMenuCallId(actionMenuCallId === callId ? null : callId);
+  }
+
+  // ── Open SMS panel for a phone number ──
+  function openSmsPanel(phone: string, name?: string) {
+    setActionMenuCallId(null);
+    setSmsTarget({ phone, name });
+    setSmsBody("");
+    setSmsSent(false);
+  }
+
+  // ── Send SMS ──
+  async function handleSendSms() {
+    if (!smsTarget || !smsBody.trim()) return;
+    setSmsSending(true);
+    try {
+      const lines = getTwilioLines();
+      await sendSms({ to: smsTarget.phone, body: smsBody.trim(), from: lines[0]?.number || selectedCallerId });
+      setSmsSent(true);
+      setTimeout(() => setSmsTarget(null), 1500);
+    } catch { /* */ }
+    setSmsSending(false);
+  }
+
+  // ── Open New Job form pre-filled with call info ──
+  function openNewJobForm(phone: string, name?: string) {
+    setActionMenuCallId(null);
+    setNewJobPhone(phone);
+    setNewJobName(name || "");
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10);
+    const timeStr = today.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", timeZone: "America/Phoenix" });
+    setNewJobForm({
+      name: name || "",
+      address: "",
+      phone,
+      source: "Phone Call",
+      description: "",
+      scheduleDate: dateStr,
+      scheduleStartTime: timeStr,
+      scheduleEndDate: dateStr,
+      scheduleEndTime: `${String(Math.min(23, Number(timeStr.slice(0, 2)) + 1)).padStart(2, "0")}:${timeStr.slice(3)}`,
+      assignedTo: "",
+    });
+    setShowNewJobForm(true);
+  }
+
+  // ── Create job from inline form ──
+  async function handleCreateJob() {
+    if (!newJobForm.name.trim()) return;
+    setJobCreating(true);
+    try {
+      const getCityFromAddr = (addr: string) => {
+        const parts = addr.split(",").map((p) => p.trim()).filter(Boolean);
+        return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
+      };
+
+      const newJob: Lead = {
+        id: `J-${Date.now()}`,
+        name: newJobForm.name,
+        email: "",
+        phone: newJobForm.phone,
+        address: newJobForm.address || "Address pending",
+        city: getCityFromAddr(newJobForm.address),
+        stage: "new_lead",
+        value: 0,
+        assignedTo: newJobForm.assignedTo,
+        roofType: "Roofing",
+        source: newJobForm.source || "Phone Call",
+        lastActivity: newJobForm.description || "New job created",
+        nextAction: "Schedule inspection",
+      };
+
+      await upsertJobRecord(leadToJobRecord(newJob));
+
+      void logCrewActivity({
+        jobId: newJob.id,
+        jobName: newJob.name,
+        actor: "Office",
+        action: "Job created",
+        details: `${newJob.address}, ${newJob.city} — from phone`,
+        module: "Jobs",
+      }).catch(() => {});
+
+      void createManualFolder({
+        name: `${newJob.name} - ${newJob.address}`.trim(),
+        address: newJob.address,
+        customerName: newJob.name,
+        workType: "Roofing",
+      }).catch(() => {});
+
+      void findOrCreateCustomer({
+        name: newJob.name,
+        phone: newJob.phone,
+        email: "",
+        propertyAddress: newJob.address,
+      }).catch(() => {});
+
+      if (newJobForm.scheduleDate) {
+        const startISO = toArizonaISO(newJobForm.scheduleDate, newJobForm.scheduleStartTime || undefined);
+        const endTime = newJobForm.scheduleEndDate && newJobForm.scheduleEndTime
+          ? toArizonaISO(newJobForm.scheduleEndDate, newJobForm.scheduleEndTime)
+          : new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
+        void syncJobToCalendar(newJob.id, {
+          title: `Roofing — ${newJob.name}`,
+          description: newJobForm.description || `Roofing job for ${newJob.name}`,
+          start_time: startISO,
+          end_time: endTime,
+          all_day: !newJobForm.scheduleStartTime,
+          location: newJob.address,
+          color: "#f97316",
+          assigned_to: newJobForm.assignedTo,
+          customer_name: newJob.name,
+          customer_phone: newJob.phone,
+          job_kind: "Roofing",
+          created_by: "Office",
+        }).catch(() => {});
+      }
+
+      setShowNewJobForm(false);
+    } catch { /* */ }
+    setJobCreating(false);
+  }
 
   if (!open) return null;
 
@@ -866,7 +1030,7 @@ export default function FloatingDialer({
                             {formatCallDate(call.time)}
                           </p>
                         )}
-                        <div className="flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50">
+                        <div className="relative flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50">
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                             isMissed ? "bg-red-50" : "bg-blue-50"
                           }`}>
@@ -891,6 +1055,33 @@ export default function FloatingDialer({
                           >
                             <Phone className="h-3.5 w-3.5" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => openActionMenu(call.id)}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                          {/* Action menu dropdown */}
+                          {actionMenuCallId === call.id && (
+                            <>
+                              <button type="button" className="fixed inset-0 z-10" onClick={() => setActionMenuCallId(null)} />
+                              <div className="absolute right-3 top-full z-20 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-xl">
+                                <button type="button" onClick={() => { setActionMenuCallId(null); handleStartCall(call.phone); }} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                  <Phone className="h-4 w-4 text-blue-600" />
+                                  Call {call.name || formatPhone(call.phone)}
+                                </button>
+                                <button type="button" onClick={() => openSmsPanel(call.phone, call.name)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                                  Message {call.name || formatPhone(call.phone)}
+                                </button>
+                                <button type="button" onClick={() => openNewJobForm(call.phone, call.name)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+                                  <Briefcase className="h-4 w-4 text-blue-600" />
+                                  New job
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -967,6 +1158,153 @@ export default function FloatingDialer({
               <p className="mt-1 text-xs text-gray-400">Incoming calls will appear here</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════ SMS Overlay ══════════ */}
+      {smsTarget && (
+        <div className="absolute inset-0 z-30 flex flex-col rounded-2xl bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold text-gray-900">Message</p>
+              <p className="text-xs text-gray-500">{smsTarget.name || formatPhone(smsTarget.phone)}</p>
+            </div>
+            <button type="button" onClick={() => setSmsTarget(null)} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex flex-1 flex-col px-4 py-3">
+            <textarea
+              value={smsBody}
+              onChange={(e) => setSmsBody(e.target.value)}
+              placeholder="Type your message..."
+              className="flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+              autoFocus
+            />
+            <div className="mt-3 flex items-center justify-end gap-2">
+              {smsSent && <span className="text-xs font-semibold text-blue-600">Sent!</span>}
+              <button
+                type="button"
+                onClick={handleSendSms}
+                disabled={!smsBody.trim() || smsSending}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {smsSending ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ New Job Form Overlay ══════════ */}
+      {showNewJobForm && (
+        <div className="absolute inset-0 z-30 flex flex-col rounded-2xl bg-white">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-blue-600" />
+              <p className="text-sm font-bold text-gray-900">New Job</p>
+            </div>
+            <button type="button" onClick={() => setShowNewJobForm(false)} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <div className="space-y-3">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Client info</p>
+                <p className="text-sm font-bold text-gray-900">{newJobName || "Unknown"}</p>
+                <p className="text-xs text-gray-500">{formatPhone(newJobPhone)}</p>
+              </div>
+
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-gray-500">Name *</span>
+                <input
+                  value={newJobForm.name}
+                  onChange={(e) => setNewJobForm({ ...newJobForm, name: e.target.value })}
+                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+                  placeholder="Customer name"
+                  required
+                />
+              </label>
+
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-gray-500">Address</span>
+                <AddressAutocomplete
+                  value={newJobForm.address}
+                  onChange={(addr) => setNewJobForm((f) => ({ ...f, address: addr }))}
+                  placeholder="Start typing address..."
+                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+                />
+              </label>
+
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-gray-500">Ad Source</span>
+                <select
+                  value={newJobForm.source}
+                  onChange={(e) => setNewJobForm({ ...newJobForm, source: e.target.value })}
+                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+                >
+                  {["Phone Call", "AZR", "Google", "Facebook", "Website", "Referral", "Partner Referral", "Door Knocking", "Yelp", "Angi", "Thumbtack", "Other"].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </label>
+
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-gray-500">Job Description</span>
+                <textarea
+                  value={newJobForm.description}
+                  onChange={(e) => setNewJobForm({ ...newJobForm, description: e.target.value })}
+                  className="resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+                  rows={2}
+                  placeholder="Describe the job..."
+                />
+              </label>
+
+              <div className="border-t border-gray-200 pt-3">
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold text-gray-700">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Schedule
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="grid gap-1">
+                    <span className="text-[10px] font-semibold text-gray-400">Start date</span>
+                    <input type="date" value={newJobForm.scheduleDate} onChange={(e) => setNewJobForm({ ...newJobForm, scheduleDate: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] font-semibold text-gray-400">Start time</span>
+                    <input type="time" value={newJobForm.scheduleStartTime} onChange={(e) => setNewJobForm({ ...newJobForm, scheduleStartTime: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] font-semibold text-gray-400">End date</span>
+                    <input type="date" value={newJobForm.scheduleEndDate} onChange={(e) => setNewJobForm({ ...newJobForm, scheduleEndDate: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] font-semibold text-gray-400">End time</span>
+                    <input type="time" value={newJobForm.scheduleEndTime} onChange={(e) => setNewJobForm({ ...newJobForm, scheduleEndTime: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                </div>
+              </div>
+
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-gray-500">Assigned Team Members</span>
+                <input
+                  value={newJobForm.assignedTo}
+                  onChange={(e) => setNewJobForm({ ...newJobForm, assignedTo: e.target.value })}
+                  className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white"
+                  placeholder="e.g. Crew A, John"
+                />
+              </label>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-3">
+            <button
+              type="button"
+              onClick={handleCreateJob}
+              disabled={!newJobForm.name.trim() || jobCreating}
+              className="w-full rounded-xl bg-yellow-400 py-2.5 text-sm font-bold text-gray-900 transition hover:bg-yellow-500 disabled:opacity-50 active:scale-[0.98]"
+            >
+              {jobCreating ? "Creating..." : "Create job"}
+            </button>
+          </div>
         </div>
       )}
 
