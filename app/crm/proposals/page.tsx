@@ -46,6 +46,8 @@ type Proposal = {
   sendMessage?: string;
   ccRecipients?: string;
   sentToEmail?: string;
+  sentAt?: string;
+  sentBy?: string;
   signedAt?: string;
   signedBy?: string;
   signatureData?: string;
@@ -706,7 +708,11 @@ export default function ProposalsPage() {
         const label = updated.proposalNumber ? `Proposal #${updated.proposalNumber}` : updated.address || "Proposal";
         // Status changed
         if (old.status !== updated.status) {
-          if (updated.status === "Won" || updated.status === "Signed") {
+          if (updated.status === "Sent") {
+            const sentVia = updated.sentViaSms ? "SMS" : "Email";
+            const sentTo = updated.sentViaSms ? updated.smsSentToPhone : updated.sentToEmail;
+            void logCrewActivity({ jobId: updated.job?.id || updated.id, jobName: label, actor: updated.sentBy || "CRM User", action: `Proposal sent by ${sentVia}`, details: `${label} sent${sentTo ? ` to ${sentTo}` : ""} — status changed from ${old.status} to Sent`, module: "Proposal" });
+          } else if (updated.status === "Won" || updated.status === "Signed") {
             void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.signedBy || updated.customerName || "Customer", action: "Proposal signed", details: `${label} signed by ${updated.signedBy || updated.customerName || "customer"}`, module: "Proposal" });
           } else if (updated.status === "Declined") {
             void logCrewActivity({ jobId: updated.id, jobName: label, actor: updated.customerName || "Customer", action: "Proposal declined", details: `${label} declined by customer`, module: "Proposal" });
@@ -1329,6 +1335,8 @@ export default function ProposalsPage() {
       sendSubject: sendForm.subject,
       sendMessage: sendForm.message,
       sentToEmail: sendForm.toEmail,
+      sentAt: new Date().toISOString(),
+      sentBy: currentUserName || currentUserEmail || "CRM User",
       proposalVersion: (activeProposal.proposalVersion ?? 0) + 1,
     });
     const proposalForLink = sentProposal || activeProposal;
@@ -1401,7 +1409,7 @@ export default function ProposalsPage() {
             jobName: proposalForLink.customerName,
             actor: currentUserName || currentUserEmail || "Office",
             action: "Proposal sent by Email",
-            details: `Sent to ${sendForm.toEmail}`,
+            details: `${proposalForLink.proposalNumber ? `Proposal #${proposalForLink.proposalNumber}` : "Proposal"} sent to ${sendForm.toEmail} — status changed to Sent`,
             module: "Proposal",
           }).catch(() => {});
         }
@@ -1446,6 +1454,8 @@ export default function ProposalsPage() {
     const sentProposal = saveActiveProposal({
       status: "Sent",
       sentViaSms: true,
+      sentAt: new Date().toISOString(),
+      sentBy: currentUserName || currentUserEmail || "CRM User",
       smsSentAt: new Date().toISOString(),
       smsSentBy: currentUserName || currentUserEmail || "CRM User",
       smsSentFrom: smsForm.fromNumber,
@@ -1506,7 +1516,7 @@ export default function ProposalsPage() {
           jobName: proposalForLink.customerName,
           actor: currentUserName || currentUserEmail || "Office",
           action: "Proposal sent by SMS",
-          details: `Sent to ${smsForm.toPhone}`,
+          details: `${proposalForLink.proposalNumber ? `Proposal #${proposalForLink.proposalNumber}` : "Proposal"} sent to ${smsForm.toPhone} — status changed to Sent`,
           module: "Proposal",
         }).catch(() => {});
       }
@@ -1737,8 +1747,8 @@ export default function ProposalsPage() {
             <button type="button" onClick={() => { setPermDeleteTarget(activeProposal); setShowPermDeleteConfirm(true); }} className="shrink-0 rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Delete</button>
             <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="shrink-0 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
             <button type="button" onClick={() => { setIsPreviewing(true); setTimeout(() => { window.print(); }, 300); }} className="shrink-0 rounded-full bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-700 active:scale-95 print:hidden">Print</button>
-            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send Email</button>
-            <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">Send SMS</button>
+            <button type="button" onClick={handleOpenSendModal} className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">{activeProposal.status !== "Draft" ? "Resend Email" : "Send Email"}</button>
+            <button type="button" onClick={handleOpenSmsSendModal} className="shrink-0 rounded-full bg-green-600 px-4 py-1.5 text-xs font-bold text-white active:scale-95">{activeProposal.status !== "Draft" ? "Resend SMS" : "Send SMS"}</button>
             {activeProposal.status !== "Won" && activeProposal.status !== "Signed" && activeProposal.status !== "Signed Offline" && (
               <button type="button" onClick={handleOpenOfflineSignModal} className="shrink-0 rounded-full bg-orange-50 px-4 py-1.5 text-xs font-bold text-orange-700 active:scale-95">Mark as Signed Offline</button>
             )}
@@ -1750,6 +1760,19 @@ export default function ProposalsPage() {
             )}
           </div>
         </div>
+
+        {/* Sent Tracking Info */}
+        {activeProposal.sentAt && activeProposal.status !== "Draft" && (
+          <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 print:hidden">
+            <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 text-xs text-gray-600">
+              <span className="font-bold text-sky-700">Sent{activeProposal.sentViaSms ? " via SMS" : " via Email"}</span>
+              <span>Sent: {azDateTime(activeProposal.sentAt)}</span>
+              {activeProposal.sentBy && <span>By: {activeProposal.sentBy}</span>}
+              {activeProposal.sentToEmail && !activeProposal.sentViaSms && <span>To: {activeProposal.sentToEmail}</span>}
+              {activeProposal.smsSentToPhone && activeProposal.sentViaSms && <span>To: {activeProposal.smsSentToPhone}</span>}
+            </div>
+          </div>
+        )}
 
         {/* View Tracking Info */}
         {activeProposal.viewCount && activeProposal.viewCount > 0 && (
@@ -2355,11 +2378,11 @@ export default function ProposalsPage() {
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-7 py-5 shadow-sm">
                 <div className="flex items-center gap-3 text-xl font-bold text-gray-900">
                   <span className="text-blue-600">✉</span>
-                  <span>Send proposal</span>
+                  <span>{activeProposal?.status !== "Draft" ? "Resend proposal" : "Send proposal"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => setIsPreviewing(true)} className="hidden rounded-full border border-blue-600 px-4 py-2 text-xs font-bold text-blue-600 sm:inline-flex">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} disabled={sendingProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingProposal ? "Sending…" : "✈ Send"}</button>
+                  <button type="button" onClick={() => { if (activeProposal?.status !== "Draft" && !window.confirm("This proposal has already been sent. Are you sure you want to resend it?")) return; handleSendProposal(); }} disabled={sendingProposal} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingProposal ? "Sending…" : activeProposal?.status !== "Draft" ? "✈ Resend" : "✈ Send"}</button>
                   <button type="button" onClick={() => setShowSendModal(false)} className="text-2xl text-gray-500">×</button>
                 </div>
               </div>
@@ -2423,6 +2446,12 @@ export default function ProposalsPage() {
                       </div>
                     </div>
                   </div>
+                  {activeProposal?.sentAt && activeProposal.status !== "Draft" && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                      <p className="font-bold">Previously sent via Email</p>
+                      <p>Sent: {azDateTime(activeProposal.sentAt)}{activeProposal.sentBy ? ` by ${activeProposal.sentBy}` : ""}{activeProposal.sentToEmail ? ` to ${activeProposal.sentToEmail}` : ""}</p>
+                    </div>
+                  )}
                   {sendNotice && <p className="whitespace-pre-line rounded-lg bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">{sendNotice}</p>}
                 </div>
               </div>
@@ -2430,7 +2459,7 @@ export default function ProposalsPage() {
                 <button type="button" onClick={() => setShowSendModal(false)} className="text-sm font-bold text-blue-600">Cancel</button>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setIsPreviewing(true)} className="rounded-full border border-blue-600 px-6 py-3 text-sm font-bold text-blue-600">↗ Preview</button>
-                  <button type="button" onClick={handleSendProposal} disabled={sendingProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingProposal ? "Sending…" : "✈ Send proposal"}</button>
+                  <button type="button" onClick={() => { if (activeProposal?.status !== "Draft" && !window.confirm("This proposal has already been sent. Are you sure you want to resend it?")) return; handleSendProposal(); }} disabled={sendingProposal} className="rounded-full bg-blue-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingProposal ? "Sending…" : activeProposal?.status !== "Draft" ? "✈ Resend proposal" : "✈ Send proposal"}</button>
                 </div>
               </div>
             </div>
@@ -2444,10 +2473,10 @@ export default function ProposalsPage() {
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-7 py-5 shadow-sm">
                 <div className="flex items-center gap-3 text-xl font-bold text-gray-900">
                   <span className="text-green-600">💬</span>
-                  <span>Send proposal via SMS</span>
+                  <span>{activeProposal?.status !== "Draft" ? "Resend proposal via SMS" : "Send proposal via SMS"}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={handleSendProposalSms} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingSms ? "Sending…" : "📤 Send SMS"}</button>
+                  <button type="button" onClick={() => { if (activeProposal?.status !== "Draft" && !window.confirm("This proposal has already been sent. Are you sure you want to resend it?")) return; handleSendProposalSms(); }} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-50">{sendingSms ? "Sending…" : activeProposal?.status !== "Draft" ? "📤 Resend SMS" : "📤 Send SMS"}</button>
                   <button type="button" onClick={() => setShowSmsSendModal(false)} className="text-2xl text-gray-500">×</button>
                 </div>
               </div>
@@ -2496,7 +2525,7 @@ export default function ProposalsPage() {
               </div>
               <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-gray-200 bg-white px-7 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)]">
                 <button type="button" onClick={() => setShowSmsSendModal(false)} className="text-sm font-bold text-green-600">Cancel</button>
-                <button type="button" onClick={handleSendProposalSms} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingSms ? "Sending…" : "📤 Send proposal via SMS"}</button>
+                <button type="button" onClick={() => { if (activeProposal?.status !== "Draft" && !window.confirm("This proposal has already been sent. Are you sure you want to resend it?")) return; handleSendProposalSms(); }} disabled={sendingSms || !smsForm.toPhone.trim()} className="rounded-full bg-green-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{sendingSms ? "Sending…" : activeProposal?.status !== "Draft" ? "📤 Resend proposal via SMS" : "📤 Send proposal via SMS"}</button>
               </div>
             </div>
           </div>
@@ -3004,7 +3033,7 @@ export default function ProposalsPage() {
               <div>
                 <p className="font-bold text-blue-700">{proposal.proposalNumber ? `#${proposal.proposalNumber} — ` : ""}{proposal.address}</p>
                 <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? "Sent" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : `Viewed${(proposal.viewCount || 0) > 1 ? ` ${proposal.viewCount} times` : ""}`}{proposal.sentViaSms ? " via SMS" : ""}{proposal.updatedBy && !(proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline") ? ` by ${proposal.updatedBy}` : ""} <span className="mx-1">•</span> {proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.lastViewedAt ? `Last viewed ${azDateTime(proposal.lastViewedAt)}` : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
+                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? `Sent${proposal.sentViaSms ? " via SMS" : " via Email"}${proposal.sentBy ? ` by ${proposal.sentBy}` : ""}${proposal.sentToEmail ? ` to ${proposal.sentToEmail}` : ""}${proposal.smsSentToPhone ? ` to ${proposal.smsSentToPhone}` : ""}` : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : `Viewed${(proposal.viewCount || 0) > 1 ? ` ${proposal.viewCount} times` : ""}`} <span className="mx-1">•</span> {proposal.sentAt ? azDateTime(proposal.sentAt) : proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.lastViewedAt ? `Last viewed ${azDateTime(proposal.lastViewedAt)}` : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
               </div>
             </div>
             </button>
