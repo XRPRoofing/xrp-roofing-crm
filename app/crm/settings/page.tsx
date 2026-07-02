@@ -1,4 +1,4 @@
-import { Building2, CreditCard, ExternalLink, KeyRound, Mail, PhoneCall, PlugZap, ShieldCheck, UsersRound, Webhook } from "lucide-react";
+import { Building2, CreditCard, ExternalLink, GitBranch, KeyRound, Mail, PhoneCall, PlugZap, ShieldCheck, UsersRound, Webhook } from "lucide-react";
 
 const settingsSections = [
   {
@@ -42,6 +42,14 @@ const settingsSections = [
     icon: PlugZap,
     status: "Apps",
     items: ["Google Calendar", "Supabase", "External tools"],
+  },
+  {
+    title: "Automations & Workflows",
+    description: "Create trigger-based automation rules. Control workflow logic directly — no coding required.",
+    icon: GitBranch,
+    status: "Rules",
+    items: ["Workflow Rules", "Notification Automations", "Activity Log"],
+    href: "/crm/automations",
   },
 ];
 
@@ -123,9 +131,11 @@ export default function SettingsPage() {
           <section className="grid gap-4 md:grid-cols-2">
             {settingsSections.map((section) => {
               const Icon = section.icon;
+              const Wrapper = (section as unknown as { href?: string }).href ? "a" : "div";
+              const wrapperProps = (section as unknown as { href?: string }).href ? { href: (section as unknown as { href: string }).href } : {};
 
               return (
-                <div key={section.title} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+                <Wrapper key={section.title} {...wrapperProps} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
                   <div className="flex items-start justify-between gap-4">
                     <span className="rounded-lg bg-blue-50 p-3 text-blue-700"><Icon className="h-6 w-6" /></span>
                     <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">{section.status}</span>
@@ -140,7 +150,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </Wrapper>
               );
             })}
           </section>
