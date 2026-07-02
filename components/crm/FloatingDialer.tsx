@@ -285,7 +285,7 @@ export default function FloatingDialer({
       const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
       const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
       setPosition({
-        x: Math.max(0, Math.min(window.innerWidth - 370, clientX - dragOffset.current.x)),
+        x: Math.max(0, Math.min(window.innerWidth - 300, clientX - dragOffset.current.x)),
         y: Math.max(0, Math.min(window.innerHeight - 100, clientY - dragOffset.current.y)),
       });
     }
@@ -503,24 +503,24 @@ export default function FloatingDialer({
   return (
     <div
       ref={containerRef}
-      className="fixed z-[9999] flex w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[370px]"
+      className="fixed z-[9999] flex w-[300px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
       style={{
         left: position.x,
         top: position.y,
-        maxHeight: "calc(100vh - 32px)",
+        maxHeight: "480px",
         cursor: isDragging ? "grabbing" : undefined,
       }}
     >
       {/* ══════════ Header ══════════ */}
       <div
-        className="flex items-center justify-between bg-gradient-to-b from-gray-50 to-white px-4 pb-2 pt-3 select-none"
+        className="flex items-center justify-between bg-gradient-to-b from-gray-50 to-white px-3 pb-1.5 pt-2 select-none"
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
       >
         <div className="flex items-center gap-2.5">
-          <GripVertical className="h-4 w-4 text-gray-300" />
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-sm">
+          <GripVertical className="h-3.5 w-3.5 text-gray-300" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-sm">
             {callerName ? (
               <span className="text-sm font-bold text-white">{callerName.charAt(0).toUpperCase()}</span>
             ) : (
@@ -534,9 +534,9 @@ export default function FloatingDialer({
           <button
             type="button"
             onClick={() => !isInCall && setCallerIdOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm transition hover:bg-gray-100"
+            className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs transition hover:bg-gray-100"
           >
-            <span className="font-semibold text-gray-800">
+            <span className="font-semibold text-gray-800 text-xs">
               {currentLine ? formatPhone(currentLine.number) : "No Line"}
             </span>
             {!isInCall && <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition ${callerIdOpen ? "rotate-180" : ""}`} />}
@@ -751,13 +751,13 @@ export default function FloatingDialer({
                 <input
                   value={dialNumber}
                   onChange={(e) => setDialNumber(e.target.value)}
-                  className="w-full bg-transparent text-center text-2xl font-light tracking-wider text-gray-900 outline-none placeholder:text-gray-300"
+                  className="w-full bg-transparent text-center text-xl font-light tracking-wider text-gray-900 outline-none placeholder:text-gray-300"
                   placeholder="Enter number"
                 />
               </div>
 
               {/* Dial pad */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { key: "1", sub: "" },
                   { key: "2", sub: "ABC" },
@@ -776,9 +776,9 @@ export default function FloatingDialer({
                     key={key}
                     type="button"
                     onClick={() => setDialNumber((v) => `${v}${key}`)}
-                    className="flex flex-col items-center justify-center rounded-full bg-gray-50 py-3.5 transition hover:bg-gray-100 active:scale-95 active:bg-gray-200"
+                    className="flex flex-col items-center justify-center rounded-full bg-gray-50 py-2.5 transition hover:bg-gray-100 active:scale-95 active:bg-gray-200"
                   >
-                    <span className="text-xl font-medium text-gray-800">{key}</span>
+                    <span className="text-lg font-medium text-gray-800">{key}</span>
                     {sub && <span className="mt-[-2px] text-[9px] font-medium tracking-[0.2em] text-gray-400">{sub}</span>}
                   </button>
                 ))}
@@ -791,15 +791,15 @@ export default function FloatingDialer({
                   type="button"
                   onClick={() => handleStartCall()}
                   disabled={!dialNumber.trim()}
-                  className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-40 active:scale-95"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-40 active:scale-95"
                 >
-                  <Phone className="h-7 w-7" />
+                  <Phone className="h-5 w-5" />
                 </button>
                 {dialNumber ? (
                   <button
                     type="button"
                     onClick={() => setDialNumber((v) => v.slice(0, -1))}
-                    className="flex h-12 w-12 items-center justify-center text-gray-400 transition hover:text-gray-600"
+                    className="flex h-10 w-10 items-center justify-center text-gray-400 transition hover:text-gray-600"
                   >
                     <span className="text-xl">⌫</span>
                   </button>
@@ -834,19 +834,19 @@ export default function FloatingDialer({
                             {formatCallDate(call.time)}
                           </p>
                         )}
-                        <div className="flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50">
-                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                        <div className="flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50">
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                             isMissed ? "bg-red-50" : call.direction === "inbound" ? "bg-green-50" : "bg-blue-50"
                           }`}>
-                            {isMissed ? <PhoneMissed className="h-4.5 w-4.5 text-red-500" /> :
-                             call.direction === "inbound" ? <PhoneIncoming className="h-4.5 w-4.5 text-green-600" /> :
-                             <PhoneOutgoing className="h-4.5 w-4.5 text-blue-600" />}
+                            {isMissed ? <PhoneMissed className="h-3.5 w-3.5 text-red-500" /> :
+                             call.direction === "inbound" ? <PhoneIncoming className="h-3.5 w-3.5 text-green-600" /> :
+                             <PhoneOutgoing className="h-3.5 w-3.5 text-blue-600" />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className={`truncate text-sm font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
+                            <p className={`truncate text-xs font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
                               {call.name || formatPhone(call.phone)}
                             </p>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-[11px] text-gray-400">
                               {call.direction === "inbound" ? "Incoming" : "Outgoing"}
                               {call.duration ? ` · ${formatDuration(call.duration)}` : ""}
                               {" · "}{formatCallTime(call.time)}
@@ -855,9 +855,9 @@ export default function FloatingDialer({
                           <button
                             type="button"
                             onClick={() => handleStartCall(call.phone)}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
                           >
-                            <Phone className="h-4 w-4" />
+                            <Phone className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -899,21 +899,21 @@ export default function FloatingDialer({
                     {filteredContacts.slice(0, 50).map((customer) => (
                       <div
                         key={customer.id}
-                        className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-gray-50"
+                        className="flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50"
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                          <span className="text-sm font-bold text-blue-600">{customer.name.charAt(0).toUpperCase()}</span>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50">
+                          <span className="text-xs font-bold text-blue-600">{customer.name.charAt(0).toUpperCase()}</span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-900">{customer.name}</p>
-                          <p className="text-xs text-gray-400">{formatPhone(customer.phone)}</p>
+                          <p className="truncate text-xs font-semibold text-gray-900">{customer.name}</p>
+                          <p className="text-[11px] text-gray-400">{formatPhone(customer.phone)}</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleStartCall(customer.phone)}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
                         >
-                          <Phone className="h-4 w-4" />
+                          <Phone className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ))}
@@ -949,13 +949,13 @@ export default function FloatingDialer({
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2.5 text-[11px] font-semibold transition ${
+              className={`flex flex-1 flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-semibold transition ${
                 activeTab === tab.key
                   ? "text-green-600"
                   : "text-gray-400 hover:text-gray-600"
               }`}
             >
-              <tab.icon className={`h-5 w-5 ${activeTab === tab.key ? "text-green-600" : ""}`} />
+              <tab.icon className={`h-4 w-4 ${activeTab === tab.key ? "text-green-600" : ""}`} />
               {tab.label}
               {tab.key === "recents" && missedCalls.length > 0 && activeTab !== "recents" && (
                 <span className="absolute -mt-3 ml-6 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
