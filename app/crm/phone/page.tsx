@@ -470,25 +470,6 @@ export default function PhonePage() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gray-50">
       {/* ----------------------------------------------------------------- */}
-      {/* Active call sticky bar (mobile)                                    */}
-      {/* ----------------------------------------------------------------- */}
-      {stats.activeCalls > 0 && (
-        <div className="sticky top-0 z-40 flex items-center justify-between bg-green-600 px-4 py-2.5 text-white lg:hidden">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
-            </span>
-            <div>
-              <p className="text-xs font-bold">Active Call</p>
-              <p className="text-[11px] opacity-80">{stats.activeCalls} call{stats.activeCalls > 1 ? "s" : ""} in progress</p>
-            </div>
-          </div>
-          <Headphones className="h-5 w-5 opacity-80" />
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
       {/* Top bar — phone numbers + title                                    */}
       {/* ----------------------------------------------------------------- */}
       <div className="border-b border-gray-200 bg-white px-4 py-3 lg:px-6">
