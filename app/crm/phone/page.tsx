@@ -258,7 +258,9 @@ export default function PhonePage() {
     for (const e of callEvents) {
       if (!e.callSid) continue;
       // Skip internal browser-to-Twilio legs (client:crm-agent) — they duplicate the real call
-      if ((e.from || "").startsWith("client:") || (e.to || "").startsWith("client:")) continue;
+      const fromVal = (e.from || "").replace(/^\+/, "");
+      const toVal = (e.to || "").replace(/^\+/, "");
+      if (fromVal.startsWith("client:") || toVal.startsWith("client:")) continue;
       const existing = callMap.get(e.callSid);
       if (!existing || new Date(e.createdAt) > new Date(existing.createdAt)) {
         callMap.set(e.callSid, e);
@@ -734,7 +736,7 @@ export default function PhonePage() {
               return (
                 <div className="fixed inset-0 z-50 lg:hidden">
                   <button type="button" className="absolute inset-0 bg-black/30" onClick={() => setActionSheetCallId(null)} />
-                  <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white pb-6 shadow-2xl">
+                  <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white shadow-2xl" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 5rem)" }}>
                     <div className="mx-auto my-2.5 h-1 w-10 rounded-full bg-gray-300" />
                     <div className="border-b border-gray-100 px-5 pb-3">
                       <p className="text-lg font-bold text-gray-900">{sheetCall.customerName}</p>
