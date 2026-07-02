@@ -290,7 +290,7 @@ export default function FloatingDialer({
                 direction: ev.direction || "inbound",
                 outcome: outcome || undefined,
                 time: ev.createdAt,
-                duration: typeof ev.payload?.duration === "number" ? ev.payload.duration as number : undefined,
+                duration: (() => { const d = ev.payload?.CallDuration ?? ev.payload?.DialCallDuration ?? ev.payload?.Duration ?? ev.payload?.duration; return d != null ? (typeof d === "number" ? d : Number(d) || 0) : undefined; })(),
               });
             }
           }

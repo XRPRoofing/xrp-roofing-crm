@@ -265,14 +265,8 @@ export default function PhonePage() {
       const phone = event.direction === "inbound" ? event.from || "" : event.to || "";
       const customer = matchCustomerByPhone(phone, phoneLookup);
       const payload = event.payload || {};
-      const duration =
-        typeof payload.CallDuration === "number"
-          ? payload.CallDuration
-          : typeof payload.Duration === "number"
-            ? payload.Duration
-            : typeof payload.duration === "number"
-              ? payload.duration
-              : 0;
+      const rawDur = payload.CallDuration ?? payload.DialCallDuration ?? payload.Duration ?? payload.duration ?? 0;
+      const duration = typeof rawDur === "number" ? rawDur : Number(rawDur) || 0;
 
       const forwarded = isForwardedCall(event);
       let displayName: string;
