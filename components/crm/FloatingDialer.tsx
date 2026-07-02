@@ -170,6 +170,7 @@ export default function FloatingDialer({
 
   // Recents filter (All / Missed)
   const [recentsFilter, setRecentsFilter] = useState<"all" | "missed">("all");
+  const missedCount = useMemo(() => recents.filter((c) => c.outcome === "Missed call").length, [recents]);
 
   // Contact search
   const [contactSearch, setContactSearch] = useState("");
@@ -840,7 +841,7 @@ export default function FloatingDialer({
                       : "text-gray-400 hover:text-gray-600"
                   }`}
                 >
-                  Missed{missedCalls.length > 0 ? ` (${missedCalls.length})` : ""}
+                  Missed{missedCount > 0 ? ` (${missedCount})` : ""}
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -990,9 +991,9 @@ export default function FloatingDialer({
             >
               <tab.icon className={`h-4 w-4 ${activeTab === tab.key ? "text-blue-600" : ""}`} />
               {tab.label}
-              {tab.key === "recents" && missedCalls.length > 0 && activeTab !== "recents" && (
+              {tab.key === "recents" && missedCount > 0 && activeTab !== "recents" && (
                 <span className="absolute -mt-3 ml-6 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                  {missedCalls.length}
+                  {missedCount}
                 </span>
               )}
             </button>
