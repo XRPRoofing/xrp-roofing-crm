@@ -7,19 +7,23 @@ import {
   Hash,
   Mic,
   MicOff,
+  Minus,
   Pause,
   Phone,
+  PhoneCall,
   PhoneForwarded,
+  PhoneIncoming,
   PhoneMissed,
   PhoneOff,
+  PhoneOutgoing,
   Play,
-  Plus,
-  Clock,
-  Users,
-  X,
+  Search,
   User,
-  BriefcaseBusiness,
-  Contact,
+  Users,
+  Volume2,
+  X,
+  Clock,
+  Maximize2,
 } from "lucide-react";
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@/lib/twilio/client";
@@ -31,10 +35,9 @@ import { logCrewActivity } from "@/lib/crew-activity";
 // Types
 // ---------------------------------------------------------------------------
 
-type Tab = "keypad" | "recents" | "missed" | "contacts";
+type Tab = "recents" | "contacts" | "keypad" | "queue";
 type CallState = "idle" | "connecting" | "active" | "held" | "forwarding";
 type ForwardingStatus = "forwarding" | "ringing" | "connected" | "no-answer" | "busy" | "failed" | "ended";
-type ContactType = "client" | "lead" | "job";
 
 interface PhoneNumber {
   label: string;
@@ -46,8 +49,9 @@ interface RecentCall {
   phone: string;
   name?: string;
   direction: "inbound" | "outbound";
+  outcome?: string;
   time: string;
-  type?: ContactType;
+  duration?: number;
 }
 
 interface MissedCall {
@@ -87,19 +91,21 @@ function formatPhone(phone: string): string {
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr);
+function formatCallTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function formatCallDate(dateStr: string): string {
+  const d = new Date(dateStr);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const diff = now.getTime() - d.getTime();
+  if (diff < 86400000 && d.getDate() === now.getDate()) return "Today";
+  if (diff < 172800000) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +128,9 @@ export default function FloatingDialer({
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Minimized state
+  const [minimized, setMinimized] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<Tab>("keypad");
@@ -151,10 +160,6 @@ export default function FloatingDialer({
   // In-call DTMF keypad
   const [showInCallKeypad, setShowInCallKeypad] = useState(false);
 
-  // Tag/identify caller
-  const [showTagMenu, setShowTagMenu] = useState(false);
-  const [callerTag, setCallerTag] = useState<ContactType | null>(null);
-
   // Recents
   const [recents, setRecents] = useState<RecentCall[]>([]);
   const [recentsLoading, setRecentsLoading] = useState(false);
@@ -163,11 +168,14 @@ export default function FloatingDialer({
   const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
   const [missedLoading, setMissedLoading] = useState(false);
 
+  // Contact search
+  const [contactSearch, setContactSearch] = useState("");
+
   // Initialize position on first open
   useEffect(() => {
     if (open && position.x === -1) {
-      const x = window.innerWidth - 380;
-      const y = window.innerHeight - 580;
+      const x = window.innerWidth - 390;
+      const y = Math.max(16, window.innerHeight - 620);
       setPosition({ x: Math.max(16, x), y: Math.max(16, y) }); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [open, position.x]);
@@ -190,7 +198,7 @@ export default function FloatingDialer({
     onCallStateChange?.(callState !== "idle");
   }, [callState, onCallStateChange]);
 
-  // Apply initial dial number / caller ID when provided (e.g. from calendar click-to-call)
+  // Apply initial dial number / caller ID when provided
   useEffect(() => {
     if (open && initialDialNumber) {
       setDialNumber(initialDialNumber); // eslint-disable-line react-hooks/set-state-in-effect
@@ -201,7 +209,7 @@ export default function FloatingDialer({
     }
   }, [open, initialDialNumber, initialCallerId]);
 
-  // Build a phone→name lookup map so contact resolution is O(1) instead of scanning the array
+  // Build phone→name lookup
   const phoneLookup = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of customers) {
@@ -215,8 +223,7 @@ export default function FloatingDialer({
     return phoneLookup.get(phone.replace(/\D/g, ""));
   }, [phoneLookup]);
 
-  // Pre-fetch recents + missed in a single API call on first open so both tabs
-  // are ready before the user clicks them. The flag prevents duplicate fetches.
+  // Pre-fetch recents + missed
   const prefetchedRef = useRef(false);
   useEffect(() => {
     if (!open || prefetchedRef.current) return;
@@ -225,20 +232,26 @@ export default function FloatingDialer({
     setMissedLoading(true);
     listConversationEvents(200)
       .then((events) => {
-        // Build recents from call events
         const seen = new Set<string>();
         const recent: RecentCall[] = [];
         const missed: MissedCall[] = [];
         for (const ev of events) {
-          // Recents: any call event
-          if (recent.length < 20 && (ev.type === "incoming_call" || (ev.type === "call_status" && ev.direction))) {
+          if (recent.length < 30 && (ev.type === "incoming_call" || (ev.type === "call_status" && ev.direction))) {
             const phone = ev.direction === "inbound" ? ev.from : ev.to;
             if (phone && !seen.has(phone)) {
               seen.add(phone);
-              recent.push({ id: ev.id, phone, name: findContactName(phone), direction: ev.direction || "inbound", time: ev.createdAt });
+              const outcome = getTwilioCallOutcomeLabel(ev);
+              recent.push({
+                id: ev.id,
+                phone,
+                name: findContactName(phone),
+                direction: ev.direction || "inbound",
+                outcome: outcome || undefined,
+                time: ev.createdAt,
+                duration: typeof ev.payload?.duration === "number" ? ev.payload.duration as number : undefined,
+              });
             }
           }
-          // Missed: filter for missed call outcome
           if (missed.length < 50 && getTwilioCallOutcomeLabel(ev) === "Missed call") {
             const phone = ev.from || ev.to || "";
             if (phone) missed.push({ id: ev.id, phone, name: findContactName(phone), time: ev.createdAt });
@@ -268,20 +281,15 @@ export default function FloatingDialer({
 
   useEffect(() => {
     if (!isDragging) return;
-
     function handleMove(e: MouseEvent | TouchEvent) {
       const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
       const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
       setPosition({
-        x: Math.max(0, Math.min(window.innerWidth - 360, clientX - dragOffset.current.x)),
+        x: Math.max(0, Math.min(window.innerWidth - 370, clientX - dragOffset.current.x)),
         y: Math.max(0, Math.min(window.innerHeight - 100, clientY - dragOffset.current.y)),
       });
     }
-
-    function handleEnd() {
-      setIsDragging(false);
-    }
-
+    function handleEnd() { setIsDragging(false); }
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleEnd);
     window.addEventListener("touchmove", handleMove);
@@ -295,7 +303,7 @@ export default function FloatingDialer({
   }, [isDragging]);
 
   // -------------------------------------------------------------------------
-  // Call actions
+  // Call actions (unchanged logic)
   // -------------------------------------------------------------------------
 
   async function handleStartCall(numberOverride?: string) {
@@ -303,6 +311,7 @@ export default function FloatingDialer({
     if (!destination) return;
     try {
       setCallState("connecting");
+      setMinimized(false);
       const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
       if (!voiceDeviceRef.current) {
         (voiceDeviceRef as React.MutableRefObject<BrowserVoiceDevice | null>).current = device;
@@ -313,8 +322,6 @@ export default function FloatingDialer({
       browserCallRef.current = call as unknown as BrowserVoiceCall;
       setCallState("active");
       setIsMuted(false);
-      setCallerTag(null);
-      // Log the outbound call to activity history
       const destDigits = destination.replace(/\D/g, "");
       const matchedCustomer = customers.find((c) => c.phone?.replace(/\D/g, "") === destDigits);
       void logCrewActivity({
@@ -325,7 +332,6 @@ export default function FloatingDialer({
         details: `Called ${destination}${selectedCallerId ? ` from ${selectedCallerId}` : ""}`,
         module: "Calls",
       });
-      // Capture CallSid — may already be available or arrive via "accept"
       const existingSid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
       if (existingSid) setCallSid(existingSid);
       call.on("accept", () => {
@@ -374,9 +380,7 @@ export default function FloatingDialer({
     try {
       await controlCall({ callSid, action });
       setCallState(callState === "held" ? "active" : "held");
-    } catch {
-      // Revert state if call fails
-    }
+    } catch { /* */ }
   }
 
   function clearForwardingState() {
@@ -418,11 +422,6 @@ export default function FloatingDialer({
     call.sendDigits?.(digit);
   }
 
-  function handleTagCaller(type: ContactType) {
-    setCallerTag(type);
-    setShowTagMenu(false);
-  }
-
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
@@ -430,119 +429,310 @@ export default function FloatingDialer({
   if (!open) return null;
 
   const isInCall = callState !== "idle";
+  const currentLine = phoneNumbers.find((p) => p.number === selectedCallerId) || phoneNumbers[0];
+  const callerName = findContactName(dialNumber) || "";
+
+  // Filtered contacts
+  const filteredContacts = contactSearch.trim()
+    ? customers.filter((c) => c.phone && (c.name.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone.includes(contactSearch)))
+    : customers.filter((c) => c.phone);
+
+  // ── Minimized pill ──
+  if (minimized && !isInCall) {
+    return (
+      <div
+        ref={containerRef}
+        className="fixed z-[9999] flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 shadow-xl"
+        style={{ left: position.x, top: position.y, cursor: isDragging ? "grabbing" : undefined }}
+      >
+        <div
+          className="flex cursor-grab items-center gap-2"
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
+            <Phone className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-sm font-bold text-gray-800">Phone</span>
+        </div>
+        <button type="button" onClick={() => setMinimized(false)} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <Maximize2 className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // ── Active call minimized pill ──
+  if (minimized && isInCall) {
+    return (
+      <div
+        ref={containerRef}
+        className="fixed z-[9999] flex items-center gap-3 rounded-full border border-green-200 bg-green-50 px-4 py-2.5 shadow-xl"
+        style={{ left: position.x, top: position.y, cursor: isDragging ? "grabbing" : undefined }}
+      >
+        <div
+          className="flex cursor-grab items-center gap-2"
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+        >
+          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
+            <PhoneCall className="h-4 w-4 text-white" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-green-400" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-500" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-green-800">{callerName || formatPhone(dialNumber)}</p>
+            <p className="text-[10px] font-semibold text-green-600">
+              {callState === "held" ? "On Hold" : callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
+            </p>
+          </div>
+        </div>
+        <button type="button" onClick={() => setMinimized(false)} className="rounded-full p-1.5 text-green-600 hover:bg-green-100">
+          <Maximize2 className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={handleEndCall} className="rounded-full bg-red-500 p-1.5 text-white hover:bg-red-600">
+          <PhoneOff className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={containerRef}
-      className="fixed z-[9999] w-[350px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      className="fixed z-[9999] flex w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-[370px]"
       style={{
         left: position.x,
         top: position.y,
+        maxHeight: "calc(100vh - 32px)",
         cursor: isDragging ? "grabbing" : undefined,
       }}
     >
-      {/* Header - Draggable */}
+      {/* ══════════ Header ══════════ */}
       <div
-        className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 select-none"
+        className="flex items-center justify-between bg-gradient-to-b from-gray-50 to-white px-4 pb-2 pt-3 select-none"
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
       >
-        <div className="flex items-center gap-2">
-          <GripVertical className="h-4 w-4 text-blue-200" />
-          <Phone className="h-4 w-4 text-white" />
-          <span className="text-sm font-bold text-white">Phone</span>
-          {isInCall && (
-            <span className="rounded-full bg-green-400/20 px-2 py-0.5 text-[10px] font-bold text-green-100">
-              {callState === "held" ? "Held" : callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
-            </span>
-          )}
+        <div className="flex items-center gap-2.5">
+          <GripVertical className="h-4 w-4 text-gray-300" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-sm">
+            {callerName ? (
+              <span className="text-sm font-bold text-white">{callerName.charAt(0).toUpperCase()}</span>
+            ) : (
+              <Phone className="h-4 w-4 text-white" />
+            )}
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-1 text-blue-200 transition hover:bg-blue-500 hover:text-white"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
 
-      {/* Caller ID Selector */}
-      {phoneNumbers.length > 0 && !isInCall && (
-        <div className="relative border-b border-gray-100 px-4 py-2">
+        {/* Active number selector */}
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setCallerIdOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-100"
+            onClick={() => !isInCall && setCallerIdOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm transition hover:bg-gray-100"
           >
-            <span className="flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 text-gray-400" />
-              <span className="font-medium">
-                {phoneNumbers.find((p) => p.number === selectedCallerId)?.label || formatPhone(selectedCallerId) || "Select number"}
-              </span>
+            <span className="font-semibold text-gray-800">
+              {currentLine ? formatPhone(currentLine.number) : "No Line"}
             </span>
-            <ChevronDown className={`h-4 w-4 text-gray-400 transition ${callerIdOpen ? "rotate-180" : ""}`} />
+            {!isInCall && <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition ${callerIdOpen ? "rotate-180" : ""}`} />}
           </button>
-          {callerIdOpen && (
+          {callerIdOpen && !isInCall && (
             <>
               <button type="button" className="fixed inset-0 z-10" onClick={() => setCallerIdOpen(false)} />
-              <div className="absolute left-4 right-4 top-full z-20 mt-1 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl">
                 {phoneNumbers.map((pn) => (
                   <button
                     key={pn.number}
                     type="button"
                     onClick={() => { setSelectedCallerId(pn.number); setCallerIdOpen(false); }}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-blue-50 ${selectedCallerId === pn.number ? "bg-blue-50 font-semibold text-blue-700" : "text-gray-700"}`}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-gray-50 ${selectedCallerId === pn.number ? "bg-green-50" : ""}`}
                   >
-                    <Phone className="h-3.5 w-3.5 text-gray-400" />
-                    <span>{pn.label}</span>
-                    <span className="ml-auto text-xs text-gray-400">{formatPhone(pn.number)}</span>
+                    <span className={`h-2 w-2 rounded-full ${selectedCallerId === pn.number ? "bg-green-500" : "bg-gray-300"}`} />
+                    <div>
+                      <p className={`text-sm font-semibold ${selectedCallerId === pn.number ? "text-green-700" : "text-gray-700"}`}>{pn.label}</p>
+                      <p className="text-xs text-gray-400">{formatPhone(pn.number)}</p>
+                    </div>
                   </button>
                 ))}
               </div>
             </>
           )}
         </div>
+
+        {/* Window controls */}
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setMinimized(true)} className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+            <Minus className="h-4 w-4" />
+          </button>
+          {!isInCall && (
+            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-red-500">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ══════════ Active Call Screen ══════════ */}
+      {isInCall && callState !== "forwarding" && (
+        <div className="flex flex-col items-center bg-gradient-to-b from-white to-gray-50 px-6 pb-5 pt-4">
+          {/* Caller avatar */}
+          <div className="relative mb-3">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg">
+              {callerName ? (
+                <span className="text-2xl font-bold text-white">{callerName.charAt(0).toUpperCase()}</span>
+              ) : (
+                <User className="h-8 w-8 text-white" />
+              )}
+            </div>
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-2 py-0.5 text-[9px] font-bold text-white shadow">
+              {callState === "held" ? "HELD" : callState === "connecting" ? "DIALING" : "LIVE"}
+            </span>
+          </div>
+
+          {/* Name & number */}
+          <p className="text-lg font-bold text-gray-900">{callerName || "Unknown"}</p>
+          <p className="text-sm text-gray-500">{formatPhone(dialNumber)}</p>
+
+          {/* Timer */}
+          <p className={`mt-1 text-2xl font-light tabular-nums ${callState === "held" ? "text-orange-500" : callState === "connecting" ? "text-yellow-500" : "text-green-600"}`}>
+            {callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
+          </p>
+
+          {/* Call action grid */}
+          <div className="mt-5 grid w-full grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={handleMute}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition active:scale-95 ${
+                isMuted ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {isMuted ? "Unmute" : "Mute"}
+            </button>
+            <button
+              type="button"
+              onClick={handleHold}
+              disabled={!callSid}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition active:scale-95 disabled:opacity-40 ${
+                callState === "held" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {callState === "held" ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+              {callState === "held" ? "Resume" : "Hold"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInCallKeypad((v) => !v)}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition active:scale-95 ${
+                showInCallKeypad ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <Hash className="h-5 w-5" />
+              Keypad
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTransfer((v) => !v)}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 text-xs font-semibold transition active:scale-95 ${
+                showTransfer ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <PhoneForwarded className="h-5 w-5" />
+              Transfer
+            </button>
+            <button
+              type="button"
+              className="flex flex-col items-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-semibold text-gray-600 transition hover:bg-gray-200 active:scale-95"
+            >
+              <Volume2 className="h-5 w-5" />
+              Speaker
+            </button>
+            <button
+              type="button"
+              onClick={handleEndCall}
+              className="flex flex-col items-center gap-1.5 rounded-2xl bg-red-500 py-3 text-xs font-bold text-white transition hover:bg-red-600 active:scale-95"
+            >
+              <PhoneOff className="h-5 w-5" />
+              End
+            </button>
+          </div>
+
+          {/* Transfer input */}
+          {showTransfer && (
+            <div className="mt-3 flex w-full items-center gap-2">
+              <input
+                value={transferNumber}
+                onChange={(e) => setTransferNumber(e.target.value)}
+                placeholder="Transfer to number..."
+                className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              />
+              <button
+                type="button"
+                onClick={handleTransfer}
+                disabled={!transferNumber.trim()}
+                className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                Go
+              </button>
+            </div>
+          )}
+
+          {/* In-call DTMF keypad */}
+          {showInCallKeypad && (
+            <div className="mt-3 grid w-full grid-cols-3 gap-1.5">
+              {"123456789*0#".split("").map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleSendDtmf(key)}
+                  className="rounded-xl bg-white py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-blue-50 active:scale-95"
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Forwarding Status */}
+      {/* ══════════ Forwarding Status ══════════ */}
       {callState === "forwarding" && forwardingStatus && (
-        <div className="border-b border-gray-100 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              forwardingStatus === "connected" ? "bg-green-100" :
-              forwardingStatus === "failed" ? "bg-red-100" :
-              forwardingStatus === "no-answer" || forwardingStatus === "busy" ? "bg-orange-100" :
-              "bg-blue-100"
-            }`}>
-              <PhoneForwarded className={`h-5 w-5 ${
-                forwardingStatus === "connected" ? "text-green-600" :
-                forwardingStatus === "failed" ? "text-red-600" :
-                forwardingStatus === "no-answer" || forwardingStatus === "busy" ? "text-orange-600" :
-                "text-blue-600"
-              }`} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-gray-900">
-                {forwardingStatus === "forwarding" && "Forwarding Call..."}
-                {forwardingStatus === "ringing" && "Ringing External Number..."}
-                {forwardingStatus === "connected" && "Forwarded Successfully"}
-                {forwardingStatus === "no-answer" && "No Answer"}
-                {forwardingStatus === "busy" && "Busy"}
-                {forwardingStatus === "failed" && "Forwarding Failed"}
-                {forwardingStatus === "ended" && "Call Ended"}
-              </p>
-              <p className="text-xs text-gray-500">{formatPhone(forwardingDest)}</p>
-            </div>
-            {(forwardingStatus === "forwarding" || forwardingStatus === "ringing") && (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
-            )}
+        <div className="flex flex-col items-center px-6 py-8">
+          <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
+            forwardingStatus === "connected" ? "bg-green-100" :
+            forwardingStatus === "failed" ? "bg-red-100" :
+            "bg-blue-100"
+          }`}>
+            <PhoneForwarded className={`h-7 w-7 ${
+              forwardingStatus === "connected" ? "text-green-600" :
+              forwardingStatus === "failed" ? "text-red-600" :
+              "text-blue-600"
+            }`} />
           </div>
+          <p className="text-base font-bold text-gray-900">
+            {forwardingStatus === "forwarding" && "Forwarding Call..."}
+            {forwardingStatus === "ringing" && "Ringing..."}
+            {forwardingStatus === "connected" && "Forwarded Successfully"}
+            {forwardingStatus === "no-answer" && "No Answer"}
+            {forwardingStatus === "busy" && "Busy"}
+            {forwardingStatus === "failed" && "Forwarding Failed"}
+            {forwardingStatus === "ended" && "Call Ended"}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">{formatPhone(forwardingDest)}</p>
+          {(forwardingStatus === "forwarding" || forwardingStatus === "ringing") && (
+            <div className="mt-4 h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+          )}
           {(forwardingStatus === "connected" || forwardingStatus === "no-answer" || forwardingStatus === "busy" || forwardingStatus === "failed" || forwardingStatus === "ended") && (
             <button
               type="button"
               onClick={clearForwardingState}
-              className="mt-3 w-full rounded-lg bg-gray-100 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-200"
+              className="mt-4 rounded-xl bg-gray-100 px-6 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-200"
             >
               Dismiss
             </button>
@@ -550,189 +740,24 @@ export default function FloatingDialer({
         </div>
       )}
 
-      {/* In-Call Controls */}
-      {isInCall && callState !== "forwarding" && (
-        <div className="border-b border-gray-100 px-4 py-3">
-          {/* Current call info */}
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold text-gray-900">{findContactName(dialNumber) || formatPhone(dialNumber)}</p>
-              <p className="text-xs text-gray-500">{formatPhone(dialNumber)}</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {callerTag && (
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  callerTag === "client" ? "bg-blue-100 text-blue-700" :
-                  callerTag === "lead" ? "bg-green-100 text-green-700" :
-                  "bg-purple-100 text-purple-700"
-                }`}>
-                  {callerTag === "client" ? "Client" : callerTag === "lead" ? "Lead" : "Job"}
-                </span>
-              )}
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                callState === "held" ? "bg-orange-100 text-orange-700" :
-                callState === "connecting" ? "bg-yellow-100 text-yellow-700" :
-                "bg-green-100 text-green-700"
-              }`}>
-                {callState === "held" ? "On Hold" : callState === "connecting" ? "Connecting" : formatDuration(callDuration)}
-              </span>
-            </div>
-          </div>
-
-          {/* Call action buttons */}
-          <div className="grid grid-cols-5 gap-1.5">
-            <button
-              type="button"
-              onClick={handleMute}
-              className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold transition ${
-                isMuted ? "bg-orange-50 text-orange-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              {isMuted ? "Unmute" : "Mute"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowInCallKeypad((v) => !v)}
-              className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold transition ${
-                showInCallKeypad ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <Hash className="h-4 w-4" />
-              Keypad
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTransfer((v) => !v)}
-              className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold transition ${
-                showTransfer ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <PhoneForwarded className="h-4 w-4" />
-              Transfer
-            </button>
-            <button
-              type="button"
-              onClick={handleHold}
-              disabled={!callSid}
-              className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold transition disabled:opacity-50 ${
-                callState === "held" ? "bg-orange-50 text-orange-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {callState === "held" ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-              {callState === "held" ? "Resume" : "Hold"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTagMenu((v) => !v)}
-              className={`relative flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold transition ${
-                showTagMenu ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <Plus className="h-4 w-4" />
-              Tag
-            </button>
-          </div>
-
-          {/* Tag menu dropdown */}
-          {showTagMenu && (
-            <div className="mt-2 rounded-lg border border-gray-200 bg-white py-1 shadow-sm">
-              <button type="button" onClick={() => handleTagCaller("client")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50">
-                <User className="h-4 w-4 text-blue-500" /> Client
-              </button>
-              <button type="button" onClick={() => handleTagCaller("lead")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-green-50">
-                <Contact className="h-4 w-4 text-green-500" /> Lead
-              </button>
-              <button type="button" onClick={() => handleTagCaller("job")} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-purple-50">
-                <BriefcaseBusiness className="h-4 w-4 text-purple-500" /> Job
-              </button>
-            </div>
-          )}
-
-          {/* Transfer input */}
-          {showTransfer && (
-            <div className="mt-2 flex items-center gap-2">
-              <input
-                value={transferNumber}
-                onChange={(e) => setTransferNumber(e.target.value)}
-                placeholder="Transfer to number..."
-                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-              />
-              <button
-                type="button"
-                onClick={handleTransfer}
-                disabled={!transferNumber.trim()}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                Transfer
-              </button>
-            </div>
-          )}
-
-          {/* In-call DTMF keypad */}
-          {showInCallKeypad && (
-            <div className="mt-2 grid grid-cols-3 gap-1">
-              {"123456789*0#".split("").map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleSendDtmf(key)}
-                  className="rounded-lg border border-gray-200 bg-gray-50 py-2 text-sm font-semibold text-gray-800 transition hover:bg-blue-50 hover:text-blue-700 active:scale-95"
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* End call */}
-          <button
-            type="button"
-            onClick={handleEndCall}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white transition hover:bg-red-700 active:scale-[0.98]"
-          >
-            <PhoneOff className="h-4 w-4" />
-            End Call
-          </button>
-        </div>
-      )}
-
-      {/* Tabs */}
+      {/* ══════════ Tab Content (when not in call) ══════════ */}
       {!isInCall && (
-        <>
-          <div className="flex border-b border-gray-100">
-            {([
-              { key: "keypad" as Tab, icon: Hash, label: "Keypad" },
-              { key: "recents" as Tab, icon: Clock, label: "Recents" },
-              { key: "missed" as Tab, icon: PhoneMissed, label: "Missed" },
-              { key: "contacts" as Tab, icon: Users, label: "Contacts" },
-            ]).map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition ${
-                  activeTab === tab.key
-                    ? "border-b-2 border-blue-600 text-blue-700"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                <tab.icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Keypad Tab */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* ── Keypad Tab ── */}
           {activeTab === "keypad" && (
-            <div className="p-3">
-              <input
-                value={dialNumber}
-                onChange={(e) => setDialNumber(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-center text-lg font-bold text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-                placeholder="Enter phone number"
-              />
-              <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+            <div className="flex flex-1 flex-col px-5 pb-3 pt-2">
+              {/* Number display */}
+              <div className="mb-3 text-center">
+                <input
+                  value={dialNumber}
+                  onChange={(e) => setDialNumber(e.target.value)}
+                  className="w-full bg-transparent text-center text-2xl font-light tracking-wider text-gray-900 outline-none placeholder:text-gray-300"
+                  placeholder="Enter number"
+                />
+              </div>
+
+              {/* Dial pad */}
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { key: "1", sub: "" },
                   { key: "2", sub: "ABC" },
@@ -751,141 +776,195 @@ export default function FloatingDialer({
                     key={key}
                     type="button"
                     onClick={() => setDialNumber((v) => `${v}${key}`)}
-                    className="flex flex-col items-center justify-center rounded-xl border border-gray-100 bg-gray-50 py-2.5 transition hover:bg-blue-50 hover:text-blue-700 active:scale-95"
+                    className="flex flex-col items-center justify-center rounded-full bg-gray-50 py-3.5 transition hover:bg-gray-100 active:scale-95 active:bg-gray-200"
                   >
-                    <span className="text-lg font-semibold text-gray-800">{key}</span>
-                    {sub && <span className="text-[9px] font-medium tracking-widest text-gray-400">{sub}</span>}
+                    <span className="text-xl font-medium text-gray-800">{key}</span>
+                    {sub && <span className="mt-[-2px] text-[9px] font-medium tracking-[0.2em] text-gray-400">{sub}</span>}
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex items-center gap-2">
+
+              {/* Call button row */}
+              <div className="mt-3 flex items-center justify-center gap-6">
+                <div className="w-12" />
                 <button
                   type="button"
                   onClick={() => handleStartCall()}
                   disabled={!dialNumber.trim()}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98]"
+                  className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-40 active:scale-95"
                 >
-                  <Phone className="h-4 w-4" />
-                  Call
+                  <Phone className="h-7 w-7" />
                 </button>
-                {dialNumber && (
+                {dialNumber ? (
                   <button
                     type="button"
                     onClick={() => setDialNumber((v) => v.slice(0, -1))}
-                    className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-600 transition hover:bg-gray-100"
+                    className="flex h-12 w-12 items-center justify-center text-gray-400 transition hover:text-gray-600"
                   >
-                    ⌫
+                    <span className="text-xl">⌫</span>
                   </button>
+                ) : (
+                  <div className="w-12" />
                 )}
               </div>
             </div>
           )}
 
-          {/* Recents Tab */}
+          {/* ── Recents Tab ── */}
           {activeTab === "recents" && (
-            <div className="max-h-[360px] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto">
               {recentsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-green-500" />
                 </div>
               ) : recents.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">No recent calls</p>
+                <div className="flex flex-col items-center py-12 text-gray-400">
+                  <Clock className="mb-2 h-8 w-8" />
+                  <p className="text-sm font-medium">No recent calls</p>
+                </div>
               ) : (
-                <div className="divide-y divide-gray-50">
-                  {recents.map((call) => (
-                    <button
-                      key={call.id}
-                      type="button"
-                      onClick={() => { setDialNumber(call.phone); setActiveTab("keypad"); }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
-                    >
-                      <div className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                        call.direction === "inbound" ? "bg-green-100" : "bg-blue-100"
-                      }`}>
-                        <Phone className={`h-4 w-4 ${call.direction === "inbound" ? "text-green-600" : "text-blue-600"}`} />
+                <div>
+                  {recents.map((call, idx) => {
+                    const showDate = idx === 0 || formatCallDate(call.time) !== formatCallDate(recents[idx - 1].time);
+                    const isMissed = call.outcome === "Missed call";
+                    return (
+                      <div key={call.id}>
+                        {showDate && (
+                          <p className="bg-gray-50 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                            {formatCallDate(call.time)}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50">
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                            isMissed ? "bg-red-50" : call.direction === "inbound" ? "bg-green-50" : "bg-blue-50"
+                          }`}>
+                            {isMissed ? <PhoneMissed className="h-4.5 w-4.5 text-red-500" /> :
+                             call.direction === "inbound" ? <PhoneIncoming className="h-4.5 w-4.5 text-green-600" /> :
+                             <PhoneOutgoing className="h-4.5 w-4.5 text-blue-600" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={`truncate text-sm font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
+                              {call.name || formatPhone(call.phone)}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {call.direction === "inbound" ? "Incoming" : "Outgoing"}
+                              {call.duration ? ` · ${formatDuration(call.duration)}` : ""}
+                              {" · "}{formatCallTime(call.time)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleStartCall(call.phone)}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                          >
+                            <Phone className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {call.name || formatPhone(call.phone)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {call.direction === "inbound" ? "Incoming" : "Outgoing"} · {formatTime(call.time)}
-                        </p>
-                      </div>
-                      <Phone className="h-4 w-4 shrink-0 text-gray-300" />
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* Missed Calls Tab */}
-          {activeTab === "missed" && (
-            <div className="max-h-[360px] overflow-y-auto">
-              {missedLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
-                </div>
-              ) : missedCalls.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">No missed calls</p>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {missedCalls.map((call) => (
-                    <button
-                      key={call.id}
-                      type="button"
-                      onClick={() => { setDialNumber(call.phone); setActiveTab("keypad"); }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
-                    >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100">
-                        <PhoneMissed className="h-4 w-4 text-red-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {call.name || formatPhone(call.phone)}
-                        </p>
-                        <p className="text-xs text-red-500">
-                          Missed · {formatTime(call.time)}
-                        </p>
-                      </div>
-                      <Phone className="h-4 w-4 shrink-0 text-gray-300" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Contacts Tab */}
+          {/* ── Contacts Tab ── */}
           {activeTab === "contacts" && (
-            <div className="max-h-[360px] overflow-y-auto">
-              {customers.length === 0 ? (
-                <p className="py-8 text-center text-sm text-gray-400">No contacts found</p>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {customers.filter((c) => c.phone).map((customer) => (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      onClick={() => { setDialNumber(customer.phone); setActiveTab("keypad"); }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
-                    >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100">
-                        <User className="h-4 w-4 text-gray-500" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">{customer.name}</p>
-                        <p className="text-xs text-gray-500">{formatPhone(customer.phone)}</p>
-                      </div>
-                      <Phone className="h-4 w-4 shrink-0 text-gray-300" />
+            <div className="flex flex-1 flex-col overflow-hidden">
+              {/* Search */}
+              <div className="px-4 pb-2 pt-1">
+                <div className="flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2">
+                  <Search className="h-4 w-4 text-gray-400" />
+                  <input
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder="Search contacts..."
+                    className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+                  />
+                  {contactSearch && (
+                    <button type="button" onClick={() => setContactSearch("")} className="text-gray-400 hover:text-gray-600">
+                      <X className="h-3.5 w-3.5" />
                     </button>
-                  ))}
+                  )}
                 </div>
-              )}
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {filteredContacts.length === 0 ? (
+                  <div className="flex flex-col items-center py-12 text-gray-400">
+                    <Users className="mb-2 h-8 w-8" />
+                    <p className="text-sm font-medium">No contacts found</p>
+                  </div>
+                ) : (
+                  <div>
+                    {filteredContacts.slice(0, 50).map((customer) => (
+                      <div
+                        key={customer.id}
+                        className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-gray-50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
+                          <span className="text-sm font-bold text-blue-600">{customer.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-gray-900">{customer.name}</p>
+                          <p className="text-xs text-gray-400">{formatPhone(customer.phone)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleStartCall(customer.phone)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                        >
+                          <Phone className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </>
+
+          {/* ── Queue Tab ── */}
+          {activeTab === "queue" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+                <Users className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-semibold text-gray-500">No calls waiting in queue</p>
+              <p className="mt-1 text-xs text-gray-400">Incoming calls will appear here</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ Bottom Tab Bar ══════════ */}
+      {!isInCall && (
+        <div className="flex border-t border-gray-200 bg-white">
+          {([
+            { key: "recents" as Tab, icon: Clock, label: "Recents" },
+            { key: "contacts" as Tab, icon: Users, label: "Contacts" },
+            { key: "keypad" as Tab, icon: Hash, label: "Keypad" },
+            { key: "queue" as Tab, icon: PhoneIncoming, label: "Queue" },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2.5 text-[11px] font-semibold transition ${
+                activeTab === tab.key
+                  ? "text-green-600"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              <tab.icon className={`h-5 w-5 ${activeTab === tab.key ? "text-green-600" : ""}`} />
+              {tab.label}
+              {tab.key === "recents" && missedCalls.length > 0 && activeTab !== "recents" && (
+                <span className="absolute -mt-3 ml-6 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                  {missedCalls.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
