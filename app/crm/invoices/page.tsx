@@ -10,7 +10,8 @@ import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, delet
 import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
-import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedInvoices, getCachedProposals, refreshInvoices, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { proposalSyncEnabled } from "@/lib/proposal-sync";
 import { addCrmNotification } from "@/lib/crm-notifications";
 import { savePaymentDocumentsToCustomerFiles } from "@/lib/crm-files";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -258,28 +259,29 @@ function normalizeProposalPackage(value?: string | ProposalPackageOption): Requi
 function readWonProposals(existingInvoices: Invoice[]) {
   if (typeof window === "undefined") return [] as (StoredProposal & { hasInvoice: boolean })[];
 
-  const savedProposals = window.localStorage.getItem("xrp-crm-proposals");
-  if (!savedProposals) return [] as (StoredProposal & { hasInvoice: boolean })[];
+  // Merge proposals from BOTH localStorage and Supabase cache
+  const localRaw = window.localStorage.getItem("xrp-crm-proposals");
+  let localProposals: StoredProposal[] = [];
+  try { localProposals = localRaw ? JSON.parse(localRaw) as StoredProposal[] : []; } catch { /* ignore */ }
 
-  try {
-    const proposals = JSON.parse(savedProposals) as StoredProposal[];
-    const invoicedProposalIds = new Set(existingInvoices.filter((inv) => inv.proposalReference).map((inv) => inv.proposalReference));
+  const cachedProposals = (getCachedProposals<StoredProposal>() ?? []) as StoredProposal[];
 
-    const wonStatuses = new Set(["Won", "Approved", "Signed", "Signed Offline"]);
+  // Merge: Supabase-cached proposals take priority (more up-to-date), then add local-only ones
+  const seenIds = new Set<string>();
+  const allProposals: StoredProposal[] = [];
+  for (const p of cachedProposals) { if (!seenIds.has(p.id)) { seenIds.add(p.id); allProposals.push(p); } }
+  for (const p of localProposals) { if (!seenIds.has(p.id)) { seenIds.add(p.id); allProposals.push(p); } }
 
-    return proposals
-      .filter((proposal) => {
-        // Show ALL proposals with Won/Signed/Approved status regardless of job stage
-        return wonStatuses.has(proposal.status);
-      })
-      .map((proposal) => ({ ...proposal, hasInvoice: invoicedProposalIds.has(proposal.id) }))
-      .sort((a, b) => {
-        if (a.hasInvoice !== b.hasInvoice) return a.hasInvoice ? 1 : -1;
-        return (b.signedAt || "").localeCompare(a.signedAt || "");
-      });
-  } catch {
-    return [] as (StoredProposal & { hasInvoice: boolean })[];
-  }
+  const invoicedProposalIds = new Set(existingInvoices.filter((inv) => inv.proposalReference).map((inv) => inv.proposalReference));
+  const wonStatuses = new Set(["Won", "Approved", "Signed", "Signed Offline"]);
+
+  return allProposals
+    .filter((proposal) => wonStatuses.has(proposal.status))
+    .map((proposal) => ({ ...proposal, hasInvoice: invoicedProposalIds.has(proposal.id) }))
+    .sort((a, b) => {
+      if (a.hasInvoice !== b.hasInvoice) return a.hasInvoice ? 1 : -1;
+      return (b.signedAt || "").localeCompare(a.signedAt || "");
+    });
 }
 
 function getProposalSelectedPackage(proposal: StoredProposal) {
@@ -1145,6 +1147,12 @@ export default function InvoicesPage() {
     setWonProposals(readWonProposals(invoices));
     setCreateForm(createBlankInvoice(invoices.length));
     setShowCreateModal(true);
+    // Also fetch latest proposals from Supabase in background and update list
+    if (proposalSyncEnabled()) {
+      void refreshProposals<StoredProposal>().then(() => {
+        setWonProposals(readWonProposals(invoices));
+      }).catch(() => {});
+    }
   }
 
   function handlePrefillFromJob(sourceId: string) {
