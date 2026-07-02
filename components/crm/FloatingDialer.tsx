@@ -168,6 +168,9 @@ export default function FloatingDialer({
   const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
   const [missedLoading, setMissedLoading] = useState(false);
 
+  // Recents filter (All / Missed)
+  const [recentsFilter, setRecentsFilter] = useState<"all" | "missed">("all");
+
   // Contact search
   const [contactSearch, setContactSearch] = useState("");
 
@@ -450,7 +453,7 @@ export default function FloatingDialer({
           onMouseDown={handleDragStart}
           onTouchStart={handleDragStart}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
             <Phone className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm font-bold text-gray-800">Phone</span>
@@ -470,7 +473,7 @@ export default function FloatingDialer({
     return (
       <div
         ref={containerRef}
-        className="fixed z-[9999] flex items-center gap-3 rounded-full border border-green-200 bg-green-50 px-4 py-2.5 shadow-xl"
+        className="fixed z-[9999] flex items-center gap-3 rounded-full border border-blue-200 bg-blue-50 px-4 py-2.5 shadow-xl"
         style={{ left: position.x, top: position.y, cursor: isDragging ? "grabbing" : undefined }}
       >
         <div
@@ -478,19 +481,19 @@ export default function FloatingDialer({
           onMouseDown={handleDragStart}
           onTouchStart={handleDragStart}
         >
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
+          <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
             <PhoneCall className="h-4 w-4 text-white" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-green-400" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-500" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-blue-400" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-blue-500" />
           </div>
           <div>
-            <p className="text-xs font-bold text-green-800">{callerName || formatPhone(dialNumber)}</p>
-            <p className="text-[10px] font-semibold text-green-600">
+            <p className="text-xs font-bold text-blue-800">{callerName || formatPhone(dialNumber)}</p>
+            <p className="text-[10px] font-semibold text-blue-600">
               {callState === "held" ? "On Hold" : callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
             </p>
           </div>
         </div>
-        <button type="button" onClick={() => setMinimized(false)} className="rounded-full p-1.5 text-green-600 hover:bg-green-100">
+        <button type="button" onClick={() => setMinimized(false)} className="rounded-full p-1.5 text-blue-600 hover:bg-blue-100">
           <Maximize2 className="h-4 w-4" />
         </button>
         <button type="button" onClick={handleEndCall} className="rounded-full bg-red-500 p-1.5 text-white hover:bg-red-600">
@@ -520,7 +523,7 @@ export default function FloatingDialer({
       >
         <div className="flex items-center gap-2.5">
           <GripVertical className="h-3.5 w-3.5 text-gray-300" />
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-sm">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-sm">
             {callerName ? (
               <span className="text-sm font-bold text-white">{callerName.charAt(0).toUpperCase()}</span>
             ) : (
@@ -550,11 +553,11 @@ export default function FloatingDialer({
                     key={pn.number}
                     type="button"
                     onClick={() => { setSelectedCallerId(pn.number); setCallerIdOpen(false); }}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-gray-50 ${selectedCallerId === pn.number ? "bg-green-50" : ""}`}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-gray-50 ${selectedCallerId === pn.number ? "bg-blue-50" : ""}`}
                   >
-                    <span className={`h-2 w-2 rounded-full ${selectedCallerId === pn.number ? "bg-green-500" : "bg-gray-300"}`} />
+                    <span className={`h-2 w-2 rounded-full ${selectedCallerId === pn.number ? "bg-blue-500" : "bg-gray-300"}`} />
                     <div>
-                      <p className={`text-sm font-semibold ${selectedCallerId === pn.number ? "text-green-700" : "text-gray-700"}`}>{pn.label}</p>
+                      <p className={`text-sm font-semibold ${selectedCallerId === pn.number ? "text-blue-700" : "text-gray-700"}`}>{pn.label}</p>
                       <p className="text-xs text-gray-400">{formatPhone(pn.number)}</p>
                     </div>
                   </button>
@@ -589,7 +592,7 @@ export default function FloatingDialer({
                 <User className="h-8 w-8 text-white" />
               )}
             </div>
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-2 py-0.5 text-[9px] font-bold text-white shadow">
+            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-blue-500 px-2 py-0.5 text-[9px] font-bold text-white shadow">
               {callState === "held" ? "HELD" : callState === "connecting" ? "DIALING" : "LIVE"}
             </span>
           </div>
@@ -599,7 +602,7 @@ export default function FloatingDialer({
           <p className="text-sm text-gray-500">{formatPhone(dialNumber)}</p>
 
           {/* Timer */}
-          <p className={`mt-1 text-2xl font-light tabular-nums ${callState === "held" ? "text-orange-500" : callState === "connecting" ? "text-yellow-500" : "text-green-600"}`}>
+          <p className={`mt-1 text-2xl font-light tabular-nums ${callState === "held" ? "text-orange-500" : callState === "connecting" ? "text-yellow-500" : "text-blue-600"}`}>
             {callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
           </p>
 
@@ -705,12 +708,12 @@ export default function FloatingDialer({
       {callState === "forwarding" && forwardingStatus && (
         <div className="flex flex-col items-center px-6 py-8">
           <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
-            forwardingStatus === "connected" ? "bg-green-100" :
+            forwardingStatus === "connected" ? "bg-blue-100" :
             forwardingStatus === "failed" ? "bg-red-100" :
             "bg-blue-100"
           }`}>
             <PhoneForwarded className={`h-7 w-7 ${
-              forwardingStatus === "connected" ? "text-green-600" :
+              forwardingStatus === "connected" ? "text-blue-600" :
               forwardingStatus === "failed" ? "text-red-600" :
               "text-blue-600"
             }`} />
@@ -791,7 +794,7 @@ export default function FloatingDialer({
                   type="button"
                   onClick={() => handleStartCall()}
                   disabled={!dialNumber.trim()}
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-40 active:scale-95"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg transition hover:bg-blue-600 disabled:opacity-40 active:scale-95"
                 >
                   <Phone className="h-5 w-5" />
                 </button>
@@ -811,21 +814,49 @@ export default function FloatingDialer({
           )}
 
           {/* ── Recents Tab ── */}
-          {activeTab === "recents" && (
-            <div className="flex-1 overflow-y-auto">
+          {activeTab === "recents" && (() => {
+            const filteredRecents = recentsFilter === "all" ? recents : recents.filter((c) => c.outcome === "Missed call");
+            return (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {/* All / Missed filter */}
+              <div className="flex border-b border-gray-200 px-4 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRecentsFilter("all")}
+                  className={`flex-1 pb-2 text-center text-xs font-semibold transition ${
+                    recentsFilter === "all"
+                      ? "border-b-2 border-blue-600 text-blue-600"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecentsFilter("missed")}
+                  className={`flex-1 pb-2 text-center text-xs font-semibold transition ${
+                    recentsFilter === "missed"
+                      ? "border-b-2 border-blue-600 text-blue-600"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  Missed{missedCalls.length > 0 ? ` (${missedCalls.length})` : ""}
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
               {recentsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-green-500" />
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
                 </div>
-              ) : recents.length === 0 ? (
+              ) : filteredRecents.length === 0 ? (
                 <div className="flex flex-col items-center py-12 text-gray-400">
                   <Clock className="mb-2 h-8 w-8" />
-                  <p className="text-sm font-medium">No recent calls</p>
+                  <p className="text-sm font-medium">{recentsFilter === "missed" ? "No missed calls" : "No recent calls"}</p>
                 </div>
               ) : (
                 <div>
-                  {recents.map((call, idx) => {
-                    const showDate = idx === 0 || formatCallDate(call.time) !== formatCallDate(recents[idx - 1].time);
+                  {filteredRecents.map((call, idx) => {
+                    const showDate = idx === 0 || formatCallDate(call.time) !== formatCallDate(filteredRecents[idx - 1].time);
                     const isMissed = call.outcome === "Missed call";
                     return (
                       <div key={call.id}>
@@ -836,10 +867,10 @@ export default function FloatingDialer({
                         )}
                         <div className="flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50">
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                            isMissed ? "bg-red-50" : call.direction === "inbound" ? "bg-green-50" : "bg-blue-50"
+                            isMissed ? "bg-red-50" : "bg-blue-50"
                           }`}>
                             {isMissed ? <PhoneMissed className="h-3.5 w-3.5 text-red-500" /> :
-                             call.direction === "inbound" ? <PhoneIncoming className="h-3.5 w-3.5 text-green-600" /> :
+                             call.direction === "inbound" ? <PhoneIncoming className="h-3.5 w-3.5 text-blue-600" /> :
                              <PhoneOutgoing className="h-3.5 w-3.5 text-blue-600" />}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -855,7 +886,7 @@ export default function FloatingDialer({
                           <button
                             type="button"
                             onClick={() => handleStartCall(call.phone)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition hover:bg-blue-100"
                           >
                             <Phone className="h-3.5 w-3.5" />
                           </button>
@@ -865,8 +896,10 @@ export default function FloatingDialer({
                   })}
                 </div>
               )}
+              </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* ── Contacts Tab ── */}
           {activeTab === "contacts" && (
@@ -911,7 +944,7 @@ export default function FloatingDialer({
                         <button
                           type="button"
                           onClick={() => handleStartCall(customer.phone)}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition hover:bg-blue-100"
                         >
                           <Phone className="h-3.5 w-3.5" />
                         </button>
@@ -951,11 +984,11 @@ export default function FloatingDialer({
               onClick={() => setActiveTab(tab.key)}
               className={`flex flex-1 flex-col items-center gap-0.5 pb-1.5 pt-2 text-[10px] font-semibold transition ${
                 activeTab === tab.key
-                  ? "text-green-600"
+                  ? "text-blue-600"
                   : "text-gray-400 hover:text-gray-600"
               }`}
             >
-              <tab.icon className={`h-4 w-4 ${activeTab === tab.key ? "text-green-600" : ""}`} />
+              <tab.icon className={`h-4 w-4 ${activeTab === tab.key ? "text-blue-600" : ""}`} />
               {tab.label}
               {tab.key === "recents" && missedCalls.length > 0 && activeTab !== "recents" && (
                 <span className="absolute -mt-3 ml-6 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
