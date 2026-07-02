@@ -57,12 +57,21 @@ let invoiceCache: CacheEntry<unknown[]> | null = null;
 let proposalCache: CacheEntry<unknown[]> | null = null;
 let customerCache: CacheEntry<unknown[]> | null = null;
 
+// Data is considered fresh for this many ms — callers that request a refresh
+// within this window get the cached value immediately instead of hitting the
+// network again.  Keeps mobile page transitions snappy.
+const FRESH_MS = 8_000;
+
 // In-flight deduplication: if a refresh is already running, return its promise
 // instead of firing a second identical request.
 let crewFlight: Promise<CrewDataset> | null = null;
 let invoiceFlight: Promise<unknown[]> | null = null;
 let proposalFlight: Promise<unknown[]> | null = null;
 let customerFlight: Promise<unknown[]> | null = null;
+
+function isFresh<T>(entry: CacheEntry<T> | null): entry is CacheEntry<T> {
+  return entry !== null && Date.now() - entry.updatedAt < FRESH_MS;
+}
 
 // ---------------------------------------------------------------------------
 // Crew dataset
@@ -72,7 +81,8 @@ export function getCachedCrewData(): CrewDataset | null {
   return crewCache?.data ?? null;
 }
 
-export async function refreshCrewData(): Promise<CrewDataset> {
+export async function refreshCrewData(force?: boolean): Promise<CrewDataset> {
+  if (!force && isFresh(crewCache)) return crewCache.data;
   if (crewFlight) return crewFlight;
   crewFlight = loadCrewDataset()
     .then((data) => { crewCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.crew); return data; })
@@ -88,7 +98,8 @@ export function getCachedInvoices<T>(): T[] | null {
   return (invoiceCache?.data as T[] | undefined) ?? null;
 }
 
-export async function refreshInvoices<T extends { id: string }>(): Promise<T[]> {
+export async function refreshInvoices<T extends { id: string }>(force?: boolean): Promise<T[]> {
+  if (!force && isFresh(invoiceCache)) return invoiceCache.data as T[];
   if (invoiceFlight) return invoiceFlight as Promise<T[]>;
   invoiceFlight = loadAllInvoices<T>()
     .then((data) => { invoiceCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.invoices); return data as unknown[]; })
@@ -104,7 +115,8 @@ export function getCachedProposals<T>(): T[] | null {
   return (proposalCache?.data as T[] | undefined) ?? null;
 }
 
-export async function refreshProposals<T extends { id: string }>(): Promise<T[]> {
+export async function refreshProposals<T extends { id: string }>(force?: boolean): Promise<T[]> {
+  if (!force && isFresh(proposalCache)) return proposalCache.data as T[];
   if (proposalFlight) return proposalFlight as Promise<T[]>;
   proposalFlight = loadProposalRecords<T>()
     .then((data) => { proposalCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.proposals); return data as unknown[]; })
@@ -120,7 +132,8 @@ export function getCachedCustomers<T>(): T[] | null {
   return (customerCache?.data as T[] | undefined) ?? null;
 }
 
-export async function refreshCustomers<T>(): Promise<T[]> {
+export async function refreshCustomers<T>(force?: boolean): Promise<T[]> {
+  if (!force && isFresh(customerCache)) return customerCache.data as T[];
   if (customerFlight) return customerFlight as Promise<T[]>;
   customerFlight = loadCustomerRecords()
     .then((data) => { customerCache = { data, updatedAt: Date.now() }; emitCacheEvent(CACHE_EVENTS.customers); return data as unknown[]; })

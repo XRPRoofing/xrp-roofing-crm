@@ -130,20 +130,37 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Warm the data cache in parallel with the auth check so pages render
-    // instantly once auth completes. Errors are swallowed — pages will retry.
+    // Warm the data cache so pages render instantly once auth completes.
+    // On mobile, stagger fetches to avoid saturating the connection; on
+    // desktop fire them all at once.
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     void refreshCrewData().catch(() => {});
-    void refreshInvoices().catch(() => {});
-    void refreshProposals().catch(() => {});
-    void refreshCustomers().catch(() => {});
+    if (mobile) {
+      setTimeout(() => void refreshInvoices().catch(() => {}), 800);
+      setTimeout(() => void refreshProposals().catch(() => {}), 1600);
+      setTimeout(() => void refreshCustomers().catch(() => {}), 2400);
+    } else {
+      void refreshInvoices().catch(() => {});
+      void refreshProposals().catch(() => {});
+      void refreshCustomers().catch(() => {});
+    }
 
-    // Pre-download JS bundles for all nav pages so transitions are instant
-    for (const item of navigation) {
+    // Pre-download JS bundles for nav pages so transitions are instant.
+    // On mobile, only prefetch the most-used pages to save bandwidth.
+    const prefetchTargets = mobile
+      ? navigation.filter((item) => ["/crm", "/crm/leads", "/crm/customers", "/crm/invoices", "/crm/calendar"].includes(item.href))
+      : navigation;
+    for (const item of prefetchTargets) {
       router.prefetch(item.href);
     }
 
-    // Pre-warm the Twilio Voice SDK bundle so it's cached before the first call
-    void import("@twilio/voice-sdk").catch(() => {});
+    // Pre-warm the Twilio Voice SDK bundle — defer on mobile to prioritize
+    // page rendering.
+    if (mobile) {
+      setTimeout(() => void import("@twilio/voice-sdk").catch(() => {}), 5000);
+    } else {
+      void import("@twilio/voice-sdk").catch(() => {});
+    }
 
     if (process.env.NEXT_PUBLIC_TEST_BYPASS_AUTH === "1") {
       setUserRole("admin");
@@ -219,6 +236,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isCrewUser) return;
     let mounted = true;
+    let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function registerGlobalVoiceDevice() {
       try {
@@ -256,10 +274,17 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       }
     }
 
-    registerGlobalVoiceDevice();
+    // Defer voice device registration on mobile to prioritize page rendering
+    const mobileDelay = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 4000 : 0;
+    if (mobileDelay > 0) {
+      delayTimer = setTimeout(() => { if (mounted) registerGlobalVoiceDevice(); }, mobileDelay);
+    } else {
+      registerGlobalVoiceDevice();
+    }
 
     return () => {
       mounted = false;
+      if (delayTimer) clearTimeout(delayTimer);
       voiceDeviceRef.current?.destroy();
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
@@ -698,10 +723,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       syncTimeoutRef.current = setTimeout(() => setSyncActive(false), 2000);
     }
     const unsubs = [
-      subscribeToCrewData(() => { flash(); void refreshCrewData().catch(() => {}); }),
-      subscribeToInvoiceShares(() => { flash(); void refreshInvoices().catch(() => {}); }),
-      subscribeToProposalRecords(() => { flash(); void refreshProposals().catch(() => {}); }),
-      subscribeToCustomerRecords(() => { flash(); void refreshCustomers().catch(() => {}); }),
+      subscribeToCrewData(() => { flash(); void refreshCrewData(true).catch(() => {}); }),
+      subscribeToInvoiceShares(() => { flash(); void refreshInvoices(true).catch(() => {}); }),
+      subscribeToProposalRecords(() => { flash(); void refreshProposals(true).catch(() => {}); }),
+      subscribeToCustomerRecords(() => { flash(); void refreshCustomers(true).catch(() => {}); }),
       subscribeToTaskUpdates(() => flash()),
     ];
     return () => {

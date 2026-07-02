@@ -2,20 +2,27 @@
 
 import { useEffect, useInsertionEffect, useRef } from "react";
 
+const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
 /**
  * Minimum elapsed time (ms) between two refresh callbacks.  When the user
  * returns to the tab (focus / visibilitychange) we only re-fetch if the data
  * was marked dirty while the tab was in the background, preventing the
  * rapid-fire reloads that previously made the CRM feel unstable.
+ *
+ * Mobile gets a longer cooldown to reduce CPU/network churn on constrained
+ * devices.
  */
-const FOCUS_COOLDOWN_MS = 10_000;
+const FOCUS_COOLDOWN_MS = isMobile ? 20_000 : 10_000;
 
 /**
  * Background polling interval (ms) — safety net for when Supabase realtime
  * disconnects or cross-device sync misses an event. Keeps data fresh without
  * waiting for a tab-focus event.
+ *
+ * Mobile polls less aggressively to save battery and bandwidth.
  */
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = isMobile ? 45_000 : 15_000;
 
 /**
  * Re-run `onRefresh` when the data is known to be stale:
