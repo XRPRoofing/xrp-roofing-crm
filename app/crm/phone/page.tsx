@@ -953,18 +953,27 @@ export default function PhonePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedCall.phone && (
-                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-green-700">
-                        Call Back
+                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
+                        <Phone className="h-3.5 w-3.5" />
+                        Call
                       </button>
                     )}
+                    {selectedCall.phone && (
+                      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        Message
+                      </button>
+                    )}
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-new-job", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                      <Briefcase className="h-3.5 w-3.5" />
+                      New Job
+                    </button>
                     {selectedCall.customerId && (
-                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
-                        Open Customer
+                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Customer
                       </a>
                     )}
-                    <a href={`/crm/leads?newLead=1&phone=${encodeURIComponent(selectedCall.phone)}&name=${encodeURIComponent(selectedCall.customerName)}`} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
-                      Create Job
-                    </a>
                   </div>
                 </div>
               </div>
