@@ -267,14 +267,17 @@ function readWonProposals(existingInvoices: Invoice[]) {
     const currentJobs = crewData?.jobs ?? [];
     const invoicedProposalIds = new Set(existingInvoices.filter((inv) => inv.proposalReference).map((inv) => inv.proposalReference));
 
+    const wonStatuses = new Set(["Won", "Approved", "Signed", "Signed Offline"]);
+
     return proposals
       .filter((proposal) => {
-        if (proposal.status !== "Won") return false;
+        if (!wonStatuses.has(proposal.status)) return false;
         const jobId = proposal.job?.id;
-        if (!jobId) return false;
+        if (!jobId) return true; // include proposals without job link if won
         const currentJob = currentJobs.find((j) => j.id === jobId);
         const stage = currentJob?.stage ?? proposal.job?.stage;
-        return stage === "completed" || stage === "paid";
+        // Include jobs that are approved, scheduled, in_progress, completed, or paid
+        return stage === "approved" || stage === "scheduled" || stage === "in_progress" || stage === "final_inspection" || stage === "completed" || stage === "paid";
       })
       .map((proposal) => ({ ...proposal, hasInvoice: invoicedProposalIds.has(proposal.id) }))
       .sort((a, b) => {
@@ -1082,6 +1085,16 @@ export default function InvoicesPage() {
         details: `${pendingReviewInvoice.invoiceNumber} — ${currency(calculateTotals(pendingReviewInvoice).finalTotal)}`,
         module: "Invoice",
       }).catch(() => {});
+      if (pendingReviewInvoice.proposalReference) {
+        void logCrewActivity({
+          jobId: pendingReviewInvoice.jobReference,
+          jobName: pendingReviewInvoice.clientName,
+          actor: currentUserEmail || "Office",
+          action: "Invoice linked to proposal",
+          details: `${pendingReviewInvoice.invoiceNumber} created from proposal`,
+          module: "Invoice",
+        }).catch(() => {});
+      }
     }
     setCreateForm(createBlankInvoice(invoices.length + 1));
     setPendingReviewInvoice(null);
@@ -2058,6 +2071,16 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <p className="mt-1 font-semibold text-sm sm:text-base text-gray-600">{selectedInvoice.jobName}</p>
                 <p className="text-xs sm:text-sm text-gray-500"><AddressLink value={selectedInvoice.propertyAddress} /></p>
                 {selectedInvoice.leadSource && <span className="mt-2 inline-block rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-200">{selectedInvoice.leadSource}</span>}
+                {(selectedInvoice.jobReference || selectedInvoice.proposalReference) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedInvoice.jobReference && (
+                      <a href={`/crm/leads?job=${encodeURIComponent(selectedInvoice.jobReference)}`} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100 transition">View Job →</a>
+                    )}
+                    {selectedInvoice.proposalReference && (
+                      <a href={`/crm/proposals?id=${encodeURIComponent(selectedInvoice.proposalReference)}`} className="inline-flex items-center gap-1 rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100 transition">View Proposal →</a>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="text-left lg:text-right">
                 <span className={`inline-block rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold ring-1 ${statusBadgeClass(getComputedStatus(selectedInvoice))}`}>{getComputedStatus(selectedInvoice)}</span>
@@ -2260,7 +2283,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Completed Job <span className="normal-case font-semibold text-blue-400">(optional)</span></label>
+                <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Won Proposal <span className="normal-case font-semibold text-blue-400">(recommended)</span></label>
                 <select 
                   value={createForm.proposalReference ? `proposal:${createForm.proposalReference}` : ""} 
                   onChange={(event) => handlePrefillFromJob(event.target.value)} 
@@ -2268,13 +2291,13 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 >
                   <option value="">— No proposal (legacy / direct invoice) —</option>
                   {wonProposals.length === 0 ? (
-                    <option value="" disabled>No completed jobs available</option>
+                    <option value="" disabled>No won/signed proposals available</option>
                   ) : (
                     wonProposals.map((proposal) => {
                       const pkg = getProposalSelectedPackage(proposal);
                       return (
                         <option key={proposal.id} value={`proposal:${proposal.id}`} disabled={proposal.hasInvoice}>
-                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.proposalNumber ? `#${proposal.proposalNumber}` : "Won"} • {currency(pkg.price)}{proposal.hasInvoice ? " (invoiced)" : ""}
+                          {proposal.hasInvoice ? "✓ " : ""}{proposal.customerName} • {proposal.address} • {proposal.proposalNumber ? `#${proposal.proposalNumber}` : proposal.status} • {currency(pkg.price)}{proposal.hasInvoice ? " (invoiced)" : ""}
                         </option>
                       );
                     })
@@ -2282,7 +2305,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 </select>
                 {wonProposals.length === 0 && (
                   <p className="mt-2 text-xs text-gray-500">
-                    No completed jobs with signed proposals available — you can still create a direct invoice below.
+                    No jobs with signed/approved proposals available — you can still create a direct invoice below.
                   </p>
                 )}
               </div>

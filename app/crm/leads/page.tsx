@@ -10,6 +10,7 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { leadStages } from "@/lib/crm-data";
 import type { Lead, LeadStage } from "@/types/crm";
 import { addJobNote, addJobPhotos, deleteJobPhoto, deleteJobRecord, ensureSeedJobs, leadToJobRecord, loadCrewDataset, loadJobPhotos, migrateStaleDueDates, subscribeToCrewData, updateJobRecord, upsertJobRecord, type JobNote, type JobPhoto } from "@/lib/crew-sync";
+import { createCalendarEvent } from "@/lib/calendar-sync";
 import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
@@ -497,6 +498,9 @@ export default function LeadsPage() {
     inspectionDate: "",
     roofYear: "",
     callNotes: "",
+    scheduleDate: "",
+    scheduleTime: "",
+    scheduleCrew: "",
   });
 
   // Client identification: suggest existing customers as user types name
@@ -1160,6 +1164,37 @@ export default function LeadsPage() {
       value: Number(form.value) || 0,
       source: form.source,
     });
+
+    // Auto-create calendar event if schedule date is provided
+    if (form.scheduleDate) {
+      const startDate = form.scheduleTime
+        ? new Date(`${form.scheduleDate}T${form.scheduleTime}:00`)
+        : new Date(`${form.scheduleDate}T09:00:00`);
+      const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default duration
+      void createCalendarEvent({
+        title: `${form.roofType || "Roofing"} — ${form.name}`,
+        description: `${form.roofType || "Roofing"} job for ${form.name}. ${form.lastActivity || ""}`.trim(),
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        all_day: !form.scheduleTime,
+        location: form.address || "",
+        color: "#f97316",
+        assigned_to: form.scheduleCrew || form.assignedTo || "",
+        customer_name: form.name,
+        customer_phone: form.phone || "",
+        job_kind: form.roofType || "Roofing",
+        created_by: currentUserName || "Office",
+      }).catch(() => {});
+      void logCrewActivity({
+        jobId: newJob.id,
+        jobName: newJob.name,
+        actor: currentUserName || "Office",
+        action: "Job scheduled",
+        details: `Scheduled for ${form.scheduleDate}${form.scheduleTime ? ` at ${form.scheduleTime}` : ""}${form.scheduleCrew ? ` — Crew: ${form.scheduleCrew}` : ""}`,
+        module: "Jobs",
+      }).catch(() => {});
+    }
+
     setForm({
       name: "",
       email: "",
@@ -1175,6 +1210,9 @@ export default function LeadsPage() {
       inspectionDate: "",
       roofYear: "",
       callNotes: "",
+      scheduleDate: "",
+      scheduleTime: "",
+      scheduleCrew: "",
     });
     setShowCallPaste(false);
     setCallPasteText("");
@@ -1358,9 +1396,31 @@ export default function LeadsPage() {
                 </div>
               </div>
 
-              {/* Section: Inspection Appointment */}
+              {/* Section: Schedule */}
               <div className="p-4 space-y-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600"><CalendarDays className="h-3.5 w-3.5" />Inspection Appointment</p>
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600"><CalendarDays className="h-3.5 w-3.5" />Schedule</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-gray-500">Schedule Date</span>
+                    <input type="date" value={form.scheduleDate} onChange={(e) => setForm({ ...form, scheduleDate: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-bold text-gray-500">Schedule Time</span>
+                    <input type="time" value={form.scheduleTime} onChange={(e) => setForm({ ...form, scheduleTime: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" />
+                  </label>
+                  <label className="grid gap-1 sm:col-span-2">
+                    <span className="text-xs font-bold text-gray-500">Assigned Crew / User</span>
+                    <input value={form.scheduleCrew} onChange={(e) => setForm({ ...form, scheduleCrew: e.target.value })} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="e.g. Crew A, John" />
+                  </label>
+                </div>
+                {form.scheduleDate && (
+                  <p className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700"><CheckCircle2 className="h-3.5 w-3.5" />This job will be added to the CRM Calendar automatically</p>
+                )}
+              </div>
+
+              {/* Section: Inspection & Dates */}
+              <div className="p-4 space-y-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-orange-600"><Clock className="h-3.5 w-3.5" />Inspection & Dates</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1">
                     <span className="text-xs font-bold text-gray-500">Inspection Date</span>
@@ -1556,6 +1616,60 @@ export default function LeadsPage() {
                 {selectedJob.callNotes && (
                   <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Call Notes<textarea value={selectedJob.callNotes} onChange={(event) => updateJob(selectedJob.id, { callNotes: event.target.value })} rows={3} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 )}
+              </div>
+
+              {/* Schedule on Calendar */}
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                <p className="flex items-center gap-2 text-sm font-bold text-orange-700"><CalendarDays className="h-4 w-4" />Schedule on Calendar</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <label className="grid gap-1 text-xs font-bold text-gray-500">Date<input type="date" id={`schedule-date-${selectedJob.id}`} defaultValue={selectedJob.dueDate || ""} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" /></label>
+                  <label className="grid gap-1 text-xs font-bold text-gray-500">Time<input type="time" id={`schedule-time-${selectedJob.id}`} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" /></label>
+                  <label className="grid gap-1 text-xs font-bold text-gray-500">Crew<input id={`schedule-crew-${selectedJob.id}`} defaultValue={selectedJob.assignedTo || ""} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" placeholder="e.g. Crew A" /></label>
+                </div>
+                <button
+                  type="button"
+                  className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-600 active:scale-95"
+                  onClick={() => {
+                    const dateEl = document.getElementById(`schedule-date-${selectedJob.id}`) as HTMLInputElement;
+                    const timeEl = document.getElementById(`schedule-time-${selectedJob.id}`) as HTMLInputElement;
+                    const crewEl = document.getElementById(`schedule-crew-${selectedJob.id}`) as HTMLInputElement;
+                    const dateVal = dateEl?.value;
+                    if (!dateVal) { alert("Please select a date"); return; }
+                    const timeVal = timeEl?.value || "";
+                    const crewVal = crewEl?.value || "";
+                    const startDate = timeVal
+                      ? new Date(`${dateVal}T${timeVal}:00`)
+                      : new Date(`${dateVal}T09:00:00`);
+                    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+                    void createCalendarEvent({
+                      title: `${selectedJob.roofType || "Roofing"} — ${selectedJob.name}`,
+                      description: `${selectedJob.roofType || "Roofing"} job for ${selectedJob.name}`,
+                      start_time: startDate.toISOString(),
+                      end_time: endDate.toISOString(),
+                      all_day: !timeVal,
+                      location: `${selectedJob.address}, ${selectedJob.city}, AZ`,
+                      color: "#f97316",
+                      assigned_to: crewVal || selectedJob.assignedTo || "",
+                      customer_name: selectedJob.name,
+                      customer_phone: selectedJob.phone || "",
+                      job_kind: selectedJob.roofType || "Roofing",
+                      created_by: currentUserName || "Office",
+                    }).then(() => {
+                      showSaveToast("Added to Calendar");
+                    }).catch(() => {});
+                    updateJob(selectedJob.id, { dueDate: dateVal });
+                    void logCrewActivity({
+                      jobId: selectedJob.id,
+                      jobName: selectedJob.name,
+                      actor: currentUserName || "Office",
+                      action: "Job scheduled",
+                      details: `Scheduled for ${dateVal}${timeVal ? ` at ${timeVal}` : ""}${crewVal ? ` — Crew: ${crewVal}` : ""}`,
+                      module: "Jobs",
+                    }).catch(() => {});
+                  }}
+                >
+                  Add to Calendar
+                </button>
               </div>
 
               <div className="space-y-3">
