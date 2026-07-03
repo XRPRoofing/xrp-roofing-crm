@@ -479,6 +479,7 @@ export default function LeadsPage() {
   const [ccLoading, setCcLoading] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
+  const [photoTab, setPhotoTab] = useState<"Before" | "Progress" | "After" | "General">("Before");
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const pendingUpdatesRef = useRef<Record<string, Partial<Lead>>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1607,8 +1608,8 @@ export default function LeadsPage() {
               </div>
             </div>
 
-            <div className="space-y-5 p-5">
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-3 p-4">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Customer Name<input value={selectedJob.name} onChange={(event) => updateJob(selectedJob.id, { name: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">City<input value={selectedJob.city} onChange={(event) => updateJob(selectedJob.id, { city: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Phone
@@ -1644,16 +1645,16 @@ export default function LeadsPage() {
               </div>
 
               {/* Schedule on Calendar */}
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                <p className="flex items-center gap-2 text-sm font-bold text-orange-700"><CalendarDays className="h-4 w-4" />Schedule on Calendar</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <label className="grid gap-1 text-xs font-bold text-gray-500">Date<input type="date" id={`schedule-date-${selectedJob.id}`} defaultValue={selectedJob.dueDate || ""} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" /></label>
-                  <label className="grid gap-1 text-xs font-bold text-gray-500">Time<input type="time" id={`schedule-time-${selectedJob.id}`} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" /></label>
-                  <label className="grid gap-1 text-xs font-bold text-gray-500">Crew<input id={`schedule-crew-${selectedJob.id}`} defaultValue={selectedJob.assignedTo || ""} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-900 outline-none" placeholder="e.g. Crew A" /></label>
+              <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5">
+                <p className="flex items-center gap-2 text-xs font-bold text-orange-700"><CalendarDays className="h-3.5 w-3.5" />Schedule on Calendar</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  <label className="grid gap-0.5 text-[11px] font-bold text-gray-500">Date<input type="date" id={`schedule-date-${selectedJob.id}`} defaultValue={selectedJob.dueDate || ""} className="rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-900 outline-none" /></label>
+                  <label className="grid gap-0.5 text-[11px] font-bold text-gray-500">Time<input type="time" id={`schedule-time-${selectedJob.id}`} className="rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-900 outline-none" /></label>
+                  <label className="grid gap-0.5 text-[11px] font-bold text-gray-500">Crew<input id={`schedule-crew-${selectedJob.id}`} defaultValue={selectedJob.assignedTo || ""} className="rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-900 outline-none" placeholder="e.g. Crew A" /></label>
                 </div>
                 <button
                   type="button"
-                  className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-600 active:scale-95"
+                  className="mt-2 rounded-md bg-orange-500 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-orange-600 active:scale-95"
                   onClick={() => {
                     const dateEl = document.getElementById(`schedule-date-${selectedJob.id}`) as HTMLInputElement;
                     const timeEl = document.getElementById(`schedule-time-${selectedJob.id}`) as HTMLInputElement;
@@ -1695,23 +1696,23 @@ export default function LeadsPage() {
                 </button>
               </div>
 
-              <div className="space-y-3">
-                {fileError && <p className="rounded-lg bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700">{fileError}</p>}
+              <div className="space-y-2">
+                {fileError && <p className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">{fileError}</p>}
 
                 {/* Photo Checklist */}
                 <div className="rounded-lg border border-gray-200 bg-white">
-                  <button type="button" onClick={() => setChecklistOpen((v) => !v)} className="flex w-full items-center justify-between p-4">
-                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><ListChecks className="h-4 w-4 text-orange-500" />Photo Checklist</div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
+                  <button type="button" onClick={() => setChecklistOpen((v) => !v)} className="flex w-full items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-700"><ListChecks className="h-3.5 w-3.5 text-orange-500" />Photo Checklist</div>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${checklistDone === PHOTO_CHECKLIST_ITEMS.length ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{checklistDone}/{PHOTO_CHECKLIST_ITEMS.length}</span>
                   </button>
                   {checklistOpen && (
-                    <div className="border-t border-gray-100 px-4 pb-4">
-                      <p className="pt-3 text-xs font-semibold text-gray-400">Tap each shot you&apos;ve taken on this job.</p>
-                      <ul className="mt-2 space-y-1">
+                    <div className="border-t border-gray-100 px-3 pb-2">
+                      <p className="pt-2 text-[11px] font-semibold text-gray-400">Tap each shot you&apos;ve taken on this job.</p>
+                      <ul className="mt-1 space-y-0.5">
                         {PHOTO_CHECKLIST_ITEMS.map((item) => (
                           <li key={item}>
-                            <button type="button" onClick={() => setPhotoChecklist((prev) => ({ ...prev, [item]: !prev[item] }))} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition hover:bg-gray-50">
-                              {photoChecklist[item] ? <CheckSquare className="h-5 w-5 shrink-0 text-blue-500" /> : <Square className="h-5 w-5 shrink-0 text-gray-300" />}
+                            <button type="button" onClick={() => setPhotoChecklist((prev) => ({ ...prev, [item]: !prev[item] }))} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition hover:bg-gray-50">
+                              {photoChecklist[item] ? <CheckSquare className="h-4 w-4 shrink-0 text-blue-500" /> : <Square className="h-4 w-4 shrink-0 text-gray-300" />}
                               <span className={photoChecklist[item] ? "font-bold text-blue-700 line-through" : "font-semibold text-gray-700"}>{item}</span>
                             </button>
                           </li>
@@ -1721,76 +1722,81 @@ export default function LeadsPage() {
                   )}
                 </div>
 
-                {/* Compact Before / Progress / After */}
-                <div className="rounded-lg border border-gray-200 bg-white p-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><Camera className="h-4 w-4" />Job Photos</div>
-                  <div className="mt-2 space-y-2">
-                    {([
-                      { type: "Before" as const, photos: beforePhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
-                      { type: "Progress" as const, photos: progressPhotos, color: "bg-orange-500 hover:bg-orange-600", badge: "bg-orange-100 text-orange-700" },
-                      { type: "After" as const, photos: afterPhotos, color: "bg-blue-600 hover:bg-blue-700", badge: "bg-blue-100 text-blue-700" },
-                    ]).map(({ type, photos, color, badge }) => (
-                      <div key={type} className="rounded-lg border border-gray-200 bg-gray-50 p-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{type}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badge}`}>{photos.length}</span>
-                        </div>
-                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                {/* Job Photos — Tabbed */}
+                <div className="rounded-lg border border-gray-200 bg-white">
+                  <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+                    <Camera className="h-3.5 w-3.5 text-blue-700" />
+                    <span className="text-xs font-bold text-blue-700">Job Photos</span>
+                  </div>
+                  <div className="flex border-b border-gray-100">
+                    {(["Before", "Progress", "After", "General"] as const).map((tab) => {
+                      const count = tab === "General" ? otherPhotos.length : tab === "Before" ? beforePhotos.length : tab === "Progress" ? progressPhotos.length : afterPhotos.length;
+                      return (
+                        <button key={tab} type="button" onClick={() => setPhotoTab(tab)} className={`flex-1 px-1 py-1.5 text-center text-[11px] font-bold transition ${photoTab === tab ? "border-b-2 border-blue-600 text-blue-700" : "text-gray-400 hover:text-gray-600"}`}>
+                          {tab} <span className={`ml-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold ${photoTab === tab ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="p-2.5">
+                    {photoTab !== "General" && (() => {
+                      const photos = photoTab === "Before" ? beforePhotos : photoTab === "Progress" ? progressPhotos : afterPhotos;
+                      const color = photoTab === "Progress" ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700";
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              disabled={fileBusy}
+                              onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: photoTab })}
+                              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-bold text-white transition active:scale-95 ${color} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                            >
+                              <Camera className="h-3.5 w-3.5" /> Camera
+                            </button>
+                            <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                              <UploadCloud className="h-3.5 w-3.5" /> Upload
+                              <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(photoTab, input.files).finally(() => { input.value = ""; }); }} />
+                            </label>
+                          </div>
+                          {photos.length > 0 && (
+                            <div className="mt-2 flex gap-1 overflow-x-auto">
+                              {photos.map((photo, photoIdx) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 cursor-pointer rounded-md object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos, index: photoIdx })} />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {photoTab === "General" && (
+                      <>
+                        <div className="grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             disabled={fileBusy}
-                            onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type })}
-                            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-white transition active:scale-95 ${color} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                            onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
+                            className={`flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
                           >
                             <Camera className="h-3.5 w-3.5" /> Camera
                           </button>
-                          <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                          <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
                             <UploadCloud className="h-3.5 w-3.5" /> Upload
-                            <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(type, input.files).finally(() => { input.value = ""; }); }} />
+                            <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
                           </label>
                         </div>
-                        {photos.length > 0 && (
-                          <div className="mt-1.5 flex gap-1 overflow-x-auto">
-                            {photos.map((photo, photoIdx) => (
+                        {otherPhotos.length > 0 && (
+                          <div className="mt-2 grid grid-cols-4 gap-1.5">
+                            {otherPhotos.map((photo, photoIdx) => (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 cursor-pointer rounded-md object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos, index: photoIdx })} />
+                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-14 w-full cursor-pointer rounded-md border border-gray-100 object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos: otherPhotos, index: photoIdx })} />
                             ))}
                           </div>
                         )}
-                      </div>
-                    ))}
+                        <p className="mt-1.5 text-[11px] font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
+                      </>
+                    )}
                   </div>
-                </div>
-
-                {/* General job photos */}
-                <div className="rounded-lg border border-gray-200 bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><Image className="h-4 w-4" />General Photos</div>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">{otherPhotos.length}</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      disabled={fileBusy}
-                      onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
-                      className={`flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-blue-900 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      <Camera className="h-4 w-4" /> Camera
-                    </button>
-                    <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                      <UploadCloud className="h-4 w-4" /> Upload
-                      <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
-                    </label>
-                  </div>
-                  {otherPhotos.length > 0 && (
-                    <div className="mt-3 grid grid-cols-3 gap-2">
-                      {otherPhotos.map((photo, photoIdx) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-20 w-full cursor-pointer rounded-lg border border-gray-100 object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos: otherPhotos, index: photoIdx })} />
-                      ))}
-                    </div>
-                  )}
-                  <p className="mt-2 text-xs font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                 </div>
 
                 {/* CompanyCam Photos */}
@@ -1843,10 +1849,10 @@ export default function LeadsPage() {
 
                 {/* Linked Documents */}
                 <div className="rounded-lg border border-gray-200 bg-white">
-                  <div className="flex items-center justify-between border-b border-gray-100 p-4">
-                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><Link2 className="h-4 w-4" />Linked Documents</div>
+                  <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-700"><Link2 className="h-3.5 w-3.5" />Linked Documents</div>
                   </div>
-                  <div className="p-4 space-y-3">
+                  <div className="px-3 py-2 space-y-2">
                     {/* Linked Proposals/Estimates */}
                     {(() => {
                       const linked = getLinkedProposals(selectedJob.id);
@@ -1897,22 +1903,22 @@ export default function LeadsPage() {
                     )}
 
                     {/* Action buttons */}
-                    <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-gray-100">
-                      <button type="button" onClick={() => openEstimateForJob(selectedJob)} className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                        <Plus className="h-4 w-4" />{getLinkedProposals(selectedJob.id).length > 0 ? "Open Estimate" : "New Estimate"}
+                    <div className="grid gap-1.5 sm:grid-cols-2 pt-1.5 border-t border-gray-100">
+                      <button type="button" onClick={() => openEstimateForJob(selectedJob)} className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                        <Plus className="h-3.5 w-3.5" />{getLinkedProposals(selectedJob.id).length > 0 ? "Open Estimate" : "New Estimate"}
                       </button>
-                      <button type="button" onClick={() => openInvoiceForJob(selectedJob)} className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                        <Plus className="h-4 w-4" />{getLinkedInvoices(selectedJob.id).length > 0 ? "Open Invoice" : "New Invoice"}
+                      <button type="button" onClick={() => openInvoiceForJob(selectedJob)} className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-2 text-xs font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                        <Plus className="h-3.5 w-3.5" />{getLinkedInvoices(selectedJob.id).length > 0 ? "Open Invoice" : "New Invoice"}
                       </button>
                     </div>
 
                     {/* Link existing documents */}
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "proposal" ? null : "proposal")} className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
-                        <Link2 className="h-3.5 w-3.5" />Link Existing Estimate
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "proposal" ? null : "proposal")} className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-[11px] font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
+                        <Link2 className="h-3 w-3" />Link Existing Estimate
                       </button>
-                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "invoice" ? null : "invoice")} className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
-                        <Link2 className="h-3.5 w-3.5" />Link Existing Invoice
+                      <button type="button" onClick={() => setShowLinkPicker(showLinkPicker === "invoice" ? null : "invoice")} className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-[11px] font-bold text-gray-500 transition hover:border-blue-300 hover:text-blue-600">
+                        <Link2 className="h-3 w-3" />Link Existing Invoice
                       </button>
                     </div>
 
@@ -1965,16 +1971,17 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-3">
-                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
-                    <History className="h-5 w-5" />Activity History
+                <div>
+                  <button type="button" onClick={() => setActivityOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                    <History className="h-4 w-4" />Activity History
+                    <ChevronRight className={`ml-auto h-3.5 w-3.5 text-gray-400 transition ${activityOpen ? "rotate-90" : ""}`} />
                   </button>
                 </div>
 
                 {activityOpen && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Activity History</p>
-                    <div className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Activity History</p>
+                    <div className="mt-2 max-h-60 space-y-2 overflow-y-auto">
                       {jobActivities.length === 0 && jobFiles.length === 0 && <p className="text-sm font-semibold text-gray-400">No activity recorded yet.</p>}
 
                       {/* All activities sorted newest first */}
@@ -2022,9 +2029,9 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm font-bold text-blue-700"><StickyNote className="h-4 w-4" />Notes</div>
-                <div className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-700"><StickyNote className="h-3.5 w-3.5" />Notes</div>
+                <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
                   {jobNotes.filter((n) => n.jobId === selectedJobId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((note) => (
                     <div key={note.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
                       <p className="font-semibold text-gray-700">{note.body}</p>
@@ -2036,12 +2043,12 @@ export default function LeadsPage() {
                 {noteToast && (
                   <p className={`mt-2 rounded-lg px-3 py-2 text-xs font-bold ${noteToast.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{noteToast.message}</p>
                 )}
-                <div className="mt-3 flex gap-2">
-                  <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddJobNote(); } }} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold outline-none" placeholder="Add a note..." />
+                <div className="mt-2 flex gap-1.5">
+                  <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleAddJobNote(); } }} className="flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs font-bold outline-none" placeholder="Add a note..." />
                   <AiWriteButton getText={() => noteDraft} onReplace={(t) => setNoteDraft(t)} context="job note for a roofing project" />
-                  <button type="button" onClick={() => void handleAddJobNote()} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white hover:bg-blue-700">Save</button>
+                  <button type="button" onClick={() => void handleAddJobNote()} className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Save</button>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs font-bold text-gray-500"><Clock className="h-4 w-4" /><CalendarDays className="h-4 w-4" />Next: {selectedJob.nextAction || "Review job"} • Due {formatDueDate(selectedJob.dueDate)}</div>
+                <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-gray-500"><Clock className="h-3.5 w-3.5" /><CalendarDays className="h-3.5 w-3.5" />Next: {selectedJob.nextAction || "Review job"} • Due {formatDueDate(selectedJob.dueDate)}</div>
               </div>
             </div>
           </aside>
