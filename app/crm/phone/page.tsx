@@ -916,7 +916,13 @@ export default function PhonePage() {
                           )}
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-gray-900">{call.customerName}</p>
-                            <p className="truncate text-xs text-gray-400">{call.from ? formatPhoneDisplay(call.from) : "-"}</p>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openJobPanel(call.phone, call.customerName); }}
+                              className="block truncate text-xs text-gray-400 hover:text-blue-500 hover:underline"
+                            >
+                              {call.from ? formatPhoneDisplay(call.from) : "-"}
+                            </button>
                           </div>
                         </div>
                       </td>
