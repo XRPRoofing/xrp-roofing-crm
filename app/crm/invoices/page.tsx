@@ -706,6 +706,9 @@ export default function InvoicesPage() {
   const [markPaidNotes, setMarkPaidNotes] = useState("");
   const [markPaidReference, setMarkPaidReference] = useState("");
 
+  // Partial payment prompt state — shown after recording a partial payment to offer sending remaining balance link
+  const [partialPaymentPrompt, setPartialPaymentPrompt] = useState<{ remaining: number; invoiceId: string } | null>(null);
+
   // Delete confirmation modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
@@ -1206,7 +1209,8 @@ export default function InvoicesPage() {
     const amount = Number(paymentForm.amount) || 0;
     if (amount <= 0) return;
     const payment: Payment = { ...paymentForm, amount, offline };
-    updateInvoice({ ...selectedInvoice, payments: [...selectedInvoice.payments, payment] }, `${offline ? "Offline payment" : "Manual payment"} recorded: ${currency(amount)}`);
+    const updatedInvoice = { ...selectedInvoice, payments: [...selectedInvoice.payments, payment] };
+    updateInvoice(updatedInvoice, `${offline ? "Offline payment" : "Partial payment"} recorded: ${currency(amount)} via ${paymentForm.method}`);
     showSaveToast("Payment saved");
     if (selectedInvoice.jobReference) {
       void logCrewActivity({
@@ -1217,6 +1221,13 @@ export default function InvoicesPage() {
         details: `${selectedInvoice.invoiceNumber} — ${paymentForm.method}`,
         module: "Invoice",
       }).catch(() => {});
+    }
+    // Check if there's remaining balance after this payment
+    const newPaid = getPaidAmount(updatedInvoice);
+    const total = calculateTotals(updatedInvoice).finalTotal;
+    const remaining = Math.max(total - newPaid, 0);
+    if (remaining > 0) {
+      setPartialPaymentPrompt({ remaining, invoiceId: selectedInvoice.id });
     }
     setPaymentForm({ amount: "", date: today, method: "Cash", reference: "", notes: "" });
     setShowPaymentModal(false);
@@ -2128,7 +2139,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               <button onClick={() => setShowSendModal(true)} className="rounded-lg sm:rounded-lg bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Send by Email</button>
               <button onClick={openSmsModal} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-lg sm:rounded-lg bg-green-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5 disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />Send by Text</button>
               <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
-              <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Payment</button>
+              <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Partial Payment</button>
               <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
               <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice marked as Paid Mail Check", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
               <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice voided", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
@@ -2222,16 +2233,51 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <section className="rounded-lg bg-gray-50 p-5">
-                <h3 className="font-bold text-blue-700">Payments</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-blue-700">Payment Summary</h3>
+                  <button onClick={() => setShowPaymentModal(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition">+ Record Payment</button>
+                </div>
+                {/* Payment breakdown */}
+                <div className="mt-4 rounded-lg border border-blue-100 bg-white p-4">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Invoice Total</p>
+                      <p className="mt-1 text-lg font-bold text-gray-900">{currency(calculateTotals(selectedInvoice).finalTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Amount Paid</p>
+                      <p className="mt-1 text-lg font-bold text-blue-700">{currency(getPaidAmount(selectedInvoice))}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Remaining Balance</p>
+                      <p className={`mt-1 text-lg font-bold ${Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0) > 0 ? "text-orange-700" : "text-blue-700"}`}>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
+                    </div>
+                  </div>
+                </div>
+                {/* Individual payments */}
                 <div className="mt-3 space-y-2">
-                  {selectedInvoice.payments.map((payment, index) => <p key={index} className="rounded-lg bg-white p-3 text-sm font-semibold text-gray-600">{currency(payment.amount)} · {payment.method} · {payment.date}{payment.offline ? " · Offline" : ""}{payment.reference ? ` · ${payment.reference}` : ""}</p>)}
+                  {selectedInvoice.payments.map((payment, index) => (
+                    <div key={index} className="flex items-center justify-between rounded-lg bg-white p-3 ring-1 ring-gray-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900">{currency(payment.amount)}</p>
+                        <p className="mt-0.5 text-xs font-semibold text-gray-500">{payment.date}{payment.reference ? ` · Ref: ${payment.reference}` : ""}{payment.notes ? ` · ${payment.notes}` : ""}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${payment.method === "Check" ? "bg-blue-50 text-blue-700 ring-blue-200" : payment.method === "Cash" ? "bg-green-50 text-green-700 ring-green-200" : payment.method === "Zelle" ? "bg-purple-50 text-purple-700 ring-purple-200" : "bg-gray-50 text-gray-700 ring-gray-200"}`}>{payment.method}{payment.offline ? " (Offline)" : ""}</span>
+                    </div>
+                  ))}
                   {selectedInvoice.payments.length === 0 && <p className="text-sm font-semibold text-gray-500">No payments recorded yet.</p>}
                 </div>
-                <div className="mt-3 rounded-lg bg-white p-3 text-sm font-bold">
-                  <div className="flex justify-between gap-3 text-gray-600"><span>Total Invoice</span><span>{currency(calculateTotals(selectedInvoice).finalTotal)}</span></div>
-                  <div className="flex justify-between gap-3 text-blue-700"><span>Total Deposits Paid</span><span>{currency(getPaidAmount(selectedInvoice))}</span></div>
-                  <div className="mt-1 flex justify-between gap-3 border-t border-gray-100 pt-2 font-bold text-blue-700"><span>Remaining Balance</span><span>{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</span></div>
-                </div>
+                {/* Send payment link for remaining balance */}
+                {Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0) > 0 && selectedInvoice.payments.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-orange-100 bg-orange-50 p-3">
+                    <p className="text-xs font-bold text-orange-800">Customer still owes {currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-orange-700">Send the invoice to the customer — the payment link will automatically show only the remaining balance.</p>
+                    <div className="mt-2 flex gap-2">
+                      <button onClick={() => setShowSendModal(true)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition">Send Payment Link</button>
+                      <button onClick={openSmsModal} disabled={!selectedInvoice.phone} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-50">Send by Text</button>
+                    </div>
+                  </div>
+                )}
               </section>
               <section className="rounded-lg bg-gray-50 p-5">
                 <h3 className="font-bold text-blue-700">Activity Timeline</h3>
@@ -2581,22 +2627,86 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         );
       })()}
 
-      {showPaymentModal && selectedInvoice && (
+      {showPaymentModal && selectedInvoice && (() => {
+        const pmTotals = calculateTotals(selectedInvoice);
+        const pmPaid = getPaidAmount(selectedInvoice);
+        const pmRemaining = Math.max(pmTotals.finalTotal - pmPaid, 0);
+        return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
           <div className="w-full max-w-xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
-            <h2 className="text-xl sm:text-2xl font-bold text-blue-700">Record Payment</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-blue-700">Record Partial Payment</h2>
+            <p className="mt-1 text-sm font-semibold text-gray-500">Enter the amount received by check, cash, or bank transfer</p>
+            {/* Balance context */}
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Invoice Total</p>
+                  <p className="mt-1 text-base font-bold text-gray-900">{currency(pmTotals.finalTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Already Paid</p>
+                  <p className="mt-1 text-base font-bold text-blue-700">{currency(pmPaid)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Remaining</p>
+                  <p className="mt-1 text-base font-bold text-orange-700">{currency(pmRemaining)}</p>
+                </div>
+              </div>
+            </div>
             <div className="mt-4 sm:mt-5 grid gap-3">
-              <input type="number" value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Payment amount" />
-              <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm({ ...paymentForm, date: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" />
-              <select value={paymentForm.method} onChange={(event) => setPaymentForm({ ...paymentForm, method: event.target.value as PaymentMethod })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base">
-                {(["Cash", "Check", "Bank Transfer", "Zelle"] as PaymentMethod[]).map((method) => <option key={method}>{method}</option>)}
-              </select>
-              <input value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Reference number" />
-              <textarea value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} className="min-h-24 rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="Notes" />
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Payment Amount</label>
+                <input type="number" value={paymentForm.amount} onChange={(event) => setPaymentForm({ ...paymentForm, amount: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder={`Up to ${currency(pmRemaining)}`} />
+                {Number(paymentForm.amount) > 0 && Number(paymentForm.amount) < pmRemaining && (
+                  <p className="mt-1 text-xs font-semibold text-orange-600">After this payment, remaining balance will be {currency(pmRemaining - Number(paymentForm.amount))}</p>
+                )}
+                {Number(paymentForm.amount) >= pmRemaining && pmRemaining > 0 && (
+                  <p className="mt-1 text-xs font-semibold text-blue-600">This will pay the invoice in full</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Payment Method</label>
+                <select value={paymentForm.method} onChange={(event) => setPaymentForm({ ...paymentForm, method: event.target.value as PaymentMethod })} className="w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base">
+                  {(["Cash", "Check", "Bank Transfer", "Zelle"] as PaymentMethod[]).map((method) => <option key={method}>{method}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Date Received</label>
+                <input type="date" value={paymentForm.date} onChange={(event) => setPaymentForm({ ...paymentForm, date: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Reference / Check Number</label>
+                <input value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="e.g. CHK-1234" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Notes</label>
+                <textarea value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} className="min-h-20 w-full rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base" placeholder="e.g. Customer paid $1,000 deposit by check" />
+              </div>
             </div>
             <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
               <button onClick={() => setShowPaymentModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-3 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
-              <button onClick={() => handleRecordPayment(false)} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2">Save Payment</button>
+              <button onClick={() => handleRecordPayment(true)} disabled={!paymentForm.amount || Number(paymentForm.amount) <= 0} className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 font-bold text-white active:scale-95 transition order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed">Record Payment</button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+      {/* ── Partial payment success prompt ── */}
+      {partialPaymentPrompt && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
+          <div className="w-full max-w-md rounded-lg sm:rounded-[2rem] bg-white p-5 sm:p-6 shadow-2xl text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-100">
+              <span className="text-2xl">✓</span>
+            </div>
+            <h2 className="mt-4 text-xl font-bold text-gray-900">Payment Recorded</h2>
+            <p className="mt-2 text-sm font-semibold text-gray-600">
+              Remaining balance: <span className="font-bold text-orange-700">{currency(partialPaymentPrompt.remaining)}</span>
+            </p>
+            <p className="mt-1 text-xs font-semibold text-gray-500">Would you like to send a payment link to the customer for the remaining balance?</p>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <button onClick={() => { setPartialPaymentPrompt(null); setShowSendModal(true); }} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white active:scale-95 transition">Send Payment Link</button>
+              <button onClick={() => setPartialPaymentPrompt(null)} className="rounded-lg border border-gray-200 px-5 py-3 text-sm font-bold text-gray-700 active:scale-95 transition">Done</button>
             </div>
           </div>
         </div>
