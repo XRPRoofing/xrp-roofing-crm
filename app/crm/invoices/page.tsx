@@ -1925,42 +1925,30 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500"><div className="flex items-center justify-between"><span>Warranty notes</span>{editable && <AiWriteButton getText={() => invoice.warrantyNotes} onReplace={(t) => onChange({ ...invoice, warrantyNotes: t })} context="roofing warranty notes" />}</div><textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-[52px] resize-none`} placeholder="Warranty notes" /></div>
         </div>
 
-        {/* ── Line Items ── */}
+        {/* ── Scope of Work ── */}
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-600">Line Items</h4>
-            {editable && <button type="button" onClick={() => onChange({ ...invoice, lineItems: [...invoice.lineItems, emptyLineItem] })} className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition">+ Add line</button>}
+          <div className="mb-1.5 flex items-center justify-between">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-600">Scope of Work</h4>
+            {editable && <button type="button" onClick={() => onChange({ ...invoice, lineItems: [...invoice.lineItems, emptyLineItem] })} className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition">+ Add item</button>}
           </div>
-          <div className="hidden md:grid md:grid-cols-[1fr_60px_90px_60px] gap-1.5 px-2 pb-1">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Description</span>
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Qty</span>
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Unit Price</span>
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Tax %</span>
-          </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {invoice.lineItems.map((item, index) => (
-              <div key={index} className="grid gap-1.5 rounded-md bg-gray-50 p-2 md:grid-cols-[1fr_60px_90px_60px]">
-                <input disabled={!editable} value={item.description} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, description: event.target.value }; onChange({ ...invoice, lineItems }); }} className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none disabled:bg-white" placeholder="Description" />
-                <input disabled={!editable} type="number" value={item.quantity} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, quantity: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none disabled:bg-white" placeholder="Qty" />
-                <input disabled={!editable} type="number" value={item.unitPrice} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, unitPrice: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none disabled:bg-white" placeholder="Unit price" />
-                <input disabled={!editable} type="number" value={item.tax} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, tax: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm outline-none disabled:bg-white" placeholder="Tax %" />
+              <div key={index} className="flex items-center gap-2">
+                <span className="shrink-0 text-xs font-semibold text-gray-400">{index + 1}.</span>
+                <input disabled={!editable} value={item.description} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, description: event.target.value }; onChange({ ...invoice, lineItems }); }} className="flex-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none disabled:border-transparent disabled:bg-transparent disabled:px-0" placeholder="Scope item description" />
+                {editable && invoice.lineItems.length > 1 && <button type="button" onClick={() => { const lineItems = invoice.lineItems.filter((_, i) => i !== index); onChange({ ...invoice, lineItems }); }} className="shrink-0 text-xs text-gray-400 hover:text-red-500">×</button>}
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Totals ── */}
-        <div className="grid gap-2.5 sm:grid-cols-2 items-end">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Discount<input disabled={!editable} type="number" value={invoice.discount} onChange={(event) => onChange({ ...invoice, discount: Number(event.target.value) || 0 })} className={inputClass} placeholder="0" /></label>
-          <div className="rounded-md bg-blue-50 p-3 text-sm font-bold text-gray-700 ring-1 ring-blue-100">
-            <div className="flex justify-between text-xs"><span className="text-gray-500">Subtotal</span><span>{currency(totals.subtotal)}</span></div>
-            <div className="mt-1 flex justify-between text-xs"><span className="text-gray-500">Tax</span><span>{currency(totals.tax)}</span></div>
-            <div className="mt-1 flex justify-between text-xs"><span className="text-gray-500">Discount</span><span>−{currency(invoice.discount)}</span></div>
-            <div className="mt-2 border-t border-blue-200 pt-2">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Final Total</p>
-              <p className="mt-0.5 text-xl font-bold text-blue-700">{currency(totals.finalTotal)}</p>
-            </div>
+        {/* ── Project Total ── */}
+        <div className="flex items-center justify-between rounded-md bg-blue-50 px-3 py-2.5 ring-1 ring-blue-100">
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Project Total</p>
+            {editable && <input type="number" value={totals.finalTotal || invoice.lineItems.reduce((sum, li) => sum + (li.quantity * li.unitPrice), 0)} onChange={(event) => { const newTotal = Number(event.target.value) || 0; const lineItems = invoice.lineItems.length > 0 ? invoice.lineItems.map((li, i) => i === 0 ? { ...li, quantity: 1, unitPrice: newTotal } : { ...li, quantity: 0, unitPrice: 0 }) : [{ ...emptyLineItem, quantity: 1, unitPrice: newTotal }]; onChange({ ...invoice, lineItems, discount: 0 }); }} className="mt-1 w-32 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-lg font-bold text-blue-700 outline-none" placeholder="0" />}
           </div>
+          <p className="text-xl font-bold text-blue-700">{currency(totals.finalTotal)}</p>
         </div>
       </div>
     );
@@ -2157,20 +2145,20 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 <p className="mt-1 sm:mt-2 text-xs sm:text-sm font-bold text-gray-600">Balance {currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
               </div>
             </div>
-            <div className="mt-4 sm:mt-5 flex flex-wrap gap-2 sm:gap-3">
-              <button onClick={() => setEditing((current) => !current)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
-              <button onClick={() => setShowSendModal(true)} className="rounded-lg sm:rounded-lg bg-blue-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Send by Email</button>
-              <button onClick={openSmsModal} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-lg sm:rounded-lg bg-green-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition flex items-center gap-1.5 disabled:opacity-50"><MessageSquare className="h-3.5 w-3.5" />Send by Text</button>
-              <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-gray-200 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">PDF</button>
-              <button onClick={() => setShowPaymentModal(true)} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition">Partial Payment</button>
-              <button onClick={handleMarkPaidOffline} className="rounded-lg sm:rounded-lg bg-gray-100 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
-              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice marked as Paid Mail Check", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-blue-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Mail Check</button>
-              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice voided", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-lg sm:rounded-lg bg-red-50 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-red-700 active:scale-95 transition">Void</button>
-              <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-lg sm:rounded-lg border border-red-300 bg-red-600 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white active:scale-95 transition hover:bg-red-700">Delete Invoice</button>
+            <div className="mt-3 flex flex-wrap gap-1.5 sm:gap-2">
+              <button onClick={() => setEditing((current) => !current)} className="rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 active:scale-95 transition">{editing ? "Done" : "Edit"}</button>
+              <button onClick={() => setShowSendModal(true)} className="rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white active:scale-95 transition flex items-center gap-1"><Mail className="h-3 w-3" />Email</button>
+              <button onClick={openSmsModal} disabled={sendingInvoice || !selectedInvoice.phone} className="rounded-md bg-green-600 px-2.5 py-1.5 text-xs font-bold text-white active:scale-95 transition flex items-center gap-1 disabled:opacity-50"><MessageSquare className="h-3 w-3" />Text</button>
+              <button onClick={() => handleDownloadPdf(selectedInvoice)} className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-bold text-gray-700 active:scale-95 transition">PDF</button>
+              <button onClick={() => setShowPaymentModal(true)} className="rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 active:scale-95 transition">Partial Payment</button>
+              <button onClick={handleMarkPaidOffline} className="rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-bold text-gray-700 active:scale-95 transition">Mark Paid</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Paid Mail Check", activity: [`[AUDIT] Marked as Paid Mail Check | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Marked as Paid Mail Check"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice marked as Paid Mail Check", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 active:scale-95 transition ring-1 ring-blue-200">Paid Check</button>
+              <button onClick={() => { const now = new Date().toISOString(); updateInvoice({ ...selectedInvoice, status: "Voided", activity: [`[AUDIT] Invoice voided | By: ${currentUserEmail || "Office"} | ${now}`, ...selectedInvoice.activity] }, "Invoice voided"); if (selectedInvoice.jobReference) { void logCrewActivity({ jobId: selectedInvoice.jobReference, jobName: selectedInvoice.clientName, actor: currentUserEmail || "Office", action: "Invoice voided", details: selectedInvoice.invoiceNumber, module: "Invoice" }).catch(() => {}); } }} className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 active:scale-95 transition">Void</button>
+              <button onClick={() => handleDeleteInvoice(selectedInvoice)} className="rounded-md bg-red-600 px-2.5 py-1.5 text-xs font-bold text-white active:scale-95 transition hover:bg-red-700">Delete</button>
             </div>
-            <div className="mt-6">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
+            <div className="mt-4">{renderInvoiceFields(selectedInvoice, editing, updateInvoice)}</div>
 
-            <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
+            <section className="mt-4 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-bold text-blue-700">Sent To</h3>
                 <div className="flex flex-wrap gap-2">
@@ -2190,13 +2178,13 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                   })}
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Name</p><p className="mt-1 text-sm font-bold text-blue-700">{selectedInvoice.clientName || "—"}</p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Email</p><p className="mt-1 text-sm font-bold text-blue-700 break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Customer Phone</p><p className="mt-1 flex items-center gap-2 text-sm font-bold text-blue-700"><PhoneLink value={selectedInvoice.phone} fallback="—" />{selectedInvoice.phone && <button onClick={() => setSmsTarget({ phone: selectedInvoice.phone, name: selectedInvoice.clientName })} className="inline-flex h-6 items-center gap-1 rounded bg-green-500 px-2 text-xs font-bold text-white hover:bg-green-600"><MessageSquare className="h-3 w-3" />SMS</button>}</p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Date Sent</p><p className="mt-1 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">Sent By User</p><p className="mt-1 text-sm font-bold text-blue-700 break-all">{selectedInvoice.sentBy || "—"}</p></div>
-                <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs font-bold uppercase text-gray-500">SMS Sent</p><p className="mt-1 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.smsSentAt) || "Not sent"}</p></div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">Customer Name</p><p className="mt-0.5 text-sm font-bold text-blue-700">{selectedInvoice.clientName || "—"}</p></div>
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">Customer Email</p><p className="mt-0.5 text-sm font-bold text-blue-700 break-all"><EmailLink value={selectedInvoice.email} fallback="—" /></p></div>
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">Customer Phone</p><p className="mt-0.5 flex items-center gap-2 text-sm font-bold text-blue-700"><PhoneLink value={selectedInvoice.phone} fallback="—" />{selectedInvoice.phone && <button onClick={() => setSmsTarget({ phone: selectedInvoice.phone, name: selectedInvoice.clientName })} className="inline-flex h-5 items-center gap-1 rounded bg-green-500 px-1.5 text-[10px] font-bold text-white hover:bg-green-600"><MessageSquare className="h-2.5 w-2.5" />SMS</button>}</p></div>
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">Date Sent</p><p className="mt-0.5 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.sentAt) || "Not sent yet"}</p></div>
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">Sent By</p><p className="mt-0.5 text-sm font-bold text-blue-700 break-all">{selectedInvoice.sentBy || "—"}</p></div>
+                <div className="rounded-md bg-gray-50 px-3 py-2"><p className="text-[10px] font-bold uppercase text-gray-500">SMS Sent</p><p className="mt-0.5 text-sm font-bold text-blue-700">{formatDateTime(selectedInvoice.smsSentAt) || "Not sent"}</p></div>
               </div>
             </section>
 
@@ -2520,74 +2508,39 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                 {/* ── Line items ── */}
                 <div className="rounded-lg border border-gray-200 overflow-hidden">
                   <div className="bg-gray-50 px-4 py-2.5">
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-600">Line Items</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-600">Scope of Work</p>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50/60">
-                          <th className="px-4 py-2 text-left text-[11px] font-bold uppercase text-gray-500">Description</th>
-                          <th className="px-4 py-2 text-right text-[11px] font-bold uppercase text-gray-500">Qty</th>
-                          <th className="px-4 py-2 text-right text-[11px] font-bold uppercase text-gray-500">Unit Price</th>
-                          <th className="px-4 py-2 text-right text-[11px] font-bold uppercase text-gray-500">Tax %</th>
-                          <th className="px-4 py-2 text-right text-[11px] font-bold uppercase text-gray-500">Line Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {inv.lineItems.length === 0 ? (
-                          <tr><td colSpan={5} className="px-4 py-4 text-center text-sm text-gray-400 italic">No line items added</td></tr>
-                        ) : (
-                          inv.lineItems.map((item, i) => {
-                            const lineTotal = item.quantity * item.unitPrice * (1 + item.tax / 100);
-                            return (
-                              <tr key={i} className="border-b border-gray-100 last:border-0">
-                                <td className="px-4 py-2.5 text-sm text-gray-800">{item.description || <span className="italic text-gray-400">No description</span>}</td>
-                                <td className="px-4 py-2.5 text-right text-sm text-gray-700">{item.quantity}</td>
-                                <td className="px-4 py-2.5 text-right text-sm text-gray-700">{currency(item.unitPrice)}</td>
-                                <td className="px-4 py-2.5 text-right text-sm text-gray-700">{item.tax}%</td>
-                                <td className="px-4 py-2.5 text-right text-sm font-bold text-gray-900">{currency(lineTotal)}</td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="px-4 py-3">
+                    {inv.lineItems.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">No scope items added</p>
+                    ) : (
+                      <ol className="space-y-1 list-decimal list-inside">
+                        {inv.lineItems.map((item, i) => (
+                          <li key={i} className="text-sm text-gray-800">{item.description || <span className="italic text-gray-400">No description</span>}</li>
+                        ))}
+                      </ol>
+                    )}
                   </div>
                 </div>
 
-                {/* ── Calculation breakdown ── */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                  <p className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-3">Amount Breakdown</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Subtotal (before tax)</span>
-                      <span className="font-semibold text-gray-800">{currency(totals.subtotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Tax</span>
-                      <span className="font-semibold text-gray-800">{currency(totals.tax)}</span>
-                    </div>
-                    {inv.discount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-blue-700">Discount applied</span>
-                        <span className="font-semibold text-blue-700">− {currency(inv.discount)}</span>
-                      </div>
-                    )}
-                    {getPaidAmount(inv) > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-blue-700">Payments received</span>
-                        <span className="font-semibold text-blue-700">− {currency(getPaidAmount(inv))}</span>
-                      </div>
-                    )}
-                    <div className="border-t border-gray-300 pt-2 flex items-center justify-between">
-                      <span className="font-bold text-blue-700 text-base">Total Invoice Amount</span>
-                      <span className="font-bold text-blue-700 text-xl">{currency(totals.finalTotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-base text-orange-700">Balance Due from Customer</span>
-                      <span className="font-bold text-xl text-orange-700">{currency(balance)}</span>
-                    </div>
+                {/* ── Project Total ── */}
+                <div className="rounded-lg border border-gray-200 bg-blue-50 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-blue-700">Project Total</span>
+                    <span className="font-bold text-blue-700 text-xl">{currency(totals.finalTotal)}</span>
                   </div>
+                  {getPaidAmount(inv) > 0 && (
+                    <div className="mt-1.5 flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Payments received</span>
+                      <span className="font-semibold text-green-700">− {currency(getPaidAmount(inv))}</span>
+                    </div>
+                  )}
+                  {balance > 0 && balance < totals.finalTotal && (
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="font-bold text-orange-700">Balance Due</span>
+                      <span className="font-bold text-orange-700 text-lg">{currency(balance)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* ── Payment terms & warranty ── */}
