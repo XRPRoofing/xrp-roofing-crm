@@ -199,15 +199,17 @@ function getColorConfig(colorId: string): ColorConfig {
 /* ── Team members ──────────────────────────────────────────────────────── */
 
 const TEAM_MEMBERS = [
-  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com", teamColor: "green" as const },
-  { id: "adrian", name: "Adrian Murillo", email: "", teamColor: "blue" as const },
-  { id: "office", name: "Office", email: "info@xrproofing.com", teamColor: "orange" as const },
+  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com", teamColor: "blue" as const },
+  { id: "adrian", name: "Adrian Murillo", email: "", teamColor: "orange" as const },
+  { id: "darwin", name: "Darwin Rodas Garcia", email: "", teamColor: "green" as const },
+  { id: "office", name: "Office", email: "info@xrproofing.com", teamColor: "purple" as const },
 ];
 
 const TEAM_COLOR_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   green: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500" },
   blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
   orange: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+  purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", dot: "bg-purple-500" },
 };
 
 function getTeamColor(memberId: string) {
