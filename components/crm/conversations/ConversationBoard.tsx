@@ -257,7 +257,6 @@ function CallRow({ message }: { message: ConversationMessage }) {
             {message.disposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(message.disposition)}`}>{message.disposition}</span>}
           </div>
         </div>
-        {message.recordingUrl && <audio controls src={proxyRecordingUrl(message.recordingUrl)} className="h-8 w-40 max-w-[40%]" />}
       </div>
     </div>
   );
@@ -1740,14 +1739,14 @@ export default function ConversationBoard() {
                 <div className="flex items-start gap-3"><button type="button" onClick={() => { setShowMobileThread(false); setShowMobileContact(false); }} className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm xl:hidden"><ArrowLeft className="h-4 w-4" /></button><div><p className="text-lg font-bold text-gray-950">{active.contact.name}</p><p className="text-sm text-gray-500"><AddressLink value={active.contact.address} /></p></div></div>
                 <div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => openDialerForConversation(active)}><Phone className="mr-1.5 h-4 w-4" />Call</Button><Button className="xl:hidden" onClick={() => setShowMobileContact(true)}><UserRound className="mr-1.5 h-4 w-4" />Contact</Button><div className="relative"><Button onClick={() => setStageMenuOpen((value) => !value)}>Move stage<ChevronDown className="ml-1 h-4 w-4" /></Button>{stageMenuOpen && (<><button type="button" aria-hidden onClick={() => setStageMenuOpen(false)} className="fixed inset-0 z-20 cursor-default" /><div className="absolute right-0 z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">{pipelineStages.map((stage) => <button key={stage} type="button" onClick={() => handleMoveStage(stage)} className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-gray-50 ${active.contact.jobStatus === stage ? "font-semibold text-blue-700" : "text-gray-700"}`}>{stage}{active.contact.jobStatus === stage && <CheckCheck className="h-4 w-4" />}</button>)}</div></>)}</div><Button onClick={openScheduleModal}><Calendar className="mr-1.5 h-4 w-4" />Schedule</Button><Button onClick={handleCreateEstimate}><FileText className="mr-1.5 h-4 w-4" />Create estimate</Button></div>
               </div>
-              <div className="relative min-h-0 flex-1 bg-gray-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{(() => { const insights = callInsights.filter((e) => eventMatchesConversation(e, active)); const bySid = new Map<string, TwilioConversationEvent>(); for (const e of insights) if (e.callSid) bySid.set(e.callSid, e); const shown = new Set<string>(); return [...active.messages.flatMap((msg) => { const sid = msg.id.startsWith("call-") ? msg.id.slice(5) : ""; const insight = sid ? bySid.get(sid) : undefined; if (insight) { shown.add(insight.id); return [<MessageRow key={msg.id} message={msg} />, <CallInsightsCard key={insight.id} event={insight} onOpen={setSelectedCallInsight} />]; } return [<MessageRow key={msg.id} message={msg} />]; }), ...insights.filter((e) => !shown.has(e.id)).map((e) => <CallInsightsCard key={e.id} event={e} onOpen={setSelectedCallInsight} />)]; })()}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-gray-800">Latest messages</button></div>
+              <div className="relative min-h-0 flex-1 bg-gray-50"><div ref={messageBoardRef} className="h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth p-4 pb-16">{active.messages.map((msg) => <MessageRow key={msg.id} message={msg} />)}</div><button onClick={scrollMessageBoardToBottom} className="absolute bottom-4 right-4 rounded-full bg-gray-900 px-3 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-gray-800">Latest messages</button></div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center bg-gray-50 p-8 text-center">
               <div className="max-w-sm rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <Phone className="mx-auto h-10 w-10 text-blue-600" />
                 <h2 className="mt-3 text-lg font-bold text-gray-950">No conversation selected</h2>
-                <p className="mt-2 text-sm leading-6 text-gray-600">Dial a number, receive a call, or send a text. The contact or phone number will appear here with messages, recordings, transcripts, and summaries.</p>
+                <p className="mt-2 text-sm leading-6 text-gray-600">Dial a number, receive a call, or send a text. The contact or phone number will appear here with messages and call history.</p>
               </div>
             </div>
           )}
@@ -1805,16 +1804,6 @@ export default function ConversationBoard() {
           </div>
         )}
       </div>
-
-      <CallTranscriptModal event={selectedCallInsight} onClose={() => setSelectedCallInsight(null)} onDeleteRecording={async (evt) => {
-        try {
-          const res = await fetch("/api/twilio/recording/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callSid: evt.callSid, recordingSid: evt.recordingSid }) });
-          if (!res.ok) throw new Error("Delete failed");
-          setCallInsights((current) => current.filter((ci) => ci.callSid !== evt.callSid));
-        } catch (error) {
-          console.error("[Recording Delete]", error);
-        }
-      }} />
 
       {newConvoOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setNewConvoOpen(false)}>

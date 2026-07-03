@@ -10,6 +10,7 @@ import {
   Clock,
   ExternalLink,
   Hash,
+  ChevronDown,
   FileText,
   Headphones,
   MessageSquare,
@@ -64,6 +65,7 @@ interface CallRecord {
   twilioLine?: string;
   recordingUrl?: string;
   summary?: string;
+  transcript?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +264,8 @@ export default function PhonePage() {
   const [smsSent, setSmsSent] = useState(false);
 
   // Expanded summary modal
-  const [expandedSummary, setExpandedSummary] = useState<{ name: string; summary: string; recordingUrl?: string } | null>(null);
+  const [expandedSummary, setExpandedSummary] = useState<{ name: string; summary: string; recordingUrl?: string; transcript?: string } | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
@@ -315,33 +318,36 @@ export default function PhonePage() {
     // A call can produce multiple call_recording events (processing → completed).
     // Prefer the most complete one (non-processing status, has summary, has url).
     const recordingEvents = events.filter((e) => e.type === "call_recording");
-    const recordingMap = new Map<string, { url?: string; summary?: string }>();
+    type RecInfo = { url?: string; summary?: string; transcript?: string };
+    const recordingMap = new Map<string, RecInfo>();
     for (const e of recordingEvents) {
       const sid = e.callSid;
       if (!sid) continue;
       const existing = recordingMap.get(sid);
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
+      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
       // Skip processing placeholders if we already have a completed one
       if (existing && e.status === "processing" && existing.summary) continue;
       if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
-        recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary });
+        recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary, transcript: transcript || existing?.transcript });
       }
     }
 
     // Fallback: build a phone+time index from recording events for calls whose
     // callSid doesn't appear in the recordingMap (Twilio may use a child leg
     // SID for the recording callback that differs from the parent call SID).
-    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string }>>();
+    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string; transcript?: string }>>();
     for (const e of recordingEvents) {
       const phone = e.direction === "inbound" ? (e.from || "") : (e.to || "");
       const normalized = phone.replace(/\D/g, "").slice(-10);
       if (!normalized) continue;
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
+      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
       if (!summary && !url) continue;
       if (!recordingByPhone.has(normalized)) recordingByPhone.set(normalized, []);
-      recordingByPhone.get(normalized)!.push({ time: new Date(e.createdAt).getTime(), url, summary });
+      recordingByPhone.get(normalized)!.push({ time: new Date(e.createdAt).getTime(), url, summary, transcript });
     }
 
     const records: CallRecord[] = [];
@@ -391,13 +397,14 @@ export default function PhonePage() {
         customerId: customer?.id,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
-        recordingUrl: (() => {
+        ...(() => {
+          // Try direct callSid match first
           const bySid = recordingMap.get(event.callSid || "");
-          if (bySid?.url) return bySid.url;
+          if (bySid?.summary || bySid?.url) return { recordingUrl: bySid.url, summary: bySid.summary, transcript: bySid.transcript };
           // Fallback: find recording by phone + closest time (within 10 min)
           const normalized = phone.replace(/\D/g, "").slice(-10);
           const candidates = recordingByPhone.get(normalized);
-          if (!candidates?.length) return bySid?.url;
+          if (!candidates?.length) return { recordingUrl: bySid?.url, summary: bySid?.summary, transcript: bySid?.transcript };
           const callTime = new Date(event.createdAt).getTime();
           let best: typeof candidates[0] | undefined;
           let bestDelta = Infinity;
@@ -405,23 +412,8 @@ export default function PhonePage() {
             const delta = Math.abs(c.time - callTime);
             if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
           }
-          return best?.url || bySid?.url;
-        })() || undefined,
-        summary: (() => {
-          const bySid = recordingMap.get(event.callSid || "");
-          if (bySid?.summary) return bySid.summary;
-          const normalized = phone.replace(/\D/g, "").slice(-10);
-          const candidates = recordingByPhone.get(normalized);
-          if (!candidates?.length) return bySid?.summary;
-          const callTime = new Date(event.createdAt).getTime();
-          let best: typeof candidates[0] | undefined;
-          let bestDelta = Infinity;
-          for (const c of candidates) {
-            const delta = Math.abs(c.time - callTime);
-            if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
-          }
-          return best?.summary || bySid?.summary;
-        })() || undefined,
+          return { recordingUrl: best?.url || bySid?.url, summary: best?.summary || bySid?.summary, transcript: best?.transcript || bySid?.transcript };
+        })(),
       });
     }
 
@@ -886,7 +878,7 @@ export default function PhonePage() {
                           {call.summary && (
                             <button
                               type="button"
-                              onClick={() => setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl })}
+                              onClick={() => { setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
                               className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               <FileText className="h-3 w-3" />
@@ -1060,7 +1052,7 @@ export default function PhonePage() {
                             {call.summary && (
                               <button
                                 type="button"
-                                onClick={(e) => { e.stopPropagation(); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl }); }}
+                                onClick={(e) => { e.stopPropagation(); setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
                                 className="flex items-center gap-1 text-left text-[11px] leading-4 text-blue-600 hover:text-blue-800 hover:underline"
                               >
                                 <FileText className="h-3 w-3 shrink-0" />
@@ -1635,10 +1627,19 @@ export default function PhonePage() {
                   <audio controls src={proxyRecordingUrl(expandedSummary.recordingUrl)} className="w-full" preload="none" />
                 </div>
               )}
-              <div>
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500"><FileText className="h-3 w-3" />Summary</p>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700"><FileText className="h-3 w-3" />Summary</p>
                 <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{expandedSummary.summary}</p>
               </div>
+              {expandedSummary.transcript && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50">
+                  <button type="button" onClick={() => setShowTranscript((v) => !v)} className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-gray-600">
+                    Full Transcript
+                    <ChevronDown className={`h-4 w-4 transition ${showTranscript ? "rotate-180" : ""}`} />
+                  </button>
+                  {showTranscript && <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{expandedSummary.transcript}</p>}
+                </div>
+              )}
             </div>
           </div>
         </>
