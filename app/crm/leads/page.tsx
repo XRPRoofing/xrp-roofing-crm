@@ -1755,16 +1755,24 @@ export default function LeadsPage() {
                     )}
                   </div>
                   <div className="p-2.5">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <button
                         type="button"
                         disabled={ccLoading}
                         onClick={() => void openCompanyCam()}
-                        className={`flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-green-700 active:scale-95 ${ccLoading ? "pointer-events-none opacity-60" : ""}`}
+                        className={`flex items-center justify-center gap-1 rounded-md bg-green-600 px-2 py-1.5 text-[11px] font-bold text-white transition hover:bg-green-700 active:scale-95 ${ccLoading ? "pointer-events-none opacity-60" : ""}`}
                       >
-                        <Camera className="h-3.5 w-3.5" /> {ccLoading ? "Opening..." : "Camera"}
+                        <Camera className="h-3.5 w-3.5" /> {ccLoading ? "Opening..." : "CompanyCam"}
                       </button>
-                      <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <button
+                        type="button"
+                        disabled={fileBusy}
+                        onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
+                        className={`flex items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-700 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <Camera className="h-3.5 w-3.5" /> Camera
+                      </button>
+                      <label className={`flex cursor-pointer items-center justify-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[11px] font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
                         <UploadCloud className="h-3.5 w-3.5" /> Upload
                         <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
                       </label>
