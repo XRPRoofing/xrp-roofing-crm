@@ -1780,14 +1780,14 @@ export default function CalendarPage() {
       {/* ── New Event Modal ─────────────────────────────────────────── */}
       {newScheduleOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-gray-950/30 pb-0 sm:items-center sm:p-4"
           onClick={() => setNewScheduleOpen(false)}
         >
           <form
             id="new-event"
             onSubmit={handleCreateEvent}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
+            className="flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-lg"
           >
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
@@ -1930,7 +1930,7 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-3 sm:px-6">
+            <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-3">
               <button
                 type="button"
                 onClick={() => setNewScheduleOpen(false)}
