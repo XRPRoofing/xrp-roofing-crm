@@ -38,12 +38,13 @@ import { logCrewActivity } from "@/lib/crew-activity";
 // Arizona Mountain Time
 const ARIZONA_TIMEZONE = "America/Phoenix";
 
-type ViewMode = "month" | "week" | "day";
+type ViewMode = "timeline" | "month" | "week" | "day";
 
 const VIEW_LABELS: Record<ViewMode, string> = {
-  month: "Month",
-  week: "Week",
+  timeline: "Timeline",
   day: "Day",
+  week: "Week",
+  month: "Month",
 };
 
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -199,8 +200,15 @@ function getColorConfig(colorId: string): ColorConfig {
 
 const TEAM_MEMBERS = [
   { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com" },
+  { id: "gerardo", name: "Gerardo Chavez", email: "" },
+  { id: "christian", name: "Christian Gonzalez", email: "" },
+  { id: "adrian", name: "Adrian Murillo", email: "" },
+  { id: "jacob", name: "Jacob Ramirez", email: "" },
   { id: "darwin", name: "Darwin Rodas Garcia", email: "" },
 ];
+
+const JOB_KINDS = ["Repair", "Replacement", "Installation", "Maintenance", "Inspection", "Other"];
+const DEFAULT_TAGS = ["Urgent", "Follow-up", "VIP", "Insurance", "Commercial", "Residential"];
 
 /* ── Google Calendar helpers ────────────────────────────────────────────── */
 
@@ -279,7 +287,7 @@ export default function CalendarPage() {
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const v = searchParams.get("view");
-    if (v === "day" || v === "week" || v === "month") return v;
+    if (v === "timeline" || v === "day" || v === "week" || v === "month") return v;
     return "month";
   });
   const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
@@ -298,7 +306,7 @@ export default function CalendarPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const v = searchParams.get("view");
-    if (v === "day" || v === "week" || v === "month") setViewMode(v);
+    if (v === "timeline" || v === "day" || v === "week" || v === "month") setViewMode(v as ViewMode);
     const dp = searchParams.get("date");
     if (dp) {
       const [y, m, d] = dp.split("-").map(Number);
@@ -326,6 +334,31 @@ export default function CalendarPage() {
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(
     new Set(TEAM_MEMBERS.map((m) => m.id)),
   );
+
+  // ── Filter state (Workiz-style) ─────────────────────────────────────────
+  const [filterPopup, setFilterPopup] = useState<"status" | "tags" | "team" | "type" | null>(null);
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(["open", "done"]));
+  const [itemTypeFilter, setItemTypeFilter] = useState<Set<string>>(new Set(["jobs", "events"]));
+  const [enabledJobKinds, setEnabledJobKinds] = useState<Set<string>>(new Set(JOB_KINDS));
+  const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
+  const [eventTags, setEventTags] = useState<Record<string, string[]>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("xrp:calendar-tags") || "{}"); } catch { return {}; }
+  });
+  const [newTagInput, setNewTagInput] = useState("");
+
+  const allTags = useMemo(() => {
+    const tags = new Set(DEFAULT_TAGS);
+    Object.values(eventTags).flat().forEach((t) => tags.add(t));
+    return Array.from(tags);
+  }, [eventTags]);
+
+  // Persist tags to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("xrp:calendar-tags", JSON.stringify(eventTags));
+    }
+  }, [eventTags]);
 
   // Create form
   const [form, setForm] = useState({
@@ -574,7 +607,7 @@ export default function CalendarPage() {
       if (viewMode === "week") {
         return azNoon(p.year, p.month, p.day + delta * 7);
       }
-      // day
+      // day or timeline
       return azNoon(p.year, p.month, p.day + delta);
     });
   }
@@ -601,9 +634,39 @@ export default function CalendarPage() {
   }
 
   function isEventVisible(event: CalendarEvent) {
-    if (enabledTeam.size === 0) return true;
-    if (enabledTeam.size === TEAM_MEMBERS.length) return true;
-    return enabledTeam.has(event.assigned_to);
+    // Team filter
+    if (enabledTeam.size > 0 && enabledTeam.size < TEAM_MEMBERS.length) {
+      if (event.assigned_to && !enabledTeam.has(event.assigned_to)) return false;
+    }
+    // Item type filter (CRM jobs vs Google events)
+    const isGcal = isGoogleEvent(event);
+    const eventItemType = isGcal ? "events" : "jobs";
+    if (!itemTypeFilter.has(eventItemType)) return false;
+    // Status filter (open = future/today, done = past)
+    const eventDate = new Date(event.start_time);
+    const now = new Date();
+    const isPast = eventDate < now && !event.all_day;
+    const eventStatus = isPast ? "done" : "open";
+    if (statusFilter.size > 0 && statusFilter.size < 2 && !statusFilter.has(eventStatus)) return false;
+    // Job kind / type filter
+    if (!isGcal && event.job_kind && enabledJobKinds.size < JOB_KINDS.length) {
+      if (!enabledJobKinds.has(event.job_kind)) return false;
+    }
+    // Tag filter
+    if (tagFilter.size > 0) {
+      const eTags = eventTags[event.id] || [];
+      if (!eTags.some((t) => tagFilter.has(t))) return false;
+    }
+    return true;
+  }
+
+  function toggleJobKind(kind: string) {
+    setEnabledJobKinds((prev) => {
+      const n = new Set(prev);
+      if (n.has(kind)) n.delete(kind);
+      else n.add(kind);
+      return n;
+    });
   }
 
   /* ── CRUD handlers ──────────────────────────────────────────────────── */
@@ -927,6 +990,123 @@ export default function CalendarPage() {
             <PhoneOutgoing className="h-3 w-3" />
           </button>
         )}
+      </div>
+    );
+  }
+
+  /* ── Timeline View (team members as rows, hours as columns) ──────── */
+
+  function renderTimelineView() {
+    const key = dateKeyFromDate(currentDate);
+    const visibleHours = HOURS.filter((h) => h >= 6 && h <= 20);
+    const cellW = 100;
+
+    return (
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+        {/* Timeline header row — hours */}
+        <div className="flex shrink-0 border-b border-gray-200 bg-gray-50">
+          <div className="w-24 shrink-0 border-r border-gray-200 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 sm:w-36 sm:px-3 sm:text-xs">
+            Team
+          </div>
+          <div className="flex-1 overflow-x-auto scrollbar-hide">
+            <div className="flex" style={{ width: `${visibleHours.length * cellW}px` }}>
+              {visibleHours.map((h) => (
+                <div key={h} className="shrink-0 border-r border-gray-100 px-1 py-2 text-center text-[10px] font-semibold text-gray-500 sm:text-xs" style={{ width: `${cellW}px` }}>
+                  {formatHour(h)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Team member rows */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {TEAM_MEMBERS.filter((m) => enabledTeam.has(m.id)).map((member) => {
+            const memberEvents = (eventsByDate[key] || [])
+              .filter(isEventVisible)
+              .filter((ev) => ev.assigned_to === member.id);
+
+            return (
+              <div key={member.id} className="flex border-b border-gray-100">
+                <div className="flex w-24 shrink-0 items-center border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-bold text-gray-800 sm:text-sm">{member.name.split(" ")[0]}</div>
+                    <div className="hidden truncate text-[10px] text-gray-400 sm:block">{member.name.split(" ").slice(1).join(" ")}</div>
+                  </div>
+                </div>
+                <div className="relative flex-1 overflow-x-auto scrollbar-hide">
+                  <div className="relative" style={{ width: `${visibleHours.length * cellW}px`, minHeight: "56px" }}>
+                    {visibleHours.map((h) => (
+                      <div key={h} className="absolute top-0 h-full border-r border-gray-50" style={{ left: `${(h - 6) * cellW}px`, width: `${cellW}px` }} />
+                    ))}
+                    {memberEvents.map((ev) => {
+                      const startH = eventHour(ev);
+                      const endH = eventEndHour(ev);
+                      const left = Math.max(0, startH - 6) * cellW;
+                      const width = Math.max(1, endH - startH) * cellW;
+                      const cc = getColorConfig(ev.color);
+                      return (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          onClick={() => setSelectedEvent(ev)}
+                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
+                          style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
+                          title={`${ev.title} ${formatEventTimeRange(ev)}`}
+                        >
+                          <div className="truncate">{ev.title}</div>
+                          <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Unassigned events row */}
+          {(() => {
+            const unassigned = (eventsByDate[key] || [])
+              .filter(isEventVisible)
+              .filter((ev) => !ev.assigned_to || !TEAM_MEMBERS.some((m) => m.id === ev.assigned_to));
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="flex border-b border-gray-100">
+                <div className="flex w-24 shrink-0 items-center border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
+                  <span className="text-[11px] font-semibold italic text-gray-400 sm:text-xs">Unassigned</span>
+                </div>
+                <div className="relative flex-1 overflow-x-auto scrollbar-hide">
+                  <div className="relative" style={{ width: `${visibleHours.length * cellW}px`, minHeight: "56px" }}>
+                    {visibleHours.map((h) => (
+                      <div key={h} className="absolute top-0 h-full border-r border-gray-50" style={{ left: `${(h - 6) * cellW}px`, width: `${cellW}px` }} />
+                    ))}
+                    {unassigned.map((ev) => {
+                      const startH = eventHour(ev);
+                      const endH = eventEndHour(ev);
+                      const left = Math.max(0, startH - 6) * cellW;
+                      const width = Math.max(1, endH - startH) * cellW;
+                      const cc = getColorConfig(ev.color);
+                      return (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          onClick={() => setSelectedEvent(ev)}
+                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
+                          style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
+                          title={`${ev.title} ${formatEventTimeRange(ev)}`}
+                        >
+                          <div className="truncate">{ev.title}</div>
+                          <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
     );
   }
@@ -1286,94 +1466,183 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Top Toolbar */}
-      <div className="sticky top-16 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:-mx-5 sm:px-5 sm:py-3">
-        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            <button
-              type="button"
-              onClick={goToToday}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5"
-              aria-label="Previous"
-            >
-              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(1)}
-              className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5"
-              aria-label="Next"
-            >
-              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-            <h1 className="text-base font-bold text-gray-900 sm:text-xl">
-              {headerLabel}
-            </h1>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={loadEvents}
-              className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 sm:p-2"
-              aria-label="Refresh"
-            >
-              <RefreshCw
-                className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? "animate-spin" : ""}`}
-              />
-            </button>
+      {/* Click-away backdrop for filter popups */}
+      {filterPopup && (
+        <div className="fixed inset-0 z-[25]" onClick={() => setFilterPopup(null)} />
+      )}
 
-            {/* View Switcher */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setViewDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:py-2 sm:text-sm"
-              >
-                {VIEW_LABELS[viewMode]}{" "}
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${viewDropdownOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {viewDropdownOpen && (
-                <div className="absolute right-0 z-30 mt-1 w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                  {(["month", "week", "day"] as ViewMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        setViewMode(mode);
-                        setViewDropdownOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold ${viewMode === mode ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"}`}
+      {/* Filter Bar + Toolbar */}
+      <div className="sticky top-16 z-20 -mx-3 sm:-mx-5">
+        {/* Dark filter bar */}
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-700 bg-gray-800 px-3 py-2 scrollbar-hide sm:px-5">
+          {/* Status Filter */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "status" ? null : "status"); }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "status" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+            >
+              Status <ChevronDown className="h-3 w-3" />
+            </button>
+            {filterPopup === "status" && (
+              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">Status</h4>
+                  <button type="button" onClick={() => { setStatusFilter(new Set(["open", "done"])); setItemTypeFilter(new Set(["jobs", "events"])); }} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+                </div>
+                <div className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1">
+                  {(["jobs", "events"] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setItemTypeFilter((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
+                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${itemTypeFilter.has(t) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      {VIEW_LABELS[mode]}
+                      {t === "jobs" ? "Jobs" : "Events"}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
+                <label className="flex cursor-pointer items-center gap-2.5 py-2">
+                  <input type="checkbox" checked={statusFilter.has("open")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("open")) n.delete("open"); else n.add("open"); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                  <span className="text-sm font-medium text-gray-700">Open</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2.5 py-2">
+                  <input type="checkbox" checked={statusFilter.has("done")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("done")) n.delete("done"); else n.add("done"); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                  <span className="text-sm font-medium text-gray-700">Done</span>
+                </label>
+                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+              </div>
+            )}
+          </div>
 
+          {/* Tags Filter */}
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setNewScheduleOpen(true)}
-              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm"
+              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "tags" ? null : "tags"); }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "tags" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
             >
-              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Event
+              Tags {tagFilter.size > 0 && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{tagFilter.size}</span>} <ChevronDown className="h-3 w-3" />
+            </button>
+            {filterPopup === "tags" && (
+              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">Tags</h4>
+                  <button type="button" onClick={() => setTagFilter(new Set())} className="text-xs font-medium text-blue-600 hover:text-blue-700">Clear all</button>
+                </div>
+                <div className="max-h-48 overflow-y-auto">
+                  {allTags.map((tag) => (
+                    <label key={tag} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+                      <input type="checkbox" checked={tagFilter.has(tag)} onChange={() => setTagFilter((prev) => { const n = new Set(prev); if (n.has(tag)) n.delete(tag); else n.add(tag); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                      <span className="text-sm font-medium text-gray-700">{tag}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
+                  <input type="text" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newTagInput.trim()) { setEventTags((prev) => ({ ...prev })); setNewTagInput(""); } }} placeholder="New tag..." className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-blue-300" />
+                  <button type="button" onClick={() => { if (newTagInput.trim()) { setNewTagInput(""); } }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Add</button>
+                </div>
+                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+              </div>
+            )}
+          </div>
+
+          {/* Team Filter */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "team" ? null : "team"); }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "team" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+            >
+              Team {enabledTeam.size < TEAM_MEMBERS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledTeam.size}</span>} <ChevronDown className="h-3 w-3" />
+            </button>
+            {filterPopup === "team" && (
+              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">Team</h4>
+                  <button type="button" onClick={() => setEnabledTeam(new Set(TEAM_MEMBERS.map((m) => m.id)))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2.5 border-b border-gray-100 py-2.5">
+                  <input type="checkbox" checked={enabledTeam.size === 1 && enabledTeam.has("jonathan")} onChange={() => setEnabledTeam(new Set(["jonathan"]))} className="h-4 w-4 rounded border-gray-300" />
+                  <span className="text-sm font-medium text-gray-700">Just me</span>
+                </label>
+                {TEAM_MEMBERS.map((member) => (
+                  <label key={member.id} className="flex cursor-pointer items-center gap-2.5 py-2">
+                    <input type="checkbox" checked={enabledTeam.has(member.id)} onChange={() => toggleTeam(member.id)} className="h-4 w-4 rounded border-gray-300" />
+                    <span className="text-sm font-medium text-gray-700">{member.name}</span>
+                  </label>
+                ))}
+                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+              </div>
+            )}
+          </div>
+
+          {/* Type Filter (Job Kind) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "type" ? null : "type"); }}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "type" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+            >
+              Type {enabledJobKinds.size < JOB_KINDS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledJobKinds.size}</span>} <ChevronDown className="h-3 w-3" />
+            </button>
+            {filterPopup === "type" && (
+              <div className="absolute left-0 top-full z-40 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-900">Type</h4>
+                  <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+                </div>
+                {JOB_KINDS.map((kind) => (
+                  <label key={kind} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+                    <input type="checkbox" checked={enabledJobKinds.has(kind)} onChange={() => toggleJobKind(kind)} className="h-4 w-4 rounded border-gray-300" />
+                    <span className="text-sm font-medium text-gray-700">{kind}</span>
+                  </label>
+                ))}
+                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Toolbar with view tabs */}
+        <div className="flex items-center justify-between gap-1.5 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:gap-2 sm:px-5 sm:py-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            <button type="button" onClick={goToToday} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm">Today</button>
+            <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Previous"><ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+            <button type="button" onClick={() => navigate(1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Next"><ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" /></button>
+            <h1 className="hidden text-base font-bold text-gray-900 sm:block sm:text-xl">{headerLabel}</h1>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button type="button" onClick={loadEvents} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 sm:p-2" aria-label="Refresh">
+              <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            {/* View Tabs (inline) */}
+            <div className="flex items-center rounded-lg bg-gray-100 p-0.5">
+              {(["timeline", "day", "week", "month"] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setViewMode(mode); setViewDropdownOpen(false); }}
+                  className={`rounded-md px-2 py-1 text-[11px] font-semibold transition sm:px-3 sm:py-1.5 sm:text-xs ${viewMode === mode ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                >
+                  {VIEW_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+
+            <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm">
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Event</span>
             </button>
           </div>
+        </div>
+        {/* Mobile header label (below toolbar on small screens) */}
+        <div className="border-b border-gray-200 bg-white px-3 py-1.5 sm:hidden">
+          <h1 className="text-sm font-bold text-gray-900">{headerLabel}</h1>
         </div>
       </div>
 
       {/* Main Layout */}
       <div className="mt-1 flex min-h-0 flex-1 gap-2 sm:mt-2 sm:gap-4">
         {/* Calendar View */}
+        {viewMode === "timeline" && renderTimelineView()}
         {viewMode === "month" && renderMonthView()}
         {viewMode === "week" && renderWeekView()}
         {viewMode === "day" && renderDayView()}
@@ -1441,46 +1710,6 @@ export default function CalendarPage() {
                 );
               })}
             </div>
-          </div>
-
-          {/* Team */}
-          <div className="rounded-lg border border-gray-200 bg-white p-3">
-            <h3 className="mb-2 text-sm font-bold text-gray-900">Team</h3>
-            <label className="flex cursor-pointer items-center gap-2 py-1">
-              <input
-                type="checkbox"
-                checked={enabledTeam.size === TEAM_MEMBERS.length}
-                onChange={() => {
-                  if (enabledTeam.size === TEAM_MEMBERS.length)
-                    setEnabledTeam(new Set());
-                  else
-                    setEnabledTeam(new Set(TEAM_MEMBERS.map((m) => m.id)));
-                }}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <span className="text-xs font-medium text-gray-700">
-                Select all
-              </span>
-              <span className="ml-auto text-xs text-gray-400">
-                {TEAM_MEMBERS.length}
-              </span>
-            </label>
-            {TEAM_MEMBERS.map((member) => (
-              <label
-                key={member.id}
-                className="flex cursor-pointer items-center gap-2 py-1"
-              >
-                <input
-                  type="checkbox"
-                  checked={enabledTeam.has(member.id)}
-                  onChange={() => toggleTeam(member.id)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <span className="text-xs font-medium text-gray-700">
-                  {member.name}
-                </span>
-              </label>
-            ))}
           </div>
 
           {/* Google Calendar Status */}
