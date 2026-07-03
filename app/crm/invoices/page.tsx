@@ -1874,71 +1874,114 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
   function renderInvoiceFields(invoice: Invoice, editable: boolean, onChange: (invoice: Invoice) => void) {
     const totals = calculateTotals(invoice);
-    const inputClass = "mt-1.5 w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50";
+    const inputClass = "mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50";
     return (
-      <div className="grid gap-3 lg:grid-cols-2">
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Client name<input disabled={!editable} value={invoice.clientName} onChange={(event) => onChange({ ...invoice, clientName: event.target.value })} className={inputClass} placeholder="Client name" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Email
-          <div className="flex items-center gap-1 mt-1.5">
-            <input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Email" />
-            {invoice.email && <a href={`mailto:${invoice.email}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-4 w-4" /></a>}
+      <div className="space-y-5">
+        {/* ── Section: Client Information ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Client Information</h4>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Client name<input disabled={!editable} value={invoice.clientName} onChange={(event) => onChange({ ...invoice, clientName: event.target.value })} className={inputClass} placeholder="Client name" /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Email
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <input disabled={!editable} value={invoice.email} onChange={(event) => onChange({ ...invoice, email: event.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Email" />
+                {invoice.email && <a href={`mailto:${invoice.email}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-3.5 w-3.5" /></a>}
+              </div>
+            </label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Phone
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <input disabled={!editable} value={invoice.phone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, invoice.phone, el.selectionStart); onChange({ ...invoice, phone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Phone" />
+                {invoice.phone && <button type="button" onClick={() => { const digits = invoice.phone.replace(/[^\d+]/g, ""); if (digits) window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } })); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-3.5 w-3.5" /></button>}
+                {invoice.phone && <button type="button" onClick={() => setSmsTarget({ phone: invoice.phone, name: invoice.clientName })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-3.5 w-3.5" /></button>}
+              </div>
+            </label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Property address
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <AddressAutocomplete
+                  value={invoice.propertyAddress}
+                  onChange={(address) => onChange({ ...invoice, propertyAddress: address })}
+                  placeholder="Property address"
+                  disabled={!editable}
+                />
+                {invoice.propertyAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(invoice.propertyAddress)}`} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><MapPin className="h-3.5 w-3.5" /></a>}
+              </div>
+            </label>
           </div>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Phone
-          <div className="flex items-center gap-1 mt-1.5">
-            <input disabled={!editable} value={invoice.phone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, invoice.phone, el.selectionStart); onChange({ ...invoice, phone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:bg-gray-50" placeholder="Phone" />
-            {invoice.phone && <button type="button" onClick={() => { const digits = invoice.phone.replace(/[^\d+]/g, ""); if (digits) window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } })); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></button>}
-            {invoice.phone && <button type="button" onClick={() => setSmsTarget({ phone: invoice.phone, name: invoice.clientName })} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
+        </section>
+
+        {/* ── Section: Job Details ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Job Details</h4>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Job name<input disabled={!editable} value={invoice.jobName} onChange={(event) => onChange({ ...invoice, jobName: event.target.value })} className={inputClass} placeholder="Job reference/name" /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Job reference<input disabled={!editable} value={invoice.jobReference} onChange={(event) => onChange({ ...invoice, jobReference: event.target.value })} className={inputClass} placeholder="Job reference" /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Roof type<input disabled={!editable} value={invoice.roofType} onChange={(event) => onChange({ ...invoice, roofType: event.target.value })} className={inputClass} placeholder="Roof type" /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Proposal reference<input disabled={!editable} value={invoice.proposalReference} onChange={(event) => onChange({ ...invoice, proposalReference: event.target.value })} className={inputClass} placeholder="Proposal reference" /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Lead source<select disabled={!editable} value={invoice.leadSource || ""} onChange={(event) => onChange({ ...invoice, leadSource: event.target.value })} className={inputClass}><option value="">—</option>{INVOICE_LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
           </div>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Property address
-          <div className="flex items-center gap-1 mt-1.5">
-            <AddressAutocomplete
-              value={invoice.propertyAddress}
-              onChange={(address) => onChange({ ...invoice, propertyAddress: address })}
-              placeholder="Property address"
-              disabled={!editable}
-            />
-            {invoice.propertyAddress && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(invoice.propertyAddress)}`} target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><MapPin className="h-4 w-4" /></a>}
+        </section>
+
+        {/* ── Section: Dates ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Invoice Dates</h4>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Issue date<input disabled={!editable} type="date" value={invoice.issueDate} onChange={(event) => onChange({ ...invoice, issueDate: event.target.value })} className={inputClass} /></label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Due date<input disabled={!editable} type="date" value={invoice.dueDate} onChange={(event) => onChange({ ...invoice, dueDate: event.target.value })} className={inputClass} /></label>
           </div>
-        </label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Job name<input disabled={!editable} value={invoice.jobName} onChange={(event) => onChange({ ...invoice, jobName: event.target.value })} className={inputClass} placeholder="Job reference/name" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Job reference<input disabled={!editable} value={invoice.jobReference} onChange={(event) => onChange({ ...invoice, jobReference: event.target.value })} className={inputClass} placeholder="Job reference" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Issue date<input disabled={!editable} type="date" value={invoice.issueDate} onChange={(event) => onChange({ ...invoice, issueDate: event.target.value })} className={inputClass} /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Due date<input disabled={!editable} type="date" value={invoice.dueDate} onChange={(event) => onChange({ ...invoice, dueDate: event.target.value })} className={inputClass} /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Roof type<input disabled={!editable} value={invoice.roofType} onChange={(event) => onChange({ ...invoice, roofType: event.target.value })} className={inputClass} placeholder="Roof type" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Proposal reference<input disabled={!editable} value={invoice.proposalReference} onChange={(event) => onChange({ ...invoice, proposalReference: event.target.value })} className={inputClass} placeholder="Proposal reference" /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Lead source<select disabled={!editable} value={invoice.leadSource || ""} onChange={(event) => onChange({ ...invoice, leadSource: event.target.value })} className={inputClass}><option value="">—</option>{INVOICE_LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Project completion date<input disabled={!editable} type="date" value={invoice.projectCompletionDate} onChange={(event) => onChange({ ...invoice, projectCompletionDate: event.target.value })} className={inputClass} /></label>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
-        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2"><div className="flex items-center justify-between"><span>Payment terms</span>{editable && <AiWriteButton getText={() => invoice.paymentTerms} onReplace={(t) => onChange({ ...invoice, paymentTerms: t })} context="invoice payment terms for a roofing project" />}</div><textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Payment terms" /></div>
-        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 lg:col-span-2"><div className="flex items-center justify-between"><span>Warranty notes</span>{editable && <AiWriteButton getText={() => invoice.warrantyNotes} onReplace={(t) => onChange({ ...invoice, warrantyNotes: t })} context="roofing warranty notes" />}</div><textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-20`} placeholder="Warranty notes" /></div>
-        <div className="lg:col-span-2">
+        </section>
+
+        {/* ── Section: Warranty ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Warranty & Terms</h4>
+          <div className="space-y-4">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500">Warranty duration<input disabled={!editable} value={invoice.warrantyDuration} onChange={(event) => onChange({ ...invoice, warrantyDuration: event.target.value })} className={inputClass} placeholder="Warranty duration" /></label>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500"><div className="flex items-center justify-between"><span>Payment terms</span>{editable && <AiWriteButton getText={() => invoice.paymentTerms} onReplace={(t) => onChange({ ...invoice, paymentTerms: t })} context="invoice payment terms for a roofing project" />}</div><textarea disabled={!editable} value={invoice.paymentTerms} onChange={(event) => onChange({ ...invoice, paymentTerms: event.target.value })} className={`${inputClass} min-h-[72px] resize-none`} placeholder="Payment terms" /></div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500"><div className="flex items-center justify-between"><span>Warranty notes</span>{editable && <AiWriteButton getText={() => invoice.warrantyNotes} onReplace={(t) => onChange({ ...invoice, warrantyNotes: t })} context="roofing warranty notes" />}</div><textarea disabled={!editable} value={invoice.warrantyNotes} onChange={(event) => onChange({ ...invoice, warrantyNotes: event.target.value })} className={`${inputClass} min-h-[72px] resize-none`} placeholder="Warranty notes" /></div>
+          </div>
+        </section>
+
+        {/* ── Section: Line Items ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-bold text-blue-700">Line Items</h3>
-            {editable && <button type="button" onClick={() => onChange({ ...invoice, lineItems: [...invoice.lineItems, emptyLineItem] })} className="rounded-full bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700">+ Add line</button>}
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Line Items</h4>
+            {editable && <button type="button" onClick={() => onChange({ ...invoice, lineItems: [...invoice.lineItems, emptyLineItem] })} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition">+ Add line</button>}
           </div>
-          <div className="space-y-3">
+          {/* Column headers */}
+          <div className="hidden md:grid md:grid-cols-[1fr_80px_110px_80px] gap-2 px-3 pb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Description</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Qty</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Unit Price</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Tax %</span>
+          </div>
+          <div className="space-y-2">
             {invoice.lineItems.map((item, index) => (
-              <div key={index} className="grid gap-2 rounded-lg bg-gray-50 p-3 md:grid-cols-[1fr_90px_120px_90px]">
-                <input disabled={!editable} value={item.description} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, description: event.target.value }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 px-3 py-2 outline-none disabled:bg-white" placeholder="Description" />
-                <input disabled={!editable} type="number" value={item.quantity} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, quantity: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 px-3 py-2 outline-none disabled:bg-white" placeholder="Qty" />
-                <input disabled={!editable} type="number" value={item.unitPrice} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, unitPrice: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 px-3 py-2 outline-none disabled:bg-white" placeholder="Unit price" />
-                <input disabled={!editable} type="number" value={item.tax} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, tax: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 px-3 py-2 outline-none disabled:bg-white" placeholder="Tax %" />
+              <div key={index} className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3 md:grid-cols-[1fr_80px_110px_80px]">
+                <input disabled={!editable} value={item.description} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, description: event.target.value }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-white" placeholder="Description" />
+                <input disabled={!editable} type="number" value={item.quantity} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, quantity: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-white" placeholder="Qty" />
+                <input disabled={!editable} type="number" value={item.unitPrice} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, unitPrice: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-white" placeholder="Unit price" />
+                <input disabled={!editable} type="number" value={item.tax} onChange={(event) => { const lineItems = [...invoice.lineItems]; lineItems[index] = { ...item, tax: Number(event.target.value) || 0 }; onChange({ ...invoice, lineItems }); }} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none disabled:bg-white" placeholder="Tax %" />
               </div>
             ))}
           </div>
-        </div>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Discount<input disabled={!editable} type="number" value={invoice.discount} onChange={(event) => onChange({ ...invoice, discount: Number(event.target.value) || 0 })} className={inputClass} placeholder="Discount" /></label>
-        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-white p-4 text-sm font-bold text-gray-700 ring-1 ring-gray-100">
-          <div className="flex justify-between"><span>Subtotal</span><span>{currency(totals.subtotal)}</span></div>
-          <div className="mt-2 flex justify-between"><span>Tax</span><span>{currency(totals.tax)}</span></div>
-          <div className="mt-2 flex justify-between"><span>Discount</span><span>{currency(invoice.discount)}</span></div>
-          <div className="mt-3 border-t border-gray-200 pt-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Final Total</p>
-            <p className="mt-1 text-2xl font-bold text-blue-700">{currency(totals.finalTotal)}</p>
+        </section>
+
+        {/* ── Section: Totals ── */}
+        <section className="rounded-xl border border-gray-200 bg-white p-4">
+          <h4 className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Invoice Total</h4>
+          <div className="grid gap-4 sm:grid-cols-2 items-end">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Discount<input disabled={!editable} type="number" value={invoice.discount} onChange={(event) => onChange({ ...invoice, discount: Number(event.target.value) || 0 })} className={inputClass} placeholder="0" /></label>
+            <div className="rounded-lg bg-gradient-to-br from-blue-50 to-white p-4 text-sm font-bold text-gray-700 ring-1 ring-blue-100">
+              <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{currency(totals.subtotal)}</span></div>
+              <div className="mt-1.5 flex justify-between"><span className="text-gray-500">Tax</span><span>{currency(totals.tax)}</span></div>
+              <div className="mt-1.5 flex justify-between"><span className="text-gray-500">Discount</span><span>−{currency(invoice.discount)}</span></div>
+              <div className="mt-3 border-t border-blue-200 pt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Final Total</p>
+                <p className="mt-1 text-2xl font-bold text-blue-700">{currency(totals.finalTotal)}</p>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     );
   }
@@ -2362,33 +2405,30 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
               <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-gray-500 hover:bg-gray-100">×</button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
-              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-blue-700">Create from Won Proposal <span className="normal-case font-semibold text-blue-400">(recommended)</span></label>
+              <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Select Won Proposal <span className="normal-case font-semibold text-blue-400">(recommended)</span></h4>
                   {createForm.proposalReference && (
-                    <button type="button" onClick={() => { handlePrefillFromJob(""); setCreateForm(createBlankInvoice(invoices.length)); }} className="text-[10px] font-bold text-red-500 hover:text-red-700">Clear</button>
+                    <button type="button" onClick={() => { handlePrefillFromJob(""); setCreateForm(createBlankInvoice(invoices.length)); }} className="text-[10px] font-bold text-red-500 hover:text-red-700">Clear selection</button>
                   )}
                 </div>
-                {/* Search */}
                 <input
                   type="text"
                   value={proposalSearch}
                   onChange={(e) => setProposalSearch(e.target.value)}
                   placeholder="Search customer name..."
-                  className="mt-2 w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300"
+                  className="w-full rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
                 />
-                {/* Proposal Cards */}
-                <div className="mt-2 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
-                  {/* Direct invoice option */}
+                <div className="mt-2.5 max-h-44 overflow-y-auto rounded-lg border border-gray-200 bg-white">
                   <button
                     type="button"
                     onClick={() => { handlePrefillFromJob(""); setCreateForm(createBlankInvoice(invoices.length)); }}
-                    className={`w-full px-3 py-2.5 text-left transition hover:bg-gray-50 ${!createForm.proposalReference ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
+                    className={`w-full px-4 py-2.5 text-left border-b border-gray-100 transition hover:bg-gray-50 ${!createForm.proposalReference ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
                   >
-                    <p className="text-xs font-bold text-gray-600">— No proposal (direct invoice) —</p>
+                    <p className="text-xs font-semibold text-gray-500">— No proposal (direct invoice) —</p>
                   </button>
                   {wonProposals.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-xs text-gray-400">No won/signed proposals available</div>
+                    <div className="px-4 py-4 text-center text-xs text-gray-400">No won/signed proposals available</div>
                   ) : (
                     wonProposals
                       .filter((p) => !p.hasInvoice)
@@ -2407,24 +2447,23 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                             type="button"
                             key={proposal.id}
                             onClick={() => handlePrefillFromJob(`proposal:${proposal.id}`)}
-                            className={`w-full px-3 py-3 text-left transition hover:bg-blue-50/50 ${isSelected ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
+                            className={`w-full px-4 py-3 text-left border-b border-gray-50 transition hover:bg-blue-50/40 ${isSelected ? "bg-blue-50 ring-1 ring-inset ring-blue-200" : ""}`}
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-bold text-gray-800 truncate">{proposal.customerName}</p>
                               <span className="shrink-0 text-sm font-bold text-blue-700">${pkg.price.toLocaleString()}</span>
                             </div>
                             <div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-500">
                               {proposal.proposalNumber && <span>#{proposal.proposalNumber}</span>}
                               <span>{city}</span>
-                              <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">{proposal.status}</span>
+                              <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-bold text-green-700 ring-1 ring-green-200">{proposal.status}</span>
                             </div>
                           </button>
                         );
                       })
                   )}
-                  {/* Show already-invoiced at bottom, collapsed */}
                   {wonProposals.filter((p) => p.hasInvoice).length > 0 && (
-                    <div className="px-3 py-2 bg-gray-50">
+                    <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Already invoiced</p>
                       {wonProposals.filter((p) => p.hasInvoice).map((proposal) => (
                         <p key={proposal.id} className="mt-1 text-[11px] text-gray-400 truncate">✓ {proposal.customerName} — {proposal.proposalNumber ? `#${proposal.proposalNumber}` : proposal.status}</p>
@@ -2432,8 +2471,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="mt-4">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
+              </section>
+              <div className="mt-5">{renderInvoiceFields(createForm, true, setCreateForm)}</div>
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-200 p-4 sm:p-5">
               <button onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto rounded-lg border border-gray-200 px-5 py-2.5 font-bold text-gray-700 active:scale-95 transition order-2 sm:order-1">Cancel</button>
