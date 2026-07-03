@@ -314,10 +314,11 @@ export default function PhonePage() {
     // Build recording + summary map from call_recording events
     // A call can produce multiple call_recording events (processing → completed).
     // Prefer the most complete one (non-processing status, has summary, has url).
-    const recordingEvents = events.filter((e) => e.type === "call_recording" && e.callSid);
+    const recordingEvents = events.filter((e) => e.type === "call_recording");
     const recordingMap = new Map<string, { url?: string; summary?: string }>();
     for (const e of recordingEvents) {
-      const sid = e.callSid!;
+      const sid = e.callSid;
+      if (!sid) continue;
       const existing = recordingMap.get(sid);
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
       const url = e.recordingUrl || "";
@@ -326,6 +327,21 @@ export default function PhonePage() {
       if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
         recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary });
       }
+    }
+
+    // Fallback: build a phone+time index from recording events for calls whose
+    // callSid doesn't appear in the recordingMap (Twilio may use a child leg
+    // SID for the recording callback that differs from the parent call SID).
+    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string }>>();
+    for (const e of recordingEvents) {
+      const phone = e.direction === "inbound" ? (e.from || "") : (e.to || "");
+      const normalized = phone.replace(/\D/g, "").slice(-10);
+      if (!normalized) continue;
+      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
+      const url = e.recordingUrl || "";
+      if (!summary && !url) continue;
+      if (!recordingByPhone.has(normalized)) recordingByPhone.set(normalized, []);
+      recordingByPhone.get(normalized)!.push({ time: new Date(e.createdAt).getTime(), url, summary });
     }
 
     const records: CallRecord[] = [];
@@ -375,8 +391,37 @@ export default function PhonePage() {
         customerId: customer?.id,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
-        recordingUrl: recordingMap.get(event.callSid || "")?.url || undefined,
-        summary: recordingMap.get(event.callSid || "")?.summary || undefined,
+        recordingUrl: (() => {
+          const bySid = recordingMap.get(event.callSid || "");
+          if (bySid?.url) return bySid.url;
+          // Fallback: find recording by phone + closest time (within 10 min)
+          const normalized = phone.replace(/\D/g, "").slice(-10);
+          const candidates = recordingByPhone.get(normalized);
+          if (!candidates?.length) return bySid?.url;
+          const callTime = new Date(event.createdAt).getTime();
+          let best: typeof candidates[0] | undefined;
+          let bestDelta = Infinity;
+          for (const c of candidates) {
+            const delta = Math.abs(c.time - callTime);
+            if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
+          }
+          return best?.url || bySid?.url;
+        })() || undefined,
+        summary: (() => {
+          const bySid = recordingMap.get(event.callSid || "");
+          if (bySid?.summary) return bySid.summary;
+          const normalized = phone.replace(/\D/g, "").slice(-10);
+          const candidates = recordingByPhone.get(normalized);
+          if (!candidates?.length) return bySid?.summary;
+          const callTime = new Date(event.createdAt).getTime();
+          let best: typeof candidates[0] | undefined;
+          let bestDelta = Infinity;
+          for (const c of candidates) {
+            const delta = Math.abs(c.time - callTime);
+            if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
+          }
+          return best?.summary || bySid?.summary;
+        })() || undefined,
       });
     }
 
