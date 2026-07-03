@@ -665,9 +665,9 @@ export default function CalendarPage() {
   }
 
   function isEventVisible(event: CalendarEvent) {
-    // Team filter
+    // Team filter — when a specific member is selected, only show their events
     if (enabledTeam.size > 0 && enabledTeam.size < TEAM_MEMBERS.length) {
-      if (event.assigned_to && !enabledTeam.has(event.assigned_to)) return false;
+      if (!event.assigned_to || !enabledTeam.has(event.assigned_to)) return false;
     }
     // Item type filter (CRM jobs vs Google events)
     const isGcal = isGoogleEvent(event);
