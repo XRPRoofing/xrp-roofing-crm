@@ -200,7 +200,6 @@ function getColorConfig(colorId: string): ColorConfig {
 
 const TEAM_MEMBERS = [
   { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com", teamColor: "blue" as const },
-  { id: "adrian", name: "Adrian Murillo", email: "", teamColor: "orange" as const },
   { id: "darwin", name: "Darwin Rodas Garcia", email: "", teamColor: "green" as const },
   { id: "office", name: "Office", email: "info@xrproofing.com", teamColor: "purple" as const },
 ];
