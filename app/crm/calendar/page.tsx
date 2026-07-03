@@ -8,6 +8,7 @@ import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import {
   AlignLeft,
   Briefcase,
+  Calendar as CalendarIcon,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -216,7 +217,7 @@ function getTeamColor(memberId: string) {
   return member ? TEAM_COLOR_STYLES[member.teamColor] || TEAM_COLOR_STYLES.blue : null;
 }
 
-const JOB_KINDS = ["Repair", "Replacement", "Installation", "Maintenance", "Inspection", "Other"];
+const JOB_KINDS = ["Roof Inspection", "Repair", "Roof Replacement", "Maintenance", "Maintenance Inspection", "Emergency Repair", "Estimate", "Other"];
 const DEFAULT_TAGS = ["Urgent", "Follow-up", "VIP", "Insurance", "Commercial", "Residential"];
 
 /* ── Google Calendar helpers ────────────────────────────────────────────── */
@@ -1025,7 +1026,7 @@ export default function CalendarPage() {
     );
   }
 
-  /* ── Timeline View (Workiz-style: week strip + vertical time grid) ── */
+  /* ── Timeline View (daily schedule list with week strip) ──────────── */
 
   function renderTimelineView() {
     const ws = getWeekStart(currentDate);
@@ -1036,8 +1037,22 @@ export default function CalendarPage() {
     });
     const WDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const selectedKey = dateKeyFromDate(currentDate);
-    const cellH = 80;
-    const dayEvents = (eventsByDate[selectedKey] || []).filter(isEventVisible);
+    const dayEvents = (eventsByDate[selectedKey] || [])
+      .filter(isEventVisible)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+    const dayLabel = new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: ARIZONA_TIMEZONE,
+    }).format(currentDate);
+
+    function getAssignedName(id: string) {
+      const m = TEAM_MEMBERS.find((t) => t.id === id);
+      return m ? m.name.split(" ")[0] : "";
+    }
 
     return (
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -1059,39 +1074,62 @@ export default function CalendarPage() {
           })}
         </div>
 
-        {/* Vertical time grid */}
+        {/* Day label */}
+        <div className="border-b border-gray-100 bg-gray-50 px-3 py-2 sm:px-4">
+          <h3 className="text-xs font-bold text-gray-700 sm:text-sm">{dayLabel}</h3>
+          <p className="text-[10px] text-gray-400 sm:text-xs">{dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""} scheduled</p>
+        </div>
+
+        {/* Schedule list */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {HOURS.map((hour) => {
-            const hourEvts = dayEvents.filter((ev) => eventHour(ev) === hour);
-            return (
-              <div key={hour} className="flex border-b border-gray-100" style={{ minHeight: `${cellH}px` }}>
-                <div className="w-14 shrink-0 border-r border-gray-100 py-2 pr-2 text-right text-[10px] font-semibold text-gray-400 sm:w-16 sm:text-xs">
-                  {formatHour(hour)}
-                </div>
-                <div className="relative flex flex-1 gap-1 p-1">
-                  {hourEvts.map((ev) => {
-                    const span = Math.max(1, eventEndHour(ev) - eventHour(ev));
-                    const tc = getTeamColor(ev.assigned_to);
-                    const colorClass = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(ev.color).color;
-                    return (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => setSelectedEvent(ev)}
-                        className={`flex-1 overflow-hidden rounded border px-2 py-1 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${colorClass}`}
-                        style={{ minHeight: `${span * cellH - 8}px` }}
-                      >
-                        <div className="truncate font-bold">{ev.title}</div>
-                        <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
-                        {ev.customer_name && <div className="mt-0.5 truncate opacity-60">{ev.customer_name}</div>}
-                        {ev.location && <div className="mt-0.5 truncate text-[9px] opacity-50 sm:text-[10px]">{ev.location}</div>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+          {dayEvents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <CalendarIcon className="mb-2 h-10 w-10 opacity-40" />
+              <p className="text-sm font-medium">No events scheduled</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {dayEvents.map((ev) => {
+                const tc = getTeamColor(ev.assigned_to);
+                const dotColor = tc?.dot || "bg-gray-400";
+                const cardBg = tc ? `${tc.bg}` : "bg-white";
+                const cardBorder = tc ? tc.border : "border-gray-200";
+                const cardText = tc ? tc.text : "text-gray-700";
+                const assignedName = getAssignedName(ev.assigned_to);
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => setSelectedEvent(ev)}
+                    className={`flex w-full items-start gap-3 px-3 py-3 text-left transition hover:bg-gray-50 sm:px-4 sm:py-4`}
+                  >
+                    {/* Time column */}
+                    <div className="w-16 shrink-0 pt-0.5 sm:w-20">
+                      <div className="text-xs font-bold text-gray-900 sm:text-sm">{formatEventTime(ev)}</div>
+                      <div className="text-[10px] text-gray-400 sm:text-xs">{new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: ARIZONA_TIMEZONE }).format(new Date(ev.end_time))}</div>
+                    </div>
+                    {/* Color bar */}
+                    <div className={`mt-1 h-10 w-1 shrink-0 rounded-full ${dotColor} sm:h-12`} />
+                    {/* Event details */}
+                    <div className={`min-w-0 flex-1 rounded-lg border px-3 py-2 ${cardBg} ${cardBorder}`}>
+                      <div className={`truncate text-xs font-bold sm:text-sm ${cardText}`}>{ev.title || "Untitled"}</div>
+                      {ev.customer_name && <div className="mt-0.5 truncate text-[10px] text-gray-600 sm:text-xs">{ev.customer_name}</div>}
+                      {ev.location && <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-gray-400 sm:text-xs"><MapPin className="h-3 w-3 shrink-0" />{ev.location}</div>}
+                      <div className="mt-1 flex items-center gap-2">
+                        {assignedName && (
+                          <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${cardBg} ${cardText}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                            {assignedName}
+                          </span>
+                        )}
+                        {ev.job_kind && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 sm:text-xs">{ev.job_kind}</span>}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1532,38 +1570,29 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* Team Filter */}
+          {/* Team Filter (dropdown) */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "team" ? null : "team"); }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "team" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+            <select
+              value={enabledTeam.size === TEAM_MEMBERS.length ? "all" : Array.from(enabledTeam)[0] || "all"}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "all") {
+                  setEnabledTeam(new Set(TEAM_MEMBERS.map((m) => m.id)));
+                } else {
+                  setEnabledTeam(new Set([v]));
+                }
+              }}
+              className="shrink-0 appearance-none rounded-full bg-gray-700 px-3 py-1.5 pr-7 text-xs font-semibold text-white outline-none hover:bg-gray-600"
             >
-              Team {enabledTeam.size < TEAM_MEMBERS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledTeam.size}</span>} <ChevronDown className="h-3 w-3" />
-            </button>
-            {filterPopup === "team" && (
-              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-900">Team</h4>
-                  <button type="button" onClick={() => setEnabledTeam(new Set(TEAM_MEMBERS.map((m) => m.id)))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
-                </div>
-                <label className="flex cursor-pointer items-center gap-2.5 border-b border-gray-100 py-2.5">
-                  <input type="checkbox" checked={enabledTeam.size === 1 && enabledTeam.has("jonathan")} onChange={() => setEnabledTeam(new Set(["jonathan"]))} className="h-4 w-4 rounded border-gray-300" />
-                  <span className="text-sm font-medium text-gray-700">Just me</span>
-                </label>
-                {TEAM_MEMBERS.map((member) => (
-                  <label key={member.id} className="flex cursor-pointer items-center gap-2.5 py-2">
-                    <input type="checkbox" checked={enabledTeam.has(member.id)} onChange={() => toggleTeam(member.id)} className="h-4 w-4 rounded border-gray-300" />
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TEAM_COLOR_STYLES[member.teamColor]?.dot || "bg-gray-400"}`} />
-                    <span className="text-sm font-medium text-gray-700">{member.name}</span>
-                  </label>
-                ))}
-                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
-              </div>
-            )}
+              <option value="all">All Teams</option>
+              {TEAM_MEMBERS.map((member) => (
+                <option key={member.id} value={member.id}>{member.name.split(" ")[0]}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white" />
           </div>
 
-          {/* Type Filter (Job Kind) */}
+          {/* Type Filter (Job Kind) — slide-up on mobile, dropdown on desktop */}
           <div className="relative">
             <button
               type="button"
@@ -1572,10 +1601,11 @@ export default function CalendarPage() {
             >
               Type {enabledJobKinds.size < JOB_KINDS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledJobKinds.size}</span>} <ChevronDown className="h-3 w-3" />
             </button>
+            {/* Desktop dropdown */}
             {filterPopup === "type" && (
-              <div className="absolute left-0 top-full z-40 mt-2 w-56 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="absolute left-0 top-full z-40 mt-2 hidden w-56 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:block" onClick={(e) => e.stopPropagation()}>
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-900">Type</h4>
+                  <h4 className="text-sm font-bold text-gray-900">Job Type</h4>
                   <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
                 </div>
                 {JOB_KINDS.map((kind) => (
@@ -1585,6 +1615,32 @@ export default function CalendarPage() {
                   </label>
                 ))}
                 <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+              </div>
+            )}
+            {/* Mobile slide-up panel */}
+            {filterPopup === "type" && (
+              <div className="fixed inset-0 z-[60] sm:hidden" onClick={() => setFilterPopup(null)}>
+                <div className="absolute inset-0 bg-black/30" />
+                <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 pb-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                  <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="text-base font-bold text-gray-900">Job Type</h4>
+                    <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {JOB_KINDS.map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => toggleJobKind(kind)}
+                        className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition ${enabledJobKinds.has(kind) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600"}`}
+                      >
+                        {kind}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setFilterPopup(null)} className="mt-5 w-full rounded-lg bg-yellow-400 py-3 text-sm font-bold text-gray-900 hover:bg-yellow-500">Apply</button>
+                </div>
               </div>
             )}
           </div>
@@ -2544,11 +2600,11 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* Floating calendar FAB — opens create schedule */}
+      {/* Floating calendar FAB — opens create schedule, sits above bottom nav on mobile */}
       <button
         type="button"
         onClick={() => setNewScheduleOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-yellow-400 text-gray-900 shadow-lg transition hover:bg-yellow-500 hover:shadow-xl sm:bottom-8 sm:right-8"
+        className="fixed right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-400 text-gray-900 shadow-lg transition hover:bg-yellow-500 hover:shadow-xl sm:right-8 sm:h-14 sm:w-14 bottom-[76px] lg:bottom-8"
         aria-label="Create event"
       >
         <Plus className="h-7 w-7" />

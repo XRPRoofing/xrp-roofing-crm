@@ -1117,15 +1117,16 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             {mobileBottomNav.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/crm" && pathname.startsWith(item.href));
+              const isCalendar = item.href === "/crm/calendar";
+              const activeColor = isCalendar && active ? "text-orange-500" : active ? "text-blue-600" : "text-gray-500 hover:text-gray-700";
+              const iconColor = isCalendar && active ? "text-orange-500" : active ? "text-blue-600" : "text-gray-400";
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-xs font-medium transition-colors ${
-                    active ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                  }`}
+                  className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-xs font-medium transition-colors ${activeColor}`}
                 >
-                  <Icon className={`h-6 w-6 shrink-0 ${active ? "text-blue-600" : "text-gray-400"}`} />
+                  <Icon className={`h-6 w-6 shrink-0 ${iconColor}`} />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );
