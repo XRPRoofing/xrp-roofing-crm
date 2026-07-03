@@ -245,6 +245,15 @@ function syncCustomerFromJob(contact: { name: string; email?: string; phone?: st
 
 type DrawPath = { points: { x: number; y: number }[]; color: string; width: number };
 
+type PhotoMeta = { tags: string[]; note: string };
+type PhotoMetaMap = Record<string, PhotoMeta>;
+
+const PHOTO_TAGS = ["Damage", "Roof", "Gutter", "Flashing", "Skylight", "Chimney", "Vent", "Siding", "Interior", "Before", "After", "Repair", "Replace", "Leak", "Mold", "Structural"];
+
+const photoMetaStorageKey = "xrp-crm-photo-meta";
+function loadPhotoMeta(): PhotoMetaMap { try { return JSON.parse(localStorage.getItem(photoMetaStorageKey) || "{}"); } catch { return {}; } }
+function savePhotoMeta(meta: PhotoMetaMap) { localStorage.setItem(photoMetaStorageKey, JSON.stringify(meta)); }
+
 function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelete }: {
   photos: JobPhoto[];
   initialIndex: number;
@@ -262,13 +271,37 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  // Tags & Notes
+  const [metaMap, setMetaMap] = useState<PhotoMetaMap>(loadPhotoMeta);
+  const [showTagPanel, setShowTagPanel] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [showNoteInput, setShowNoteInput] = useState(false);
+
   const photo = photos[index];
   const hasPrev = index > 0;
   const hasNext = index < photos.length - 1;
 
+  const photoMeta = metaMap[photo.id] || { tags: [], note: "" };
   const drawColors = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#ffffff", "#000000"];
 
-  useEffect(() => { setPaths([]); setCurrentPath(null); setDrawMode(false); }, [index]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { setPaths([]); setCurrentPath(null); setDrawMode(false); setShowTagPanel(false); setShowNoteInput(false); setNoteText(metaMap[photos[index]?.id]?.note || ""); }, [index]); // eslint-disable-line react-hooks/set-state-in-effect
+
+  function toggleTag(tag: string) {
+    const current = metaMap[photo.id] || { tags: [], note: "" };
+    const has = current.tags.includes(tag);
+    const newTags = has ? current.tags.filter((t) => t !== tag) : [...current.tags, tag];
+    const updated = { ...metaMap, [photo.id]: { ...current, tags: newTags } };
+    setMetaMap(updated);
+    savePhotoMeta(updated);
+  }
+
+  function saveNote() {
+    const current = metaMap[photo.id] || { tags: [], note: "" };
+    const updated = { ...metaMap, [photo.id]: { ...current, note: noteText.trim() } };
+    setMetaMap(updated);
+    savePhotoMeta(updated);
+    setShowNoteInput(false);
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -403,6 +436,8 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={() => setDrawMode((v) => !v)} className={`rounded-lg p-2 transition ${drawMode ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100"}`} title="Draw / Annotate"><Pencil className="h-4 w-4" /></button>
+            <button type="button" onClick={() => { setShowTagPanel((v) => !v); setShowNoteInput(false); }} className={`rounded-lg p-2 transition ${showTagPanel ? "bg-amber-100 text-amber-700" : "text-gray-500 hover:bg-gray-100"}`} title="Tags"><Tag className="h-4 w-4" /></button>
+            <button type="button" onClick={() => { setShowNoteInput((v) => !v); setShowTagPanel(false); setNoteText(photoMeta.note); }} className={`rounded-lg p-2 transition ${showNoteInput ? "bg-purple-100 text-purple-700" : "text-gray-500 hover:bg-gray-100"}`} title="Note"><StickyNote className="h-4 w-4" /></button>
             <a href={photo.dataUrl} download={photo.name} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100" title="Download"><Download className="h-4 w-4" /></a>
             <button type="button" onClick={handleDelete} className="rounded-lg p-2 text-red-400 transition hover:bg-red-50 hover:text-red-600" title="Delete photo"><Trash2 className="h-4 w-4" /></button>
             <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"><X className="h-5 w-5" /></button>
@@ -421,6 +456,48 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
             <div className="mt-2 flex items-center gap-2">
               <button type="button" onClick={() => setPaths((prev) => prev.slice(0, -1))} disabled={paths.length === 0} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"><RotateCcw className="mr-1 inline h-3 w-3" />Undo</button>
               <button type="button" onClick={handleSave} disabled={paths.length === 0} className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-40 sm:flex-none"><Save className="mr-1 inline h-3 w-3" />Save annotated</button>
+            </div>
+          </div>
+        )}
+
+        {/* Tags panel */}
+        {showTagPanel && (
+          <div className="border-b border-gray-200 bg-amber-50 px-3 py-2 sm:px-4">
+            <p className="mb-1.5 text-[11px] font-bold text-amber-700">Photo Tags</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PHOTO_TAGS.map((tag) => {
+                const active = photoMeta.tags.includes(tag);
+                return (
+                  <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${active ? "bg-amber-500 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-amber-100"}`}>
+                    {tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Note input */}
+        {showNoteInput && (
+          <div className="border-b border-gray-200 bg-purple-50 px-3 py-2 sm:px-4">
+            <p className="mb-1.5 text-[11px] font-bold text-purple-700">Photo Note</p>
+            <div className="flex gap-2">
+              <input type="text" value={noteText} onChange={(e) => setNoteText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveNote(); }} placeholder="Add a note about this photo..." className="flex-1 rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs text-gray-700 outline-none focus:ring-2 focus:ring-purple-300" autoFocus />
+              <button type="button" onClick={saveNote} className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-purple-700">Save</button>
+            </div>
+          </div>
+        )}
+
+        {/* Tags & note display (below header, always visible when set) */}
+        {!showTagPanel && !showNoteInput && (photoMeta.tags.length > 0 || photoMeta.note) && (
+          <div className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 sm:px-4">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {photoMeta.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">{tag}</span>
+              ))}
+              {photoMeta.note && (
+                <span className="text-[11px] text-purple-600"><StickyNote className="mr-0.5 inline h-3 w-3" />{photoMeta.note}</span>
+              )}
             </div>
           </div>
         )}
