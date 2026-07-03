@@ -1360,22 +1360,17 @@ export default function ProposalsPage() {
     }
 
     // Save the proposal to Supabase so the status is persisted before the email
-    // is sent. Await the write and verify the response so a failure doesn't leave
-    // the status stuck on "Draft".
+    // is sent. Always call both share AND upsert to guarantee status "Sent" sticks.
     try {
-      const shareRes = await fetch("/api/proposals/share", {
+      await fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
       });
-      if (!shareRes.ok) {
-        await upsertProposalRecord(proposalForLink);
-      }
-    } catch {
-      try {
-        await upsertProposalRecord(proposalForLink);
-      } catch { /* sync effect will retry on next change */ }
-    }
+    } catch { /* fallback below */ }
+    try {
+      await upsertProposalRecord(proposalForLink);
+    } catch { /* sync effect will retry on next change */ }
 
     try {
       const response = await fetch("/api/proposals/send", {
@@ -1483,22 +1478,17 @@ export default function ProposalsPage() {
     }
 
     // Save the proposal to Supabase so the status is persisted before the SMS
-    // is sent. Await the write and verify the response so a failure doesn't leave
-    // the status stuck on "Draft".
+    // is sent. Always call both share AND upsert to guarantee status "Sent" sticks.
     try {
-      const shareRes = await fetch("/api/proposals/share", {
+      await fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(proposalForLink),
       });
-      if (!shareRes.ok) {
-        await upsertProposalRecord(proposalForLink);
-      }
-    } catch {
-      try {
-        await upsertProposalRecord(proposalForLink);
-      } catch { /* sync effect will retry on next change */ }
-    }
+    } catch { /* fallback below */ }
+    try {
+      await upsertProposalRecord(proposalForLink);
+    } catch { /* sync effect will retry on next change */ }
 
     // Build the SMS body: user's message + proposal link appended
     const smsBody = `${smsForm.message.trim()}\n\n${proposalLink}`;
