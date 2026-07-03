@@ -1772,6 +1772,27 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       actor: currentUserEmail || "Office",
       module: "Invoices",
     });
+
+    // Send payment receipt when fully paid (not check pending verification)
+    if (!(markPaidMethod === "Check" && markPaidCheckImage) && selectedInvoice.email) {
+      const totals = calculateTotals(updatedInvoice);
+      void fetch("/api/invoices/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: selectedInvoice.id,
+          customerEmail: selectedInvoice.email,
+          customerName: selectedInvoice.clientName || "",
+          invoiceNumber: selectedInvoice.invoiceNumber,
+          amount: totals.finalTotal,
+          method: markPaidMethod,
+          reference: payment.reference,
+          propertyAddress: selectedInvoice.propertyAddress || "",
+          lineItems: selectedInvoice.lineItems,
+          discount: selectedInvoice.discount,
+        }),
+      }).catch(() => {});
+    }
   }
 
   function handleMarkPaidFileUpload(e: React.ChangeEvent<HTMLInputElement>, type: "check" | "document") {
@@ -1833,6 +1854,26 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       });
     } catch {
       /* best-effort share sync */
+    }
+    // Send payment receipt to customer when invoice is fully paid
+    if (newStatus === "Paid" && selectedInvoice.email) {
+      const totals = calculateTotals(nextInvoice);
+      void fetch("/api/invoices/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceId: selectedInvoice.id,
+          customerEmail: selectedInvoice.email,
+          customerName: selectedInvoice.clientName || "",
+          invoiceNumber: selectedInvoice.invoiceNumber,
+          amount: totals.finalTotal,
+          method: pending.method,
+          reference: payment.reference,
+          propertyAddress: selectedInvoice.propertyAddress || "",
+          lineItems: selectedInvoice.lineItems,
+          discount: selectedInvoice.discount,
+        }),
+      }).catch(() => {});
     }
   }
 

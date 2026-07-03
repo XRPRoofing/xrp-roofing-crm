@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { sendInternalInvoiceEmail } from "@/lib/invoice-emails";
+import { sendPaymentReceiptEmail } from "@/lib/invoice-customer-emails";
 import { pushServerNotification } from "@/lib/server-notifications";
 
 // Stripe needs the raw request body for signature verification, so this route
@@ -27,8 +28,10 @@ type StoredInvoice = {
   status?: string;
   paidAt?: string;
   failedAt?: string;
-  lineItems?: { quantity: number; unitPrice: number; tax: number }[];
+  lineItems?: { description: string; quantity: number; unitPrice: number; tax: number }[];
   discount?: number;
+  propertyAddress?: string;
+  receiptSent?: boolean;
 };
 
 function getAdminClient() {
@@ -234,6 +237,35 @@ export async function POST(req: NextRequest) {
         actor: "Stripe",
         module: "Invoices",
       });
+    }
+
+    // Send payment receipt to customer (only once per invoice, only when fully paid)
+    if (status === "Paid" && !invoice.receiptSent && customerEmail) {
+      const receiptSent = await sendPaymentReceiptEmail({
+        customerEmail,
+        customerName,
+        invoiceNumber,
+        amount: paid,
+        method,
+        reference,
+        propertyAddress: invoice.propertyAddress,
+        lineItems: invoice.lineItems,
+        discount: invoice.discount,
+      });
+      if (receiptSent) {
+        // Mark receipt as sent to prevent duplicates
+        payload.receiptSent = true;
+        payload.activity = [`Receipt emailed to ${customerEmail}`, ...(payload.activity || [])];
+        await supabase
+          .from("invoice_shares")
+          .upsert({ id: invoiceId, payload, updated_at: new Date().toISOString() }, { onConflict: "id" });
+        await pushServerNotification({
+          title: "Receipt sent",
+          message: `Payment receipt emailed to ${customerName || "Customer"} (${customerEmail}) for ${invoiceNumber}`,
+          actor: "Invoices",
+          module: "Invoices",
+        });
+      }
     }
 
     return NextResponse.json({ ok: true });
