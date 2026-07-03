@@ -11,7 +11,6 @@ import {
   ExternalLink,
   Hash,
   ChevronDown,
-  ChevronRight,
   FileText,
   Headphones,
   MessageSquare,
@@ -861,7 +860,7 @@ export default function PhonePage() {
               </div>
             </div>
 
-            {/* ========== Mobile call cards (compact, expandable) ========== */}
+            {/* ========== Mobile call cards ========== */}
             <div className="divide-y divide-gray-100 lg:hidden">
               {paginatedCalls.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -870,115 +869,114 @@ export default function PhonePage() {
                   <p className="text-xs">Start making or receiving calls.</p>
                 </div>
               )}
-              {paginatedCalls.map((call) => {
-                const mobileExpanded = selectedCallId === call.id;
-                return (
-                  <div key={call.id} className="bg-white">
-                    {/* Compact row */}
-                    <div
-                      className={`flex items-center gap-3 px-4 py-2.5 active:bg-gray-50 ${mobileExpanded ? "bg-blue-50/50" : ""}`}
-                      onClick={() => setSelectedCallId(mobileExpanded ? null : call.id)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                        call.statusColor === "red" ? "bg-red-50" : "bg-gray-100"
-                      }`}>
-                        {call.statusColor === "red" ? (
-                          <PhoneMissed className="h-4 w-4 text-red-500" />
-                        ) : call.direction === "inbound" ? (
-                          <ArrowDownLeft className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <ArrowUpRight className="h-4 w-4 text-gray-500" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
-                          {call.recordingUrl && <Headphones className="h-3 w-3 shrink-0 text-blue-500" />}
-                          {call.summary && <FileText className="h-3 w-3 shrink-0 text-blue-500" />}
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                          <span>{call.status}</span>
-                          <span>·</span>
-                          <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{call.duration}</span>
-                          <span>·</span>
-                          <span>{call.dateTime}</span>
-                        </div>
-                      </div>
-                      <ChevronRight className={`h-4 w-4 shrink-0 text-gray-300 transition-transform ${mobileExpanded ? "rotate-90" : ""}`} />
+              {paginatedCalls.map((call) => (
+                <div key={call.id} className="bg-white px-4 py-3 active:bg-gray-50" onClick={() => setActionSheetCallId(actionSheetCallId === call.id ? null : call.id)} role="button" tabIndex={0}>
+                  <div className="flex items-start gap-3">
+                    {/* Direction icon */}
+                    <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                      call.statusColor === "red" ? "bg-red-50" : "bg-gray-100"
+                    }`}>
+                      {call.statusColor === "red" ? (
+                        <PhoneMissed className="h-5 w-5 text-red-500" />
+                      ) : call.direction === "inbound" ? (
+                        <ArrowDownLeft className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <ArrowUpRight className="h-5 w-5 text-gray-500" />
+                      )}
                     </div>
-                    {/* Expanded detail */}
-                    {mobileExpanded && (
-                      <div className="border-t border-blue-100 bg-blue-50/30 px-4 py-3">
-                        {/* Recording + Summary */}
-                        {(call.recordingUrl || call.summary) && (
-                          <div className="mb-3 space-y-2 rounded-lg bg-white p-2.5 ring-1 ring-blue-100">
-                            {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-8 w-full" preload="none" />}
-                            {call.summary && (
-                              <button
-                                type="button"
-                                onClick={() => { setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600"
-                              >
-                                <FileText className="h-3.5 w-3.5" />
-                                View AI Summary & Transcript
-                              </button>
-                            )}
-                          </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
+                        {call.tag === "Forwarded" && (
+                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-gray-100 text-gray-500">Fwd</span>
                         )}
-                        {/* Disposition */}
-                        <div className="mb-3">
-                          {call.disposition ? (
-                            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>{call.disposition}</span>
-                          ) : (
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {call.direction === "inbound" ? "Incoming Call" : "Outgoing Call"}
+                        {call.twilioLine ? ` · ${call.twilioLine}` : ""}
+                      </p>
+                      <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {call.duration}
+                        </span>
+                        <span>{call.dateTime}</span>
+                      </div>
+                      {call.disposition && (
+                        <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>
+                          {call.disposition}
+                        </span>
+                      )}
+                      {(call.recordingUrl || call.summary) && (
+                        <div className="mt-2 space-y-1 rounded-md bg-blue-50/60 px-2.5 py-2">
+                          {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />}
+                          {call.summary && (
                             <button
                               type="button"
-                              onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
-                              className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-semibold text-gray-400"
+                              onClick={() => { setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                             >
-                              + Tag
+                              <FileText className="h-3 w-3" />
+                              View AI Summary
                             </button>
-                          )}
-                          {showDispositionPicker === call.id && (
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              {LEAD_DISPOSITIONS.map((d) => (
-                                <button key={d} type="button" onClick={() => handleDisposition(call.phone, d)} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${getDispositionColor(d)} active:opacity-70`}>
-                                  {d}
-                                </button>
-                              ))}
-                            </div>
                           )}
                         </div>
-                        {/* Quick actions */}
-                        <div className="flex items-center gap-2">
-                          {call.phone && (
-                            <button type="button" onClick={() => handleCallBack(call.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50">
-                              <Phone className="h-3.5 w-3.5 text-gray-500" />
-                              Call
-                            </button>
-                          )}
-                          {call.phone && (
-                            <button type="button" onClick={() => openSmsPanel(call.phone, call.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50">
-                              <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
-                              Message
-                            </button>
-                          )}
-                          <button type="button" onClick={() => openJobPanel(call.phone, call.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50">
-                            <Briefcase className="h-3.5 w-3.5 text-gray-500" />
-                            Job
-                          </button>
-                          {call.customerId && (
-                            <a href={`/crm/customers?id=${call.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50">
-                              <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
+                    {/* Status indicator */}
+                    {call.statusColor === "red" && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
                   </div>
-                );
-              })}
+
+                  {/* Quick action buttons */}
+                  <div className="mt-2.5 flex items-center gap-2 pl-[52px]">
+                    {call.phone && (
+                      <button
+                        type="button"
+                        onClick={() => handleCallBack(call.phone)}
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
+                      >
+                        <Phone className="h-3.5 w-3.5 text-gray-500" />
+                        Call Back
+                      </button>
+                    )}
+                    {call.customerId && (
+                      <a
+                        href={`/crm/customers?id=${call.customerId}`}
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
+                        Customer
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
+                      className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
+                    >
+                      + Tag
+                    </button>
+                  </div>
+
+                  {/* Mobile disposition picker */}
+                  {showDispositionPicker === call.id && (
+                    <div className="mt-2 ml-[52px] flex flex-wrap gap-1.5">
+                      {LEAD_DISPOSITIONS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => handleDisposition(call.phone, d)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${getDispositionColor(d)} active:opacity-70`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
             {/* ========== Mobile Action Bottom Sheet ========== */}
@@ -1017,19 +1015,20 @@ export default function PhonePage() {
               );
             })()}
 
-            {/* ========== Desktop call history table (compact, expandable rows) ========== */}
-            <div className="hidden lg:block">
-              <table className="w-full">
+            {/* ========== Desktop call history table ========== */}
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[1100px]">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="w-8 py-2 pl-4" />
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">From</th>
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">To</th>
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Duration</th>
-                    <th className="px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Info</th>
-                    <th className="pr-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Actions</th>
+                    <th className="px-6 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">From</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">To</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Recording / Summary</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Duration</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Disposition</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Line</th>
+                    <th className="pr-6 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Quick Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -1038,205 +1037,152 @@ export default function PhonePage() {
                       <td colSpan={8} className="px-6 py-16 text-center">
                         <PhoneOff className="mx-auto h-10 w-10 text-gray-300" />
                         <p className="mt-2 text-sm font-semibold text-gray-400">No calls yet</p>
-                        <p className="text-xs text-gray-400">Your call history is empty.</p>
+                        <p className="text-xs text-gray-400">Your call history is empty. Start making or receiving calls.</p>
                       </td>
                     </tr>
                   )}
-                  {paginatedCalls.map((call) => {
-                    const isExpanded = selectedCallId === call.id;
-                    return (
-                      <tr key={call.id} className="group">
-                        <td colSpan={8} className="p-0">
-                          {/* Compact row */}
-                          <div
-                            onClick={() => setSelectedCallId(isExpanded ? null : call.id)}
-                            className={`flex cursor-pointer items-center gap-0 transition hover:bg-blue-50/50 ${isExpanded ? "bg-blue-50/60" : ""}`}
-                          >
-                            <div className="flex w-8 shrink-0 items-center justify-center pl-4">
-                              <ChevronRight className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                            </div>
-                            <div className="flex min-w-[90px] items-center gap-1.5 px-3 py-2.5">
-                              <StatusDot color={call.statusColor} />
-                              <span className="text-xs font-semibold text-gray-800">{call.status}</span>
-                            </div>
-                            <div className="flex min-w-[180px] flex-1 items-center gap-2 px-3 py-2.5">
-                              {call.statusColor === "red" ? (
-                                <PhoneMissed className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                              ) : call.direction === "inbound" ? (
-                                <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-green-500" />
-                              ) : (
-                                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                              )}
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-gray-900">{call.customerName}</p>
-                                <p className="truncate text-[11px] text-gray-400">{call.from ? formatPhoneDisplay(call.from) : "-"}</p>
-                              </div>
-                            </div>
-                            <div className="min-w-[120px] px-3 py-2.5">
-                              <p className="text-xs text-gray-600">{call.to ? formatPhoneDisplay(call.to) : "-"}</p>
-                            </div>
-                            <div className="min-w-[130px] px-3 py-2.5">
-                              <p className="text-xs text-gray-600">{call.dateTime}</p>
-                            </div>
-                            <div className="min-w-[70px] px-3 py-2.5">
-                              <div className="flex items-center gap-1 text-xs text-gray-600">
-                                <Clock className="h-3 w-3 text-gray-400" />
-                                {call.duration}
-                              </div>
-                            </div>
-                            <div className="flex min-w-[80px] items-center gap-1.5 px-3 py-2.5">
-                              {call.recordingUrl && <span title="Recording available"><Headphones className="h-3 w-3 text-blue-500" /></span>}
-                              {call.summary && <span title="AI Summary available"><FileText className="h-3 w-3 text-blue-500" /></span>}
-                              {call.disposition && (
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>
-                                  {call.disposition}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex shrink-0 items-center justify-end gap-1 pr-4 py-2.5">
-                              {call.phone && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); handleCallBack(call.phone); }}
-                                  title="Call Back"
-                                  className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                                >
-                                  <Phone className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {call.phone && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); openSmsPanel(call.phone, call.customerName); }}
-                                  title="Message"
-                                  className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                                >
-                                  <MessageSquare className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                              {call.customerId && (
-                                <a
-                                  href={`/crm/customers?id=${call.customerId}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  title="View Customer"
-                                  className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              )}
-                            </div>
+                  {paginatedCalls.map((call) => (
+                    <tr
+                      key={call.id}
+                      onClick={() => setSelectedCallId(selectedCallId === call.id ? null : call.id)}
+                      className={`cursor-pointer transition hover:bg-blue-50/50 ${selectedCallId === call.id ? "bg-blue-50/60" : ""}`}
+                    >
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2">
+                          <StatusDot color={call.statusColor} />
+                          <span className="text-sm font-semibold text-gray-800">{call.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          {call.statusColor === "red" ? (
+                            <PhoneMissed className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                          ) : call.direction === "inbound" ? (
+                            <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                          ) : (
+                            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-900">{call.customerName}</p>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openJobPanel(call.phone, call.customerName); }}
+                              className="block truncate text-xs text-gray-400 hover:text-blue-500 hover:underline"
+                            >
+                              {call.from ? formatPhoneDisplay(call.from) : "-"}
+                            </button>
                           </div>
-                          {/* Expanded detail panel (inline) */}
-                          {isExpanded && (
-                            <div className="border-t border-blue-100 bg-blue-50/40 px-6 py-3">
-                              <div className="flex flex-wrap items-start gap-5">
-                                {/* Recording + Summary */}
-                                {(call.recordingUrl || call.summary) && (
-                                  <div className="min-w-[260px] max-w-sm space-y-2">
-                                    {call.recordingUrl && (
-                                      <div>
-                                        <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500"><Headphones className="h-3 w-3" />Recording</p>
-                                        <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-8 w-full" preload="none" />
-                                      </div>
-                                    )}
-                                    {call.summary && (
-                                      <button
-                                        type="button"
-                                        onClick={() => { setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
-                                        className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-                                      >
-                                        <FileText className="h-3.5 w-3.5" />
-                                        View AI Summary & Transcript
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Details */}
-                                <div className="flex flex-wrap items-start gap-4">
-                                  <div>
-                                    <p className="text-[10px] font-bold uppercase text-gray-400">Direction</p>
-                                    <p className="text-xs font-semibold text-gray-800">{call.direction === "inbound" ? "Inbound" : "Outbound"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] font-bold uppercase text-gray-400">Line</p>
-                                    <p className="text-xs font-semibold text-gray-800">{call.twilioLine || "-"}</p>
-                                  </div>
-                                  {call.tag && (
-                                    <div>
-                                      <p className="text-[10px] font-bold uppercase text-gray-400">Tag</p>
-                                      <p className="text-xs font-semibold text-gray-800">{call.tag}</p>
-                                    </div>
-                                  )}
-                                </div>
-                                {/* Disposition */}
-                                <div>
-                                  <p className="text-[10px] font-bold uppercase text-gray-400">Disposition</p>
-                                  <div className="relative mt-0.5">
-                                    {call.disposition ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
-                                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}
-                                      >
-                                        {call.disposition}
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
-                                        className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-                                      >
-                                        + Tag
-                                      </button>
-                                    )}
-                                    {showDispositionPicker === call.id && (
-                                      <div className="absolute left-0 top-7 z-50 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
-                                        {LEAD_DISPOSITIONS.map((d) => (
-                                          <button
-                                            key={d}
-                                            type="button"
-                                            onClick={() => handleDisposition(call.phone, d)}
-                                            className="w-full px-3 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                                          >
-                                            {d}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                {/* Quick actions */}
-                                <div className="ml-auto flex items-center gap-2">
-                                  {call.phone && (
-                                    <button type="button" onClick={() => handleCallBack(call.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                                      <Phone className="h-3.5 w-3.5 text-gray-500" />
-                                      Call
-                                    </button>
-                                  )}
-                                  {call.phone && (
-                                    <button type="button" onClick={() => openSmsPanel(call.phone, call.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                                      <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
-                                      Message
-                                    </button>
-                                  )}
-                                  <button type="button" onClick={() => openJobPanel(call.phone, call.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                                    <Briefcase className="h-3.5 w-3.5 text-gray-500" />
-                                    New Job
-                                  </button>
-                                  {call.customerId && (
-                                    <a href={`/crm/customers?id=${call.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                                      <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
-                                      Customer
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="text-sm text-gray-600">{call.to ? formatPhoneDisplay(call.to) : "-"}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="text-sm text-gray-600">{call.dateTime}</p>
+                      </td>
+                      <td className="px-3 py-3 max-w-[280px]">
+                        {call.recordingUrl || call.summary ? (
+                          <div className="space-y-1">
+                            {call.recordingUrl && (
+                              <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />
+                            )}
+                            {call.summary && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setShowTranscript(false); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl, transcript: call.transcript }); }}
+                                className="flex items-center gap-1 text-left text-[11px] leading-4 text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                <FileText className="h-3 w-3 shrink-0" />
+                                <span className="line-clamp-1">View AI Summary</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Clock className="h-3 w-3 text-gray-400" />
+                          {call.duration}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="relative">
+                          {call.disposition ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id);
+                              }}
+                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}
+                            >
+                              {call.disposition}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id);
+                              }}
+                              className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                            >
+                              + Tag
+                            </button>
+                          )}
+                          {showDispositionPicker === call.id && (
+                            <div className="absolute left-0 top-7 z-50 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+                              {LEAD_DISPOSITIONS.map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDisposition(call.phone, d);
+                                  }}
+                                  className="w-full px-3 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                                >
+                                  {d}
+                                </button>
+                              ))}
                             </div>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <p className="text-xs text-gray-400">{call.twilioLine || "-"}</p>
+                      </td>
+                      <td className="pr-6 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {call.phone && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCallBack(call.phone);
+                              }}
+                              title="Call Back"
+                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {call.customerId && (
+                            <a
+                              href={`/crm/customers?id=${call.customerId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              title="View Customer"
+                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1251,6 +1197,66 @@ export default function PhonePage() {
                 >
                   Show more ({filteredCalls.length - perPage} remaining)
                 </button>
+              </div>
+            )}
+
+            {/* Desktop expanded call detail */}
+            {selectedCall && (
+              <div className="hidden border-t border-blue-200 bg-blue-50/30 px-6 py-4 lg:block">
+                <div className="flex flex-wrap items-start gap-6">
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Customer</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.customerName}</p>
+                    <p className="text-xs text-gray-500">{selectedCall.phone ? formatPhoneDisplay(selectedCall.phone) : "No number"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Direction</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.direction === "inbound" ? "Inbound" : "Outbound"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Status</p>
+                    <div className="flex items-center gap-1.5">
+                      <StatusDot color={selectedCall.statusColor} />
+                      <p className="text-sm font-semibold text-gray-900">{selectedCall.status}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Duration</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.duration}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Date / Time</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.dateTime}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-gray-400">Call SID</p>
+                    <p className="font-mono text-xs text-gray-500">{selectedCall.callSid || "-"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedCall.phone && (
+                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <Phone className="h-3.5 w-3.5 text-gray-500" />
+                        Call
+                      </button>
+                    )}
+                    {selectedCall.phone && (
+                      <button type="button" onClick={() => openSmsPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
+                        Message
+                      </button>
+                    )}
+                    <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                      <Briefcase className="h-3.5 w-3.5 text-gray-500" />
+                      New Job
+                    </button>
+                    {selectedCall.customerId && (
+                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
+                        Customer
+                      </a>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
