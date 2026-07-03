@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import { azNoon, azParts } from "@/lib/arizona-time";
@@ -629,6 +629,27 @@ export default function CalendarPage() {
   function goToDate(date: Date) {
     setCurrentDate(date);
     setSelectedDay(dateKeyFromDate(date));
+  }
+
+  /* ── Swipe navigation (mobile) ─────────────────────────────────────── */
+
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const swiping = useRef(false);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    swiping.current = true;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (!swiping.current) return;
+    swiping.current = false;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+    navigate(dx < 0 ? 1 : -1);
   }
 
   /* ── Filtering ──────────────────────────────────────────────────────── */
@@ -1609,11 +1630,13 @@ export default function CalendarPage() {
 
       {/* Main Layout */}
       <div className="mt-1 flex min-h-0 flex-1 gap-2 sm:mt-2 sm:gap-4">
-        {/* Calendar View */}
-        {viewMode === "timeline" && renderTimelineView()}
-        {viewMode === "month" && renderMonthView()}
-        {viewMode === "week" && renderWeekView()}
-        {viewMode === "day" && renderDayView()}
+        {/* Calendar View — swipe left/right to navigate on mobile */}
+        <div className="flex min-w-0 flex-1 flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          {viewMode === "timeline" && renderTimelineView()}
+          {viewMode === "month" && renderMonthView()}
+          {viewMode === "week" && renderWeekView()}
+          {viewMode === "day" && renderDayView()}
+        </div>
 
         {/* Sidebar */}
         <aside className="hidden w-64 shrink-0 space-y-4 lg:block">
