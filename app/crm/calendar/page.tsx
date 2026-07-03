@@ -1787,7 +1787,7 @@ export default function CalendarPage() {
             id="new-event"
             onSubmit={handleCreateEvent}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl"
           >
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
@@ -2715,7 +2715,7 @@ export default function CalendarPage() {
       <button
         type="button"
         onClick={() => setNewScheduleOpen(true)}
-        className="fixed right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-400 text-gray-900 shadow-lg transition hover:bg-yellow-500 hover:shadow-xl sm:right-8 sm:h-14 sm:w-14 bottom-[76px] lg:bottom-8"
+        className="fixed right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-400 text-gray-900 shadow-lg transition hover:bg-yellow-500 hover:shadow-xl sm:right-8 sm:h-14 sm:w-14 bottom-[140px] sm:bottom-[76px] lg:bottom-8"
         aria-label="Create event"
       >
         <Plus className="h-7 w-7" />
