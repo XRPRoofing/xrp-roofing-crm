@@ -28,7 +28,7 @@ import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type Cre
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
-import { listProjects, listProjectPhotos, matchProjectByAddress, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
+import { listProjects, listProjectPhotos, matchProjectByAddress, ensureProjectForJob, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
 
@@ -673,11 +673,12 @@ export default function LeadsPage() {
     listProjects().then(setCcProjects).catch(() => {});
   }, []);
 
-  // Match CompanyCam project when selected job changes
+  // Match CompanyCam project when selected job changes (match existing, don't auto-create yet)
   useEffect(() => {
     setCcPhotos([]);
     setCcMatchedProject(null);
-    if (!selectedJob || !selectedJob.address || ccProjects.length === 0) return;
+    if (!selectedJob || !selectedJob.address) return;
+    if (ccProjects.length === 0) return;
     const matched = matchProjectByAddress(selectedJob.address, ccProjects);
     if (matched) {
       setCcMatchedProject(matched);
@@ -685,6 +686,29 @@ export default function LeadsPage() {
       listProjectPhotos(matched.id).then(setCcPhotos).catch(() => {}).finally(() => setCcLoading(false));
     }
   }, [selectedJobId, ccProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Open CompanyCam: find existing project or auto-create one, then open in new tab
+  const openCompanyCam = async () => {
+    if (!selectedJob) return;
+    // Already matched — open directly
+    if (ccMatchedProject) {
+      window.open(ccMatchedProject.project_url, "_blank");
+      return;
+    }
+    // Ensure project exists (match or create)
+    setCcLoading(true);
+    const project = await ensureProjectForJob(
+      { address: selectedJob.address, city: selectedJob.city, name: selectedJob.name },
+      ccProjects
+    );
+    if (project) {
+      setCcMatchedProject(project);
+      setCcProjects((prev) => [...prev, project]);
+      listProjectPhotos(project.id).then(setCcPhotos).catch(() => {});
+      window.open(project.project_url, "_blank");
+    }
+    setCcLoading(false);
+  };
 
   // Subscribe to real-time crew activity updates
   useEffect(() => {
@@ -1720,10 +1744,9 @@ export default function LeadsPage() {
                 <div className="rounded-lg border border-gray-200 bg-white">
                   <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Camera className="h-3.5 w-3.5 text-blue-700" />
-                      <span className="text-xs font-bold text-blue-700">Job Photos</span>
-                      {ccMatchedProject && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-600">{ccMatchedProject.photo_count + jobFiles.length} total</span>}
-                      {!ccMatchedProject && jobFiles.length > 0 && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">{jobFiles.length}</span>}
+                      <Camera className="h-3.5 w-3.5 text-green-600" />
+                      <span className="text-xs font-bold text-green-700">Job Photos</span>
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-600">{(ccMatchedProject?.photo_count || 0) + jobFiles.length} photos</span>
                     </div>
                     {ccMatchedProject && (
                       <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-green-600 hover:text-green-800">
@@ -1733,25 +1756,14 @@ export default function LeadsPage() {
                   </div>
                   <div className="p-2.5">
                     <div className="grid grid-cols-2 gap-1.5">
-                      {ccMatchedProject ? (
-                        <a
-                          href={ccMatchedProject.project_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-green-700 active:scale-95"
-                        >
-                          <Camera className="h-3.5 w-3.5" /> Open CompanyCam
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={fileBusy}
-                          onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
-                          className={`flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
-                        >
-                          <Camera className="h-3.5 w-3.5" /> Camera
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        disabled={ccLoading}
+                        onClick={() => void openCompanyCam()}
+                        className={`flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-green-700 active:scale-95 ${ccLoading ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <Camera className="h-3.5 w-3.5" /> {ccLoading ? "Opening..." : "Camera"}
+                      </button>
                       <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
                         <UploadCloud className="h-3.5 w-3.5" /> Upload
                         <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
@@ -1795,7 +1807,7 @@ export default function LeadsPage() {
                       </>
                     )}
 
-                    {!ccMatchedProject && jobFiles.length === 0 && <p className="mt-2 text-[11px] text-gray-400">No photos yet. Tap Camera to start.</p>}
+                    {ccPhotos.length === 0 && jobFiles.length === 0 && !ccLoading && <p className="mt-2 text-[11px] text-gray-400">No photos yet. Tap Camera to open CompanyCam and start taking photos.</p>}
                     <p className="mt-1.5 text-[10px] font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                   </div>
                 </div>

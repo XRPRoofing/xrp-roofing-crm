@@ -68,3 +68,46 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
+
+/**
+ * POST /api/companycam
+ * body: { action: "create_project", name, address }
+ *   Creates a new CompanyCam project with the given name and address.
+ */
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const action = body.action;
+
+  if (action === "create_project") {
+    const token = getToken();
+    if (!token) return NextResponse.json({ error: "CompanyCam not configured" }, { status: 503 });
+
+    const projectBody: Record<string, unknown> = {
+      name: body.name || "Untitled Project",
+    };
+    if (body.address) {
+      projectBody.address = {
+        street_address_1: body.address.street || "",
+        city: body.address.city || "",
+        state: body.address.state || "",
+        postal_code: body.address.zip || "",
+        country: "US",
+      };
+    }
+
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(projectBody),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return NextResponse.json({ error: text || res.statusText }, { status: res.status });
+    }
+    const data = await res.json();
+    return NextResponse.json(data);
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}

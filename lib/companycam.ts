@@ -98,6 +98,55 @@ export async function searchProjects(query: string): Promise<CompanyCamProject[]
   }
 }
 
+/**
+ * Create a new CompanyCam project from CRM job data.
+ */
+export async function createProject(opts: {
+  name: string;
+  address?: { street: string; city: string; state: string; zip: string };
+}): Promise<CompanyCamProject | null> {
+  try {
+    const res = await fetch("/api/companycam", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create_project", name: opts.name, address: opts.address }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find an existing CompanyCam project for a job, or create one.
+ * Returns the project and its photos, or null if CompanyCam isn't configured.
+ */
+export async function ensureProjectForJob(job: {
+  address: string;
+  city?: string;
+  name: string;
+}, existingProjects: CompanyCamProject[]): Promise<CompanyCamProject | null> {
+  // Try matching by address first
+  if (job.address && existingProjects.length > 0) {
+    const matched = matchProjectByAddress(job.address, existingProjects);
+    if (matched) return matched;
+  }
+
+  // No match — create a new project
+  const projectName = `${job.name} — ${job.address}`;
+  const created = await createProject({
+    name: projectName,
+    address: {
+      street: job.address || "",
+      city: job.city || "",
+      state: "AZ",
+      zip: "",
+    },
+  });
+  return created;
+}
+
 // ── Address matching ─────────────────────────────────────────────────────────
 
 function normalizeAddress(addr: string): string {
