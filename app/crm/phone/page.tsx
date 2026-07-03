@@ -329,8 +329,8 @@ export default function PhonePage() {
       const url = e.recordingUrl || "";
       // Skip processing placeholders if we already have a completed one
       if (existing && e.status === "processing" && existing.summary) continue;
-      if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
-        recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary, transcript: transcript || existing?.transcript });
+      if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
+        recordingMap.set(sid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript });
       }
     }
 
@@ -366,8 +366,8 @@ export default function PhonePage() {
       const url = e.recordingUrl || "";
       const existing = recordingMap.get(customerSid);
       if (existing && e.status === "processing" && existing.summary) continue;
-      if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
-        recordingMap.set(customerSid, { url: url || existing?.url, summary: summary || existing?.summary, transcript: transcript || existing?.transcript });
+      if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
+        recordingMap.set(customerSid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript });
       }
     }
 
