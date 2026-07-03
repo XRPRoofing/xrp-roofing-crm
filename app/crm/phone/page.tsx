@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   BarChart3,
   Briefcase,
+  CalendarDays,
   Clock,
   ExternalLink,
+  Hash,
   Headphones,
   MessageSquare,
   Phone,
@@ -18,6 +20,8 @@ import {
   PhoneOutgoing,
   Search,
   ShieldBan,
+  User,
+  Users,
   Voicemail,
   X,
 } from "lucide-react";
@@ -26,7 +30,12 @@ import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib
 import { azDateTime } from "@/lib/arizona-time";
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import type { Customer } from "@/types/crm";
+import type { Customer, Lead } from "@/types/crm";
+import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
+import { syncJobToCalendar, toArizonaISO } from "@/lib/calendar-sync";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { createManualFolder } from "@/lib/manual-folders";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -220,6 +229,25 @@ export default function PhonePage() {
   const [perPage, setPerPage] = useState(25);
   const [actionSheetCallId, setActionSheetCallId] = useState<string | null>(null);
 
+  // Right-side New Job panel
+  const [jobPanelOpen, setJobPanelOpen] = useState(false);
+  const [jobPanelPhone, setJobPanelPhone] = useState("");
+  const [jobPanelName, setJobPanelName] = useState("");
+  const [jobForm, setJobForm] = useState({
+    name: "",
+    address: "",
+    phone: "",
+    source: "Phone Call",
+    description: "",
+    scheduleDate: "",
+    scheduleStartTime: "",
+    scheduleEndDate: "",
+    scheduleEndTime: "",
+    assignedTo: "",
+  });
+  const [jobCreating, setJobCreating] = useState(false);
+  const [jobCreated, setJobCreated] = useState(false);
+
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
   // Load data
@@ -397,6 +425,82 @@ export default function PhonePage() {
   const handleCallBack = useCallback((phone: string) => {
     window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone } }));
   }, []);
+
+  // Open right-side New Job panel
+  const openJobPanel = useCallback((phone: string, name?: string) => {
+    setJobPanelPhone(phone);
+    setJobPanelName(name || "");
+    setJobCreated(false);
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10);
+    const timeStr = today.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", timeZone: "America/Phoenix" });
+    setJobForm({
+      name: name || "",
+      address: "",
+      phone,
+      source: "Phone Call",
+      description: "",
+      scheduleDate: dateStr,
+      scheduleStartTime: timeStr,
+      scheduleEndDate: dateStr,
+      scheduleEndTime: `${String(Math.min(23, Number(timeStr.slice(0, 2)) + 1)).padStart(2, "0")}:${timeStr.slice(3)}`,
+      assignedTo: "",
+    });
+    setJobPanelOpen(true);
+  }, []);
+
+  // Create job from panel form
+  const handleCreateJob = useCallback(async () => {
+    if (!jobForm.name.trim()) return;
+    setJobCreating(true);
+    try {
+      const getCityFromAddr = (addr: string) => {
+        const parts = addr.split(",").map((p) => p.trim()).filter(Boolean);
+        return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
+      };
+      const newJob: Lead = {
+        id: `J-${Date.now()}`,
+        name: jobForm.name,
+        email: "",
+        phone: jobForm.phone,
+        address: jobForm.address || "Address pending",
+        city: getCityFromAddr(jobForm.address),
+        stage: "new_lead",
+        value: 0,
+        assignedTo: jobForm.assignedTo,
+        roofType: "Roofing",
+        source: jobForm.source || "Phone Call",
+        lastActivity: jobForm.description || "New job created",
+        nextAction: "Schedule inspection",
+      };
+      await upsertJobRecord(leadToJobRecord(newJob));
+      void createManualFolder({ name: `${newJob.name} - ${newJob.address}`.trim(), address: newJob.address, customerName: newJob.name, workType: "Roofing" }).catch(() => {});
+      void findOrCreateCustomer({ name: newJob.name, phone: newJob.phone, email: "", propertyAddress: newJob.address }).catch(() => {});
+      if (jobForm.scheduleDate) {
+        const startISO = toArizonaISO(jobForm.scheduleDate, jobForm.scheduleStartTime || undefined);
+        const endTime = jobForm.scheduleEndDate && jobForm.scheduleEndTime
+          ? toArizonaISO(jobForm.scheduleEndDate, jobForm.scheduleEndTime)
+          : new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
+        void syncJobToCalendar(newJob.id, {
+          title: `Roofing — ${newJob.name}`,
+          description: jobForm.description || `Roofing job for ${newJob.name}`,
+          start_time: startISO,
+          end_time: endTime,
+          all_day: !jobForm.scheduleStartTime,
+          location: newJob.address,
+          color: "#f97316",
+          assigned_to: jobForm.assignedTo,
+          customer_name: newJob.name,
+          customer_phone: newJob.phone,
+          job_kind: "Roofing",
+          created_by: "Office",
+        }).catch(() => {});
+      }
+      setJobCreated(true);
+      setTimeout(() => setJobPanelOpen(false), 1500);
+    } catch { /* */ }
+    setJobCreating(false);
+  }, [jobForm]);
 
   // Selected call detail
   const selectedCall = useMemo(() => {
@@ -754,7 +858,7 @@ export default function PhonePage() {
                           <span className="text-base font-semibold text-gray-700">Message {sheetCall.customerName}</span>
                         </button>
                       )}
-                      <button type="button" onClick={() => { setActionSheetCallId(null); window.dispatchEvent(new CustomEvent("crm:open-new-job", { detail: { phone: sheetCall.phone, name: sheetCall.customerName } })); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
+                      <button type="button" onClick={() => { setActionSheetCallId(null); openJobPanel(sheetCall.phone, sheetCall.customerName); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
                         <Briefcase className="h-5 w-5 text-blue-600" />
                         <span className="text-base font-semibold text-gray-700">New job</span>
                       </button>
@@ -964,7 +1068,7 @@ export default function PhonePage() {
                         Message
                       </button>
                     )}
-                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-new-job", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                    <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
                       <Briefcase className="h-3.5 w-3.5" />
                       New Job
                     </button>
@@ -1175,6 +1279,120 @@ export default function PhonePage() {
           </div>
         )}
       </div>
+
+      {/* ---- Right-side New Job Panel ---- */}
+      {jobPanelOpen && (
+        <>
+          <button type="button" className="fixed inset-0 z-40 bg-black/20" onClick={() => setJobPanelOpen(false)} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-blue-600 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <Briefcase className="h-5 w-5 text-white" />
+                <div>
+                  <h2 className="text-base font-bold text-white">New Job</h2>
+                  <p className="text-xs text-blue-100">{jobPanelName ? jobPanelName : "From call"} &middot; {jobPanelPhone ? formatPhoneDisplay(jobPanelPhone) : ""}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setJobPanelOpen(false)} className="rounded-lg p-1.5 text-white/70 hover:bg-blue-700 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Success */}
+            {jobCreated ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <Briefcase className="h-7 w-7 text-green-600" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">Job Created</p>
+                <p className="text-sm text-gray-500">Added to dashboard and calendar.</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><User className="h-3.5 w-3.5" /> Customer Name</label>
+                  <input type="text" value={jobForm.name} onChange={(e) => setJobForm((p) => ({ ...p, name: e.target.value }))} placeholder="Enter customer name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Hash className="h-3.5 w-3.5" /> Address</label>
+                  <AddressAutocomplete value={jobForm.address} onChange={(val) => setJobForm((p) => ({ ...p, address: val }))} placeholder="Search address..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Phone className="h-3.5 w-3.5" /> Phone</label>
+                  <input type="tel" value={jobForm.phone} onChange={(e) => setJobForm((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm" readOnly />
+                </div>
+
+                {/* Ad Source */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><BarChart3 className="h-3.5 w-3.5" /> Ad Source</label>
+                  <select value={jobForm.source} onChange={(e) => setJobForm((p) => ({ ...p, source: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option>Phone Call</option>
+                    <option>Google</option>
+                    <option>Yelp</option>
+                    <option>Referral</option>
+                    <option>Social Media</option>
+                    <option>Home Advisor</option>
+                    <option>Angi</option>
+                    <option>Door Knock</option>
+                    <option>Storm Chase</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><MessageSquare className="h-3.5 w-3.5" /> Job Description</label>
+                  <textarea value={jobForm.description} onChange={(e) => setJobForm((p) => ({ ...p, description: e.target.value }))} placeholder="Describe the job..." rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+
+                {/* Schedule */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-gray-700"><CalendarDays className="h-3.5 w-3.5" /> Schedule</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-0.5 text-[11px] font-semibold text-gray-500">Start Date</label>
+                      <input type="date" value={jobForm.scheduleDate} onChange={(e) => setJobForm((p) => ({ ...p, scheduleDate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="mb-0.5 text-[11px] font-semibold text-gray-500">Start Time</label>
+                      <input type="time" value={jobForm.scheduleStartTime} onChange={(e) => setJobForm((p) => ({ ...p, scheduleStartTime: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="mb-0.5 text-[11px] font-semibold text-gray-500">End Date</label>
+                      <input type="date" value={jobForm.scheduleEndDate} onChange={(e) => setJobForm((p) => ({ ...p, scheduleEndDate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="mb-0.5 text-[11px] font-semibold text-gray-500">End Time</label>
+                      <input type="time" value={jobForm.scheduleEndTime} onChange={(e) => setJobForm((p) => ({ ...p, scheduleEndTime: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assigned To */}
+                <div>
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Users className="h-3.5 w-3.5" /> Assign Team Members</label>
+                  <input type="text" value={jobForm.assignedTo} onChange={(e) => setJobForm((p) => ({ ...p, assignedTo: e.target.value }))} placeholder="e.g. Oscar, Team A" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            {!jobCreated && (
+              <div className="border-t border-gray-200 px-5 py-4">
+                <button type="button" onClick={handleCreateJob} disabled={jobCreating || !jobForm.name.trim()} className="w-full rounded-lg bg-yellow-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-yellow-600 disabled:opacity-50">
+                  {jobCreating ? "Creating..." : "Create Job"}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
