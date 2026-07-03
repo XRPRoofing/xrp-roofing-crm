@@ -1004,121 +1004,73 @@ export default function CalendarPage() {
     );
   }
 
-  /* ── Timeline View (team members as rows, hours as columns) ──────── */
+  /* ── Timeline View (Workiz-style: week strip + vertical time grid) ── */
 
   function renderTimelineView() {
-    const key = dateKeyFromDate(currentDate);
-    const visibleHours = HOURS.filter((h) => h >= 6 && h <= 20);
-    const cellW = 100;
+    const ws = getWeekStart(currentDate);
+    const weekStripDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(ws);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+    const WDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const selectedKey = dateKeyFromDate(currentDate);
+    const cellH = 80;
+    const dayEvents = (eventsByDate[selectedKey] || []).filter(isEventVisible);
 
     return (
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
-        {/* Timeline header row — hours */}
-        <div className="flex shrink-0 border-b border-gray-200 bg-gray-50">
-          <div className="w-24 shrink-0 border-r border-gray-200 px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 sm:w-36 sm:px-3 sm:text-xs">
-            Team
-          </div>
-          <div className="flex-1 overflow-x-auto scrollbar-hide">
-            <div className="flex" style={{ width: `${visibleHours.length * cellW}px` }}>
-              {visibleHours.map((h) => (
-                <div key={h} className="shrink-0 border-r border-gray-100 px-1 py-2 text-center text-[10px] font-semibold text-gray-500 sm:text-xs" style={{ width: `${cellW}px` }}>
-                  {formatHour(h)}
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Week strip */}
+        <div className="flex items-center justify-around border-b border-gray-200 bg-white px-1 py-2 sm:px-4">
+          {weekStripDays.map((d) => {
+            const p = azParts(d);
+            const k = dateKeyFromDate(d);
+            const isSel = k === selectedKey;
+            const isTd = k === todayKey;
+            const hasEvts = Boolean(eventsByDate[k]?.length);
+            return (
+              <button key={k} type="button" onClick={() => setCurrentDate(d)} className="flex flex-col items-center gap-0.5">
+                <span className={`text-[10px] font-semibold sm:text-xs ${isSel ? "text-green-600" : "text-gray-400"}`}>{WDAY_SHORT[p.dow]}</span>
+                <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold sm:h-8 sm:w-8 sm:text-sm ${isSel || isTd ? "bg-green-500 text-white" : "text-gray-700 hover:bg-gray-100"}`}>{p.day}</span>
+                {hasEvts && <span className={`h-1 w-1 rounded-full ${isSel ? "bg-green-400" : "bg-gray-300"}`} />}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Team member rows */}
+        {/* Vertical time grid */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {TEAM_MEMBERS.filter((m) => enabledTeam.has(m.id)).map((member) => {
-            const memberEvents = (eventsByDate[key] || [])
-              .filter(isEventVisible)
-              .filter((ev) => ev.assigned_to === member.id);
-
+          {HOURS.map((hour) => {
+            const hourEvts = dayEvents.filter((ev) => eventHour(ev) === hour);
             return (
-              <div key={member.id} className="flex border-b border-gray-100">
-                <div className="flex w-24 shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TEAM_COLOR_STYLES[member.teamColor]?.dot || "bg-gray-400"}`} />
-                  <div className="min-w-0">
-                    <div className="truncate text-[11px] font-bold text-gray-800 sm:text-sm">{member.name.split(" ")[0]}</div>
-                    <div className="hidden truncate text-[10px] text-gray-400 sm:block">{member.name.split(" ").slice(1).join(" ")}</div>
-                  </div>
+              <div key={hour} className="flex border-b border-gray-100" style={{ minHeight: `${cellH}px` }}>
+                <div className="w-14 shrink-0 border-r border-gray-100 py-2 pr-2 text-right text-[10px] font-semibold text-gray-400 sm:w-16 sm:text-xs">
+                  {formatHour(hour)}
                 </div>
-                <div className="relative flex-1 overflow-x-auto scrollbar-hide">
-                  <div className="relative" style={{ width: `${visibleHours.length * cellW}px`, minHeight: "56px" }}>
-                    {visibleHours.map((h) => (
-                      <div key={h} className="absolute top-0 h-full border-r border-gray-50" style={{ left: `${(h - 6) * cellW}px`, width: `${cellW}px` }} />
-                    ))}
-                    {memberEvents.map((ev) => {
-                      const startH = eventHour(ev);
-                      const endH = eventEndHour(ev);
-                      const left = Math.max(0, startH - 6) * cellW;
-                      const width = Math.max(1, endH - startH) * cellW;
-                      const tc = TEAM_COLOR_STYLES[member.teamColor];
-                      const colorClass = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(ev.color).color;
-                      return (
-                        <button
-                          key={ev.id}
-                          type="button"
-                          onClick={() => setSelectedEvent(ev)}
-                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${colorClass}`}
-                          style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
-                          title={`${ev.title} ${formatEventTimeRange(ev)}`}
-                        >
-                          <div className="truncate">{ev.title}</div>
-                          <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="relative flex flex-1 gap-1 p-1">
+                  {hourEvts.map((ev) => {
+                    const span = Math.max(1, eventEndHour(ev) - eventHour(ev));
+                    const tc = getTeamColor(ev.assigned_to);
+                    const colorClass = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(ev.color).color;
+                    return (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() => setSelectedEvent(ev)}
+                        className={`flex-1 overflow-hidden rounded border px-2 py-1 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${colorClass}`}
+                        style={{ minHeight: `${span * cellH - 8}px` }}
+                      >
+                        <div className="truncate font-bold">{ev.title}</div>
+                        <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
+                        {ev.customer_name && <div className="mt-0.5 truncate opacity-60">{ev.customer_name}</div>}
+                        {ev.location && <div className="mt-0.5 truncate text-[9px] opacity-50 sm:text-[10px]">{ev.location}</div>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
-
-          {/* Unassigned events row */}
-          {(() => {
-            const unassigned = (eventsByDate[key] || [])
-              .filter(isEventVisible)
-              .filter((ev) => !ev.assigned_to || !TEAM_MEMBERS.some((m) => m.id === ev.assigned_to));
-            if (unassigned.length === 0) return null;
-            return (
-              <div className="flex border-b border-gray-100">
-                <div className="flex w-24 shrink-0 items-center border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
-                  <span className="text-[11px] font-semibold italic text-gray-400 sm:text-xs">Unassigned</span>
-                </div>
-                <div className="relative flex-1 overflow-x-auto scrollbar-hide">
-                  <div className="relative" style={{ width: `${visibleHours.length * cellW}px`, minHeight: "56px" }}>
-                    {visibleHours.map((h) => (
-                      <div key={h} className="absolute top-0 h-full border-r border-gray-50" style={{ left: `${(h - 6) * cellW}px`, width: `${cellW}px` }} />
-                    ))}
-                    {unassigned.map((ev) => {
-                      const startH = eventHour(ev);
-                      const endH = eventEndHour(ev);
-                      const left = Math.max(0, startH - 6) * cellW;
-                      const width = Math.max(1, endH - startH) * cellW;
-                      const utc = getTeamColor(ev.assigned_to);
-                      const uColor = utc ? `${utc.bg} ${utc.text} ${utc.border}` : getColorConfig(ev.color).color;
-                      return (
-                        <button
-                          key={ev.id}
-                          type="button"
-                          onClick={() => setSelectedEvent(ev)}
-                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${uColor}`}
-                          style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
-                          title={`${ev.title} ${formatEventTimeRange(ev)}`}
-                        >
-                          <div className="truncate">{ev.title}</div>
-                          <div className="truncate opacity-70">{formatEventTimeRange(ev)}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
     );
@@ -2568,6 +2520,16 @@ export default function CalendarPage() {
           onClose={() => setSmsTarget(null)}
         />
       )}
+
+      {/* Floating calendar FAB — opens create schedule */}
+      <button
+        type="button"
+        onClick={() => setNewScheduleOpen(true)}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-yellow-400 text-gray-900 shadow-lg transition hover:bg-yellow-500 hover:shadow-xl sm:bottom-8 sm:right-8"
+        aria-label="Create event"
+      >
+        <Plus className="h-7 w-7" />
+      </button>
 
       {/* Phone Number Picker for Click-to-Call */}
       {callPickerEvent && (

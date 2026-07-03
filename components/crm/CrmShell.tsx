@@ -738,7 +738,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   useEffect(() => { void loadCustomerRecords(); }, []);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
-  const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations";
+  const showTeamChatFloatingButton = pathname !== "/crm/team-chat" && pathname !== "/crm/conversations" && pathname !== "/crm/calendar";
 
   const mobileBottomNav = isCrewUser ? [] : [
     { href: "/crm", label: "Home", icon: LayoutDashboard },
