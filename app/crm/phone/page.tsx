@@ -25,7 +25,7 @@ import {
   Voicemail,
   X,
 } from "lucide-react";
-import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { listConversationEvents, subscribeToConversationEvents, sendSms } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
 import { azDateTime } from "@/lib/arizona-time";
 import { getTwilioLines } from "@/lib/twilio/numbers";
@@ -247,6 +247,14 @@ export default function PhonePage() {
   });
   const [jobCreating, setJobCreating] = useState(false);
   const [jobCreated, setJobCreated] = useState(false);
+
+  // Right-side Message panel
+  const [smsPanelOpen, setSmsPanelOpen] = useState(false);
+  const [smsPanelPhone, setSmsPanelPhone] = useState("");
+  const [smsPanelName, setSmsPanelName] = useState("");
+  const [smsBody, setSmsBody] = useState("");
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
 
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
@@ -501,6 +509,29 @@ export default function PhonePage() {
     } catch { /* */ }
     setJobCreating(false);
   }, [jobForm]);
+
+  // Open right-side Message panel
+  const openSmsPanel = useCallback((phone: string, name?: string) => {
+    setSmsPanelPhone(phone);
+    setSmsPanelName(name || "");
+    setSmsBody("");
+    setSmsSent(false);
+    setSmsPanelOpen(true);
+  }, []);
+
+  // Send SMS from panel
+  const handleSendSms = useCallback(async () => {
+    if (!smsBody.trim() || !smsPanelPhone) return;
+    setSmsSending(true);
+    try {
+      const lines = getTwilioLines();
+      const fromNumber = lines[0]?.number || "";
+      await sendSms({ to: smsPanelPhone, body: smsBody, from: fromNumber });
+      setSmsSent(true);
+      setTimeout(() => setSmsPanelOpen(false), 1500);
+    } catch { /* */ }
+    setSmsSending(false);
+  }, [smsBody, smsPanelPhone]);
 
   // Selected call detail
   const selectedCall = useMemo(() => {
@@ -853,7 +884,7 @@ export default function PhonePage() {
                         </button>
                       )}
                       {sheetCall.phone && (
-                        <button type="button" onClick={() => { setActionSheetCallId(null); window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: sheetCall.phone, name: sheetCall.customerName } })); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
+                        <button type="button" onClick={() => { setActionSheetCallId(null); openSmsPanel(sheetCall.phone, sheetCall.customerName); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
                           <MessageSquare className="h-5 w-5 text-gray-500" />
                           <span className="text-base font-semibold text-gray-700">Message {sheetCall.customerName}</span>
                         </button>
@@ -1071,7 +1102,7 @@ export default function PhonePage() {
                       </button>
                     )}
                     {selectedCall.phone && (
-                      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                      <button type="button" onClick={() => openSmsPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
                         <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
                         Message
                       </button>
@@ -1395,6 +1426,73 @@ export default function PhonePage() {
               <div className="border-t border-gray-200 px-5 py-4">
                 <button type="button" onClick={handleCreateJob} disabled={jobCreating || !jobForm.name.trim()} className="w-full rounded-lg bg-yellow-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-yellow-600 disabled:opacity-50">
                   {jobCreating ? "Creating..." : "Create Job"}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ---- Right-side Message Panel ---- */}
+      {smsPanelOpen && (
+        <>
+          <button type="button" className="fixed inset-0 z-40 bg-black/20" onClick={() => setSmsPanelOpen(false)} />
+          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-800 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="h-5 w-5 text-white" />
+                <div>
+                  <h2 className="text-base font-bold text-white">Message</h2>
+                  <p className="text-xs text-gray-300">{smsPanelName ? smsPanelName : "Send SMS"} &middot; {smsPanelPhone ? formatPhoneDisplay(smsPanelPhone) : ""}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setSmsPanelOpen(false)} className="rounded-lg p-1.5 text-white/70 hover:bg-gray-700 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Success */}
+            {smsSent ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <MessageSquare className="h-7 w-7 text-green-600" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">Message Sent</p>
+                <p className="text-sm text-gray-500">SMS delivered to {smsPanelName || formatPhoneDisplay(smsPanelPhone)}</p>
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col px-5 py-4">
+                {/* To */}
+                <div className="mb-4">
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Phone className="h-3.5 w-3.5" /> To</label>
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2">
+                    <span className="text-sm font-semibold text-gray-700">{smsPanelName || "Unknown"}</span>
+                    <span className="text-sm text-gray-400">{formatPhoneDisplay(smsPanelPhone)}</span>
+                  </div>
+                </div>
+
+                {/* Message body */}
+                <div className="flex-1">
+                  <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600"><MessageSquare className="h-3.5 w-3.5" /> Message</label>
+                  <textarea
+                    value={smsBody}
+                    onChange={(e) => setSmsBody(e.target.value)}
+                    placeholder="Type your message..."
+                    rows={6}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  <p className="mt-1 text-right text-[11px] text-gray-400">{smsBody.length} characters</p>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            {!smsSent && (
+              <div className="border-t border-gray-200 px-5 py-4">
+                <button type="button" onClick={handleSendSms} disabled={smsSending || !smsBody.trim()} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50">
+                  {smsSending ? "Sending..." : "Send Message"}
                 </button>
               </div>
             )}
