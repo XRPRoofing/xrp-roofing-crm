@@ -10,9 +10,12 @@ import {
   Clock,
   ExternalLink,
   Hash,
+  FileText,
   Headphones,
   MessageSquare,
+  Mic,
   Phone,
+  Play,
   PhoneCall,
   PhoneIncoming,
   PhoneMissed,
@@ -258,6 +261,9 @@ export default function PhonePage() {
   const [smsSending, setSmsSending] = useState(false);
   const [smsSent, setSmsSent] = useState(false);
 
+  // Expanded summary modal
+  const [expandedSummary, setExpandedSummary] = useState<{ name: string; summary: string; recordingUrl?: string } | null>(null);
+
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
   // Load data
@@ -306,6 +312,8 @@ export default function PhonePage() {
     }
 
     // Build recording + summary map from call_recording events
+    // A call can produce multiple call_recording events (processing → completed).
+    // Prefer the most complete one (non-processing status, has summary, has url).
     const recordingEvents = events.filter((e) => e.type === "call_recording" && e.callSid);
     const recordingMap = new Map<string, { url?: string; summary?: string }>();
     for (const e of recordingEvents) {
@@ -313,7 +321,9 @@ export default function PhonePage() {
       const existing = recordingMap.get(sid);
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
       const url = e.recordingUrl || "";
-      if (!existing || (summary && !existing.summary) || (url && !existing.url)) {
+      // Skip processing placeholders if we already have a completed one
+      if (existing && e.status === "processing" && existing.summary) continue;
+      if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
         recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary });
       }
     }
@@ -828,7 +838,16 @@ export default function PhonePage() {
                       {(call.recordingUrl || call.summary) && (
                         <div className="mt-2 space-y-1 rounded-md bg-blue-50/60 px-2.5 py-2">
                           {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />}
-                          {call.summary && <p className="line-clamp-3 text-[11px] leading-4 text-gray-600">{call.summary}</p>}
+                          {call.summary && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl })}
+                              className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              <FileText className="h-3 w-3" />
+                              View AI Summary
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -987,11 +1006,22 @@ export default function PhonePage() {
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.dateTime}</p>
                       </td>
-                      <td className="px-3 py-3 max-w-[260px]">
+                      <td className="px-3 py-3 max-w-[280px]">
                         {call.recordingUrl || call.summary ? (
                           <div className="space-y-1">
-                            {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[200px]" preload="none" />}
-                            {call.summary && <p className="line-clamp-2 text-[11px] leading-4 text-gray-500">{call.summary}</p>}
+                            {call.recordingUrl && (
+                              <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />
+                            )}
+                            {call.summary && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setExpandedSummary({ name: call.customerName, summary: call.summary!, recordingUrl: call.recordingUrl }); }}
+                                className="flex items-center gap-1 text-left text-[11px] leading-4 text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                <FileText className="h-3 w-3 shrink-0" />
+                                <span className="line-clamp-1">View AI Summary</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-[11px] text-gray-300">—</span>
@@ -1530,6 +1560,41 @@ export default function PhonePage() {
                 </button>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* ========== Expanded AI Summary Modal ========== */}
+      {expandedSummary && (
+        <>
+          <div className="fixed inset-0 z-[90] bg-black/40" onClick={() => setExpandedSummary(null)} />
+          <div className="fixed inset-x-4 top-[10%] z-[91] mx-auto max-w-lg rounded-xl border border-gray-200 bg-white shadow-2xl sm:inset-x-auto sm:w-full">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">AI Call Summary</h3>
+                  <p className="text-xs text-gray-500">{expandedSummary.name}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setExpandedSummary(null)} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+              {expandedSummary.recordingUrl && (
+                <div className="mb-4">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500"><Mic className="h-3 w-3" />Recording</p>
+                  <audio controls src={proxyRecordingUrl(expandedSummary.recordingUrl)} className="w-full" preload="none" />
+                </div>
+              )}
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500"><FileText className="h-3 w-3" />Summary</p>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{expandedSummary.summary}</p>
+              </div>
+            </div>
           </div>
         </>
       )}
