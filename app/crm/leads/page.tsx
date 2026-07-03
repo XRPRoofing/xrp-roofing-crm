@@ -475,11 +475,9 @@ export default function LeadsPage() {
   const [ccProjects, setCcProjects] = useState<CompanyCamProject[]>([]);
   const [ccPhotos, setCcPhotos] = useState<CompanyCamPhoto[]>([]);
   const [ccMatchedProject, setCcMatchedProject] = useState<CompanyCamProject | null>(null);
-  const [ccOpen, setCcOpen] = useState(false);
   const [ccLoading, setCcLoading] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
-  const [photoTab, setPhotoTab] = useState<"Before" | "Progress" | "After" | "General">("Before");
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const pendingUpdatesRef = useRef<Record<string, Partial<Lead>>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -532,10 +530,7 @@ export default function LeadsPage() {
   ];
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
-  const beforePhotos = jobFiles.filter((f) => f.photoType === "Before");
-  const progressPhotos = jobFiles.filter((f) => f.photoType === "Progress");
-  const afterPhotos = jobFiles.filter((f) => f.photoType === "After");
-  const otherPhotos = jobFiles.filter((f) => f.photoType === "Job Photo");
+
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 
   const jobCardHashRef = useRef(false);
@@ -682,7 +677,6 @@ export default function LeadsPage() {
   useEffect(() => {
     setCcPhotos([]);
     setCcMatchedProject(null);
-    setCcOpen(false);
     if (!selectedJob || !selectedJob.address || ccProjects.length === 0) return;
     const matched = matchProjectByAddress(selectedJob.address, ccProjects);
     if (matched) {
@@ -1722,130 +1716,89 @@ export default function LeadsPage() {
                   )}
                 </div>
 
-                {/* Job Photos — Tabbed */}
+                {/* Job Photos — CompanyCam primary */}
                 <div className="rounded-lg border border-gray-200 bg-white">
-                  <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
-                    <Camera className="h-3.5 w-3.5 text-blue-700" />
-                    <span className="text-xs font-bold text-blue-700">Job Photos</span>
-                  </div>
-                  <div className="flex border-b border-gray-100">
-                    {(["Before", "Progress", "After", "General"] as const).map((tab) => {
-                      const count = tab === "General" ? otherPhotos.length : tab === "Before" ? beforePhotos.length : tab === "Progress" ? progressPhotos.length : afterPhotos.length;
-                      return (
-                        <button key={tab} type="button" onClick={() => setPhotoTab(tab)} className={`flex-1 px-1 py-1.5 text-center text-[11px] font-bold transition ${photoTab === tab ? "border-b-2 border-blue-600 text-blue-700" : "text-gray-400 hover:text-gray-600"}`}>
-                          {tab} <span className={`ml-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold ${photoTab === tab ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{count}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-3.5 w-3.5 text-blue-700" />
+                      <span className="text-xs font-bold text-blue-700">Job Photos</span>
+                      {ccMatchedProject && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-600">{ccMatchedProject.photo_count + jobFiles.length} total</span>}
+                      {!ccMatchedProject && jobFiles.length > 0 && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">{jobFiles.length}</span>}
+                    </div>
+                    {ccMatchedProject && (
+                      <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-green-600 hover:text-green-800">
+                        Open in CompanyCam →
+                      </a>
+                    )}
                   </div>
                   <div className="p-2.5">
-                    {photoTab !== "General" && (() => {
-                      const photos = photoTab === "Before" ? beforePhotos : photoTab === "Progress" ? progressPhotos : afterPhotos;
-                      const color = photoTab === "Progress" ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700";
-                      return (
-                        <>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button
-                              type="button"
-                              disabled={fileBusy}
-                              onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: photoTab })}
-                              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-bold text-white transition active:scale-95 ${color} ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
-                            >
-                              <Camera className="h-3.5 w-3.5" /> Camera
-                            </button>
-                            <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                              <UploadCloud className="h-3.5 w-3.5" /> Upload
-                              <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload(photoTab, input.files).finally(() => { input.value = ""; }); }} />
-                            </label>
-                          </div>
-                          {photos.length > 0 && (
-                            <div className="mt-2 flex gap-1 overflow-x-auto">
-                              {photos.map((photo, photoIdx) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-12 w-16 shrink-0 cursor-pointer rounded-md object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos, index: photoIdx })} />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                    {photoTab === "General" && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {ccMatchedProject ? (
+                        <a
+                          href={ccMatchedProject.project_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-green-700 active:scale-95"
+                        >
+                          <Camera className="h-3.5 w-3.5" /> Open CompanyCam
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={fileBusy}
+                          onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
+                          className={`flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
+                        >
+                          <Camera className="h-3.5 w-3.5" /> Camera
+                        </button>
+                      )}
+                      <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
+                        <UploadCloud className="h-3.5 w-3.5" /> Upload
+                        <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
+                      </label>
+                    </div>
+
+                    {/* CompanyCam photos */}
+                    {ccLoading && <p className="mt-2 text-[11px] text-gray-400">Loading CompanyCam photos...</p>}
+                    {!ccLoading && ccPhotos.length > 0 && (
+                      <div className="mt-2 grid grid-cols-4 gap-1.5">
+                        {ccPhotos.map((photo) => {
+                          const thumbUri = photo.uris.find((u) => u.type === "thumbnail") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
+                          const fullUri = photo.uris.find((u) => u.type === "original") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
+                          return (
+                            <a key={photo.id} href={fullUri?.url || photo.photo_url} target="_blank" rel="noopener noreferrer" className="group relative">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={thumbUri?.url} alt={photo.description || "CompanyCam photo"} className="h-14 w-full rounded-md border border-gray-100 object-cover transition group-hover:ring-2 group-hover:ring-green-400" />
+                              {photo.creator_name && <span className="absolute bottom-0 left-0 right-0 truncate rounded-b-md bg-black/50 px-1 py-0.5 text-[8px] text-white">{photo.creator_name}</span>}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!ccLoading && ccPhotos.length > 0 && ccMatchedProject && ccMatchedProject.photo_count > ccPhotos.length && (
+                      <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="mt-1.5 block text-center text-[11px] font-semibold text-green-600 hover:text-green-800">
+                        View all {ccMatchedProject.photo_count} photos in CompanyCam →
+                      </a>
+                    )}
+
+                    {/* Existing CRM photos */}
+                    {jobFiles.length > 0 && (
                       <>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            disabled={fileBusy}
-                            onClick={() => selectedJobId && setLiveCamera({ jobId: selectedJobId, type: "After" })}
-                            className={`flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}
-                          >
-                            <Camera className="h-3.5 w-3.5" /> Camera
-                          </button>
-                          <label className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 ${fileBusy ? "pointer-events-none opacity-60" : ""}`}>
-                            <UploadCloud className="h-3.5 w-3.5" /> Upload
-                            <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
-                          </label>
+                        {ccPhotos.length > 0 && <div className="my-2 border-t border-gray-100" />}
+                        {ccPhotos.length > 0 && <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">CRM Photos</p>}
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {jobFiles.map((photo, photoIdx) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-14 w-full cursor-pointer rounded-md border border-gray-100 object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos: jobFiles, index: photoIdx })} />
+                          ))}
                         </div>
-                        {otherPhotos.length > 0 && (
-                          <div className="mt-2 grid grid-cols-4 gap-1.5">
-                            {otherPhotos.map((photo, photoIdx) => (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img key={photo.id} src={photo.dataUrl} alt={photo.name} className="h-14 w-full cursor-pointer rounded-md border border-gray-100 object-cover transition hover:ring-2 hover:ring-blue-400" onClick={() => setLightbox({ photos: otherPhotos, index: photoIdx })} />
-                            ))}
-                          </div>
-                        )}
-                        <p className="mt-1.5 text-[11px] font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                       </>
                     )}
+
+                    {!ccMatchedProject && jobFiles.length === 0 && <p className="mt-2 text-[11px] text-gray-400">No photos yet. Tap Camera to start.</p>}
+                    <p className="mt-1.5 text-[10px] font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                   </div>
                 </div>
-
-                {/* CompanyCam Photos */}
-                {ccMatchedProject && (
-                  <div className="rounded-lg border border-green-200 bg-white">
-                    <button type="button" onClick={() => setCcOpen((v) => !v)} className="flex w-full items-center justify-between p-4 text-left">
-                      <div className="flex items-center gap-2 text-sm font-bold text-green-700">
-                        <Camera className="h-4 w-4" />
-                        CompanyCam
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-600">{ccMatchedProject.photo_count} photos</span>
-                      </div>
-                      <ChevronRight className={`h-4 w-4 text-gray-400 transition ${ccOpen ? "rotate-90" : ""}`} />
-                    </button>
-                    {ccOpen && (
-                      <div className="border-t border-green-100 p-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-500">
-                            {ccMatchedProject.address.street_address_1}, {ccMatchedProject.address.city}
-                          </p>
-                          <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-green-600 hover:text-green-800">
-                            Open in CompanyCam →
-                          </a>
-                        </div>
-                        {ccLoading && <p className="mt-3 text-xs text-gray-400">Loading photos...</p>}
-                        {!ccLoading && ccPhotos.length === 0 && <p className="mt-3 text-xs text-gray-400">No photos found for this project.</p>}
-                        {!ccLoading && ccPhotos.length > 0 && (
-                          <div className="mt-3 grid grid-cols-3 gap-2">
-                            {ccPhotos.map((photo) => {
-                              const thumbUri = photo.uris.find((u) => u.type === "thumbnail") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
-                              const fullUri = photo.uris.find((u) => u.type === "original") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
-                              return (
-                                <a key={photo.id} href={fullUri?.url || photo.photo_url} target="_blank" rel="noopener noreferrer" className="group relative">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={thumbUri?.url} alt={photo.description || "CompanyCam photo"} className="h-20 w-full rounded-lg border border-gray-100 object-cover transition group-hover:ring-2 group-hover:ring-green-400" />
-                                  {photo.creator_name && <span className="absolute bottom-0 left-0 right-0 truncate rounded-b-lg bg-black/50 px-1 py-0.5 text-[9px] text-white">{photo.creator_name}</span>}
-                                </a>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {!ccLoading && ccPhotos.length > 0 && ccMatchedProject.photo_count > ccPhotos.length && (
-                          <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="mt-2 block text-center text-xs font-semibold text-green-600 hover:text-green-800">
-                            View all {ccMatchedProject.photo_count} photos in CompanyCam →
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Linked Documents */}
                 <div className="rounded-lg border border-gray-200 bg-white">
