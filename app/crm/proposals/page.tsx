@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
-import { subscribeToCrewData, leadToJobRecord, upsertJobRecord, updateJobRecord } from "@/lib/crew-sync";
+import { subscribeToCrewData, leadToJobRecord, upsertJobRecord, updateJobRecord, loadJobPhotos, type JobPhoto } from "@/lib/crew-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime, azDate, azTime } from "@/lib/arizona-time";
 import { useSaveToast } from "@/components/crm/SaveToast";
@@ -163,11 +163,14 @@ const defaultEmailTemplates: ProposalEmailTemplate[] = [
 const trashRetentionDays = 30;
 const trashRetentionMs = trashRetentionDays * 24 * 60 * 60 * 1000;
 const proposalsLocalKey = "xrp-crm-proposals";
+const MAX_INSPECTION_PHOTOS = 6;
 const defaultInspectionPhotos: InspectionPhoto[] = [
   { label: "Front elevation", image: "", note: "" },
   { label: "Roof condition", image: "", note: "" },
   { label: "Detail area", image: "", note: "" },
   { label: "Project notes", image: "", note: "" },
+  { label: "Additional photo 1", image: "", note: "" },
+  { label: "Additional photo 2", image: "", note: "" },
 ];
 const defaultTerms = `AZPRO Contractor LLC DBA XRP Roofing
 2843 W McDowell Rd, Phoenix, AZ 85009
@@ -349,7 +352,7 @@ function normalizeInspectionPhotos(photos?: InspectionPhoto[]) {
   return defaultInspectionPhotos.map((defaultPhoto, index) => ({
     ...defaultPhoto,
     ...(photos?.[index] || {}),
-  }));
+  })).slice(0, MAX_INSPECTION_PHOTOS);
 }
 
 
@@ -514,6 +517,10 @@ export default function ProposalsPage() {
   const offlineSigDrawingRef = useRef(false);
   const offlineSigHasDrawnRef = useRef(false);
   const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [showJobPhotoPicker, setShowJobPhotoPicker] = useState(false);
+  const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
+  const [jobPhotosLoading, setJobPhotosLoading] = useState(false);
+  const [selectedJobPhotos, setSelectedJobPhotos] = useState<Set<string>>(new Set());
   const [typedSignature, setTypedSignature] = useState("");
   const [showResetSignatureConfirm, setShowResetSignatureConfirm] = useState(false);
   const [sendForm, setSendForm] = useState({
@@ -1840,6 +1847,51 @@ export default function ProposalsPage() {
     reader.readAsDataURL(file);
   }
 
+  function handleRemoveInspectionPhoto(index: number) {
+    const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos);
+    inspectionPhotos[index] = { ...inspectionPhotos[index], image: "" };
+    setEditorForm({ ...editorForm, inspectionPhotos });
+  }
+
+  function handleMoveInspectionPhoto(fromIndex: number, toIndex: number) {
+    if (toIndex < 0 || toIndex >= MAX_INSPECTION_PHOTOS) return;
+    const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos);
+    const temp = inspectionPhotos[fromIndex];
+    inspectionPhotos[fromIndex] = inspectionPhotos[toIndex];
+    inspectionPhotos[toIndex] = temp;
+    setEditorForm({ ...editorForm, inspectionPhotos });
+  }
+
+  async function openJobPhotoPicker() {
+    const jobId = activeProposal?.job?.id || selectedJobId;
+    if (!jobId) return;
+    setJobPhotosLoading(true);
+    setShowJobPhotoPicker(true);
+    setSelectedJobPhotos(new Set());
+    try {
+      const photos = await loadJobPhotos(jobId);
+      setJobPhotos(photos.filter((p) => p.dataUrl && !p.name.match(/\.(webm|mp4|mov)$/i)));
+    } catch {
+      setJobPhotos([]);
+    }
+    setJobPhotosLoading(false);
+  }
+
+  function confirmJobPhotoSelection() {
+    const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos);
+    const selectedArr = jobPhotos.filter((p) => selectedJobPhotos.has(p.id));
+    let slotIdx = 0;
+    for (const photo of selectedArr) {
+      while (slotIdx < MAX_INSPECTION_PHOTOS && inspectionPhotos[slotIdx].image) slotIdx++;
+      if (slotIdx >= MAX_INSPECTION_PHOTOS) break;
+      inspectionPhotos[slotIdx] = { ...inspectionPhotos[slotIdx], image: photo.dataUrl };
+      slotIdx++;
+    }
+    setEditorForm({ ...editorForm, inspectionPhotos });
+    setShowJobPhotoPicker(false);
+    setSelectedJobPhotos(new Set());
+  }
+
   if (activeProposal) {
     return (
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-gray-100 font-serif sm:-mx-6 lg:-mx-8 print:m-0 print:min-h-0 print:bg-white">
@@ -2143,26 +2195,42 @@ export default function ProposalsPage() {
 
                 {(isPreviewing || activeSection === "Inspection Photos") && (
                   <div className={`mt-10 ${normalizeInspectionPhotos(editorForm.inspectionPhotos).every((p) => !p.image) ? "print:hidden" : ""}`}>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Inspection Photos</p>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Inspection Photos ({normalizeInspectionPhotos(editorForm.inspectionPhotos).filter((p) => p.image).length}/{MAX_INSPECTION_PHOTOS})</p>
+                      {!isPreviewing && (activeProposal?.job?.id || selectedJobId) && (
+                        <button type="button" onClick={openJobPhotoPicker} className="rounded-md bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 transition hover:bg-green-100">
+                          Choose from Job Folder
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {normalizeInspectionPhotos(editorForm.inspectionPhotos).map((photo, index) => (
-                        <div key={photo.label} className={`rounded-lg border border-dashed border-gray-200 bg-gray-50/50 p-4 ${!photo.image ? "print:hidden" : ""}`}>
-                          <div className="flex min-h-40 items-center justify-center overflow-hidden rounded-lg bg-white text-sm text-gray-400">
+                        <div key={`photo-slot-${index}`} className={`rounded-lg border border-dashed border-gray-200 bg-gray-50/50 p-3 ${!photo.image ? "print:hidden" : ""}`}>
+                          <div className="flex min-h-36 items-center justify-center overflow-hidden rounded-lg bg-white text-sm text-gray-400">
                             {photo.image ? (
-                              <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-52 w-full object-cover" />
+                              <Image src={photo.image} alt={photo.label} width={320} height={220} className="h-full max-h-44 w-full object-cover" />
                             ) : (
-                              <span>{photo.label}</span>
+                              <span className="text-xs">{photo.label}</span>
                             )}
                           </div>
                           {isPreviewing ? (
-                            photo.note && <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-600">{photo.note}</p>
+                            photo.note && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-600">{photo.note}</p>
                           ) : (
                             <>
-                              <label className="mt-3 block cursor-pointer rounded-md bg-gray-100 px-4 py-2.5 text-center text-sm font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600">
-                                Upload photo
-                                <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
-                              </label>
-                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-3 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder={`${photo.label} notes`} />
+                              <div className="mt-2 flex gap-1.5">
+                                <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md bg-gray-100 px-2 py-2 text-center text-xs font-medium text-gray-600 transition hover:bg-blue-50 hover:text-blue-600">
+                                  {photo.image ? "Replace" : "Upload"}
+                                  <input type="file" accept="image/*" onChange={(event) => handleInspectionPhotoUpload(index, event.target.files?.[0])} className="hidden" />
+                                </label>
+                                {photo.image && (
+                                  <>
+                                    <button type="button" onClick={() => handleMoveInspectionPhoto(index, index - 1)} disabled={index === 0} className="rounded-md bg-gray-100 px-2 py-2 text-xs text-gray-500 transition hover:bg-gray-200 disabled:opacity-30" title="Move up">↑</button>
+                                    <button type="button" onClick={() => handleMoveInspectionPhoto(index, index + 1)} disabled={index === MAX_INSPECTION_PHOTOS - 1} className="rounded-md bg-gray-100 px-2 py-2 text-xs text-gray-500 transition hover:bg-gray-200 disabled:opacity-30" title="Move down">↓</button>
+                                    <button type="button" onClick={() => handleRemoveInspectionPhoto(index)} className="rounded-md bg-red-50 px-2 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title="Remove">✕</button>
+                                  </>
+                                )}
+                              </div>
+                              <textarea value={photo.note} onChange={(event) => { const inspectionPhotos = normalizeInspectionPhotos(editorForm.inspectionPhotos); inspectionPhotos[index] = { ...inspectionPhotos[index], note: event.target.value }; setEditorForm({ ...editorForm, inspectionPhotos }); }} className="mt-2 min-h-[3rem] w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-xs leading-5 text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder={`${photo.label} notes`} />
                             </>
                           )}
                         </div>
@@ -2600,6 +2668,60 @@ export default function ProposalsPage() {
               <div className="mt-6 flex items-center gap-4">
                 <button type="button" onClick={() => { saveActiveProposal(); setShowDepositModal(false); }} className="flex-1 rounded-lg bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700">Save</button>
                 <button type="button" onClick={() => { setEditorForm({ ...editorForm, depositType: "", depositValue: "", depositDueDate: "", depositAddToFuture: false }); saveActiveProposal({ depositType: undefined, depositValue: undefined, depositDueDate: undefined, depositAddToFuture: undefined }); setShowDepositModal(false); }} className="text-sm font-bold text-red-500 hover:text-red-700">Cancel this request</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Photo Picker Modal */}
+        {showJobPhotoPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4" onClick={() => setShowJobPhotoPicker(false)}>
+            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Choose from Job Folder</h2>
+                  <p className="mt-0.5 text-xs text-gray-500">Select up to {MAX_INSPECTION_PHOTOS - normalizeInspectionPhotos(editorForm.inspectionPhotos).filter((p) => p.image).length} photos — {selectedJobPhotos.size} selected</p>
+                </div>
+                <button type="button" onClick={() => setShowJobPhotoPicker(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5">
+                {jobPhotosLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
+                  </div>
+                ) : jobPhotos.length === 0 ? (
+                  <div className="py-16 text-center text-sm text-gray-400">No photos found in the job folder</div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                    {jobPhotos.map((photo) => {
+                      const isSelected = selectedJobPhotos.has(photo.id);
+                      const emptySlots = MAX_INSPECTION_PHOTOS - normalizeInspectionPhotos(editorForm.inspectionPhotos).filter((p) => p.image).length;
+                      const atLimit = !isSelected && selectedJobPhotos.size >= emptySlots;
+                      return (
+                        <button
+                          key={photo.id}
+                          type="button"
+                          disabled={atLimit}
+                          onClick={() => setSelectedJobPhotos((prev) => { const n = new Set(prev); if (n.has(photo.id)) n.delete(photo.id); else n.add(photo.id); return n; })}
+                          className={`relative overflow-hidden rounded-lg border-2 transition ${isSelected ? "border-blue-500 ring-2 ring-blue-200" : atLimit ? "border-gray-100 opacity-40" : "border-gray-200 hover:border-blue-300"}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={photo.dataUrl} alt={photo.name} className="aspect-square w-full object-cover" />
+                          {isSelected && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-blue-500/30">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">✓</div>
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 left-0 right-0 truncate bg-black/50 px-1.5 py-0.5 text-[9px] text-white">{photo.photoType}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+                <button type="button" onClick={() => setShowJobPhotoPicker(false)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="button" disabled={selectedJobPhotos.size === 0} onClick={confirmJobPhotoSelection} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:bg-gray-300">Add {selectedJobPhotos.size} photo{selectedJobPhotos.size !== 1 ? "s" : ""}</button>
               </div>
             </div>
           </div>
