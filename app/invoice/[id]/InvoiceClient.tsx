@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import InvoicePaymentButtons from "./InvoicePaymentButtons";
-import OfflinePaymentPanel from "./OfflinePaymentPanel";
+// OfflinePaymentPanel removed from customer view — offline payments are recorded on admin side only
 
 type Invoice = {
   id: string;
@@ -229,22 +229,10 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                       >
                         <span className="text-xl">💳</span>
                         <div>
-                          <p>Pay Deposit Online</p>
+                          <p>Pay Online</p>
                           <p className="text-xs font-semibold text-slate-500">Card or bank transfer — instant &amp; secure</p>
                         </div>
                         <span className="ml-auto text-blue-400">›</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMode("offline")}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-800 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
-                      >
-                        <span className="text-xl">📋</span>
-                        <div>
-                          <p>Pay by Check / Cash / Bank Transfer</p>
-                          <p className="text-xs font-semibold text-slate-500">Submit your offline payment for verification</p>
-                        </div>
-                        <span className="ml-auto text-slate-400">›</span>
                       </button>
                     </div>
                   )}
@@ -253,19 +241,6 @@ export default function InvoiceClient({ invoiceId }: { invoiceId: string }) {
                     <div className="mt-3">
                       <button type="button" onClick={() => setPaymentMode(null)} className="mb-3 text-xs font-bold text-blue-700 hover:underline">← Back</button>
                       <InvoicePaymentButtons invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber || invoice.id} amount={totals.balance} customerEmail={invoice.email || ""} />
-                    </div>
-                  )}
-
-                  {paymentMode === "offline" && (
-                    <div className="mt-3">
-                      <button type="button" onClick={() => setPaymentMode(null)} className="mb-3 text-xs font-bold text-blue-700 hover:underline">← Back</button>
-                      <OfflinePaymentPanel
-                        invoiceId={invoice.id}
-                        balance={totals.balance}
-                        totalAmount={totals.finalTotal}
-                        totalPaid={totals.paid}
-                        onSuccess={() => void load()}
-                      />
                     </div>
                   )}
 
