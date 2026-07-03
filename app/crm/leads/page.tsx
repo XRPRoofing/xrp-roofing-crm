@@ -673,6 +673,44 @@ export default function LeadsPage() {
     listProjects().then(setCcProjects).catch(() => {});
   }, []);
 
+  // Sync CompanyCam photos into CRM storage (avoid duplicates by checking existing file names)
+  const syncCcPhotosToCrm = async (jobId: string, photos: CompanyCamPhoto[]) => {
+    if (photos.length === 0) return;
+    const existing = await loadJobPhotos(jobId);
+    const existingNames = new Set(existing.map((f) => f.name));
+    const newPhotos = photos.filter((p) => !existingNames.has(`cc-${p.id}`));
+    if (newPhotos.length === 0) return;
+    const toSave = await Promise.all(
+      newPhotos.map(async (photo) => {
+        const imgUri = photo.uris.find((u) => u.type === "web") || photo.uris.find((u) => u.type === "original") || photo.uris[0];
+        if (!imgUri?.url) return null;
+        try {
+          const res = await fetch(imgUri.url);
+          const blob = await res.blob();
+          const reader = new FileReader();
+          const dataUrl = await new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+          return {
+            photoType: "Job Photo" as const,
+            name: `cc-${photo.id}`,
+            dataUrl,
+            uploadedBy: photo.creator_name || "CompanyCam",
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+    const valid = toSave.filter((p): p is NonNullable<typeof p> => p !== null);
+    if (valid.length > 0) {
+      await addJobPhotos(jobId, valid);
+      const refreshed = await loadJobPhotos(jobId);
+      setJobFiles(refreshed);
+    }
+  };
+
   // Match CompanyCam project when selected job changes (match existing, don't auto-create yet)
   useEffect(() => {
     setCcPhotos([]);
@@ -683,7 +721,15 @@ export default function LeadsPage() {
     if (matched) {
       setCcMatchedProject(matched);
       setCcLoading(true);
-      listProjectPhotos(matched.id).then(setCcPhotos).catch(() => {}).finally(() => setCcLoading(false));
+      listProjectPhotos(matched.id)
+        .then((photos) => {
+          setCcPhotos(photos);
+          if (selectedJob.id && photos.length > 0) {
+            void syncCcPhotosToCrm(selectedJob.id, photos);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setCcLoading(false));
     }
   }, [selectedJobId, ccProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -704,11 +750,28 @@ export default function LeadsPage() {
     if (project) {
       setCcMatchedProject(project);
       setCcProjects((prev) => [...prev, project]);
-      listProjectPhotos(project.id).then(setCcPhotos).catch(() => {});
+      listProjectPhotos(project.id).then((photos) => {
+        setCcPhotos(photos);
+        if (photos.length > 0) void syncCcPhotosToCrm(selectedJob.id, photos);
+      }).catch(() => {});
       window.open(project.project_url, "_blank");
     }
     setCcLoading(false);
   };
+
+  // Re-sync CompanyCam photos when user returns to CRM tab (after taking photos in CompanyCam)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (ccMatchedProject && selectedJobId) {
+        listProjectPhotos(ccMatchedProject.id).then((photos) => {
+          setCcPhotos(photos);
+          if (photos.length > 0) void syncCcPhotosToCrm(selectedJobId, photos);
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [ccMatchedProject, selectedJobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to real-time crew activity updates
   useEffect(() => {
