@@ -28,6 +28,7 @@ import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type Cre
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
+import { listProjects, listProjectPhotos, matchProjectByAddress, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
 
@@ -471,6 +472,11 @@ export default function LeadsPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
+  const [ccProjects, setCcProjects] = useState<CompanyCamProject[]>([]);
+  const [ccPhotos, setCcPhotos] = useState<CompanyCamPhoto[]>([]);
+  const [ccMatchedProject, setCcMatchedProject] = useState<CompanyCamProject | null>(null);
+  const [ccOpen, setCcOpen] = useState(false);
+  const [ccLoading, setCcLoading] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -665,6 +671,25 @@ export default function LeadsPage() {
     void loadJobActivities(selectedJobId).then((acts) => { if (mounted) setJobActivities(acts); }).catch(() => {});
     return () => { mounted = false; };
   }, [selectedJobId]);
+
+  // Load CompanyCam projects once
+  useEffect(() => {
+    listProjects().then(setCcProjects).catch(() => {});
+  }, []);
+
+  // Match CompanyCam project when selected job changes
+  useEffect(() => {
+    setCcPhotos([]);
+    setCcMatchedProject(null);
+    setCcOpen(false);
+    if (!selectedJob || !selectedJob.address || ccProjects.length === 0) return;
+    const matched = matchProjectByAddress(selectedJob.address, ccProjects);
+    if (matched) {
+      setCcMatchedProject(matched);
+      setCcLoading(true);
+      listProjectPhotos(matched.id).then(setCcPhotos).catch(() => {}).finally(() => setCcLoading(false));
+    }
+  }, [selectedJobId, ccProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Subscribe to real-time crew activity updates
   useEffect(() => {
@@ -1767,6 +1792,54 @@ export default function LeadsPage() {
                   )}
                   <p className="mt-2 text-xs font-bold text-gray-400">Auto-saved to Files → {selectedJob.address || "job"} folder.</p>
                 </div>
+
+                {/* CompanyCam Photos */}
+                {ccMatchedProject && (
+                  <div className="rounded-lg border border-green-200 bg-white">
+                    <button type="button" onClick={() => setCcOpen((v) => !v)} className="flex w-full items-center justify-between p-4 text-left">
+                      <div className="flex items-center gap-2 text-sm font-bold text-green-700">
+                        <Camera className="h-4 w-4" />
+                        CompanyCam
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-600">{ccMatchedProject.photo_count} photos</span>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-gray-400 transition ${ccOpen ? "rotate-90" : ""}`} />
+                    </button>
+                    {ccOpen && (
+                      <div className="border-t border-green-100 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-500">
+                            {ccMatchedProject.address.street_address_1}, {ccMatchedProject.address.city}
+                          </p>
+                          <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-green-600 hover:text-green-800">
+                            Open in CompanyCam →
+                          </a>
+                        </div>
+                        {ccLoading && <p className="mt-3 text-xs text-gray-400">Loading photos...</p>}
+                        {!ccLoading && ccPhotos.length === 0 && <p className="mt-3 text-xs text-gray-400">No photos found for this project.</p>}
+                        {!ccLoading && ccPhotos.length > 0 && (
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            {ccPhotos.map((photo) => {
+                              const thumbUri = photo.uris.find((u) => u.type === "thumbnail") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
+                              const fullUri = photo.uris.find((u) => u.type === "original") || photo.uris.find((u) => u.type === "web") || photo.uris[0];
+                              return (
+                                <a key={photo.id} href={fullUri?.url || photo.photo_url} target="_blank" rel="noopener noreferrer" className="group relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={thumbUri?.url} alt={photo.description || "CompanyCam photo"} className="h-20 w-full rounded-lg border border-gray-100 object-cover transition group-hover:ring-2 group-hover:ring-green-400" />
+                                  {photo.creator_name && <span className="absolute bottom-0 left-0 right-0 truncate rounded-b-lg bg-black/50 px-1 py-0.5 text-[9px] text-white">{photo.creator_name}</span>}
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!ccLoading && ccPhotos.length > 0 && ccMatchedProject.photo_count > ccPhotos.length && (
+                          <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="mt-2 block text-center text-xs font-semibold text-green-600 hover:text-green-800">
+                            View all {ccMatchedProject.photo_count} photos in CompanyCam →
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Linked Documents */}
                 <div className="rounded-lg border border-gray-200 bg-white">
