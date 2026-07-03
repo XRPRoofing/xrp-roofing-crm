@@ -2801,46 +2801,35 @@ export default function ProposalsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 font-sans">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 font-sans">
       <BackToJobsLink />
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] p-3 text-white shadow-2xl shadow-blue-950/20 sm:rounded-[2rem] sm:p-6">
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-400/20 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-2 sm:gap-4 md:flex-row md:items-end">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-[#072C6B] via-[#0A3D91] to-[#2B6BC4] px-4 py-3 text-white shadow-lg sm:rounded-2xl sm:px-6 sm:py-4">
+        <div className="relative flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-orange-300 sm:text-sm">Proposal Center</p>
-            <h1 className="text-xl font-bold tracking-tight sm:text-3xl">Proposals</h1>
-            <p className="crm-board-subtitle mt-1 hidden max-w-2xl text-sm font-medium leading-6 text-blue-100 sm:mt-2 sm:block">Create, send, track, and manage branded XRP Roofing proposals from one workspace.</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-blue-200 sm:text-xs">Proposal Center</p>
+            <h1 className="text-lg font-bold tracking-tight sm:text-xl">Proposals</h1>
           </div>
-          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="w-fit rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 sm:px-5 sm:py-3 sm:text-sm">⊕ Proposal</button>
+          <button type="button" onClick={() => setShowCreateForm((current) => !current)} className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 sm:px-4 sm:py-2 sm:text-sm">+ Proposal</button>
         </div>
       </div>
 
-      <div className="sticky top-16 z-20 -mx-3 border-b border-gray-200 bg-white/95 px-3 backdrop-blur-sm sm:-mx-5 sm:px-5">
-        <div className="rounded-lg border border-white/70 bg-white/95 px-3 pt-2 shadow-sm sm:px-5 sm:pt-4">
-          <div className="flex gap-4 text-xs font-bold sm:gap-8 sm:text-sm">
-            <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`px-1 pb-4 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Proposals</button>
-            <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`px-1 pb-4 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Drafts</button>
-            <button type="button" onClick={() => setActiveTab("templates")} className={`px-1 pb-4 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Templates</button>
-            <button type="button" onClick={() => setActiveTab("trash")} className={`px-1 pb-4 ${activeTab === "trash" ? "border-b-2 border-red-600 text-red-600" : "text-gray-600"}`}>Trash{trashedProposals.length > 0 ? ` (${trashedProposals.length})` : ""}</button>
-            <button type="button" onClick={() => setActiveTab("settings")} className={`px-1 pb-4 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-600"}`}>Settings</button>
+      <div className="sticky top-16 z-20 -mx-3 border-b border-gray-100 bg-white/95 px-3 backdrop-blur-sm sm:-mx-5 sm:px-5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-1 overflow-x-auto text-xs font-semibold sm:gap-2 sm:text-sm">
+            <button type="button" onClick={() => { setActiveTab("proposals"); setProposalFilter("all"); }} className={`whitespace-nowrap px-3 py-2.5 ${activeTab === "proposals" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>Proposals</button>
+            <button type="button" onClick={() => { setActiveTab("drafts"); setProposalFilter("drafts"); }} className={`whitespace-nowrap px-3 py-2.5 ${activeTab === "drafts" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>Drafts</button>
+            <button type="button" onClick={() => setActiveTab("templates")} className={`whitespace-nowrap px-3 py-2.5 ${activeTab === "templates" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>Templates</button>
+            <button type="button" onClick={() => setActiveTab("trash")} className={`whitespace-nowrap px-3 py-2.5 ${activeTab === "trash" ? "border-b-2 border-red-500 text-red-500" : "text-gray-500 hover:text-gray-700"}`}>Trash{trashedProposals.length > 0 ? ` (${trashedProposals.length})` : ""}</button>
+            <button type="button" onClick={() => setActiveTab("settings")} className={`whitespace-nowrap px-3 py-2.5 ${activeTab === "settings" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>Settings</button>
           </div>
         </div>
-
-        <div className="mt-3 rounded-lg border border-white/70 bg-white/95 p-4 shadow-sm">
-        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-          <div className="flex flex-1 flex-col gap-3 sm:flex-row">
-            <div className="relative max-w-md flex-1">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
-              <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:bg-white" placeholder="Search for a customer or address..." />
-            </div>
-            <button className="w-fit rounded-full bg-gray-50 px-5 py-3 text-sm font-bold text-blue-600">▽ Filter</button>
+        <div className="flex items-center gap-2 py-2.5">
+          <div className="relative flex-1 max-w-sm">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⌕</span>
+            <input value={proposalSearch} onChange={(event) => setProposalSearch(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white" placeholder="Search customer or address..." />
           </div>
-          <div className="flex overflow-hidden rounded-lg border border-gray-200">
-            <button className="bg-blue-50 px-4 py-3 text-xl text-blue-700 ring-1 ring-blue-500">▦</button>
-            <button className="px-4 py-3 text-xl text-gray-500">☰</button>
-          </div>
+          <button className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">Filter</button>
         </div>
-      </div>
       </div>
 
       {deletedProposal && (
@@ -3265,46 +3254,47 @@ export default function ProposalsPage() {
       )}
 
       {activeTab !== "templates" && activeTab !== "trash" && activeTab !== "settings" && (
-      <div className="space-y-3 pb-20 pr-2 lg:pb-0">
+      <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white pb-20 lg:pb-0">
         {filteredProposals.map((proposal) => (
-          <div key={proposal.id} className="grid w-full grid-cols-1 items-center gap-4 rounded-lg border border-white/70 bg-white/95 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-xl md:grid-cols-[1fr_auto]">
-            <button type="button" onClick={() => openProposal(proposal)} className="flex items-center gap-4 text-left">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded bg-white text-sm font-bold leading-4 text-blue-700 shadow-sm">XRP<br />ROOF</div>
-              <div>
-                <p className="font-bold text-blue-700">{proposal.proposalNumber ? `#${proposal.proposalNumber} — ` : ""}{proposal.address}</p>
-                <p className="mt-1 text-sm text-gray-500">{proposal.customerName}{proposal.createdBy ? <> <span className="mx-2">•</span> Created by {proposal.createdBy}</> : null}</p>
-                <p className="mt-1 text-xs text-gray-500">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? `Sent${proposal.sentViaSms ? " via SMS" : " via Email"}${proposal.sentBy ? ` by ${proposal.sentBy}` : ""}${proposal.sentToEmail ? ` to ${proposal.sentToEmail}` : ""}${proposal.smsSentToPhone ? ` to ${proposal.smsSentToPhone}` : ""}` : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : `Viewed${(proposal.viewCount || 0) > 1 ? ` ${proposal.viewCount} times` : ""}`} <span className="mx-1">•</span> {proposal.sentAt ? azDateTime(proposal.sentAt) : proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.lastViewedAt ? `Last viewed ${azDateTime(proposal.lastViewedAt)}` : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? <> <span className="mx-1">•</span> SMS by {proposal.smsSentBy}</> : null}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? <> <span className="mx-1">•</span> Follow-up {proposal.followUpStepCompleted + 1} sent</> : proposal.followUpSentAt ? <> <span className="mx-1">•</span> Follow-up sent {azDate(proposal.followUpSentAt)}</> : null}</p>
+          <div key={proposal.id} className="flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50 sm:gap-4 sm:px-5">
+            <button type="button" onClick={() => openProposal(proposal)} className="flex min-w-0 flex-1 items-center gap-3 text-left sm:gap-4">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-[9px] font-bold leading-3 text-blue-700 sm:flex">XRP<br />ROOF</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-900">{proposal.proposalNumber ? `#${proposal.proposalNumber} — ` : ""}{proposal.address}</p>
+                <p className="mt-0.5 truncate text-xs text-gray-500">{proposal.customerName}{proposal.createdBy ? ` · Created by ${proposal.createdBy}` : ""}</p>
+                <p className="mt-0.5 truncate text-[11px] text-gray-400">{proposal.status === "Draft" ? "Created" : proposal.status === "Sent" ? `Sent${proposal.sentViaSms ? " via SMS" : " via Email"}${proposal.sentBy ? ` by ${proposal.sentBy}` : ""}${proposal.sentToEmail ? ` to ${proposal.sentToEmail}` : ""}${proposal.smsSentToPhone ? ` to ${proposal.smsSentToPhone}` : ""}` : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? `Signed by ${proposal.signedBy || proposal.customerName}` : proposal.status === "Declined" ? "Declined by client" : `Viewed${(proposal.viewCount || 0) > 1 ? ` ${proposal.viewCount} times` : ""}`} · {proposal.sentAt ? azDateTime(proposal.sentAt) : proposal.signedAt ? azDateTime(proposal.signedAt) : proposal.declinedAt ? azDateTime(proposal.declinedAt) : proposal.lastViewedAt ? `Last viewed ${azDateTime(proposal.lastViewedAt)}` : proposal.createdAt ? azDateTime(proposal.createdAt) : "Today"}{proposal.smsSentBy ? ` · SMS by ${proposal.smsSentBy}` : ""}{proposal.followUpStepCompleted !== undefined && proposal.followUpStepCompleted >= 0 ? ` · Follow-up ${proposal.followUpStepCompleted + 1} sent` : proposal.followUpSentAt ? ` · Follow-up sent ${azDate(proposal.followUpSentAt)}` : ""}</p>
               </div>
-            </div>
             </button>
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <div className="text-right">
-                <p className="font-bold text-gray-600">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
-                <p className="mt-1 text-xs font-bold uppercase text-gray-500">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
+                <p className="text-sm font-bold text-gray-800">${(isProposalLocked(proposal) ? (proposal.acceptedPrice ?? proposal.total) : proposal.total).toLocaleString()}</p>
+                <p className="text-[10px] font-medium uppercase text-gray-400">{proposal.acceptedPackageName || proposal.acceptedPackage || proposal.selectedOption || "BEST"}</p>
                 {proposal.depositType && proposal.depositValue && proposal.depositValue > 0 && (
-                  <p className={`mt-1 text-xs font-bold ${proposal.depositPaidAt ? "text-emerald-600" : "text-orange-600"}`}>{proposal.depositPaidAt ? "✓ Deposit Paid" : "Deposit Due"}</p>
+                  <p className={`text-[10px] font-semibold ${proposal.depositPaidAt ? "text-emerald-600" : "text-amber-600"}`}>{proposal.depositPaidAt ? "Deposit Paid" : "Deposit Due"}</p>
                 )}
               </div>
-              <span className={`rounded-full px-4 py-1 text-sm font-bold ${proposal.status === "Draft" ? "bg-gray-500 text-white" : proposal.status === "Sent" ? "bg-sky-500 text-white" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-blue-500 text-white" : proposal.status === "Declined" ? "bg-red-500 text-white" : "bg-orange-400 text-gray-900"}`}>{proposal.status === "Approved" || proposal.status === "Viewed" ? `Viewed${(proposal.viewCount || 0) > 1 ? ` (${proposal.viewCount})` : ""}` : proposal.status}</span>
-              <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">Delete</button>
-              <span className="text-xl font-bold text-gray-500">⋯</span>
+              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${proposal.status === "Draft" ? "bg-gray-100 text-gray-600" : proposal.status === "Sent" ? "bg-blue-50 text-blue-700" : proposal.status === "Won" || proposal.status === "Signed" || proposal.status === "Signed Offline" ? "bg-emerald-50 text-emerald-700" : proposal.status === "Declined" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"}`}>{proposal.status === "Approved" || proposal.status === "Viewed" ? `Viewed${(proposal.viewCount || 0) > 1 ? ` (${proposal.viewCount})` : ""}` : proposal.status}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setPermDeleteTarget(proposal); setShowPermDeleteConfirm(true); }} className="rounded-md px-2 py-1 text-[11px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-600 transition">Delete</button>
+              <button type="button" onClick={() => openProposal(proposal)} className="text-gray-400 hover:text-gray-600">⋯</button>
             </div>
           </div>
         ))}
         {filteredProposals.length === 0 && !dataLoaded && (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1,2,3,4,5,6].map((i) => (
-              <div key={i} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
-                <div className="mt-2 h-3 w-48 animate-pulse rounded bg-gray-100" />
-                <div className="mt-3 h-6 w-20 animate-pulse rounded bg-blue-100" />
+          <div className="space-y-2 p-4">
+            {[1,2,3,4,5].map((i) => (
+              <div key={i} className="flex items-center gap-4 py-3">
+                <div className="h-10 w-10 animate-pulse rounded-md bg-gray-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-48 animate-pulse rounded bg-gray-100" />
+                  <div className="h-3 w-32 animate-pulse rounded bg-gray-50" />
+                </div>
+                <div className="h-5 w-16 animate-pulse rounded-full bg-gray-100" />
               </div>
             ))}
           </div>
         )}
         {filteredProposals.length === 0 && dataLoaded && (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center font-semibold text-gray-500">No proposals match your search.</div>
+          <div className="p-8 text-center text-sm text-gray-400">No proposals match your search.</div>
         )}
       </div>
       )}
