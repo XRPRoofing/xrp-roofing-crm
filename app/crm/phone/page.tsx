@@ -1323,7 +1323,7 @@ export default function PhonePage() {
       {jobPanelOpen && (
         <>
           <button type="button" className="fixed inset-0 z-40 bg-black/20" onClick={() => setJobPanelOpen(false)} />
-          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 5rem)" }}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-blue-600 px-5 py-4">
               <div className="flex items-center gap-3">
@@ -1437,7 +1437,7 @@ export default function PhonePage() {
       {smsPanelOpen && (
         <>
           <button type="button" className="fixed inset-0 z-40 bg-black/20" onClick={() => setSmsPanelOpen(false)} />
-          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+          <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-2xl" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 5rem)" }}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 bg-gray-800 px-5 py-4">
               <div className="flex items-center gap-3">
