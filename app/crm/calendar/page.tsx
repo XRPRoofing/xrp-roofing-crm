@@ -1715,12 +1715,12 @@ export default function CalendarPage() {
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-bold text-cyan-700">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-4">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <span className="inline-flex shrink-0 items-center rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-bold text-cyan-700">
                   Google Calendar
                 </span>
-                <h2 className="text-2xl font-bold text-cyan-700">
+                <h2 className="truncate text-xl font-bold text-cyan-700 sm:text-2xl">
                   {selectedEvent.title}
                 </h2>
               </div>
@@ -1848,14 +1848,14 @@ export default function CalendarPage() {
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-              <h2 className="text-2xl font-bold text-blue-700">
+            <div className="flex items-center justify-between gap-2 border-b border-gray-200 pb-4">
+              <h2 className="min-w-0 truncate text-xl font-bold text-blue-700 sm:text-2xl">
                 {selectedEvent.title || "Untitled"}
               </h2>
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
-                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+                className="shrink-0 rounded-full p-2 text-gray-500 hover:bg-gray-100"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1863,7 +1863,7 @@ export default function CalendarPage() {
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-gray-400" />
+                <Clock className="h-5 w-5 shrink-0 text-gray-400" />
                 <span className="text-sm text-gray-700">
                   {selectedEvent.all_day
                     ? new Intl.DateTimeFormat("en-US", {
@@ -1964,11 +1964,11 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex flex-wrap justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 font-bold text-red-600 hover:bg-red-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 sm:gap-2 sm:px-4 sm:py-2.5"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete
@@ -1977,7 +1977,7 @@ export default function CalendarPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedEvent(null)}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 sm:px-4 sm:py-2.5"
                 >
                   Close
                 </button>

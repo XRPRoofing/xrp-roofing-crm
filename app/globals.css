@@ -537,6 +537,35 @@
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
+/* ── Mobile responsiveness: prevent horizontal overflow globally ── */
+@media (max-width: 639px) {
+  .crm-main table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .crm-main input[type="text"],
+  .crm-main input[type="email"],
+  .crm-main input[type="tel"],
+  .crm-main input[type="number"],
+  .crm-main input[type="search"],
+  .crm-main input[type="url"],
+  .crm-main textarea,
+  .crm-main select {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Hide scrollbar utility (works cross-browser) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Google Places autocomplete dropdown above modals */
 .pac-container {
   z-index: 99999 !important;

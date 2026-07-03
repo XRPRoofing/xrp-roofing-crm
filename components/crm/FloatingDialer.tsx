@@ -716,7 +716,7 @@ export default function FloatingDialer({
   return (
     <div
       ref={containerRef}
-      className="fixed z-[9999] flex w-[300px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      className="fixed z-[9999] flex w-[300px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
       style={{
         left: position.x,
         top: position.y,

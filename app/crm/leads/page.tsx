@@ -1752,15 +1752,15 @@ export default function LeadsPage() {
       {selectedJob && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-black/20 backdrop-blur-sm" onClick={closeJobCard}>
           <aside className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
+            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3 sm:p-5">
+              <div className="flex items-start justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold uppercase tracking-wide text-orange-600">Job details</p>
-                  <h2 className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">{selectedJob.name}</h2>
-                  <p className="text-sm font-bold text-gray-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
+                  <h2 className="mt-1 truncate text-lg font-bold text-gray-900 sm:text-2xl">{selectedJob.name}</h2>
+                  <p className="truncate text-sm font-bold text-gray-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"><Trash2 className="h-4 w-4" />Delete Job</button>
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                  <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 sm:gap-1.5 sm:px-3 sm:py-2"><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">Delete Job</span></button>
                   <button type="button" onClick={closeJobCard} className="pointer-events-auto relative rounded-lg p-2 text-gray-400 hover:bg-gray-100"><X className="h-5 w-5" /></button>
                 </div>
               </div>
@@ -1978,7 +1978,7 @@ export default function LeadsPage() {
                                   <DollarSign className="h-4 w-4 text-purple-600" />
                                   <div className="flex flex-col">
                                     <span className="text-sm font-bold text-purple-800">{p.customerName || "Estimate"}{p.proposalNumber ? ` #${p.proposalNumber}` : ""}</span>
-                                    {p.address && <span className="text-[11px] text-purple-600 truncate max-w-[200px]">{p.address}</span>}
+                                    {p.address && <span className="truncate text-[11px] text-purple-600">{p.address}</span>}
                                   </div>
                                 </div>
                                 <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${getProposalStatusStyle(p.status)}`}>{p.status}</span>

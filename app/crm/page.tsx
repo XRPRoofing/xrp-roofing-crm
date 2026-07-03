@@ -388,29 +388,29 @@ export default function CrmDashboardPage() {
         </section>
       ) : (
       <section className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Total Jobs</p>
-          <p className="mt-0.5 text-xl font-bold text-gray-900">{jobs.length}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Total Jobs</p>
+          <p className="mt-0.5 truncate text-lg font-bold text-gray-900 sm:text-xl">{jobs.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Active Leads</p>
-          <p className="mt-0.5 text-xl font-bold text-gray-900">{activeLeads}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Active Leads</p>
+          <p className="mt-0.5 truncate text-lg font-bold text-gray-900 sm:text-xl">{activeLeads}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Proposals Sent</p>
-          <p className="mt-0.5 text-xl font-bold text-gray-900">{sentProposalCount}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Proposals</p>
+          <p className="mt-0.5 truncate text-lg font-bold text-gray-900 sm:text-xl">{sentProposalCount}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Signed</p>
-          <p className="mt-0.5 text-xl font-bold text-green-600">{signedProposals}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Signed</p>
+          <p className="mt-0.5 truncate text-lg font-bold text-green-600 sm:text-xl">{signedProposals}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Revenue</p>
-          <p className="mt-0.5 text-xl font-bold text-gray-900">{totalRevenue > 0 ? formatUsd(totalRevenue) : "$0"}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Revenue</p>
+          <p className="mt-0.5 truncate text-lg font-bold text-gray-900 sm:text-xl">{totalRevenue > 0 ? formatUsd(totalRevenue) : "$0"}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Outstanding</p>
-          <p className={`mt-0.5 text-xl font-bold ${outstandingBalance > 0 ? "text-orange-600" : "text-gray-900"}`}>{outstandingBalance > 0 ? formatUsd(outstandingBalance) : "$0"}</p>
+        <div className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 sm:px-3 sm:py-2.5">
+          <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-400">Outstanding</p>
+          <p className={`mt-0.5 truncate text-lg font-bold sm:text-xl ${outstandingBalance > 0 ? "text-orange-600" : "text-gray-900"}`}>{outstandingBalance > 0 ? formatUsd(outstandingBalance) : "$0"}</p>
         </div>
       </section>
       )}
@@ -436,7 +436,7 @@ export default function CrmDashboardPage() {
             {eventsLoading ? (
               <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3 sm:gap-x-6">
                 <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneIncoming className="h-3 w-3" />Incoming</span><span className="text-sm font-semibold text-gray-800">{callMetrics.incoming}</span></div>
                 <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneOutgoing className="h-3 w-3" />Outgoing</span><span className="text-sm font-semibold text-gray-800">{callMetrics.outgoing}</span></div>
                 <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneMissed className="h-3 w-3 text-red-400" />Missed</span><span className={`text-sm font-semibold ${callMetrics.missed > 0 ? "text-red-600" : "text-gray-800"}`}>{callMetrics.missed}</span></div>

@@ -726,16 +726,16 @@ export default function CustomersPage() {
         <div className="fixed inset-0 z-[60] flex justify-end bg-gray-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
           <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
-              <div className="flex items-start justify-between gap-4 p-5 pb-3">
-                <div>
+              <div className="flex items-start justify-between gap-2 p-3 pb-2 sm:gap-4 sm:p-5 sm:pb-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold uppercase tracking-wide text-blue-500">Customer profile</p>
-                  <h2 className="mt-1 text-2xl font-bold text-blue-700">{selectedCustomer.name}</h2>
+                  <h2 className="mt-1 truncate text-xl font-bold text-blue-700 sm:text-2xl">{selectedCustomer.name}</h2>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusTone(selectedCustomer.status)}`}>{selectedCustomer.status || "New customer"}</span>
-                    <span className="text-sm font-bold text-gray-500">{getActiveJobCount(selectedCustomer, jobList)} active • {selectedCustomerJobs.length} total job{selectedCustomerJobs.length === 1 ? "" : "s"}</span>
+                    <span className="text-xs font-bold text-gray-500 sm:text-sm">{getActiveJobCount(selectedCustomer, jobList)} active • {selectedCustomerJobs.length} total job{selectedCustomerJobs.length === 1 ? "" : "s"}</span>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-1.5 sm:gap-2">
                   <button type="button" onClick={() => handleEditCustomer(selectedCustomer)} className="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-100"><Edit3 className="h-5 w-5" /></button>
                   {savedCustomers.some((customer) => customer.id === selectedCustomer.id) && (
                     <button type="button" onClick={() => handleDeleteCustomer(selectedCustomer.id)} className="rounded-lg border border-red-200 p-2 text-red-500 hover:bg-red-50"><Trash2 className="h-5 w-5" /></button>

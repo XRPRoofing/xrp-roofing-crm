@@ -931,7 +931,7 @@ export default function PhonePage() {
                   </div>
 
                   {/* Quick action buttons */}
-                  <div className="mt-2.5 flex items-center gap-2 pl-[52px]">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pl-[52px] sm:gap-2">
                     {call.phone && (
                       <button
                         type="button"
