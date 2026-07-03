@@ -25,7 +25,7 @@ import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
-import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "@/lib/unified-numbering";
+import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
@@ -943,7 +943,9 @@ export default function InvoicesPage() {
         const saved = readStoredInvoices();
         if (mounted) setInvoices(saved && saved.length > 0 ? saved : initialInvoices);
       }
-      // Initialize unified counter from existing invoice numbers
+      // Sync unified counter from database (scans BOTH proposals AND invoices)
+      await syncCounterFromDatabase();
+      // Also ensure local invoices are accounted for
       const allInvoices = getCachedInvoices<Invoice>() || readStoredInvoices() || [];
       const existingNums = allInvoices
         .map((inv) => parseUnifiedNumber(inv.invoiceNumber))

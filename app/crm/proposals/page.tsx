@@ -21,7 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
-import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber } from "@/lib/unified-numbering";
+import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 
 type Proposal = {
@@ -823,7 +823,9 @@ export default function ProposalsPage() {
         if (mounted) setProposals(local);
       }
 
-      // Initialize unified counter from existing proposal numbers
+      // Sync unified counter from database (scans BOTH proposals AND invoices)
+      await syncCounterFromDatabase();
+      // Also ensure local proposals are accounted for
       const allProposals = prevProposalsRef.current;
       const existingNumbers = allProposals
         .map((p) => p.proposalNumber ? parseUnifiedNumber(p.proposalNumber) : NaN)
@@ -1790,7 +1792,7 @@ export default function ProposalsPage() {
     const duplicated: Proposal = {
       ...activeProposal,
       id: `proposal-${Date.now()}`,
-      proposalNumber: `XRP-P-${getNextUnifiedNumber()}`,
+      proposalNumber: String(getNextUnifiedNumber()),
       status: "Draft",
       locked: false,
       signedAt: undefined,
