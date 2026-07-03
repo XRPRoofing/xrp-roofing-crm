@@ -202,12 +202,12 @@ function StatusDot({ color }: { color: string }) {
   const colorMap: Record<string, string> = {
     green: "bg-green-500",
     red: "bg-red-500",
-    blue: "bg-blue-500",
-    orange: "bg-orange-500",
-    yellow: "bg-yellow-500",
+    blue: "bg-gray-400",
+    orange: "bg-orange-400",
+    yellow: "bg-yellow-400",
     gray: "bg-gray-400",
   };
-  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${colorMap[color] || "bg-gray-400"}`} />;
+  return <span className={`inline-block h-2 w-2 rounded-full ${colorMap[color] || "bg-gray-400"}`} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -644,11 +644,11 @@ export default function PhonePage() {
                 <p className="text-[10px] font-semibold text-gray-500">Missed</p>
               </div>
               <div className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">
-                <p className="text-lg font-bold text-green-600">{stats.inbound}</p>
+                <p className="text-lg font-bold text-gray-800">{stats.inbound}</p>
                 <p className="text-[10px] font-semibold text-gray-500">Inbound</p>
               </div>
               <div className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">
-                <p className="text-lg font-bold text-blue-600">{stats.outbound}</p>
+                <p className="text-lg font-bold text-gray-800">{stats.outbound}</p>
                 <p className="text-[10px] font-semibold text-gray-500">Outbound</p>
               </div>
             </div>
@@ -656,10 +656,10 @@ export default function PhonePage() {
             {/* ========== Desktop stats cards ========== */}
             <div className="hidden grid-cols-6 gap-3 p-4 lg:grid lg:px-6">
               <StatCard icon={PhoneMissed} iconColor="text-red-600" iconBg="bg-red-50" label="Missed Calls" value={stats.missed} />
-              <StatCard icon={PhoneIncoming} iconColor="text-green-600" iconBg="bg-green-50" label="Inbound Calls" value={stats.inbound} />
-              <StatCard icon={PhoneOutgoing} iconColor="text-blue-600" iconBg="bg-blue-50" label="Outbound Calls" value={stats.outbound} />
-              <StatCard icon={Headphones} iconColor="text-purple-600" iconBg="bg-purple-50" label="Active Calls" value={stats.activeCalls} />
-              <StatCard icon={Clock} iconColor="text-amber-600" iconBg="bg-amber-50" label="Avg Duration" value={formatDurationLong(stats.avgDuration)} />
+              <StatCard icon={PhoneIncoming} iconColor="text-gray-600" iconBg="bg-gray-100" label="Inbound Calls" value={stats.inbound} />
+              <StatCard icon={PhoneOutgoing} iconColor="text-gray-600" iconBg="bg-gray-100" label="Outbound Calls" value={stats.outbound} />
+              <StatCard icon={Headphones} iconColor="text-gray-600" iconBg="bg-gray-100" label="Active Calls" value={stats.activeCalls} />
+              <StatCard icon={Clock} iconColor="text-gray-600" iconBg="bg-gray-100" label="Avg Duration" value={formatDurationLong(stats.avgDuration)} />
               <StatCard icon={PhoneCall} iconColor="text-gray-600" iconBg="bg-gray-100" label="Total Calls" value={stats.total} />
             </div>
 
@@ -742,14 +742,14 @@ export default function PhonePage() {
                   <div className="flex items-start gap-3">
                     {/* Direction icon */}
                     <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                      call.statusColor === "red" ? "bg-red-50" : call.statusColor === "blue" ? "bg-blue-50" : call.statusColor === "orange" ? "bg-orange-50" : "bg-green-50"
+                      call.statusColor === "red" ? "bg-red-50" : "bg-gray-100"
                     }`}>
                       {call.statusColor === "red" ? (
-                        <PhoneMissed className={`h-5 w-5 text-red-500`} />
+                        <PhoneMissed className="h-5 w-5 text-red-500" />
                       ) : call.direction === "inbound" ? (
                         <ArrowDownLeft className="h-5 w-5 text-green-600" />
                       ) : (
-                        <ArrowUpRight className="h-5 w-5 text-blue-600" />
+                        <ArrowUpRight className="h-5 w-5 text-gray-500" />
                       )}
                     </div>
 
@@ -758,7 +758,7 @@ export default function PhonePage() {
                       <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-bold text-gray-900">{call.customerName}</p>
                         {call.tag === "Forwarded" && (
-                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-orange-50 text-orange-600">Fwd</span>
+                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-gray-100 text-gray-500">Fwd</span>
                         )}
                       </div>
                       <p className="text-xs text-gray-500">
@@ -779,8 +779,8 @@ export default function PhonePage() {
                       )}
                     </div>
 
-                    {/* Status dot */}
-                    <StatusDot color={call.statusColor} />
+                    {/* Status indicator */}
+                    {call.statusColor === "red" && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />}
                   </div>
 
                   {/* Quick action buttons */}
@@ -789,25 +789,25 @@ export default function PhonePage() {
                       <button
                         type="button"
                         onClick={() => handleCallBack(call.phone)}
-                        className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-700 active:bg-green-100"
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
                       >
-                        <Phone className="h-3.5 w-3.5" />
+                        <Phone className="h-3.5 w-3.5 text-gray-500" />
                         Call Back
                       </button>
                     )}
                     {call.customerId && (
                       <a
                         href={`/crm/customers?id=${call.customerId}`}
-                        className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 active:bg-blue-100"
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
+                        <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
                         Customer
                       </a>
                     )}
                     <button
                       type="button"
                       onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
-                      className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-600 active:bg-gray-200"
+                      className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
                     >
                       + Tag
                     </button>
@@ -848,18 +848,18 @@ export default function PhonePage() {
                     <div className="py-1">
                       {sheetCall.phone && (
                         <button type="button" onClick={() => { setActionSheetCallId(null); handleCallBack(sheetCall.phone); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
-                          <Phone className="h-5 w-5 text-blue-600" />
+                          <Phone className="h-5 w-5 text-gray-500" />
                           <span className="text-base font-semibold text-gray-700">Call {sheetCall.customerName}</span>
                         </button>
                       )}
                       {sheetCall.phone && (
                         <button type="button" onClick={() => { setActionSheetCallId(null); window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: sheetCall.phone, name: sheetCall.customerName } })); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
-                          <MessageSquare className="h-5 w-5 text-blue-600" />
+                          <MessageSquare className="h-5 w-5 text-gray-500" />
                           <span className="text-base font-semibold text-gray-700">Message {sheetCall.customerName}</span>
                         </button>
                       )}
                       <button type="button" onClick={() => { setActionSheetCallId(null); openJobPanel(sheetCall.phone, sheetCall.customerName); }} className="flex w-full items-center gap-4 px-5 py-4 text-left transition active:bg-gray-50">
-                        <Briefcase className="h-5 w-5 text-blue-600" />
+                        <Briefcase className="h-5 w-5 text-gray-500" />
                         <span className="text-base font-semibold text-gray-700">New job</span>
                       </button>
                     </div>
@@ -907,10 +907,12 @@ export default function PhonePage() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
-                          {call.direction === "inbound" ? (
+                          {call.statusColor === "red" ? (
+                            <PhoneMissed className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                          ) : call.direction === "inbound" ? (
                             <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-green-500" />
                           ) : (
-                            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                           )}
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-gray-900">{call.customerName}</p>
@@ -987,7 +989,7 @@ export default function PhonePage() {
                                 handleCallBack(call.phone);
                               }}
                               title="Call Back"
-                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-green-50 hover:text-green-600"
+                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </button>
@@ -997,7 +999,7 @@ export default function PhonePage() {
                               href={`/crm/customers?id=${call.customerId}`}
                               onClick={(e) => e.stopPropagation()}
                               title="View Customer"
-                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600"
+                              className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
@@ -1057,24 +1059,24 @@ export default function PhonePage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedCall.phone && (
-                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
-                        <Phone className="h-3.5 w-3.5" />
+                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <Phone className="h-3.5 w-3.5 text-gray-500" />
                         Call
                       </button>
                     )}
                     {selectedCall.phone && (
-                      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
-                        <MessageSquare className="h-3.5 w-3.5" />
+                      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crm:open-sms", { detail: { phone: selectedCall.phone, name: selectedCall.customerName } }))} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
                         Message
                       </button>
                     )}
-                    <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
-                      <Briefcase className="h-3.5 w-3.5" />
+                    <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                      <Briefcase className="h-3.5 w-3.5 text-gray-500" />
                       New Job
                     </button>
                     {selectedCall.customerId && (
-                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
-                        <ExternalLink className="h-3.5 w-3.5" />
+                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                        <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
                         Customer
                       </a>
                     )}

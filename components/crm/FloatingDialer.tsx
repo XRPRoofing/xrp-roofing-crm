@@ -1081,11 +1081,11 @@ export default function FloatingDialer({
                           className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-gray-50 active:bg-gray-100"
                         >
                           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                            isMissed ? "bg-red-50" : "bg-blue-50"
+                            isMissed ? "bg-red-50" : "bg-gray-100"
                           }`}>
                             {isMissed ? <PhoneMissed className="h-4 w-4 text-red-500" /> :
-                             call.direction === "inbound" ? <PhoneIncoming className="h-4 w-4 text-blue-600" /> :
-                             <PhoneOutgoing className="h-4 w-4 text-blue-600" />}
+                             call.direction === "inbound" ? <PhoneIncoming className="h-4 w-4 text-green-600" /> :
+                             <PhoneOutgoing className="h-4 w-4 text-gray-500" />}
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className={`truncate text-sm font-semibold ${isMissed ? "text-red-600" : "text-gray-900"}`}>
@@ -1142,8 +1142,8 @@ export default function FloatingDialer({
                         key={customer.id}
                         className="flex items-center gap-2 px-3 py-2 transition hover:bg-gray-50"
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50">
-                          <span className="text-xs font-bold text-blue-600">{customer.name.charAt(0).toUpperCase()}</span>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                          <span className="text-xs font-bold text-gray-600">{customer.name.charAt(0).toUpperCase()}</span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-semibold text-gray-900">{customer.name}</p>
@@ -1152,7 +1152,7 @@ export default function FloatingDialer({
                         <button
                           type="button"
                           onClick={() => handleStartCall(customer.phone)}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 transition hover:bg-blue-100"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200"
                         >
                           <Phone className="h-3.5 w-3.5" />
                         </button>
@@ -1192,15 +1192,15 @@ export default function FloatingDialer({
               </div>
               <div className="py-1">
                 <button type="button" onClick={() => { setActionMenuCallId(null); handleStartCall(menuCall.phone); }} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
-                  <Phone className="h-5 w-5 text-blue-600" />
+                  <Phone className="h-5 w-5 text-gray-500" />
                   <span className="text-sm font-semibold text-gray-700">Call {displayName}</span>
                 </button>
                 <button type="button" onClick={() => openSmsPanel(menuCall.phone, menuCall.name)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
-                  <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <MessageSquare className="h-5 w-5 text-gray-500" />
                   <span className="text-sm font-semibold text-gray-700">Message {displayName}</span>
                 </button>
                 <button type="button" onClick={() => openNewJobForm(menuCall.phone, menuCall.name)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-gray-50 active:bg-gray-100">
-                  <Briefcase className="h-5 w-5 text-blue-600" />
+                  <Briefcase className="h-5 w-5 text-gray-500" />
                   <span className="text-sm font-semibold text-gray-700">New job</span>
                 </button>
               </div>
