@@ -661,6 +661,56 @@ export default function CalendarPage() {
     navigate(dx < 0 ? 1 : -1);
   }
 
+  /* ── Drag and drop (reschedule events) ────────────────────────────── */
+
+  const [dragEventId, setDragEventId] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+
+  function handleDragStart(e: React.DragEvent, eventId: string) {
+    setDragEventId(eventId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", eventId);
+  }
+
+  function handleDragOver(e: React.DragEvent, dateKey: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverDate(dateKey);
+  }
+
+  function handleDragLeave() {
+    setDragOverDate(null);
+  }
+
+  async function handleDrop(e: React.DragEvent, dateKey: string) {
+    e.preventDefault();
+    setDragOverDate(null);
+    const eventId = e.dataTransfer.getData("text/plain") || dragEventId;
+    setDragEventId(null);
+    if (!eventId) return;
+    const ev = events.find((x) => x.id === eventId);
+    if (!ev) return;
+    const [y, m, d] = dateKey.split("-").map(Number);
+    const oldStart = new Date(ev.start_time);
+    const oldEnd = new Date(ev.end_time);
+    const diff = oldEnd.getTime() - oldStart.getTime();
+    const newStart = new Date(oldStart);
+    newStart.setFullYear(y, m - 1, d);
+    const newEnd = new Date(newStart.getTime() + diff);
+    const updated = { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), updated_at: new Date().toISOString() };
+    setEvents((prev) => prev.map((x) => x.id === eventId ? updated : x));
+    setStatusMessage("Event moved.");
+    setTimeout(() => setStatusMessage(""), 2000);
+    try {
+      const { updateCalendarEvent } = await import("@/lib/calendar-sync");
+      await updateCalendarEvent(eventId, { start_time: updated.start_time, end_time: updated.end_time });
+      broadcastCrmUpdate();
+    } catch {
+      setEvents((prev) => prev.map((x) => x.id === eventId ? ev : x));
+      setError("Failed to move event.");
+    }
+  }
+
   /* ── Filtering ──────────────────────────────────────────────────────── */
 
   function toggleTeam(id: string) {
@@ -688,8 +738,9 @@ export default function CalendarPage() {
     const eventStatus = isPast ? "done" : "open";
     if (statusFilter.size > 0 && statusFilter.size < 2 && !statusFilter.has(eventStatus)) return false;
     // Job kind / type filter (normalize old values like "Inspection" → "Roof Inspection")
-    if (!isGcal && event.job_kind && enabledJobKinds.size < JOB_KINDS.length) {
-      if (!enabledJobKinds.has(normalizeJobKind(event.job_kind))) return false;
+    if (enabledJobKinds.size < JOB_KINDS.length) {
+      const kind = event.job_kind ? normalizeJobKind(event.job_kind) : "Other";
+      if (!enabledJobKinds.has(kind)) return false;
     }
     // Tag filter
     if (tagFilter.size > 0) {
@@ -991,11 +1042,13 @@ export default function CalendarPage() {
       <div key={event.id} className="group relative flex w-full items-center">
         <button
           type="button"
+          draggable
+          onDragStart={(e) => handleDragStart(e, event.id)}
           onClick={(e) => {
             e.stopPropagation();
             setSelectedEvent(event);
           }}
-          className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${hasPhone ? "pr-5 sm:pr-6" : ""} ${chipColor}`}
+          className={`block w-full cursor-grab truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 active:cursor-grabbing sm:px-1.5 sm:py-[3px] sm:text-xs ${hasPhone ? "pr-5 sm:pr-6" : ""} ${chipColor}`}
           title={`${isGcal ? "[Google] " : ""}${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
         >
           {compact ? (
@@ -1108,8 +1161,10 @@ export default function CalendarPage() {
                   <button
                     key={ev.id}
                     type="button"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, ev.id)}
                     onClick={() => setSelectedEvent(ev)}
-                    className={`flex w-full items-start gap-3 px-3 py-3 text-left transition hover:bg-gray-50 sm:px-4 sm:py-4`}
+                    className={`flex w-full cursor-grab items-start gap-3 px-3 py-3 text-left transition hover:bg-gray-50 active:cursor-grabbing sm:px-4 sm:py-4`}
                   >
                     {/* Time column */}
                     <div className="w-16 shrink-0 pt-0.5 sm:w-20">
@@ -1130,7 +1185,7 @@ export default function CalendarPage() {
                             {assignedName}
                           </span>
                         )}
-                        {ev.job_kind && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 sm:text-xs">{ev.job_kind}</span>}
+                        {ev.job_kind && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 sm:text-xs">{normalizeJobKind(ev.job_kind)}</span>}
                       </div>
                     </div>
                   </button>
@@ -1176,12 +1231,15 @@ export default function CalendarPage() {
             return (
               <div
                 key={`${key}-${index}`}
-                className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
                 onClick={() => {
                   setCurrentDate(cell.date);
                   setSelectedDay(key);
                   setViewMode("day");
                 }}
+                onDragOver={(e) => handleDragOver(e, key)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, key)}
               >
                 <div className="mb-0.5 text-right sm:mb-1">
                   <span
@@ -1227,8 +1285,11 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={dayIdx}
-                    className="relative border-b border-r border-gray-100 p-0.5 last:border-r-0"
+                    className={`relative border-b border-r border-gray-100 p-0.5 last:border-r-0 ${dragOverDate === key ? "bg-blue-50" : ""}`}
                     style={{ minHeight: `${cellHeight}px` }}
+                    onDragOver={(e) => handleDragOver(e, key)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, key)}
                   >
                     {hourEvents.map((ev) => {
                       const span = Math.max(
@@ -1242,8 +1303,10 @@ export default function CalendarPage() {
                         <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * cellHeight}px` }}>
                           <button
                             type="button"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, ev.id)}
                             onClick={() => setSelectedEvent(ev)}
-                            className={`h-full w-full overflow-hidden rounded border px-1.5 py-1 text-left text-xs font-semibold transition hover:opacity-80 sm:px-1 sm:py-0.5 sm:text-[10px] ${wColor}`}
+                            className={`h-full w-full cursor-grab overflow-hidden rounded border px-1.5 py-1 text-left text-xs font-semibold transition hover:opacity-80 active:cursor-grabbing sm:px-1 sm:py-0.5 sm:text-[10px] ${wColor}`}
                             title={`${ev.title} ${formatEventTimeRange(ev)}`}
                           >
                             <div className="truncate">{ev.title}</div>
@@ -1942,12 +2005,9 @@ export default function CalendarPage() {
                   }
                   className="rounded-lg border border-gray-200 px-4 py-3 outline-none"
                 >
-                  <option>Repair</option>
-                  <option>Replacement</option>
-                  <option>Installation</option>
-                  <option>Maintenance</option>
-                  <option>Inspection</option>
-                  <option>Other</option>
+                  {JOB_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>{kind}</option>
+                  ))}
                 </select>
                 <select
                   value={form.assigned_to}
@@ -2496,12 +2556,9 @@ export default function CalendarPage() {
                       }
                       className="rounded-lg bg-gray-100 px-4 py-3 outline-none"
                     >
-                      <option>Repair</option>
-                      <option>Replacement</option>
-                      <option>Installation</option>
-                      <option>Maintenance</option>
-                      <option>Inspection</option>
-                      <option>Other</option>
+                      {JOB_KINDS.map((kind) => (
+                        <option key={kind} value={kind}>{kind}</option>
+                      ))}
                     </select>
                   </label>
                   <label className="grid grid-cols-[28px_1fr] items-center gap-4">
