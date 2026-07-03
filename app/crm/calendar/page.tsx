@@ -199,13 +199,21 @@ function getColorConfig(colorId: string): ColorConfig {
 /* ── Team members ──────────────────────────────────────────────────────── */
 
 const TEAM_MEMBERS = [
-  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com" },
-  { id: "gerardo", name: "Gerardo Chavez", email: "" },
-  { id: "christian", name: "Christian Gonzalez", email: "" },
-  { id: "adrian", name: "Adrian Murillo", email: "" },
-  { id: "jacob", name: "Jacob Ramirez", email: "" },
-  { id: "darwin", name: "Darwin Rodas Garcia", email: "" },
+  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com", teamColor: "green" as const },
+  { id: "adrian", name: "Adrian Murillo", email: "", teamColor: "blue" as const },
+  { id: "office", name: "Office", email: "info@xrproofing.com", teamColor: "orange" as const },
 ];
+
+const TEAM_COLOR_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  green: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500" },
+  blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
+  orange: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+};
+
+function getTeamColor(memberId: string) {
+  const member = TEAM_MEMBERS.find((m) => m.id === memberId);
+  return member ? TEAM_COLOR_STYLES[member.teamColor] || TEAM_COLOR_STYLES.blue : null;
+}
 
 const JOB_KINDS = ["Repair", "Replacement", "Installation", "Maintenance", "Inspection", "Other"];
 const DEFAULT_TAGS = ["Urgent", "Follow-up", "VIP", "Insurance", "Commercial", "Residential"];
@@ -943,7 +951,8 @@ export default function CalendarPage() {
   /* ── Render helpers ─────────────────────────────────────────────────── */
 
   function renderEventChip(event: CalendarEvent, compact = false) {
-    const cc = getColorConfig(event.color);
+    const tc = getTeamColor(event.assigned_to);
+    const chipColor = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(event.color).color;
     const time = formatEventTime(event);
     const isGcal = isGoogleEvent(event);
     const hasPhone = Boolean(event.customer_phone?.replace(/[^\d+]/g, ""));
@@ -955,7 +964,7 @@ export default function CalendarPage() {
             e.stopPropagation();
             setSelectedEvent(event);
           }}
-          className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${hasPhone ? "pr-5 sm:pr-6" : ""} ${cc.color}`}
+          className={`block w-full truncate rounded border px-1 py-0.5 text-left text-[10px] font-semibold leading-snug transition hover:opacity-80 sm:px-1.5 sm:py-[3px] sm:text-xs ${hasPhone ? "pr-5 sm:pr-6" : ""} ${chipColor}`}
           title={`${isGcal ? "[Google] " : ""}${event.title || "Untitled"}${time ? ` ${time}` : ""}`}
         >
           {compact ? (
@@ -1028,7 +1037,8 @@ export default function CalendarPage() {
 
             return (
               <div key={member.id} className="flex border-b border-gray-100">
-                <div className="flex w-24 shrink-0 items-center border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
+                <div className="flex w-24 shrink-0 items-center gap-2 border-r border-gray-200 bg-gray-50/50 px-2 py-3 sm:w-36 sm:px-3">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TEAM_COLOR_STYLES[member.teamColor]?.dot || "bg-gray-400"}`} />
                   <div className="min-w-0">
                     <div className="truncate text-[11px] font-bold text-gray-800 sm:text-sm">{member.name.split(" ")[0]}</div>
                     <div className="hidden truncate text-[10px] text-gray-400 sm:block">{member.name.split(" ").slice(1).join(" ")}</div>
@@ -1044,13 +1054,14 @@ export default function CalendarPage() {
                       const endH = eventEndHour(ev);
                       const left = Math.max(0, startH - 6) * cellW;
                       const width = Math.max(1, endH - startH) * cellW;
-                      const cc = getColorConfig(ev.color);
+                      const tc = TEAM_COLOR_STYLES[member.teamColor];
+                      const colorClass = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(ev.color).color;
                       return (
                         <button
                           key={ev.id}
                           type="button"
                           onClick={() => setSelectedEvent(ev)}
-                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
+                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${colorClass}`}
                           style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
                           title={`${ev.title} ${formatEventTimeRange(ev)}`}
                         >
@@ -1086,13 +1097,14 @@ export default function CalendarPage() {
                       const endH = eventEndHour(ev);
                       const left = Math.max(0, startH - 6) * cellW;
                       const width = Math.max(1, endH - startH) * cellW;
-                      const cc = getColorConfig(ev.color);
+                      const utc = getTeamColor(ev.assigned_to);
+                      const uColor = utc ? `${utc.bg} ${utc.text} ${utc.border}` : getColorConfig(ev.color).color;
                       return (
                         <button
                           key={ev.id}
                           type="button"
                           onClick={() => setSelectedEvent(ev)}
-                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${cc.color}`}
+                          className={`absolute top-1 overflow-hidden rounded border px-1.5 py-0.5 text-left text-[10px] font-semibold transition hover:opacity-80 sm:text-xs ${uColor}`}
                           style={{ left: `${left}px`, width: `${Math.max(width - 4, 40)}px`, height: "calc(100% - 8px)" }}
                           title={`${ev.title} ${formatEventTimeRange(ev)}`}
                         >
@@ -1203,14 +1215,15 @@ export default function CalendarPage() {
                         1,
                         eventEndHour(ev) - eventHour(ev),
                       );
-                      const cc = getColorConfig(ev.color);
+                      const wtc = getTeamColor(ev.assigned_to);
+                      const wColor = wtc ? `${wtc.bg} ${wtc.text} ${wtc.border}` : getColorConfig(ev.color).color;
                       const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                       return (
                         <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * cellHeight}px` }}>
                           <button
                             type="button"
                             onClick={() => setSelectedEvent(ev)}
-                            className={`h-full w-full overflow-hidden rounded border px-1.5 py-1 text-left text-xs font-semibold transition hover:opacity-80 sm:px-1 sm:py-0.5 sm:text-[10px] ${cc.color}`}
+                            className={`h-full w-full overflow-hidden rounded border px-1.5 py-1 text-left text-xs font-semibold transition hover:opacity-80 sm:px-1 sm:py-0.5 sm:text-[10px] ${wColor}`}
                             title={`${ev.title} ${formatEventTimeRange(ev)}`}
                           >
                             <div className="truncate">{ev.title}</div>
@@ -1382,14 +1395,15 @@ export default function CalendarPage() {
                         1,
                         eventEndHour(ev) - eventHour(ev),
                       );
-                      const cc = getColorConfig(ev.color);
+                      const dtc = getTeamColor(ev.assigned_to);
+                      const dColor = dtc ? `${dtc.bg} ${dtc.text} ${dtc.border}` : getColorConfig(ev.color).color;
                       const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                       return (
                         <div key={ev.id} className="group/ev absolute inset-x-1 z-10" style={{ top: 0, height: `${span * 56}px` }}>
                           <button
                             type="button"
                             onClick={() => setSelectedEvent(ev)}
-                            className={`h-full w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition hover:opacity-80 ${cc.color}`}
+                            className={`h-full w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition hover:opacity-80 ${dColor}`}
                           >
                             <div className="text-sm font-bold">{ev.title}</div>
                             <div className="mt-0.5 text-xs opacity-80">
@@ -1566,6 +1580,7 @@ export default function CalendarPage() {
                 {TEAM_MEMBERS.map((member) => (
                   <label key={member.id} className="flex cursor-pointer items-center gap-2.5 py-2">
                     <input type="checkbox" checked={enabledTeam.has(member.id)} onChange={() => toggleTeam(member.id)} className="h-4 w-4 rounded border-gray-300" />
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TEAM_COLOR_STYLES[member.teamColor]?.dot || "bg-gray-400"}`} />
                     <span className="text-sm font-medium text-gray-700">{member.name}</span>
                   </label>
                 ))}
