@@ -334,6 +334,43 @@ export default function PhonePage() {
       }
     }
 
+    // Conference recording resolution: browser-initiated outbound calls use a
+    // conference for hold/transfer.  The recording callback arrives with
+    // payload.ConferenceSid but no callSid/from/to.  Trace through conference
+    // participant events to find the customer's callSid and attach the recording.
+    const confSidToName = new Map<string, string>();
+    const confNameToCustomer = new Map<string, string>();
+    for (const e of events) {
+      if (e.type !== "call_status") continue;
+      const p = e.payload;
+      if (!p) continue;
+      const cs = typeof p.ConferenceSid === "string" ? p.ConferenceSid : "";
+      const fn = typeof p.FriendlyName === "string" ? p.FriendlyName : "";
+      if (cs && fn && typeof fn === "string" && fn.startsWith("call-")) {
+        confSidToName.set(cs, fn);
+        if (p.ParticipantLabel === "customer" && e.callSid) {
+          confNameToCustomer.set(fn, e.callSid);
+        }
+      }
+    }
+    for (const e of recordingEvents) {
+      if (e.callSid) continue;
+      const cs = typeof e.payload?.ConferenceSid === "string" ? e.payload.ConferenceSid : "";
+      if (!cs) continue;
+      const fn = confSidToName.get(cs);
+      if (!fn) continue;
+      const customerSid = confNameToCustomer.get(fn);
+      if (!customerSid) continue;
+      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
+      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
+      const url = e.recordingUrl || "";
+      const existing = recordingMap.get(customerSid);
+      if (existing && e.status === "processing" && existing.summary) continue;
+      if (!existing || (summary && !existing.summary) || (url && !existing.url) || (e.status !== "processing" && !existing.summary)) {
+        recordingMap.set(customerSid, { url: url || existing?.url, summary: summary || existing?.summary, transcript: transcript || existing?.transcript });
+      }
+    }
+
     // Fallback: build a phone+time index from recording events for calls whose
     // callSid doesn't appear in the recordingMap (Twilio may use a child leg
     // SID for the recording callback that differs from the parent call SID).
