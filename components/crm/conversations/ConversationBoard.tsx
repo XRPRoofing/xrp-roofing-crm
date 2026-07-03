@@ -13,10 +13,15 @@ import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twili
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime } from "@/lib/arizona-time";
+import { refreshCrewData, getCachedCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { refreshInvoices, getCachedInvoices } from "@/lib/data-cache";
+import { refreshProposals, getCachedProposals } from "@/lib/data-cache";
+import type { JobRecord } from "@/lib/crew-sync";
+import type { Lead } from "@/types/crm";
 import type { BrowserVoiceCall } from "@/lib/twilio/client";
 import type { ConversationChannel, ConversationMessage, ConversationRecord } from "@/types/conversations";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
-import { ArrowLeft, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, FileImage, FileText, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Trash2, Upload, UserRound, X } from "lucide-react";
+import { ArrowLeft, Briefcase, Calendar, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Clock, CreditCard, DollarSign, ExternalLink, FileImage, FileText, Hash, MapPin, MessageCircle, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Plus, Search, Send, Smile, Sparkles, Trash2, Upload, UserRound, X } from "lucide-react";
 import { PhoneLink, AddressLink, linkifyContactInfo } from "@/components/ContactLinks";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { getTwilioLines, getLineLabelForNumber } from "@/lib/twilio/numbers";
@@ -867,48 +872,271 @@ function createLocalCommunicationEvent(type: TwilioConversationEvent["type"], ph
   };
 }
 
-function ContactPanel({ conversation, onDial, onContactChange, onSchedule }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void; onSchedule: () => void }) {
+function ContactPanel({ conversation, onDial, onContactChange, onSchedule, allJobs, allInvoices, allProposals }: { conversation: ConversationRecord; onDial: (conversation: ConversationRecord) => void; onContactChange: (field: keyof ConversationRecord["contact"], value: string) => void; onSchedule: () => void; allJobs: JobRecord[]; allInvoices: Record<string, unknown>[]; allProposals: Record<string, unknown>[] }) {
   const contact = conversation.contact;
+  const phone = contact.phone;
+  const phoneNorm = normalizePhone(phone);
+
+  // Match customer jobs by phone or name
+  const customerJobs = useMemo(() => {
+    if (!phoneNorm && !contact.name) return [];
+    return allJobs.filter((j) => {
+      if (phoneNorm && j.phone && normalizePhone(j.phone) === phoneNorm) return true;
+      if (contact.name && j.name && j.name.toLowerCase() === contact.name.toLowerCase()) return true;
+      return false;
+    });
+  }, [allJobs, phoneNorm, contact.name]);
+
+  const activeJobs = customerJobs.filter((j) => j.stage !== "completed" && j.stage !== "paid");
+  const completedJobs = customerJobs.filter((j) => j.stage === "completed" || j.stage === "paid");
+
+  // Match invoices by phone, email, or name
+  const customerInvoices = useMemo(() => {
+    if (!phoneNorm && !contact.name && !contact.email) return [];
+    return allInvoices.filter((inv) => {
+      const invPhone = normalizePhone(String(inv.clientPhone || ""));
+      const invName = String(inv.clientName || "").toLowerCase();
+      const invEmail = String(inv.clientEmail || "").toLowerCase();
+      if (phoneNorm && invPhone === phoneNorm) return true;
+      if (contact.name && invName === contact.name.toLowerCase()) return true;
+      if (contact.email && invEmail === contact.email.toLowerCase()) return true;
+      return false;
+    });
+  }, [allInvoices, phoneNorm, contact.name, contact.email]);
+
+  const paidInvoices = customerInvoices.filter((inv) => inv.status === "Paid");
+  const unpaidInvoices = customerInvoices.filter((inv) => inv.status !== "Paid" && inv.status !== "Void" && !inv.isDeleted);
+  const totalSpent = paidInvoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+
+  // Match proposals by phone, email, or name
+  const customerProposals = useMemo(() => {
+    if (!phoneNorm && !contact.name && !contact.email) return [];
+    return allProposals.filter((p) => {
+      const payload = (p.payload || p) as Record<string, unknown>;
+      const pPhone = normalizePhone(String(payload.clientPhone || payload.phone || ""));
+      const pName = String(payload.clientName || payload.name || "").toLowerCase();
+      const pEmail = String(payload.clientEmail || payload.email || "").toLowerCase();
+      if (phoneNorm && pPhone === phoneNorm) return true;
+      if (contact.name && pName === contact.name.toLowerCase()) return true;
+      if (contact.email && pEmail === contact.email.toLowerCase()) return true;
+      return false;
+    });
+  }, [allProposals, phoneNorm, contact.name, contact.email]);
+
+  // Last dates
+  const lastServiceDate = completedJobs.length > 0 ? completedJobs.sort((a, b) => (b.submittedAt || b.lastActivity || "").localeCompare(a.submittedAt || a.lastActivity || ""))[0]?.submittedAt || completedJobs[0]?.lastActivity || "" : "";
+  const lastContactDate = conversation.lastActivityIso ? azDateTime(conversation.lastActivityIso) : conversation.lastActivityAt || "";
+
+  // Timeline events
+  const timelineEvents = useMemo(() => {
+    const events: { id: string; type: string; label: string; detail: string; date: string; iso: string; icon: "sms" | "proposal" | "invoice" | "payment" | "job" | "note" }[] = [];
+    // SMS messages
+    for (const msg of conversation.messages) {
+      if (msg.channel === "sms") {
+        events.push({ id: msg.id, type: "sms", label: msg.direction === "inbound" ? "SMS Received" : "SMS Sent", detail: msg.body.length > 80 ? msg.body.slice(0, 80) + "\u2026" : msg.body, date: msg.timestamp, iso: "", icon: "sms" });
+      }
+    }
+    // Proposals
+    for (const p of customerProposals) {
+      const payload = (p.payload || p) as Record<string, unknown>;
+      const num = String(payload.proposalNumber || payload.id || p.id || "").slice(0, 20);
+      const status = String(payload.status || "Draft");
+      const total = Number(payload.total || payload.grandTotal || 0);
+      events.push({ id: String(p.id), type: "proposal", label: `Proposal ${num}`, detail: `${status} · $${total.toLocaleString()}`, date: String(payload.createdAt || payload.created_at || ""), iso: String(payload.createdAt || payload.created_at || ""), icon: "proposal" });
+    }
+    // Invoices
+    for (const inv of customerInvoices) {
+      const num = String(inv.invoiceNumber || inv.id || "").slice(0, 20);
+      const status = String(inv.status || "Draft");
+      const total = Number(inv.total || 0);
+      events.push({ id: String(inv.id), type: "invoice", label: `Invoice ${num}`, detail: `${status} · $${total.toLocaleString()}`, date: String(inv.createdAt || ""), iso: String(inv.createdAt || ""), icon: "invoice" });
+      // Payment sub-events
+      const payments = (inv.payments || []) as Array<{ amount: number; date: string; method: string }>;
+      for (const pay of payments) {
+        events.push({ id: `${inv.id}-pay-${pay.date}`, type: "payment", label: `Payment Received`, detail: `$${pay.amount.toLocaleString()} via ${pay.method || "card"}`, date: pay.date || "", iso: pay.date || "", icon: "payment" });
+      }
+    }
+    // Jobs
+    for (const j of customerJobs) {
+      events.push({ id: j.id, type: "job", label: `Job: ${j.name || j.address || "Untitled"}`, detail: `${j.stage || "new_lead"} · ${j.roofType || ""}`.trim(), date: j.lastActivity || j.createdAt || "", iso: j.lastActivity || j.createdAt || "", icon: "job" });
+    }
+    // Sort by date descending (most recent first)
+    return events.sort((a, b) => {
+      const da = a.iso || a.date || "";
+      const db = b.iso || b.date || "";
+      return db.localeCompare(da);
+    }).slice(0, 20);
+  }, [conversation.messages, customerProposals, customerInvoices, customerJobs]);
+
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
+  const visibleTimeline = showAllTimeline ? timelineEvents : timelineEvents.slice(0, 5);
+
+  const timelineIconMap: Record<string, React.ReactNode> = {
+    sms: <MessageCircle className="h-3.5 w-3.5 text-blue-500" />,
+    proposal: <FileText className="h-3.5 w-3.5 text-purple-500" />,
+    invoice: <Hash className="h-3.5 w-3.5 text-green-600" />,
+    payment: <DollarSign className="h-3.5 w-3.5 text-green-500" />,
+    job: <Briefcase className="h-3.5 w-3.5 text-orange-500" />,
+    note: <FileText className="h-3.5 w-3.5 text-gray-400" />,
+  };
+
   return (
-    <aside className="space-y-4 xl:h-full xl:overflow-y-auto xl:pr-1">
-      <Card className="p-5">
+    <aside className="space-y-3 xl:h-full xl:overflow-y-auto xl:pr-1">
+      {/* Customer Info */}
+      <Card className="p-4">
         <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700"><UserRound className="h-5 w-5" /></div>
           <div className="min-w-0 flex-1">
-            <input value={contact.name} onChange={(event) => onContactChange("name", event.target.value)} className="w-full rounded-lg border border-transparent bg-transparent px-1 text-lg font-bold text-gray-950 outline-none transition hover:border-gray-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
-            <button onClick={() => onDial(conversation)} className="mt-1 inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-800"><Phone className="mr-1.5 h-3.5 w-3.5" />{contact.phone}</button>
+            <input value={contact.name} onChange={(event) => onContactChange("name", event.target.value)} className="w-full rounded-lg border border-transparent bg-transparent px-1 text-base font-bold text-gray-950 outline-none transition hover:border-gray-200 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50" />
+            <button onClick={() => onDial(conversation)} className="mt-0.5 inline-flex items-center text-xs font-medium text-blue-700 hover:text-blue-800"><Phone className="mr-1 h-3 w-3" />{contact.phone}</button>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-14 shrink-0 font-semibold text-gray-400">Email</span>
+            <input value={contact.email} onChange={(event) => onContactChange("email", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
+          <div className="flex items-start gap-2 text-xs text-gray-600">
+            <span className="mt-0.5 w-14 shrink-0 font-semibold text-gray-400">Address</span>
+            <input value={contact.address} onChange={(event) => onContactChange("address", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-14 shrink-0 font-semibold text-gray-400">Source</span>
+            <input value={contact.leadSource} onChange={(event) => onContactChange("leadSource", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
           </div>
         </div>
       </Card>
 
-      <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-950">Contact Info</h3>
-        <div className="mt-4 space-y-4">
-          <EditableDetailRow label="Email" value={contact.email} onChange={(value) => onContactChange("email", value)} />
-          <EditableDetailRow label="Address" value={contact.address} onChange={(value) => onContactChange("address", value)} />
-          <EditableDetailRow label="Lead source" value={contact.leadSource} onChange={(value) => onContactChange("leadSource", value)} />
+      {/* Customer History */}
+      <Card className="p-4">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Customer History</h3>
+        <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Total Jobs</span>
+            <span className="text-xs font-bold text-gray-900">{customerJobs.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Active</span>
+            <span className="text-xs font-bold text-blue-600">{activeJobs.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Completed</span>
+            <span className="text-xs font-bold text-green-600">{completedJobs.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Proposals</span>
+            <span className="text-xs font-bold text-gray-900">{customerProposals.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Invoices</span>
+            <span className="text-xs font-bold text-gray-900">{customerInvoices.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Paid</span>
+            <span className="text-xs font-bold text-green-600">{paidInvoices.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Unpaid</span>
+            <span className="text-xs font-bold text-red-500">{unpaidInvoices.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-500">Total Spent</span>
+            <span className="text-xs font-bold text-gray-900">${totalSpent.toLocaleString()}</span>
+          </div>
+        </div>
+        {(lastServiceDate || lastContactDate) && (
+          <div className="mt-2.5 border-t border-gray-100 pt-2 space-y-1">
+            {lastServiceDate && <p className="text-[11px] text-gray-400">Last service: <span className="font-semibold text-gray-600">{lastServiceDate.includes("T") ? azDateTime(lastServiceDate) : lastServiceDate}</span></p>}
+            {lastContactDate && <p className="text-[11px] text-gray-400">Last contact: <span className="font-semibold text-gray-600">{lastContactDate}</span></p>}
+          </div>
+        )}
+      </Card>
+
+      {/* Quick Access */}
+      <Card className="p-4">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Quick Access</h3>
+        <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+          {conversation.customerId && (
+            <a href={`/crm/customers?id=${conversation.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+              <UserRound className="h-3 w-3 text-gray-400" />Profile
+            </a>
+          )}
+          {customerJobs.length > 0 && (
+            <a href={`/crm/leads?job=${customerJobs[0].id}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+              <Briefcase className="h-3 w-3 text-gray-400" />Open Job
+            </a>
+          )}
+          {customerProposals.length > 0 && (
+            <a href="/crm/proposals" className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+              <FileText className="h-3 w-3 text-gray-400" />Proposal
+            </a>
+          )}
+          {customerInvoices.length > 0 && (
+            <a href="/crm/invoices" className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+              <Hash className="h-3 w-3 text-gray-400" />Invoice
+            </a>
+          )}
+          <button type="button" onClick={onSchedule} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+            <Calendar className="h-3 w-3 text-gray-400" />Schedule
+          </button>
+          <button type="button" onClick={() => onDial(conversation)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+            <Phone className="h-3 w-3 text-gray-400" />Call
+          </button>
+          <a href="/crm/leads" className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+            <Plus className="h-3 w-3 text-gray-400" />New Job
+          </a>
+          <a href="/crm/proposals" className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50">
+            <Plus className="h-3 w-3 text-gray-400" />New Proposal
+          </a>
         </div>
       </Card>
 
-      <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-950">Job Details</h3>
-        <div className="mt-4 space-y-4">
-          <EditableDetailRow label="Roof type" value={contact.roofType} onChange={(value) => onContactChange("roofType", value)} />
-          <EditableDetailRow label="Assigned rep" value={contact.assignedRep} onChange={(value) => onContactChange("assignedRep", value)} />
-          <EditableDetailRow label="Insurance" value={contact.insuranceStatus} onChange={(value) => onContactChange("insuranceStatus", value)} />
-          <EditableDetailRow label="Job status" value={contact.jobStatus} onChange={(value) => onContactChange("jobStatus", value)} />
+      {/* Job Details (existing fields) */}
+      <Card className="p-4">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Job Details</h3>
+        <div className="mt-2.5 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-16 shrink-0 font-semibold text-gray-400">Roof</span>
+            <input value={contact.roofType} onChange={(event) => onContactChange("roofType", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-16 shrink-0 font-semibold text-gray-400">Rep</span>
+            <input value={contact.assignedRep} onChange={(event) => onContactChange("assignedRep", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-16 shrink-0 font-semibold text-gray-400">Insurance</span>
+            <input value={contact.insuranceStatus} onChange={(event) => onContactChange("insuranceStatus", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="w-16 shrink-0 font-semibold text-gray-400">Status</span>
+            <input value={contact.jobStatus} onChange={(event) => onContactChange("jobStatus", event.target.value)} className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs outline-none hover:border-gray-200 focus:border-blue-300 focus:bg-white" placeholder="—" />
+          </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">{contact.tags.slice(0, 3).map((tag) => <Badge key={tag} tone="slate">{tag}</Badge>)}</div>
+        {contact.tags.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1.5">{contact.tags.slice(0, 5).map((tag) => <Badge key={tag} tone="slate">{tag}</Badge>)}</div>}
       </Card>
 
-      <Card className="p-5">
-        <h3 className="text-sm font-bold text-gray-950">Activity Timeline</h3>
-        <div className="mt-4 space-y-3">
-          {conversation.messages.slice(0, 3).map((message) => <div key={message.id} className="border-l-2 border-gray-200 pl-3"><p className="text-sm text-gray-700">{message.body.length > 120 ? message.body.slice(0, 120) + "\u2026" : message.body}</p><p className="mt-1 text-xs text-gray-500">{message.timestamp}{message.line && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">{message.line}</span>}{message.status === "delivered" && <span className="ml-1.5 text-green-600">Delivered</span>}{message.status === "sent" && <span className="ml-1.5">Sent</span>}{message.status === "missed" && message.channel === "sms" && <span className="ml-1.5 text-red-500">Failed</span>}</p></div>)}
+      {/* Customer Timeline */}
+      <Card className="p-4">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Customer Timeline</h3>
+        <div className="mt-2.5 space-y-2.5">
+          {visibleTimeline.length === 0 && <p className="text-xs text-gray-400">No activity yet</p>}
+          {visibleTimeline.map((ev) => (
+            <div key={ev.id} className="flex gap-2.5 border-l-2 border-gray-200 pl-2.5">
+              <div className="mt-0.5 shrink-0">{timelineIconMap[ev.icon]}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-gray-800">{ev.label}</p>
+                <p className="text-[11px] leading-4 text-gray-500 line-clamp-2">{ev.detail}</p>
+                {ev.date && <p className="mt-0.5 text-[10px] text-gray-400">{ev.date.includes("T") ? azDateTime(ev.date) : ev.date}</p>}
+              </div>
+            </div>
+          ))}
+          {timelineEvents.length > 5 && (
+            <button type="button" onClick={() => setShowAllTimeline((v) => !v)} className="text-xs font-semibold text-blue-600 hover:text-blue-800">
+              {showAllTimeline ? "Show less" : `Show all (${timelineEvents.length})`}
+            </button>
+          )}
         </div>
       </Card>
-
-      <SchedulerPanel onSchedule={onSchedule} />
     </aside>
   );
 }
@@ -1008,6 +1236,9 @@ export default function ConversationBoard() {
   const [newConvoName, setNewConvoName] = useState("");
   const [newConvoPhone, setNewConvoPhone] = useState("");
   const [newConvoError, setNewConvoError] = useState("");
+  const [hubJobs, setHubJobs] = useState<JobRecord[]>([]);
+  const [hubInvoices, setHubInvoices] = useState<Record<string, unknown>[]>([]);
+  const [hubProposals, setHubProposals] = useState<Record<string, unknown>[]>([]);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
     if (typeof window === "undefined" || !("Notification" in window)) return "default";
     return Notification.permission;
@@ -1302,6 +1533,32 @@ export default function ConversationBoard() {
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  // Load jobs, invoices, proposals for the Customer Hub panel
+  useEffect(() => {
+    let mounted = true;
+    function loadHubData() {
+      refreshCrewData().then((data) => { if (mounted) setHubJobs(data.jobs); }).catch(() => {});
+      refreshInvoices().then((data) => { if (mounted) setHubInvoices(data as Record<string, unknown>[]); }).catch(() => {});
+      refreshProposals().then((data) => { if (mounted) setHubProposals(data as Record<string, unknown>[]); }).catch(() => {});
+    }
+    // Use cached data first for instant render
+    const cachedCrew = getCachedCrewData();
+    if (cachedCrew) setHubJobs(cachedCrew.jobs);
+    const cachedInv = getCachedInvoices<Record<string, unknown>>();
+    if (cachedInv) setHubInvoices(cachedInv);
+    const cachedProp = getCachedProposals<Record<string, unknown>>();
+    if (cachedProp) setHubProposals(cachedProp);
+    loadHubData();
+    // Listen for cache updates from other pages
+    function onCrewUpdate() { const d = getCachedCrewData(); if (d && mounted) setHubJobs(d.jobs); }
+    function onInvUpdate() { const d = getCachedInvoices<Record<string, unknown>>(); if (d && mounted) setHubInvoices(d); }
+    function onPropUpdate() { const d = getCachedProposals<Record<string, unknown>>(); if (d && mounted) setHubProposals(d); }
+    window.addEventListener(CACHE_EVENTS.crew, onCrewUpdate);
+    window.addEventListener(CACHE_EVENTS.invoices, onInvUpdate);
+    window.addEventListener(CACHE_EVENTS.proposals, onPropUpdate);
+    return () => { mounted = false; window.removeEventListener(CACHE_EVENTS.crew, onCrewUpdate); window.removeEventListener(CACHE_EVENTS.invoices, onInvUpdate); window.removeEventListener(CACHE_EVENTS.proposals, onPropUpdate); };
   }, []);
 
   // Refresh relative timestamps ("3 min ago") every 60 seconds so they
@@ -1793,14 +2050,14 @@ export default function ConversationBoard() {
             <div className={`flex items-end gap-2 ${pendingMedia.length > 0 ? "rounded-b-lg border border-t-0" : "rounded-lg border"} border-gray-200 bg-gray-50 p-2`}><button type="button" onClick={() => setMessageText((prev: string) => `${prev}😊`)} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700"><Smile className="h-5 w-5" /></button><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2.5 text-gray-500 transition hover:bg-white hover:text-blue-700" title="Attach image or PDF"><Upload className="h-5 w-5" /></button><AiWriteButton getText={() => messageText} onReplace={(t) => setMessageText(t)} context="SMS message to a roofing customer" className="my-auto" /><textarea value={messageText} onChange={(event) => setMessageText(event.target.value)} className="min-h-12 flex-1 resize-none bg-transparent p-2 text-sm outline-none placeholder:text-gray-400" placeholder={pendingMedia.length > 0 ? "Add a caption (optional)..." : "Send SMS or add a note..."} /><button onClick={handleSendSms} disabled={mediaUploading} className="rounded-lg bg-blue-600 p-3 text-white transition hover:bg-blue-700 disabled:opacity-50">{mediaUploading ? <Clock className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}</button></div>
           </div>
         </main>
-        {active && <div className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>}
+        {active && <div className="hidden xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} allJobs={hubJobs} allInvoices={hubInvoices} allProposals={hubProposals} /></div>}
         {active && showMobileContact && (
           <div className="fixed inset-0 z-[60] flex flex-col bg-gray-100 xl:hidden">
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
               <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Contact</p><p className="text-base font-bold text-gray-950">{active.contact.name}</p></div>
               <button type="button" onClick={() => setShowMobileContact(false)} aria-label="Close contact" className="rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm"><X className="h-5 w-5" /></button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4"><ContactPanel conversation={active} onDial={openDialerForConversation} onContactChange={handleContactChange} onSchedule={openScheduleModal} allJobs={hubJobs} allInvoices={hubInvoices} allProposals={hubProposals} /></div>
           </div>
         )}
       </div>
