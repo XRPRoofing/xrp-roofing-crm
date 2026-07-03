@@ -25,7 +25,7 @@ import {
   Voicemail,
   X,
 } from "lucide-react";
-import { listConversationEvents, subscribeToConversationEvents, sendSms } from "@/lib/twilio/client";
+import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
 import { azDateTime } from "@/lib/arizona-time";
 import { getTwilioLines } from "@/lib/twilio/numbers";
@@ -59,6 +59,8 @@ interface CallRecord {
   customerId?: string;
   tag?: "Forwarded" | "Unknown Caller";
   twilioLine?: string;
+  recordingUrl?: string;
+  summary?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +305,19 @@ export default function PhonePage() {
       }
     }
 
+    // Build recording + summary map from call_recording events
+    const recordingEvents = events.filter((e) => e.type === "call_recording" && e.callSid);
+    const recordingMap = new Map<string, { url?: string; summary?: string }>();
+    for (const e of recordingEvents) {
+      const sid = e.callSid!;
+      const existing = recordingMap.get(sid);
+      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
+      const url = e.recordingUrl || "";
+      if (!existing || (summary && !existing.summary) || (url && !existing.url)) {
+        recordingMap.set(sid, { url: url || existing?.url, summary: summary || existing?.summary });
+      }
+    }
+
     const records: CallRecord[] = [];
     for (const [, event] of callMap) {
       const phone = event.direction === "inbound" ? event.from || "" : event.to || "";
@@ -350,6 +365,8 @@ export default function PhonePage() {
         customerId: customer?.id,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
+        recordingUrl: recordingMap.get(event.callSid || "")?.url || undefined,
+        summary: recordingMap.get(event.callSid || "")?.summary || undefined,
       });
     }
 
@@ -808,6 +825,12 @@ export default function PhonePage() {
                           {call.disposition}
                         </span>
                       )}
+                      {(call.recordingUrl || call.summary) && (
+                        <div className="mt-2 space-y-1 rounded-md bg-blue-50/60 px-2.5 py-2">
+                          {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />}
+                          {call.summary && <p className="line-clamp-3 text-[11px] leading-4 text-gray-600">{call.summary}</p>}
+                        </div>
+                      )}
                     </div>
 
                     {/* Status indicator */}
@@ -901,13 +924,14 @@ export default function PhonePage() {
 
             {/* ========== Desktop call history table ========== */}
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1100px]">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="px-6 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">From</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">To</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Recording / Summary</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Duration</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Disposition</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Line</th>
@@ -962,6 +986,16 @@ export default function PhonePage() {
                       </td>
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.dateTime}</p>
+                      </td>
+                      <td className="px-3 py-3 max-w-[260px]">
+                        {call.recordingUrl || call.summary ? (
+                          <div className="space-y-1">
+                            {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[200px]" preload="none" />}
+                            {call.summary && <p className="line-clamp-2 text-[11px] leading-4 text-gray-500">{call.summary}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1 text-sm text-gray-600">
