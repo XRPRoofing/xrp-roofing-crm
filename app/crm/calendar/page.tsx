@@ -218,6 +218,14 @@ function getTeamColor(memberId: string) {
 }
 
 const JOB_KINDS = ["Roof Inspection", "Repair", "Roof Replacement", "Maintenance", "Maintenance Inspection", "Emergency Repair", "Estimate", "Other"];
+const JOB_KIND_ALIASES: Record<string, string> = {
+  Inspection: "Roof Inspection",
+  Replacement: "Roof Replacement",
+  Installation: "Roof Replacement",
+};
+function normalizeJobKind(kind: string): string {
+  return JOB_KIND_ALIASES[kind] || kind;
+}
 const DEFAULT_TAGS = ["Urgent", "Follow-up", "VIP", "Insurance", "Commercial", "Residential"];
 
 /* ── Google Calendar helpers ────────────────────────────────────────────── */
@@ -679,9 +687,9 @@ export default function CalendarPage() {
     const isPast = eventDate < now && !event.all_day;
     const eventStatus = isPast ? "done" : "open";
     if (statusFilter.size > 0 && statusFilter.size < 2 && !statusFilter.has(eventStatus)) return false;
-    // Job kind / type filter
+    // Job kind / type filter (normalize old values like "Inspection" → "Roof Inspection")
     if (!isGcal && event.job_kind && enabledJobKinds.size < JOB_KINDS.length) {
-      if (!enabledJobKinds.has(event.job_kind)) return false;
+      if (!enabledJobKinds.has(normalizeJobKind(event.job_kind))) return false;
     }
     // Tag filter
     if (tagFilter.size > 0) {
@@ -1502,73 +1510,22 @@ export default function CalendarPage() {
         {/* Dark filter bar */}
         <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-700 bg-gray-800 px-3 py-2 scrollbar-hide sm:px-5">
           {/* Status Filter */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "status" ? null : "status"); }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "status" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-            >
-              Status <ChevronDown className="h-3 w-3" />
-            </button>
-            {filterPopup === "status" && (
-              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-900">Status</h4>
-                  <button type="button" onClick={() => { setStatusFilter(new Set(["open", "done"])); setItemTypeFilter(new Set(["jobs", "events"])); }} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
-                </div>
-                <div className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1">
-                  {(["jobs", "events"] as const).map((t) => (
-                    <button key={t} type="button" onClick={() => setItemTypeFilter((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
-                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${itemTypeFilter.has(t) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                    >
-                      {t === "jobs" ? "Jobs" : "Events"}
-                    </button>
-                  ))}
-                </div>
-                <label className="flex cursor-pointer items-center gap-2.5 py-2">
-                  <input type="checkbox" checked={statusFilter.has("open")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("open")) n.delete("open"); else n.add("open"); return n; })} className="h-4 w-4 rounded border-gray-300" />
-                  <span className="text-sm font-medium text-gray-700">Open</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2.5 py-2">
-                  <input type="checkbox" checked={statusFilter.has("done")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("done")) n.delete("done"); else n.add("done"); return n; })} className="h-4 w-4 rounded border-gray-300" />
-                  <span className="text-sm font-medium text-gray-700">Done</span>
-                </label>
-                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "status" ? null : "status"); }}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "status" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+          >
+            Status <ChevronDown className="h-3 w-3" />
+          </button>
 
           {/* Tags Filter */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "tags" ? null : "tags"); }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "tags" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-            >
-              Tags {tagFilter.size > 0 && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{tagFilter.size}</span>} <ChevronDown className="h-3 w-3" />
-            </button>
-            {filterPopup === "tags" && (
-              <div className="absolute left-0 top-full z-40 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-900">Tags</h4>
-                  <button type="button" onClick={() => setTagFilter(new Set())} className="text-xs font-medium text-blue-600 hover:text-blue-700">Clear all</button>
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {allTags.map((tag) => (
-                    <label key={tag} className="flex cursor-pointer items-center gap-2.5 py-1.5">
-                      <input type="checkbox" checked={tagFilter.has(tag)} onChange={() => setTagFilter((prev) => { const n = new Set(prev); if (n.has(tag)) n.delete(tag); else n.add(tag); return n; })} className="h-4 w-4 rounded border-gray-300" />
-                      <span className="text-sm font-medium text-gray-700">{tag}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
-                  <input type="text" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newTagInput.trim()) { setEventTags((prev) => ({ ...prev })); setNewTagInput(""); } }} placeholder="New tag..." className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-blue-300" />
-                  <button type="button" onClick={() => { if (newTagInput.trim()) { setNewTagInput(""); } }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Add</button>
-                </div>
-                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "tags" ? null : "tags"); }}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "tags" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+          >
+            Tags {tagFilter.size > 0 && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{tagFilter.size}</span>} <ChevronDown className="h-3 w-3" />
+          </button>
 
           {/* Team Filter (dropdown) */}
           <div className="relative">
@@ -1592,59 +1549,161 @@ export default function CalendarPage() {
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white" />
           </div>
 
-          {/* Type Filter (Job Kind) — slide-up on mobile, dropdown on desktop */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "type" ? null : "type"); }}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "type" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
-            >
-              Type {enabledJobKinds.size < JOB_KINDS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledJobKinds.size}</span>} <ChevronDown className="h-3 w-3" />
-            </button>
-            {/* Desktop dropdown */}
-            {filterPopup === "type" && (
-              <div className="absolute left-0 top-full z-40 mt-2 hidden w-56 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:block" onClick={(e) => e.stopPropagation()}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-gray-900">Job Type</h4>
-                  <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
-                </div>
-                {JOB_KINDS.map((kind) => (
-                  <label key={kind} className="flex cursor-pointer items-center gap-2.5 py-1.5">
-                    <input type="checkbox" checked={enabledJobKinds.has(kind)} onChange={() => toggleJobKind(kind)} className="h-4 w-4 rounded border-gray-300" />
-                    <span className="text-sm font-medium text-gray-700">{kind}</span>
+          {/* Type Filter */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setFilterPopup(filterPopup === "type" ? null : "type"); }}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${filterPopup === "type" ? "bg-white text-gray-900" : "bg-gray-700 text-white hover:bg-gray-600"}`}
+          >
+            Type {enabledJobKinds.size < JOB_KINDS.length && <span className="rounded-full bg-blue-500 px-1.5 text-[10px] text-white">{enabledJobKinds.size}</span>} <ChevronDown className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* ── Filter popup overlays (rendered outside overflow container) ── */}
+
+        {/* Status popup */}
+        {filterPopup === "status" && (
+          <div className="fixed inset-0 z-[60]" onClick={() => setFilterPopup(null)}>
+            <div className="absolute inset-0 sm:bg-transparent bg-black/30" />
+            {/* Desktop */}
+            <div className="absolute left-3 top-28 z-50 hidden w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:block" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Status</h4>
+                <button type="button" onClick={() => { setStatusFilter(new Set(["open", "done"])); setItemTypeFilter(new Set(["jobs", "events"])); }} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+              </div>
+              <div className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1">
+                {(["jobs", "events"] as const).map((t) => (
+                  <button key={t} type="button" onClick={() => setItemTypeFilter((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${itemTypeFilter.has(t) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                  >
+                    {t === "jobs" ? "Jobs" : "Events"}
+                  </button>
+                ))}
+              </div>
+              <label className="flex cursor-pointer items-center gap-2.5 py-2">
+                <input type="checkbox" checked={statusFilter.has("open")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("open")) n.delete("open"); else n.add("open"); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                <span className="text-sm font-medium text-gray-700">Open</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2.5 py-2">
+                <input type="checkbox" checked={statusFilter.has("done")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("done")) n.delete("done"); else n.add("done"); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                <span className="text-sm font-medium text-gray-700">Done</span>
+              </label>
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+            </div>
+            {/* Mobile */}
+            <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 pb-8 shadow-2xl sm:hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-base font-bold text-gray-900">Status</h4>
+                <button type="button" onClick={() => { setStatusFilter(new Set(["open", "done"])); setItemTypeFilter(new Set(["jobs", "events"])); }} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+              </div>
+              <div className="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1">
+                {(["jobs", "events"] as const).map((t) => (
+                  <button key={t} type="button" onClick={() => setItemTypeFilter((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; })}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-sm font-semibold transition ${itemTypeFilter.has(t) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                  >
+                    {t === "jobs" ? "Jobs" : "Events"}
+                  </button>
+                ))}
+              </div>
+              <label className="flex cursor-pointer items-center gap-2.5 py-3">
+                <input type="checkbox" checked={statusFilter.has("open")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("open")) n.delete("open"); else n.add("open"); return n; })} className="h-5 w-5 rounded border-gray-300" />
+                <span className="text-sm font-medium text-gray-700">Open</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2.5 py-3">
+                <input type="checkbox" checked={statusFilter.has("done")} onChange={() => setStatusFilter((prev) => { const n = new Set(prev); if (n.has("done")) n.delete("done"); else n.add("done"); return n; })} className="h-5 w-5 rounded border-gray-300" />
+                <span className="text-sm font-medium text-gray-700">Done</span>
+              </label>
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-4 w-full rounded-lg bg-yellow-400 py-3 text-sm font-bold text-gray-900 hover:bg-yellow-500">Apply</button>
+            </div>
+          </div>
+        )}
+
+        {/* Tags popup */}
+        {filterPopup === "tags" && (
+          <div className="fixed inset-0 z-[60]" onClick={() => setFilterPopup(null)}>
+            <div className="absolute inset-0 sm:bg-transparent bg-black/30" />
+            {/* Desktop */}
+            <div className="absolute left-20 top-28 z-50 hidden w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:block" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Tags</h4>
+                <button type="button" onClick={() => setTagFilter(new Set())} className="text-xs font-medium text-blue-600 hover:text-blue-700">Clear all</button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {allTags.map((tag) => (
+                  <label key={tag} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+                    <input type="checkbox" checked={tagFilter.has(tag)} onChange={() => setTagFilter((prev) => { const n = new Set(prev); if (n.has(tag)) n.delete(tag); else n.add(tag); return n; })} className="h-4 w-4 rounded border-gray-300" />
+                    <span className="text-sm font-medium text-gray-700">{tag}</span>
                   </label>
                 ))}
-                <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
               </div>
-            )}
-            {/* Mobile slide-up panel */}
-            {filterPopup === "type" && (
-              <div className="fixed inset-0 z-[60] sm:hidden" onClick={() => setFilterPopup(null)}>
-                <div className="absolute inset-0 bg-black/30" />
-                <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 pb-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                  <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
-                  <div className="mb-4 flex items-center justify-between">
-                    <h4 className="text-base font-bold text-gray-900">Job Type</h4>
-                    <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {JOB_KINDS.map((kind) => (
-                      <button
-                        key={kind}
-                        type="button"
-                        onClick={() => toggleJobKind(kind)}
-                        className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition ${enabledJobKinds.has(kind) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600"}`}
-                      >
-                        {kind}
-                      </button>
-                    ))}
-                  </div>
-                  <button type="button" onClick={() => setFilterPopup(null)} className="mt-5 w-full rounded-lg bg-yellow-400 py-3 text-sm font-bold text-gray-900 hover:bg-yellow-500">Apply</button>
-                </div>
+              <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
+                <input type="text" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newTagInput.trim()) { setEventTags((prev) => ({ ...prev })); setNewTagInput(""); } }} placeholder="New tag..." className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-blue-300" />
+                <button type="button" onClick={() => { if (newTagInput.trim()) { setNewTagInput(""); } }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Add</button>
               </div>
-            )}
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+            </div>
+            {/* Mobile */}
+            <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 pb-8 shadow-2xl sm:hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-base font-bold text-gray-900">Tags</h4>
+                <button type="button" onClick={() => setTagFilter(new Set())} className="text-xs font-medium text-blue-600 hover:text-blue-700">Clear all</button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {allTags.map((tag) => (
+                  <label key={tag} className="flex cursor-pointer items-center gap-2.5 py-3">
+                    <input type="checkbox" checked={tagFilter.has(tag)} onChange={() => setTagFilter((prev) => { const n = new Set(prev); if (n.has(tag)) n.delete(tag); else n.add(tag); return n; })} className="h-5 w-5 rounded border-gray-300" />
+                    <span className="text-sm font-medium text-gray-700">{tag}</span>
+                  </label>
+                ))}
+              </div>
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-4 w-full rounded-lg bg-yellow-400 py-3 text-sm font-bold text-gray-900 hover:bg-yellow-500">Apply</button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Type popup */}
+        {filterPopup === "type" && (
+          <div className="fixed inset-0 z-[60]" onClick={() => setFilterPopup(null)}>
+            <div className="absolute inset-0 sm:bg-transparent bg-black/30" />
+            {/* Desktop */}
+            <div className="absolute right-20 top-28 z-50 hidden w-56 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl sm:block" onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900">Job Type</h4>
+                <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+              </div>
+              {JOB_KINDS.map((kind) => (
+                <label key={kind} className="flex cursor-pointer items-center gap-2.5 py-1.5">
+                  <input type="checkbox" checked={enabledJobKinds.has(kind)} onChange={() => toggleJobKind(kind)} className="h-4 w-4 rounded border-gray-300" />
+                  <span className="text-sm font-medium text-gray-700">{kind}</span>
+                </label>
+              ))}
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-3 w-full rounded-lg bg-yellow-400 py-2 text-sm font-bold text-gray-900 hover:bg-yellow-500">Submit</button>
+            </div>
+            {/* Mobile */}
+            <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 pb-8 shadow-2xl sm:hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-300" />
+              <div className="mb-4 flex items-center justify-between">
+                <h4 className="text-base font-bold text-gray-900">Job Type</h4>
+                <button type="button" onClick={() => setEnabledJobKinds(new Set(JOB_KINDS))} className="text-xs font-medium text-blue-600 hover:text-blue-700">Select all</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {JOB_KINDS.map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => toggleJobKind(kind)}
+                    className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition ${enabledJobKinds.has(kind) ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600"}`}
+                  >
+                    {kind}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setFilterPopup(null)} className="mt-5 w-full rounded-lg bg-yellow-400 py-3 text-sm font-bold text-gray-900 hover:bg-yellow-500">Apply</button>
+            </div>
+          </div>
+        )}
 
         {/* Toolbar with view tabs */}
         <div className="flex items-center justify-between gap-1.5 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:gap-2 sm:px-5 sm:py-2.5">
