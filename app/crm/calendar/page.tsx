@@ -1787,7 +1787,7 @@ export default function CalendarPage() {
             id="new-event"
             onSubmit={handleCreateEvent}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-lg"
+            className="flex max-h-[calc(100dvh-60px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-lg"
           >
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
               <div className="min-w-0">
