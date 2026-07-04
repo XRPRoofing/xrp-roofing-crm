@@ -2406,8 +2406,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
       )}
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 sm:p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="my-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/30 p-3 pb-[76px] sm:p-4 lg:pb-4" onClick={() => setShowCreateModal(false)}>
+          <div className="my-auto flex max-h-[80vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 p-4 sm:p-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
@@ -2647,7 +2647,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         const pmPaid = getPaidAmount(selectedInvoice);
         const pmRemaining = Math.max(pmTotals.finalTotal - pmPaid, 0);
         return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 pb-[76px] sm:p-4 lg:pb-4">
           <div className="w-full max-w-xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <h2 className="text-xl sm:text-2xl font-bold text-blue-700">Record Partial Payment</h2>
             <p className="mt-1 text-sm font-semibold text-gray-500">Enter the amount received by check, cash, or bank transfer</p>
@@ -2709,7 +2709,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Partial payment success prompt ── */}
       {partialPaymentPrompt && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 pb-[76px] sm:p-4 lg:pb-4">
           <div className="w-full max-w-md rounded-lg sm:rounded-[2rem] bg-white p-5 sm:p-6 shadow-2xl text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-100">
               <span className="text-2xl">✓</span>
@@ -2729,7 +2729,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Reject payment modal ── */}
       {rejectModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/50 p-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4" onClick={() => { setRejectModal(null); setRejectNotes(""); }}>
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => { (e as { stopPropagation(): void }).stopPropagation(); }}>
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-lg">✗</span>
@@ -2782,8 +2782,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
         const invoiceIsPaid = getComputedStatus(selectedInvoice) === "Paid" || getComputedStatus(selectedInvoice) === "Paid Mail Check";
         const lastPayment = selectedInvoice.payments[selectedInvoice.payments.length - 1];
         return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
-          <div className="w-full max-w-2xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 pb-[76px] sm:p-4 lg:pb-4">
+          <div className="w-full max-w-2xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
             <h2 className="text-xl sm:text-2xl font-bold text-blue-700">{isPaidReceiptSelected ? "Send Paid Receipt" : "Send Invoice"}</h2>
             <div className="mt-4 sm:mt-5 grid gap-3">
               <select value={sendForm.template} onChange={(event) => setSendForm({ ...sendForm, template: event.target.value, message: emailTemplates[event.target.value as keyof typeof emailTemplates] })} className="rounded-lg border border-gray-200 px-4 py-3.5 outline-none text-base">
@@ -2857,7 +2857,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Invoice Send Confirmation Modal ── */}
       {invoiceSendConfirmation && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
             {invoiceSendConfirmation.type === "success" ? (
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -2882,8 +2882,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── SMS Compose Modal ── */}
       {showSmsModal && selectedInvoice && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 sm:p-4">
-          <div className="w-full max-w-lg rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/40 p-3 pb-[76px] sm:p-4 lg:pb-4">
+          <div className="w-full max-w-lg rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
             <h2 className="text-xl sm:text-2xl font-bold text-green-700 flex items-center gap-2"><MessageSquare className="h-5 w-5" />Send Invoice by Text</h2>
             <div className="mt-4 grid gap-3">
               <div>
@@ -2906,7 +2906,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Paid Receipt Success Confirmation ── */}
       {paidReceiptConfirmation && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
               <svg className="h-12 w-12 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -2927,8 +2927,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Mark as Paid Confirmation Modal ── */}
       {showMarkPaidModal && selectedInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowMarkPaidModal(false)}>
-          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => setShowMarkPaidModal(false)}>
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-gray-900">Confirm Payment</h2>
             <p className="mt-1 text-sm text-gray-600">Mark invoice <span className="font-bold">{selectedInvoice.invoiceNumber}</span> for <span className="font-bold">{selectedInvoice.clientName}</span> as paid.</p>
             <p className="mt-1 text-lg font-bold text-blue-700">{currency(Math.max(calculateTotals(selectedInvoice).finalTotal - getPaidAmount(selectedInvoice), 0))}</p>
@@ -3021,7 +3021,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
 
       {/* ── Delete Confirmation Modal ── */}
       {showDeleteModal && deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => { setShowDeleteModal(false); setDeleteTarget(null); }}>
           <div className="w-full max-w-md rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>

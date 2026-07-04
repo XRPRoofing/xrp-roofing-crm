@@ -147,7 +147,7 @@ export function AiFloatingButton() {
     <button
       type="button"
       onClick={isMinimized ? maximizeChat : openChat}
-      className="fixed bottom-20 right-6 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95"
+      className="fixed bottom-[84px] right-6 z-[90] flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition-all hover:bg-blue-700 hover:scale-105 active:scale-95 lg:bottom-6"
       title="AI Assistant"
     >
       <Sparkles className="h-5 w-5" />

@@ -2488,8 +2488,8 @@ export default function ProposalsPage() {
           </main>
         </div>
         {showOfflineSignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
-            <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4">
+            <div className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl bg-white shadow-2xl">
               <div className="flex items-center justify-between px-6 pt-5 pb-3">
                 <h2 className="text-lg font-bold text-gray-900">Mark as Signed Offline</h2>
                 <button type="button" onClick={() => setShowOfflineSignModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
@@ -2613,8 +2613,8 @@ export default function ProposalsPage() {
         )}
         {/* Deposit Request Modal */}
         {showDepositModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50">
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4">
+            <div className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-gray-900">Deposit request</h2>
                 <button type="button" onClick={() => setShowDepositModal(false)} className="text-2xl text-gray-400 hover:text-gray-600">&times;</button>
@@ -2675,8 +2675,8 @@ export default function ProposalsPage() {
 
         {/* Job Photo Picker Modal */}
         {showJobPhotoPicker && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4" onClick={() => setShowJobPhotoPicker(false)}>
-            <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4" onClick={() => setShowJobPhotoPicker(false)}>
+            <div className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">Choose from Job Folder</h2>
@@ -2888,7 +2888,7 @@ export default function ProposalsPage() {
 
         {/* ── Proposal Send Confirmation Modal ── */}
         {sendConfirmation && (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-gray-950/50 p-4 pb-[76px] lg:pb-4">
             <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
               {sendConfirmation.type === "success" ? (
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -3190,7 +3190,7 @@ export default function ProposalsPage() {
       )}
 
       {confirmPermanentDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 pb-[76px] lg:pb-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-bold text-gray-900">Permanently delete proposal?</h3>
             <p className="mt-2 text-sm text-gray-600">This will permanently delete the proposal for <strong>{confirmPermanentDelete.customerName}</strong>. This action cannot be undone.</p>
@@ -3415,7 +3415,7 @@ export default function ProposalsPage() {
 
       {/* ── Permanent Delete Confirmation Modal ── */}
       {showPermDeleteConfirm && permDeleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => { setShowPermDeleteConfirm(false); setPermDeleteTarget(null); }}>
           <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>

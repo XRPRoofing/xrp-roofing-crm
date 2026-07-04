@@ -489,8 +489,8 @@ function ShareFolderModal({ folder, onClose }: { folder: CrmFileFolder; onClose:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4 pb-[76px] lg:pb-4" onClick={onClose}>
+      <div className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-blue-700">Share Folder</h2>

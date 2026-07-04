@@ -538,6 +538,11 @@
 }
 
 /* ── Mobile responsiveness: prevent horizontal overflow globally ── */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 @media (max-width: 639px) {
   .crm-main table {
     display: block;
@@ -554,6 +559,11 @@
   .crm-main select {
     max-width: 100%;
     box-sizing: border-box;
+  }
+  /* Ensure all cards/sections don't overflow */
+  .crm-main > div {
+    max-width: 100%;
+    overflow-x: hidden;
   }
 }
 

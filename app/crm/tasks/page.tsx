@@ -529,9 +529,9 @@ export default function TasksPage() {
 
       {/* Task Detail Drawer */}
       {selectedTask && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => setSelectedTask(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[72px] sm:items-center sm:pb-0" onClick={() => setSelectedTask(null)}>
           <div className="absolute inset-0 bg-gray-950/40 backdrop-blur-sm" />
-          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="relative z-10 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:max-h-[90vh] sm:rounded-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="mb-1.5 flex items-center gap-2">
@@ -681,9 +681,9 @@ export default function TasksPage() {
 
       {/* New Daily Task Modal */}
       {showNewTask && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowNewTask(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[76px] lg:pb-4" onClick={() => setShowNewTask(false)}>
           <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm" />
-          <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative z-10 w-full max-w-md max-h-[80vh] overflow-y-auto rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-violet-600">New Daily Task</p>
@@ -734,7 +734,7 @@ export default function TasksPage() {
 
       {/* Customer Satisfaction Modal */}
       {satModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setSatModal(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[76px] lg:pb-4" onClick={() => setSatModal(null)}>
           <div className="absolute inset-0 bg-gray-950/50 backdrop-blur-sm" />
           <div className="relative z-10 w-full max-w-sm rounded-lg bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <p className="text-xs font-bold uppercase tracking-widest text-blue-600">Customer Satisfaction Check</p>
@@ -780,7 +780,7 @@ export default function TasksPage() {
 
       {/* ── Delete Confirmation Modal ── */}
       {showDeleteConfirm && deleteTaskTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => { setShowDeleteConfirm(false); setDeleteTaskTarget(null); }}>
           <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>
@@ -804,8 +804,8 @@ export default function TasksPage() {
 
       {/* ── Review Request SMS Modal ── */}
       {reviewModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setReviewModal(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => setReviewModal(null)}>
+          <div className="w-full max-w-md max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <div className="flex items-center gap-3">

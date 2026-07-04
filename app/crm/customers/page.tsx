@@ -724,7 +724,7 @@ export default function CustomersPage() {
 
       {selectedCustomer && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-gray-950/30 backdrop-blur-sm" onClick={closeCustomerCard}>
-          <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <aside className="h-full w-full max-w-2xl overflow-y-auto bg-white pb-20 shadow-2xl lg:pb-0" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
               <div className="flex items-start justify-between gap-2 p-3 pb-2 sm:gap-4 sm:p-5 sm:pb-3">
                 <div className="min-w-0 flex-1">
@@ -920,7 +920,7 @@ export default function CustomersPage() {
 
       {/* ── Delete Customer Confirmation Modal ── */}
       {showDeleteCustomerModal && deleteCustomerTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => { setShowDeleteCustomerModal(false); setDeleteCustomerTarget(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[76px] lg:pb-4" onClick={() => { setShowDeleteCustomerModal(false); setDeleteCustomerTarget(null); }}>
           <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">⚠</div>

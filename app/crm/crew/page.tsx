@@ -550,8 +550,8 @@ export default function CrewWorkflowPage() {
       </section>
 
       {showCreateJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4 backdrop-blur-sm" onClick={() => setShowCreateJob(false)}>
-        <section className="my-auto w-full max-w-2xl rounded-lg border border-blue-100 bg-blue-50 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4 pb-[76px] backdrop-blur-sm lg:pb-4" onClick={() => setShowCreateJob(false)}>
+        <section className="my-auto w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-lg border border-blue-100 bg-blue-50 p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Crew Created Job</p>
@@ -791,9 +791,9 @@ export default function CrewWorkflowPage() {
 
       {/* Photo Label Picker Modal */}
       {labelPickerPhoto && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" onClick={() => setLabelPickerPhoto(null)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-[72px] sm:items-center sm:pb-0" onClick={() => setLabelPickerPhoto(null)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-full max-w-xs rounded-t-2xl bg-white p-5 pb-8 shadow-xl sm:rounded-2xl sm:pb-5" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-xs rounded-t-2xl bg-white p-5 pb-6 shadow-xl sm:rounded-2xl sm:pb-5" onClick={(e) => e.stopPropagation()}>
             <p className="mb-3 text-center text-sm font-black text-gray-800">Change Photo Label</p>
             <div className="space-y-1.5">
               {([["Before", "bg-blue-600"], ["Progress", "bg-orange-500"], ["After", "bg-emerald-600"], ["Job Photo", "bg-gray-500"]] as const).map(([type, color]) => (
