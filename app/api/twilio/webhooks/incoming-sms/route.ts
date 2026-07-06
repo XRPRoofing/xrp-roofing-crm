@@ -37,7 +37,15 @@ async function reHostMedia(payload: Record<string, unknown>): Promise<string[]> 
       if (!res.ok) continue;
 
       const contentType = res.headers.get("content-type") || "image/jpeg";
-      const ext = contentType.includes("png") ? "png" : contentType.includes("gif") ? "gif" : contentType.includes("webp") ? "webp" : "jpg";
+      const ext = contentType.includes("png") ? "png"
+        : contentType.includes("gif") ? "gif"
+        : contentType.includes("webp") ? "webp"
+        : contentType.includes("quicktime") ? "mov"
+        : contentType.includes("mp4") ? "mp4"
+        : contentType.includes("3gpp") ? "3gp"
+        : contentType.includes("webm") ? "webm"
+        : contentType.includes("pdf") ? "pdf"
+        : "jpg";
       const bytes = new Uint8Array(await res.arrayBuffer());
       const path = `inbound-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
