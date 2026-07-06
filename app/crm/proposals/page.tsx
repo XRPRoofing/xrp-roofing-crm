@@ -455,6 +455,11 @@ export default function ProposalsPage() {
   const prevProposalsRef = useRef<Proposal[]>([]);
   const permanentlyDeletedIdsRef = useRef<Set<string>>(new Set());
   const locallyDeletedIdsRef = useRef<Set<string>>(new Set());
+  // Proposals just marked "Sent" locally. A background/cached reload (the data
+  // cache stays "fresh" for a few seconds and realtime/other devices can hold a
+  // pre-send copy) must never downgrade them back to "Draft". We overlay the
+  // sent fields until the server copy actually reflects a non-Draft status.
+  const recentlySentRef = useRef<Map<string, Partial<Proposal>>>(new Map());
   const boardIntentHandledRef = useRef(false);
   const [templates, setTemplates] = useState<ProposalTemplate[]>(initialProposalTemplates);
   const [emailTemplates, setEmailTemplates] = useState<ProposalEmailTemplate[]>(defaultEmailTemplates);
@@ -695,6 +700,23 @@ export default function ProposalsPage() {
   // fast first paint + offline fallback. On first load, any local-only
   // proposals are migrated up so nothing is lost, then realtime + focus keep
   // all devices consistent.
+  // Overlay locally-sent status onto server/cached records that are still a
+  // stale "Draft", so a background reload never reverts a just-sent proposal.
+  // Once the server copy advances past Draft, we stop overlaying.
+  const overlayRecentlySent = useCallback((list: Proposal[]): Proposal[] => {
+    const pending = recentlySentRef.current;
+    if (pending.size === 0) return list;
+    return list.map((proposal) => {
+      const sent = pending.get(proposal.id);
+      if (!sent) return proposal;
+      if (proposal.status && proposal.status !== "Draft") {
+        pending.delete(proposal.id);
+        return proposal;
+      }
+      return { ...proposal, ...sent };
+    });
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -759,14 +781,18 @@ export default function ProposalsPage() {
           }
           return proposal;
         });
-        prevProposalsRef.current = merged;
-        return merged;
+        const guarded = overlayRecentlySent(merged);
+        prevProposalsRef.current = guarded;
+        return guarded;
       });
       setActiveProposal((currentProposal) => {
         if (!currentProposal) return currentProposal;
         if (deletedIds.has(currentProposal.id)) return null;
         const updated = filtered.find((proposal) => proposal.id === currentProposal.id);
-        return updated ? { ...currentProposal, ...updated } : currentProposal;
+        if (!updated) return currentProposal;
+        const next = { ...currentProposal, ...updated };
+        const sent = recentlySentRef.current.get(next.id);
+        return sent && next.status === "Draft" ? { ...next, ...sent } : next;
       });
     }
 
@@ -887,8 +913,9 @@ export default function ProposalsPage() {
             }
             return p;
           });
-        prevProposalsRef.current = merged;
-        return merged;
+        const guarded = overlayRecentlySent(merged);
+        prevProposalsRef.current = guarded;
+        return guarded;
       });
     }).catch(() => {});
   });
@@ -1420,6 +1447,17 @@ export default function ProposalsPage() {
         }) || draftProposal;
         setActiveProposal(sentProposal);
 
+        // Guard against a stale/cached reload downgrading this back to Draft
+        // before the server copy propagates. Cleared once the server catches up.
+        recentlySentRef.current.set(sentProposal.id, {
+          status: "Sent",
+          sentAt: sentProposal.sentAt,
+          sentBy: sentProposal.sentBy,
+          sentToEmail: sentProposal.sentToEmail,
+          sentViaSms: false,
+          proposalVersion: sentProposal.proposalVersion,
+        });
+
         // Persist the Sent status to Supabase (both share + upsert) so it
         // propagates in real time and never reverts to Draft.
         try {
@@ -1432,6 +1470,12 @@ export default function ProposalsPage() {
         try {
           await upsertProposalRecord(sentProposal);
         } catch { /* sync effect will retry on next change */ }
+        // Repopulate the shared data cache with the fresh Sent record so a
+        // background refresh within the cache-fresh window can't serve a
+        // pre-send Draft copy.
+        try {
+          await refreshProposals<Proposal>(true);
+        } catch { /* realtime/next refresh reconciles */ }
 
         // Log send activity
         const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
@@ -1559,6 +1603,19 @@ export default function ProposalsPage() {
           module: "Proposal",
         }).catch(() => {});
       }
+
+      // Guard against a stale/cached reload reverting this to Draft.
+      recentlySentRef.current.set(proposalForLink.id, {
+        status: "Sent",
+        sentAt: proposalForLink.sentAt,
+        sentBy: proposalForLink.sentBy,
+        sentViaSms: true,
+        smsSentToPhone: smsForm.toPhone,
+        proposalVersion: proposalForLink.proposalVersion,
+      });
+      try {
+        await refreshProposals<Proposal>(true);
+      } catch { /* realtime/next refresh reconciles */ }
 
       setSendConfirmation({ type: "success", customerName: activeProposal.customerName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Proposal sent via SMS to ${smsForm.toPhone}.\n\nProposal link: ${proposalLink}` });
       setShowSmsSendModal(false);
