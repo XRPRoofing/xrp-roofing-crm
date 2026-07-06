@@ -265,16 +265,38 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
             setGlobalActiveIncomingCall(false);
           });
         });
-        device.on("unregistered", () => {
-          void getVoiceToken("crm-agent")
+        const refreshAndRegister = () =>
+          getVoiceToken("crm-agent")
             .then(({ token }) => { device.updateToken?.(token); return device.register(); })
             .catch(() => undefined);
+        // Re-register if Twilio drops the registration.
+        device.on("unregistered", () => { void refreshAndRegister(); });
+        // Proactively refresh the access token shortly before it expires so the
+        // device never silently stops receiving incoming calls.
+        (device as unknown as { on: (e: string, h: () => void) => void }).on("tokenWillExpire", () => { void refreshAndRegister(); });
+        // A transient error can knock the device offline — recover unless a call
+        // is currently in progress.
+        (device as unknown as { on: (e: string, h: (err?: unknown) => void) => void }).on("error", () => {
+          if (mounted && !incomingCallRef.current) void refreshAndRegister();
         });
         await device.register();
       } catch {
         voiceDeviceRef.current = null;
       }
     }
+
+    // Bring the device back if the network or tab visibility recovers while it
+    // is not registered — otherwise incoming calls would be missed silently.
+    function ensureRegistered() {
+      const device = voiceDeviceRef.current as unknown as { state?: string; register?: () => Promise<unknown> } | null;
+      if (!device || incomingCallRef.current) return;
+      if (device.state && device.state !== "registered") {
+        void getVoiceToken("crm-agent")
+          .then(({ token }) => { voiceDeviceRef.current?.updateToken?.(token); return device.register?.(); })
+          .catch(() => undefined);
+      }
+    }
+    function handleVisibility() { if (document.visibilityState === "visible") ensureRegistered(); }
 
     // Defer voice device registration on mobile to prioritize page rendering
     const mobileDelay = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 4000 : 0;
@@ -284,9 +306,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       registerGlobalVoiceDevice();
     }
 
+    window.addEventListener("online", ensureRegistered);
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       mounted = false;
       if (delayTimer) clearTimeout(delayTimer);
+      window.removeEventListener("online", ensureRegistered);
+      document.removeEventListener("visibilitychange", handleVisibility);
       voiceDeviceRef.current?.destroy();
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
