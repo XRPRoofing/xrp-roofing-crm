@@ -8,6 +8,7 @@ import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
+import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { leadStages } from "@/lib/crm-data";
 import { subscribeToCrewData } from "@/lib/crew-sync";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
@@ -286,6 +287,25 @@ export default function CustomersPage() {
   const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, conversationEvents) : [];
   const selectedCustomerInvoices = selectedCustomer ? getCustomerInvoices(selectedCustomer, storedInvoices) : [];
   const selectedCustomerProposals = selectedCustomer ? getCustomerProposals(selectedCustomer, storedProposals) : [];
+
+  // Publish the currently-open customer to the AI assistant for context awareness.
+  useAiRecordContext(
+    selectedCustomer
+      ? {
+          kind: "Customer",
+          title: selectedCustomer.name,
+          details: {
+            Email: selectedCustomer.email,
+            Phone: selectedCustomer.phone,
+            "Property Address": selectedCustomer.propertyAddress,
+            "Roof Details": selectedCustomer.roofDetails,
+            "Insurance Carrier": selectedCustomer.insuranceCarrier,
+            Status: selectedCustomer.status,
+            "Active Jobs": selectedCustomerJobs.length,
+          },
+        }
+      : null,
+  );
 
   // Build a job payload for create-and-link: prefer the customer's first job (so
   // the new estimate/invoice links by job id), otherwise synthesize from the
