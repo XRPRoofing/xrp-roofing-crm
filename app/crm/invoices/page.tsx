@@ -20,6 +20,7 @@ import BackToJobsLink from "@/components/crm/BackToJobsLink";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { Phone, Mail, MapPin, MessageSquare } from "lucide-react";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
+import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { sendSms } from "@/lib/twilio/client";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
@@ -1013,6 +1014,25 @@ export default function InvoicesPage() {
   }, [invoices]);
 
   const selectedInvoice = invoices.find((invoice) => invoice.id === selectedInvoiceId) || null;
+
+  // Publish the currently-open invoice to the AI assistant for context awareness.
+  useAiRecordContext(
+    selectedInvoice
+      ? {
+          kind: "Invoice",
+          title: selectedInvoice.clientName,
+          details: {
+            "Invoice #": selectedInvoice.invoiceNumber,
+            "Property Address": selectedInvoice.propertyAddress,
+            "Job": selectedInvoice.jobName,
+            Amount: `$${calculateTotals(selectedInvoice).finalTotal.toLocaleString()}`,
+            Status: getComputedStatus(selectedInvoice),
+            "Due Date": selectedInvoice.dueDate,
+          },
+        }
+      : null,
+  );
+
   const boardTotals = useMemo(() => {
     const total = invoices.reduce((sum, invoice) => sum + calculateTotals(invoice).finalTotal, 0);
     const paid = invoices.reduce((sum, invoice) => sum + getPaidAmount(invoice), 0);

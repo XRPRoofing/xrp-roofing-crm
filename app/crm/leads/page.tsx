@@ -28,6 +28,7 @@ import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type Cre
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
+import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { listProjects, listProjectPhotos, matchProjectByAddress, ensureProjectForJob, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
@@ -607,6 +608,25 @@ export default function LeadsPage() {
   ];
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) || null;
+
+  // Publish the currently-open job to the AI assistant for context awareness.
+  useAiRecordContext(
+    selectedJob
+      ? {
+          kind: "Job",
+          title: selectedJob.name,
+          details: {
+            "Property Address": [selectedJob.address, selectedJob.city].filter(Boolean).join(", "),
+            Phone: selectedJob.phone,
+            Email: selectedJob.email,
+            Stage: leadStages.find((item) => item.id === selectedJob.stage)?.label || selectedJob.stage,
+            "Job Value": selectedJob.value ? `$${Number(selectedJob.value).toLocaleString()}` : undefined,
+            "Roof Type": selectedJob.roofType,
+            "Assigned To": selectedJob.assignedTo,
+          },
+        }
+      : null,
+  );
 
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 

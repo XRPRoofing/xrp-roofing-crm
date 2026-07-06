@@ -23,6 +23,7 @@ import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
 import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
+import { useAiRecordContext } from "@/components/crm/AiChatContext";
 
 type Proposal = {
   id: string;
@@ -481,6 +482,23 @@ export default function ProposalsPage() {
   const proposalCardHashRef = useRef(false);
   const proposalSearchParams = useSearchParams();
   const router = useRouter();
+
+  // Publish the currently-open proposal to the AI assistant so it is
+  // context-aware (customer, proposal #, address, amount, status).
+  useAiRecordContext(
+    activeProposal
+      ? {
+          kind: "Proposal",
+          title: activeProposal.customerName,
+          details: {
+            "Proposal #": activeProposal.proposalNumber || activeProposal.id,
+            "Property Address": activeProposal.address,
+            Amount: activeProposal.total ? `$${Number(activeProposal.total).toLocaleString()}` : undefined,
+            Status: activeProposal.status,
+          },
+        }
+      : null,
+  );
 
   const closeProposalCard = useCallback(() => {
     setActiveProposal(null);

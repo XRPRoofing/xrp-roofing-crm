@@ -18,7 +18,7 @@ import {
   FileText,
   GripHorizontal,
 } from "lucide-react";
-import { useAiChat, type ChatMessage } from "./AiChatContext";
+import { useAiChat, type ChatMessage, type RecordContext } from "./AiChatContext";
 
 // ---------------------------------------------------------------------------
 // Preset actions (same as existing AiWritingAssistant)
@@ -30,33 +30,41 @@ type AiActionGroup = { title: string; actions: AiAction[] };
 const REWRITE_ACTIONS: AiAction[] = [
   { label: "Make Professional", instruction: "Rewrite this text to sound more professional and polished." },
   { label: "Make Friendly", instruction: "Rewrite this text to sound warm, friendly, and approachable." },
-  { label: "Make Shorter", instruction: "Rewrite this text to be significantly shorter while keeping the key points." },
-  { label: "Make Longer", instruction: "Expand this text with more detail while keeping the same meaning." },
-  { label: "Make More Clear", instruction: "Rewrite this text to be clearer and easier to understand." },
-  { label: "Fix Grammar & Spelling", instruction: "Fix all grammar, spelling, and punctuation errors. Keep the meaning and tone the same." },
+  { label: "Shorten", instruction: "Rewrite this text to be significantly shorter while keeping the key points." },
+  { label: "Expand", instruction: "Expand this text with more detail and depth while keeping the same meaning and tone." },
+  { label: "Summarize", instruction: "Summarize this text into a short, clear summary highlighting only the key points." },
+  { label: "Improve Grammar", instruction: "Fix all grammar, spelling, and punctuation errors. Keep the meaning and tone the same." },
+  { label: "Make Clearer", instruction: "Rewrite this text to be clearer and easier to understand. Use shorter sentences and clearer structure." },
   { label: "Simplify", instruction: "Simplify this text so a homeowner with no roofing knowledge can easily understand it." },
-  { label: "Add More Detail", instruction: "Add more specific detail and information to this text." },
-  { label: "Improve Readability", instruction: "Improve the readability of this text. Use shorter sentences and clearer structure." },
+  { label: "Translate to Spanish", instruction: "Translate this text into natural, professional Spanish. Return only the Spanish translation." },
+  { label: "Translate to English", instruction: "Translate this text into natural, professional English. Return only the English translation." },
 ];
 
 const ROOFING_ACTIONS: AiAction[] = [
-  { label: "Write Scope of Work", instruction: "Write a professional roofing Scope of Work based on these notes. Use proper roofing terminology and organize into clear sections." },
-  { label: "Improve Scope of Work", instruction: "Improve this Scope of Work to be more professional, detailed, and well-organized. Keep all roofing terminology accurate." },
-  { label: "Generate Proposal Summary", instruction: "Generate a professional proposal summary for a roofing project based on this text." },
-  { label: "Homeowner-Friendly Language", instruction: "Rewrite this using homeowner-friendly language. Explain any roofing terms in simple words." },
-  { label: "Generate Warranty Wording", instruction: "Generate professional warranty wording for a roofing project based on this text." },
-  { label: "Write Inspection Findings", instruction: "Write professional inspection findings based on these notes. Be specific and organized." },
+  { label: "Scope of Work", instruction: "Write a professional roofing Scope of Work based on these notes. Use proper roofing terminology and organize into clear sections." },
+  { label: "Create Estimate", instruction: "Create a clear, itemized roofing estimate based on these notes. Break out materials, labor, and line-item pricing where possible, and include a total. Note any assumptions." },
+  { label: "Proposal Summary", instruction: "Generate a professional proposal summary for a roofing project based on this text." },
+  { label: "Homeowner-Friendly", instruction: "Rewrite this using homeowner-friendly language. Explain any roofing terms in simple words." },
+  { label: "Warranty Wording", instruction: "Generate professional warranty wording for a roofing project based on this text." },
+  { label: "Inspection Findings", instruction: "Write professional inspection findings based on these notes. Be specific and organized." },
   { label: "Insurance Supplement", instruction: "Write a clear explanation of this insurance supplement for the homeowner." },
-  { label: "Follow-Up Message", instruction: "Write a professional follow-up message to send after a roof inspection." },
-  { label: "Appointment Reminder", instruction: "Write a friendly appointment reminder message based on this text." },
-  { label: "Payment Reminder", instruction: "Write a professional but friendly payment reminder based on this text." },
-  { label: "Thank-You Message", instruction: "Write a sincere thank-you message to a customer based on this context." },
+];
+
+const COMMUNICATION_ACTIONS: AiAction[] = [
+  { label: "Follow-Up Email", instruction: "Write a professional follow-up email based on the current context. Use the customer and job details you already know. Include a subject line." },
+  { label: "Follow-Up SMS", instruction: "Write a short, friendly follow-up SMS text message (under 300 characters) based on the current context." },
+  { label: "Customer Reply", instruction: "Draft a professional, helpful reply to this customer message based on the current context." },
+  { label: "Appointment Reminder", instruction: "Write a friendly appointment reminder message based on the current context." },
+  { label: "Payment Reminder", instruction: "Write a professional but friendly payment reminder based on the current context." },
+  { label: "Thank-You Message", instruction: "Write a sincere thank-you message to the customer based on the current context." },
   { label: "Review Request", instruction: "Write a friendly message requesting a Google review from a satisfied customer." },
+  { label: "Suggest Next Actions", instruction: "Based on the current record and context, suggest the smartest next actions I should take. Be specific and prioritized." },
 ];
 
 const ACTION_GROUPS: AiActionGroup[] = [
-  { title: "Rewrite", actions: REWRITE_ACTIONS },
-  { title: "Roofing-Specific", actions: ROOFING_ACTIONS },
+  { title: "Rewrite & Edit", actions: REWRITE_ACTIONS },
+  { title: "Roofing Documents", actions: ROOFING_ACTIONS },
+  { title: "Communication", actions: COMMUNICATION_ACTIONS },
 ];
 
 // ---------------------------------------------------------------------------
@@ -68,15 +76,31 @@ interface ChatHistoryMsg {
   content: string;
 }
 
+/** Turn a RecordContext object into a compact human-readable summary. */
+function buildRecordSummary(record: RecordContext | null | undefined): string | undefined {
+  if (!record) return undefined;
+  const parts: string[] = [];
+  const heading = record.title ? `${record.kind}: ${record.title}` : record.kind;
+  parts.push(heading);
+  if (record.details) {
+    for (const [key, value] of Object.entries(record.details)) {
+      if (value === null || value === undefined || value === "") continue;
+      parts.push(`${key}: ${value}`);
+    }
+  }
+  return parts.join("\n");
+}
+
 async function callAiChat(
   message: string,
   history: ChatHistoryMsg[],
   currentPage?: string,
+  recordContext?: string,
 ): Promise<string> {
   const res = await fetch("/api/ai/rewrite", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "chat", message, messages: history, currentPage }),
+    body: JSON.stringify({ mode: "chat", message, messages: history, currentPage, recordContext }),
   });
 
   if (!res.ok) {
@@ -177,6 +201,7 @@ export function AiChatPanel() {
     clearMessages,
     confirmFieldContext,
     dismissFieldContext,
+    recordContext,
   } = useAiChat();
 
   const pathname = usePathname();
@@ -242,7 +267,7 @@ export function AiChatPanel() {
           content: m.content,
         }));
 
-        const result = await callAiChat(userContent, history, pathname);
+        const result = await callAiChat(userContent, history, pathname, buildRecordSummary(recordContext));
 
         const assistantMsg: ChatMessage = {
           id: generateId(),
@@ -266,7 +291,7 @@ export function AiChatPanel() {
         setLoading(false);
       }
     },
-    [activeFieldContext, addMessage, messages, pathname],
+    [activeFieldContext, addMessage, messages, pathname, recordContext],
   );
 
   const handleSubmit = useCallback(() => {
@@ -275,11 +300,15 @@ export function AiChatPanel() {
 
   const handleActionClick = useCallback(
     (instruction: string) => {
-      if (!activeFieldContext?.text) {
-        setError("No text loaded. Click 'Use Current Text' first or type your request.");
-        return;
+      // If field text is loaded, apply the action to it. Otherwise run the
+      // instruction on its own — the AI still has the CRM record context and
+      // conversation history to work from (e.g. "Follow-Up Email",
+      // "Suggest Next Actions").
+      if (activeFieldContext?.text) {
+        sendMessage(activeFieldContext.text, instruction);
+      } else {
+        sendMessage("", instruction);
       }
-      sendMessage(activeFieldContext.text, instruction);
       setShowActions(false);
     },
     [activeFieldContext, sendMessage],
@@ -374,6 +403,11 @@ export function AiChatPanel() {
               {activeFieldContext.fieldLabel || "Field loaded"}
             </span>
           )}
+          {!activeFieldContext && recordContext && (
+            <span className="max-w-[160px] truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700" title={`${recordContext.kind}: ${recordContext.title || ""}`}>
+              {recordContext.kind}{recordContext.title ? ` · ${recordContext.title}` : ""}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button type="button" onClick={clearMessages} className="rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" title="Clear conversation">
@@ -424,10 +458,15 @@ export function AiChatPanel() {
         {messages.length === 0 && !pendingFieldContext && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Sparkles className="mb-3 h-8 w-8 text-blue-300" />
-            <p className="text-sm font-semibold text-gray-600">AI Writing Assistant</p>
+            <p className="text-sm font-semibold text-gray-600">AI Assistant</p>
             <p className="mt-1 text-xs text-gray-400">
-              Ask me to help write proposals, emails, SMS messages, or improve any text.
+              Ask me anything — write proposals, emails, SMS, estimates, or improve any text.
             </p>
+            {recordContext && (
+              <p className="mt-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-[11px] font-medium text-emerald-700">
+                I can see your current {recordContext.kind.toLowerCase()}{recordContext.title ? ` — ${recordContext.title}` : ""}. Ask a follow-up without repeating the details.
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setShowActions(!showActions)}
