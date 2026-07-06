@@ -1351,35 +1351,31 @@ export default function ProposalsPage() {
     setSendingProposal(true);
     setSendNotice("");
 
-    const sentProposal = saveActiveProposal({
-      status: "Sent",
+    // Persist the latest edits WITHOUT changing status yet. The status only
+    // flips Draft -> Sent after the email is confirmed delivered below, so a
+    // failed send never leaves a proposal incorrectly marked "Sent".
+    const draftProposal = saveActiveProposal({
       ccRecipients: sendForm.ccRecipients,
       sendSubject: sendForm.subject,
       sendMessage: sendForm.message,
       sentToEmail: sendForm.toEmail,
-      sentAt: new Date().toISOString(),
-      sentBy: currentUserName || currentUserEmail || "CRM User",
-      proposalVersion: (activeProposal.proposalVersion ?? 0) + 1,
-    });
-    const proposalForLink = sentProposal || activeProposal;
-    const proposalLink = `${window.location.origin}/proposal/${encodeURIComponent(proposalForLink.id)}`;
+    }) || activeProposal;
+    const previousStatus = activeProposal.status;
+    const proposalLink = `${window.location.origin}/proposal/${encodeURIComponent(draftProposal.id)}`;
 
-    if (sentProposal) {
-      setActiveProposal(sentProposal);
+    if (draftProposal !== activeProposal) {
+      setActiveProposal(draftProposal);
     }
 
-    // Save the proposal to Supabase so the status is persisted before the email
-    // is sent. Always call both share AND upsert to guarantee status "Sent" sticks.
+    // Publish the current content to the public share page so the link the
+    // customer receives is up to date (status unchanged for now).
     try {
       await fetch("/api/proposals/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(proposalForLink),
+        body: JSON.stringify(draftProposal),
       });
     } catch { /* fallback below */ }
-    try {
-      await upsertProposalRecord(proposalForLink);
-    } catch { /* sync effect will retry on next change */ }
 
     try {
       const response = await fetch("/api/proposals/send", {
@@ -1392,21 +1388,51 @@ export default function ProposalsPage() {
           subject: sendForm.subject,
           message: sendForm.message,
           proposalLink,
-          coverPhoto: sentProposal?.coverPhoto || editorForm.coverPhoto,
-          coverTitle: sentProposal?.title || editorForm.title,
-          coverText: sentProposal?.coverText || editorForm.coverText,
+          coverPhoto: draftProposal.coverPhoto || editorForm.coverPhoto,
+          coverTitle: draftProposal.title || editorForm.title,
+          coverText: draftProposal.coverText || editorForm.coverText,
         }),
       });
 
       if (!response.ok) {
+        // Send failed — keep the proposal in its previous status (Draft) and
+        // surface the error. Do NOT mark it Sent.
         const data = await response.json().catch(() => null) as { error?: string } | null;
         const serverError = typeof data?.error === "string" ? data.error : "Unable to send proposal email";
         if (serverError === "Email service is not configured") {
-          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: draftProposal.proposalNumber || draftProposal.id, message: `Email service is not configured. Add RESEND_API_KEY in Vercel to send proposal emails, or copy and send this proposal link manually:\n\n${proposalLink}` });
         } else {
-          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `${serverError}\n\nProposal link: ${proposalLink}` });
+          setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: draftProposal.proposalNumber || draftProposal.id, message: `${serverError}\n\nThe proposal is still marked "${previousStatus}". Proposal link: ${proposalLink}` });
         }
       } else {
+        // Email confirmed delivered — NOW flip the status to Sent, stamp the
+        // send time, and persist so the correct status shows everywhere.
+        const sentProposal = saveActiveProposal({
+          status: "Sent",
+          ccRecipients: sendForm.ccRecipients,
+          sendSubject: sendForm.subject,
+          sendMessage: sendForm.message,
+          sentToEmail: sendForm.toEmail,
+          sentViaSms: false,
+          sentAt: new Date().toISOString(),
+          sentBy: currentUserName || currentUserEmail || "CRM User",
+          proposalVersion: (draftProposal.proposalVersion ?? 0) + 1,
+        }) || draftProposal;
+        setActiveProposal(sentProposal);
+
+        // Persist the Sent status to Supabase (both share + upsert) so it
+        // propagates in real time and never reverts to Draft.
+        try {
+          await fetch("/api/proposals/share", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sentProposal),
+          });
+        } catch { /* upsert below is the durable path */ }
+        try {
+          await upsertProposalRecord(sentProposal);
+        } catch { /* sync effect will retry on next change */ }
+
         // Log send activity
         const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];
         sendLog.unshift({
@@ -1414,28 +1440,29 @@ export default function ProposalsPage() {
           sentBy: currentUserName || currentUserEmail || "CRM User",
           sentAt: new Date().toISOString(),
           customerName: sendForm.toName,
-          documentNumber: proposalForLink.proposalNumber || proposalForLink.id,
+          documentNumber: sentProposal.proposalNumber || sentProposal.id,
           deliveryMethod: "Email",
           recipient: sendForm.toEmail,
         });
         window.localStorage.setItem("xrp-crm-send-activity-log", JSON.stringify(sendLog));
 
-        if (proposalForLink.job?.id) {
+        if (sentProposal.job?.id) {
           void logCrewActivity({
-            jobId: proposalForLink.job.id,
-            jobName: proposalForLink.customerName,
+            jobId: sentProposal.job.id,
+            jobName: sentProposal.customerName,
             actor: currentUserName || currentUserEmail || "Office",
             action: "Proposal sent by Email",
-            details: `${proposalForLink.proposalNumber ? `Proposal #${proposalForLink.proposalNumber}` : "Proposal"} sent to ${sendForm.toEmail} — status changed to Sent`,
+            details: `${sentProposal.proposalNumber ? `Proposal #${sentProposal.proposalNumber}` : "Proposal"} sent to ${sendForm.toEmail} — status changed to Sent`,
             module: "Proposal",
           }).catch(() => {});
         }
 
-        setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
+        setSendConfirmation({ type: "success", customerName: sendForm.toName, proposalNumber: sentProposal.proposalNumber || sentProposal.id, message: `Proposal sent to ${sendForm.toEmail}.\n\nProposal link: ${proposalLink}` });
         setShowSendModal(false);
       }
     } catch {
-      setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: proposalForLink.proposalNumber || proposalForLink.id, message: `Could not connect to the email server. Please check your internet connection and try again.\n\nProposal link: ${proposalLink}` });
+      // Network error — keep previous status (Draft), do not mark Sent.
+      setSendConfirmation({ type: "error", customerName: sendForm.toName, proposalNumber: draftProposal.proposalNumber || draftProposal.id, message: `Could not connect to the email server. The proposal is still marked "${previousStatus}". Please check your internet connection and try again.\n\nProposal link: ${proposalLink}` });
     } finally {
       setSendingProposal(false);
     }
