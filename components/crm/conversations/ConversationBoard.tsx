@@ -323,10 +323,18 @@ function MessageRow({ message }: { message: ConversationMessage }) {
         {message.mediaUrls && message.mediaUrls.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {message.mediaUrls.map((url) => {
-              const isPdf = url.toLowerCase().endsWith(".pdf");
-              return isPdf ? (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${outbound ? "bg-white/20 text-white hover:bg-white/30" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}><FileText className="h-4 w-4" />PDF Document</a>
-              ) : (
+              const isPdf = url.toLowerCase().includes(".pdf") || url.includes("ct=application%2Fpdf");
+              if (isPdf) {
+                return (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition ${outbound ? "bg-white/20 text-white hover:bg-white/30" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}><FileText className="h-4 w-4" />PDF Document</a>
+                );
+              }
+              if (isVideoMedia(url)) {
+                return (
+                  <video key={url} src={url} controls playsInline preload="metadata" className="max-h-48 max-w-[240px] rounded-lg border border-white/20 object-cover" />
+                );
+              }
+              return (
                 <a key={url} href={url} target="_blank" rel="noopener noreferrer"><img src={url} alt="MMS" className="max-h-48 max-w-[240px] rounded-lg border border-white/20 object-cover" /></a>
               );
             })}
@@ -660,20 +668,31 @@ function eventMatchesConversation(event: TwilioConversationEvent, conversation: 
 }
 
 function extractMediaUrls(payload: Record<string, unknown>): string[] {
-  const urls: string[] = [];
-  // Outbound MMS: stored as payload.mediaUrls
+  // Prefer media re-hosted to our own public storage (works in the browser).
+  // Outbound MMS and re-hosted inbound MMS are both stored as payload.mediaUrls.
   if (Array.isArray(payload.mediaUrls)) {
-    for (const url of payload.mediaUrls) {
-      if (typeof url === "string" && url.startsWith("http")) urls.push(url);
-    }
+    const rehosted = payload.mediaUrls.filter(
+      (url): url is string => typeof url === "string" && url.startsWith("http"),
+    );
+    if (rehosted.length > 0) return rehosted;
   }
-  // Inbound MMS: Twilio sends MediaUrl0, MediaUrl1, …
+  // Fallback for inbound MMS that wasn't re-hosted: Twilio's raw MediaUrl links
+  // are private (401 in the browser), so route them through our authenticated
+  // media proxy. Carry the content type so videos can be detected and played.
+  const urls: string[] = [];
   const numMedia = Number(payload.NumMedia || 0);
   for (let i = 0; i < numMedia; i++) {
     const url = payload[`MediaUrl${i}`];
-    if (typeof url === "string" && url.startsWith("http")) urls.push(url);
+    if (typeof url !== "string" || !url.startsWith("http")) continue;
+    const ct = typeof payload[`MediaContentType${i}`] === "string" ? String(payload[`MediaContentType${i}`]) : "";
+    urls.push(`/api/twilio/media?url=${encodeURIComponent(url)}${ct ? `&ct=${encodeURIComponent(ct)}` : ""}`);
   }
   return urls;
+}
+
+function isVideoMedia(url: string): boolean {
+  const u = url.toLowerCase();
+  return /\.(mp4|mov|webm|3gp|m4v)(\?|$)/.test(u) || u.includes("ct=video");
 }
 
 function getSmsStatusLabel(event: TwilioConversationEvent): ConversationMessage["status"] {
