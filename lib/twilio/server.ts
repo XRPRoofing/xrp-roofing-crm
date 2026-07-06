@@ -1,7 +1,7 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
 import { findTwilioLine, resolveFromNumber } from "@/lib/twilio/numbers";
-import { getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
+import { getAdminAgentIdentities, getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 export function getTwilioClient() {
@@ -130,10 +130,19 @@ function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, on
   }
 }
 
-/** Fetch online agent identities for ring group routing */
+/** Fetch the agent identities to ring for an inbound call.
+ *  Rings EVERY admin-access user's browser (each registers its own
+ *  `agent-<id>` identity) so any available admin can answer. Also unions in
+ *  any explicitly-online agents from the agent_status table when present.
+ *  dialRingGroup adds the shared `crm-agent` as an ultimate fallback. */
 export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
   try {
-    return await getOnlineAgentIdentities();
+    const [online, admins] = await Promise.all([
+      getOnlineAgentIdentities().catch(() => ({ configured: false, agents: [] as string[] })),
+      getAdminAgentIdentities().catch(() => [] as string[]),
+    ]);
+    const agents = Array.from(new Set([...(online.agents || []), ...admins]));
+    return { configured: online.configured || agents.length > 0, agents };
   } catch {
     return { configured: false, agents: [] };
   }
