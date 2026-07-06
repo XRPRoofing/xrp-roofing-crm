@@ -114,20 +114,20 @@ function normalizePhoneForTwiml(value?: string) {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]) {
+  // The in-app softphone (CrmShell / FloatingDialer / ConversationBoard) always
+  // registers its Twilio Voice device under the shared "crm-agent" identity, so
+  // "crm-agent" must ALWAYS be a dial target — otherwise inbound calls ring
+  // per-user identities (agent-<id>) or the ring-group only and the browser
+  // never receives the call, leaving no way to answer.
+  const targets = new Set<string>(["crm-agent"]);
   if (onlineAgents && onlineAgents.length > 0) {
-    for (const agentId of onlineAgents) {
-      dial.client(agentId);
-    }
-    return;
+    for (const agentId of onlineAgents) targets.add(agentId);
+  } else {
+    for (const agentId of config.ringGroup) targets.add(agentId);
   }
-  if (config.ringGroup.length > 0) {
-    for (const agentId of config.ringGroup) {
-      dial.client(agentId);
-    }
-    return;
+  for (const agentId of targets) {
+    dial.client(agentId);
   }
-  // Ultimate fallback — always dial at least crm-agent to prevent empty <Dial>
-  dial.client("crm-agent");
 }
 
 /** Fetch online agent identities for ring group routing */
@@ -140,18 +140,14 @@ export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
 }
 
 /** Check if any agents are available to take calls.
- *  Returns true when:
- *  - online agents exist, OR
- *  - TWILIO_RING_GROUP env var is set, OR
- *  - the agent-status system is NOT configured (fallback to crm-agent)
+ *  The shared "crm-agent" browser softphone is ALWAYS a dial target (see
+ *  dialRingGroup), so the in-app softphone can always receive the call. We
+ *  therefore never trap callers in the hold queue — an unanswered <Dial> falls
+ *  through to its `action` callback (voicemail / call-ended) after `timeout`,
+ *  which is the correct "no answer" path rather than an endless hold loop.
  */
-export function hasAvailableAgents(status: AgentStatusResult): boolean {
-  if (status.agents.length > 0) return true;
-  const config = getTwilioConfig();
-  if (config.ringGroup.length > 0) return true;
-  // If the availability system is not configured, assume agents are available
-  // so we dial crm-agent directly instead of entering the queue
-  return !status.configured;
+export function hasAvailableAgents(_status: AgentStatusResult): boolean {
+  return true;
 }
 
 /**
