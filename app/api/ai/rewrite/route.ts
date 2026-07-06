@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const chatMessages = body.messages as ChatMsg[] | undefined;
     const userMessage = body.message as string | undefined;
     const currentPage = body.currentPage as string | undefined;
+    const recordContext = body.recordContext as string | undefined;
 
     if (!userMessage && (!chatMessages || chatMessages.length === 0)) {
       return NextResponse.json(
@@ -39,13 +40,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const chatSystemPrompt = buildCrmAssistantPrompt(currentPage);
+    const chatSystemPrompt = buildCrmAssistantPrompt(currentPage, recordContext);
 
     const messages: ChatMsg[] = [{ role: "system", content: chatSystemPrompt }];
 
     if (chatMessages && chatMessages.length > 0) {
-      // Include conversation history (limit to last 20 messages for token budget)
-      const recent = chatMessages.slice(-20);
+      // Include conversation history (last 30 messages) so follow-up questions
+      // keep full context without losing the thread.
+      const recent = chatMessages.slice(-30);
       for (const m of recent) {
         if (m.role === "user" || m.role === "assistant") {
           messages.push({ role: m.role, content: m.content });
@@ -65,9 +67,9 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
-          temperature: 0.7,
-          max_tokens: 2048,
+          model: "gpt-4o",
+          temperature: 0.6,
+          max_tokens: 3000,
           messages,
         }),
       });
