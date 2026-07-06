@@ -18,7 +18,9 @@ function buildFallbackCallSummary(status: string, direction?: "inbound" | "outbo
     return `Summary: The call could not be completed because the ${direction === "outbound" ? "customer's" : "caller's"} line was busy.\nNext steps:\n- Try calling again in a few minutes`;
   }
   if (s === "failed") {
-    return `Summary: The ${direction === "outbound" ? "outbound" : "inbound"} call could not be connected due to a network or carrier issue.\nNext steps:\n- Verify the phone number is correct\n- Try again later`;
+    return direction === "outbound"
+      ? "Summary: The call didn't connect — the customer likely didn't answer, or the call ended before they picked up. No conversation occurred.\nNext steps:\n- Try calling again\n- Consider sending a follow-up text"
+      : "Summary: The inbound call didn't connect — the caller may have hung up before it was answered. No conversation occurred.\nNext steps:\n- Return the call when available\n- Check for voicemail";
   }
   if (s === "canceled") {
     return "Summary: The call was canceled before it was answered.\nNext steps:\n- Reach out via text if follow-up is needed";
