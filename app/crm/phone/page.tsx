@@ -301,17 +301,45 @@ export default function PhonePage() {
   // Build call records from events
   const callRecords: CallRecord[] = useMemo(() => {
     const callEvents = events.filter((e) => e.type === "incoming_call" || e.type === "call_status");
-    const callMap = new Map<string, TwilioConversationEvent>();
+    const normalizePhone = (value: string) => (value || "").replace(/\D/g, "").slice(-10);
+    const isClientAddr = (value: string) => (value || "").replace(/^\+/, "").startsWith("client:");
+    // The agent side is the CRM browser client; the customer side is the real
+    // phone number. Which side each maps to depends on call direction.
+    const agentSide = (e: TwilioConversationEvent) => (e.direction === "outbound" ? e.from || e.to : e.to || e.from) || "";
+    const customerSide = (e: TwilioConversationEvent) => (e.direction === "outbound" ? e.to || e.from : e.from || e.to) || "";
+
+    // Dedup per call leg (callSid), keeping the most recent status. Drop legs
+    // that carry no real customer number (customer side is a client: address).
+    const legMap = new Map<string, TwilioConversationEvent>();
     for (const e of callEvents) {
       if (!e.callSid) continue;
-      // Skip internal browser-to-Twilio legs (client:crm-agent) — they duplicate the real call
-      const fromVal = (e.from || "").replace(/^\+/, "");
-      const toVal = (e.to || "").replace(/^\+/, "");
-      if (fromVal.startsWith("client:") || toVal.startsWith("client:")) continue;
-      const existing = callMap.get(e.callSid);
+      if (isClientAddr(customerSide(e))) continue;
+      const existing = legMap.get(e.callSid);
       if (!existing || new Date(e.createdAt) > new Date(existing.createdAt)) {
-        callMap.set(e.callSid, e);
+        legMap.set(e.callSid, e);
       }
+    }
+
+    // Internal browser legs have the agent (client:crm-agent) on the agent side:
+    //  - inbound  <Dial><Client> leg  → to = client:crm-agent (duplicates the
+    //    real inbound PSTN leg) → always drop.
+    //  - outbound agent leg published by the TwiML route → from = client:crm-agent.
+    //    The real customer leg (Twilio # → customer) is dialed into the
+    //    conference best-effort, so drop the agent leg ONLY when that real-number
+    //    sibling exists — otherwise keep it so the outbound call is never lost.
+    const realOutbound = [...legMap.values()]
+      .filter((e) => e.direction === "outbound" && !isClientAddr(agentSide(e)))
+      .map((e) => ({ norm: normalizePhone(customerSide(e)), t: new Date(e.createdAt).getTime() }));
+    const callMap = new Map<string, TwilioConversationEvent>();
+    for (const [sid, e] of legMap) {
+      if (isClientAddr(agentSide(e))) {
+        if (e.direction === "inbound") continue;
+        const norm = normalizePhone(customerSide(e));
+        const t = new Date(e.createdAt).getTime();
+        const hasSibling = realOutbound.some((s) => s.norm === norm && Math.abs(s.t - t) < 5 * 60 * 1000);
+        if (hasSibling) continue;
+      }
+      callMap.set(sid, e);
     }
 
     // Build recording + summary map from call_recording events
