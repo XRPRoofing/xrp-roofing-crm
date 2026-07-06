@@ -235,12 +235,18 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isCrewUser) return;
+    // Register under a per-user Voice identity so the inbound <Dial> can ring
+    // EVERY logged-in admin's browser at once (they each register a distinct
+    // agent-<id>). A single shared identity would let Twilio ring only one
+    // browser. Wait until the user id is known before registering.
+    if (!currentUserId) return;
+    const voiceIdentity = `agent-${currentUserId}`;
     let mounted = true;
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function registerGlobalVoiceDevice() {
       try {
-        const device = await createBrowserVoiceDevice("crm-agent");
+        const device = await createBrowserVoiceDevice(voiceIdentity);
         if (!mounted) {
           device.destroy();
           return;
@@ -266,7 +272,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           });
         });
         const refreshAndRegister = () =>
-          getVoiceToken("crm-agent")
+          getVoiceToken(voiceIdentity)
             .then(({ token }) => { device.updateToken?.(token); return device.register(); })
             .catch(() => undefined);
         // Re-register if Twilio drops the registration.
@@ -291,7 +297,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       const device = voiceDeviceRef.current as unknown as { state?: string; register?: () => Promise<unknown> } | null;
       if (!device || incomingCallRef.current) return;
       if (device.state && device.state !== "registered") {
-        void getVoiceToken("crm-agent")
+        void getVoiceToken(voiceIdentity)
           .then(({ token }) => { voiceDeviceRef.current?.updateToken?.(token); return device.register?.(); })
           .catch(() => undefined);
       }
@@ -318,7 +324,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
     };
-  }, [isCrewUser]);
+  }, [isCrewUser, currentUserId]);
 
   useEffect(() => {
     function refreshUnreadTeamChatCount() {
