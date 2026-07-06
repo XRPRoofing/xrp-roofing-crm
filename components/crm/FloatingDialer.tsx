@@ -47,7 +47,7 @@ import { getTwilioLines } from "@/lib/twilio/numbers";
 // ---------------------------------------------------------------------------
 
 type Tab = "recents" | "contacts" | "keypad" | "queue";
-type CallState = "idle" | "connecting" | "active" | "held" | "forwarding";
+type CallState = "idle" | "connecting" | "ringing" | "active" | "held" | "forwarding";
 type ForwardingStatus = "forwarding" | "ringing" | "connected" | "no-answer" | "busy" | "failed" | "ended";
 
 interface PhoneNumber {
@@ -158,6 +158,11 @@ export default function FloatingDialer({
   const [callSid, setCallSid] = useState<string | undefined>();
   const browserCallRef = useRef<BrowserVoiceCall | null>(null);
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Ringback tone (played to the agent while the customer's phone is being
+  // dialed, so an outbound call is never silent/ambiguous).
+  const ringbackRef = useRef<{ ctx: AudioContext; osc1: OscillatorNode; osc2: OscillatorNode; interval: ReturnType<typeof setInterval> } | null>(null);
+  // Guards the ringing→active transition so it only fires once per call.
+  const answeredRef = useRef(false);
 
   // Transfer state
   const [showTransfer, setShowTransfer] = useState(false);
@@ -239,6 +244,11 @@ export default function FloatingDialer({
   useEffect(() => {
     onCallStateChange?.(callState !== "idle");
   }, [callState, onCallStateChange]);
+
+  // Stop the ringback tone if the dialer unmounts mid-call.
+  useEffect(() => {
+    return () => { stopRingback(); };
+  }, []);
 
   // Listen for custom events from Phone page to open SMS / New Job panels
   // Store pending action so it can be applied after the dialer opens
@@ -393,12 +403,53 @@ export default function FloatingDialer({
   // Call actions (unchanged logic)
   // -------------------------------------------------------------------------
 
+  function stopRingback() {
+    const rb = ringbackRef.current;
+    if (!rb) return;
+    ringbackRef.current = null;
+    clearInterval(rb.interval);
+    try { rb.osc1.stop(); } catch { /* already stopped */ }
+    try { rb.osc2.stop(); } catch { /* already stopped */ }
+    try { void rb.ctx.close(); } catch { /* already closed */ }
+  }
+
+  function startRingback() {
+    if (ringbackRef.current) return;
+    try {
+      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(ctx.destination);
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      osc1.frequency.value = 440;
+      osc2.frequency.value = 480;
+      osc1.connect(gain);
+      osc2.connect(gain);
+      osc1.start();
+      osc2.start();
+      // US ringback cadence: 2s tone on, 4s silent, repeating.
+      const ring = () => {
+        const t = ctx.currentTime;
+        gain.gain.setValueAtTime(0.06, t);
+        gain.gain.setValueAtTime(0, t + 2);
+      };
+      ring();
+      const interval = setInterval(ring, 6000);
+      ringbackRef.current = { ctx, osc1, osc2, interval };
+    } catch { /* audio unavailable */ }
+  }
+
   async function handleStartCall(numberOverride?: string) {
     const destination = numberOverride || dialNumber.trim();
     if (!destination) return;
     try {
+      answeredRef.current = false;
       setCallState("connecting");
       setMinimized(false);
+      startRingback();
       const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
       if (!voiceDeviceRef.current) {
         (voiceDeviceRef as React.MutableRefObject<BrowserVoiceDevice | null>).current = device;
@@ -407,7 +458,10 @@ export default function FloatingDialer({
       if (selectedCallerId) connectParams.CallerId = selectedCallerId;
       const call = await device.connect({ params: connectParams });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
-      setCallState("active");
+      // The agent leg is now bridged into the conference, but the customer's
+      // phone is still ringing — keep showing "Calling customer…" with a
+      // ringback tone until real audio arrives from the far end.
+      setCallState("ringing");
       setIsMuted(false);
       const destDigits = destination.replace(/\D/g, "");
       const matchedCustomer = customers.find((c) => c.phone?.replace(/\D/g, "") === destDigits);
@@ -425,8 +479,21 @@ export default function FloatingDialer({
         const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
         if (sid) setCallSid(sid);
       });
+      // Detect when the customer actually joins: audio starts flowing from the
+      // far end (outputVolume > 0). Until then we stay in the "ringing" state
+      // with the ringback tone, so a silent conference is never mistaken for a
+      // connected call.
+      call.on("volume", (_inputVolume, outputVolume) => {
+        if (answeredRef.current) return;
+        if (outputVolume > 0.02) {
+          answeredRef.current = true;
+          stopRingback();
+          setCallState((prev) => (prev === "ringing" || prev === "connecting" ? "active" : prev));
+        }
+      });
       call.on("disconnect", () => {
         const endedSid = callSid || (call as unknown as BrowserVoiceCall).parameters?.CallSid;
+        stopRingback();
         setCallState("idle");
         setCallSid(undefined);
         browserCallRef.current = null;
@@ -435,16 +502,19 @@ export default function FloatingDialer({
         if (endedSid) onCallEnd?.(endedSid);
       });
       call.on("error", () => {
+        stopRingback();
         setCallState("idle");
         browserCallRef.current = null;
       });
     } catch {
+      stopRingback();
       setCallState("idle");
     }
   }
 
   function handleEndCall() {
     const endedSid = callSid;
+    stopRingback();
     browserCallRef.current?.disconnect();
     browserCallRef.current = null;
     setCallState("idle");
@@ -699,7 +769,7 @@ export default function FloatingDialer({
           <div>
             <p className="text-xs font-bold text-blue-800">{callerName || formatPhone(dialNumber)}</p>
             <p className="text-[10px] font-semibold text-blue-600">
-              {callState === "held" ? "On Hold" : callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
+              {callState === "held" ? "On Hold" : callState === "connecting" ? "Connecting..." : callState === "ringing" ? "Calling…" : formatDuration(callDuration)}
             </p>
           </div>
         </div>
@@ -803,7 +873,7 @@ export default function FloatingDialer({
               )}
             </div>
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-blue-500 px-2 py-0.5 text-[9px] font-bold text-white shadow">
-              {callState === "held" ? "HELD" : callState === "connecting" ? "DIALING" : "LIVE"}
+              {callState === "held" ? "HELD" : callState === "connecting" ? "DIALING" : callState === "ringing" ? "RINGING" : "LIVE"}
             </span>
           </div>
 
@@ -812,8 +882,8 @@ export default function FloatingDialer({
           <p className="text-sm text-gray-500">{formatPhone(dialNumber)}</p>
 
           {/* Timer */}
-          <p className={`mt-1 text-2xl font-light tabular-nums ${callState === "held" ? "text-orange-500" : callState === "connecting" ? "text-yellow-500" : "text-blue-600"}`}>
-            {callState === "connecting" ? "Connecting..." : formatDuration(callDuration)}
+          <p className={`mt-1 font-light tabular-nums ${callState === "held" ? "text-2xl text-orange-500" : callState === "connecting" ? "text-2xl text-yellow-500" : callState === "ringing" ? "text-base text-yellow-600" : "text-2xl text-blue-600"}`}>
+            {callState === "connecting" ? "Connecting..." : callState === "ringing" ? "Calling customer…" : formatDuration(callDuration)}
           </p>
 
           {/* Call action grid */}
