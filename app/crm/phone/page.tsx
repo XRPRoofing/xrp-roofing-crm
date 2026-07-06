@@ -301,17 +301,41 @@ export default function PhonePage() {
   // Build call records from events
   const callRecords: CallRecord[] = useMemo(() => {
     const callEvents = events.filter((e) => e.type === "incoming_call" || e.type === "call_status");
-    const callMap = new Map<string, TwilioConversationEvent>();
+    const normalizePhone = (value: string) => (value || "").replace(/\D/g, "").slice(-10);
+    const isClientAddr = (value: string) => (value || "").replace(/^\+/, "").startsWith("client:");
+    // The customer's number is the non-agent side of the call.
+    const customerSide = (e: TwilioConversationEvent) => (e.direction === "outbound" ? e.to || e.from : e.from || e.to) || "";
+
+    // Dedup per call leg (callSid), keeping the most recent status. Drop purely
+    // internal legs that carry no real customer number (e.g. the inbound
+    // <Dial><Client> leg whose customer side is client:crm-agent).
+    const legMap = new Map<string, TwilioConversationEvent>();
     for (const e of callEvents) {
       if (!e.callSid) continue;
-      // Skip internal browser-to-Twilio legs (client:crm-agent) — they duplicate the real call
-      const fromVal = (e.from || "").replace(/^\+/, "");
-      const toVal = (e.to || "").replace(/^\+/, "");
-      if (fromVal.startsWith("client:") || toVal.startsWith("client:")) continue;
-      const existing = callMap.get(e.callSid);
+      if (isClientAddr(customerSide(e))) continue;
+      const existing = legMap.get(e.callSid);
       if (!existing || new Date(e.createdAt) > new Date(existing.createdAt)) {
-        callMap.set(e.callSid, e);
+        legMap.set(e.callSid, e);
       }
+    }
+
+    // Browser-initiated outbound calls produce two legs: the internal agent leg
+    // (from = client:crm-agent, published by the TwiML route) and the customer
+    // leg (real Twilio number → customer, dialed into the conference). Show the
+    // call once: drop the internal agent leg ONLY when its real-number sibling
+    // exists — otherwise keep it so the outbound call is never lost from the log.
+    const realOutbound = [...legMap.values()]
+      .filter((e) => e.direction === "outbound" && !isClientAddr(e.from || ""))
+      .map((e) => ({ norm: normalizePhone(customerSide(e)), t: new Date(e.createdAt).getTime() }));
+    const callMap = new Map<string, TwilioConversationEvent>();
+    for (const [sid, e] of legMap) {
+      if (isClientAddr(e.from || "")) {
+        const norm = normalizePhone(customerSide(e));
+        const t = new Date(e.createdAt).getTime();
+        const hasSibling = realOutbound.some((s) => s.norm === norm && Math.abs(s.t - t) < 5 * 60 * 1000);
+        if (hasSibling) continue;
+      }
+      callMap.set(sid, e);
     }
 
     // Build recording + summary map from call_recording events
