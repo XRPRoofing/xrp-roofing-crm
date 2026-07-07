@@ -2,6 +2,7 @@ import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
 import { findTwilioLine, resolveFromNumber } from "@/lib/twilio/numbers";
 import { getAdminAgentIdentities, getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
+import type { RoutingStep } from "@/lib/twilio/routing-types";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
 export function getTwilioClient() {
@@ -359,6 +360,87 @@ const DEPARTMENT_PRIORITY: Record<IvrDepartment, QueuePriority> = {
   other: "low",
 };
 
+const OFFICE_NUMBER = "+16233008097";
+
+/** Resolve the department + default forward number for a pressed IVR digit.
+ *  Returns null for invalid digits. Shared by the legacy simultaneous-ring
+ *  path and the configurable step-based routing path so both agree on which
+ *  key maps to which department. The IVR greeting/menu itself is unchanged. */
+export function resolveIvrDepartment(digit: string): { label: IvrDepartment; number: string } | null {
+  const config = getTwilioConfig();
+  const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
+    "1": { label: "scheduling", number: OFFICE_NUMBER },
+    "2": { label: "sales", number: config.phoneNumber },
+    "3": { label: "billing", number: OFFICE_NUMBER },
+    "0": { label: "other", number: OFFICE_NUMBER },
+  };
+  return departmentMap[digit] || null;
+}
+
+/** The spoken "connecting you…" line for a department. */
+export function ivrDepartmentSay(label: IvrDepartment): string {
+  if (label === "scheduling") return "Connecting you to schedule your free roof inspection.";
+  if (label === "sales") return "Connecting you to customer service.";
+  if (label === "billing") return "Connecting you to our billing department.";
+  return "Connecting you to the operator.";
+}
+
+/** Ring the targets for a single routing step onto an existing <Dial>. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyRoutingStepTargets(dial: any, step: RoutingStep, config: ReturnType<typeof getTwilioConfig>, agentStatus?: AgentStatusResult) {
+  if (step.type === "ring_group") {
+    dialRingGroup(dial, config, agentStatus?.agents);
+    return;
+  }
+  const number = normalizePhoneForTwiml(step.number);
+  if (number) dial.number(number);
+}
+
+/**
+ * Build TwiML for one step of a configured routing sequence. Rings the step's
+ * target(s) for `step.seconds`; the <Dial> `action` points at the next step so
+ * an unanswered step automatically fails over to the following one. When the
+ * step index is past the end, routes to the final "no answer" callback (same
+ * ending as today). `sayText` is spoken only on the first step.
+ */
+export function buildRoutingStepTwiml(params: {
+  steps: RoutingStep[];
+  option: string;
+  stepIndex: number;
+  statusCallbackUrl: string;
+  nextStepUrlFor: (option: string, stepIndex: number) => string;
+  finalNoAnswerUrl: string;
+  agentStatus?: AgentStatusResult;
+  callerNumber?: string;
+  sayText?: string;
+}): string {
+  const config = getTwilioConfig();
+  const response = new twilio.twiml.VoiceResponse();
+  if (params.stepIndex === 0 && params.sayText) response.say(params.sayText);
+
+  const step = params.steps[params.stepIndex];
+  if (!step) {
+    // Sequence exhausted — no one answered any step. Fall through to the same
+    // "no answer" ending used today (logs the result + hangs up).
+    response.redirect({ method: "POST" }, params.finalNoAnswerUrl);
+    return response.toString();
+  }
+
+  const dial = response.dial({
+    answerOnBridge: true,
+    record: "record-from-answer-dual",
+    timeout: step.seconds,
+    action: params.nextStepUrlFor(params.option, params.stepIndex + 1),
+    method: "POST",
+    recordingStatusCallback: params.statusCallbackUrl,
+    recordingStatusCallbackEvent: ["completed"],
+    recordingStatusCallbackMethod: "POST",
+    ...(params.callerNumber ? { callerId: params.callerNumber } : {}),
+  });
+  applyRoutingStepTargets(dial, step, config, params.agentStatus);
+  return response.toString();
+}
+
 export function buildIvrMenuTwiml(
   digit: string,
   statusCallbackUrl: string,
@@ -371,15 +453,7 @@ export function buildIvrMenuTwiml(
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
 
-  const officeNumber = "+16233008097";
-  const departmentMap: Record<string, { label: IvrDepartment; number: string }> = {
-    "1": { label: "scheduling", number: officeNumber },
-    "2": { label: "sales", number: config.phoneNumber },
-    "3": { label: "billing", number: officeNumber },
-    "0": { label: "other", number: officeNumber },
-  };
-
-  const dept = departmentMap[digit];
+  const dept = resolveIvrDepartment(digit);
 
   if (!dept) {
     response.say("Sorry, that is not a valid option.");
@@ -388,10 +462,7 @@ export function buildIvrMenuTwiml(
   }
 
   const sayDepartment = () => {
-    if (dept.label === "scheduling") response.say("Connecting you to schedule your free roof inspection.");
-    else if (dept.label === "sales") response.say("Connecting you to customer service.");
-    else if (dept.label === "billing") response.say("Connecting you to our billing department.");
-    else response.say("Connecting you to the operator.");
+    response.say(ivrDepartmentSay(dept.label));
   };
 
   const status = agentStatus || { configured: false, agents: [] };

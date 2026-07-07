@@ -1,4 +1,4 @@
-import { Building2, CreditCard, ExternalLink, GitBranch, KeyRound, Mail, PhoneCall, PlugZap, ShieldCheck, UsersRound, Webhook } from "lucide-react";
+import { Building2, CreditCard, ExternalLink, GitBranch, KeyRound, Mail, PhoneCall, PhoneForwarded, PlugZap, ShieldCheck, UsersRound, Webhook } from "lucide-react";
 
 const settingsSections = [
   {
@@ -21,6 +21,14 @@ const settingsSections = [
     icon: PhoneCall,
     status: "Twilio",
     items: ["Outbound calls", "SMS messaging", "Call notes"],
+  },
+  {
+    title: "Incoming Call Routing",
+    description: "Set the order calls ring for each IVR menu option — ring one destination, then fail over to a ring group of all admins.",
+    icon: PhoneForwarded,
+    status: "Routing",
+    items: ["Per-option order", "Ring timeouts", "Admin ring group"],
+    href: "/crm/settings/call-routing",
   },
   {
     title: "System Email",
