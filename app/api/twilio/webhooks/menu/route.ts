@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { buildIvrMenuTwiml, fetchOnlineAgents, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
+import { buildIvrMenuTwiml, buildRoutingStepTwiml, fetchOnlineAgents, ivrDepartmentSay, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl, resolveIvrDepartment } from "@/lib/twilio/server";
+import { getCallRoutingForOption } from "@/lib/twilio/routing-server";
+import { routeStepUrlFor } from "@/lib/twilio/routing-urls";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { sendIncomingCallPushNotification } from "@/lib/push-notifications";
 
@@ -19,7 +21,32 @@ export async function POST(req: NextRequest) {
 
   const callerNumber = formData.get("From")?.toString() || "";
   const onlineAgents = await fetchOnlineAgents();
-  const { twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl, callerNumber);
+
+  // Configurable step-based routing: if this option has a saved sequence, ring
+  // its steps one after another (failover). If no config exists, fall back to
+  // the existing simultaneous-ring behavior — so a missing config never breaks
+  // inbound calls.
+  const dept = resolveIvrDepartment(digit);
+  const routingSteps = dept ? await getCallRoutingForOption(digit) : [];
+
+  let twiml: string;
+  let department: string | null;
+  if (dept && routingSteps.length > 0) {
+    twiml = buildRoutingStepTwiml({
+      steps: routingSteps,
+      option: digit,
+      stepIndex: 0,
+      statusCallbackUrl,
+      nextStepUrlFor: (option, stepIndex) => routeStepUrlFor(origin, option, stepIndex),
+      finalNoAnswerUrl: actionCallbackUrl,
+      agentStatus: onlineAgents,
+      callerNumber,
+      sayText: ivrDepartmentSay(dept.label),
+    });
+    department = dept.label;
+  } else {
+    ({ twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl, callerNumber));
+  }
 
   if (department) {
     after(async () => {
