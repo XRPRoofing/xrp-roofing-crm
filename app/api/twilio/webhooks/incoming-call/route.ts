@@ -15,6 +15,9 @@ function handleIncomingCall(formData: FormData, req: NextRequest) {
   // IVR exhausted all retries without a digit press — record a missed call
   // and hang up cleanly.
   if (isMissedIvr) {
+    console.log(
+      `[call-trace] IVR missed \u2014 caller left without pressing a key | callSid=${formData.get("CallSid") || ""} | from=${formData.get("From") || ""}`,
+    );
     after(async () => {
       const event = normalizeTwilioWebhookEvent("call_status", formData);
       await publishConversationEvent({
@@ -37,6 +40,9 @@ function handleIncomingCall(formData: FormData, req: NextRequest) {
   const twiml = buildIvrGreetingTwiml(menuActionUrl, selfUrl, attempt);
 
   if (attempt === 0) {
+    console.log(
+      `[call-trace] incoming call received | callSid=${formData.get("CallSid") || ""} | from=${formData.get("From") || ""} | to=${formData.get("To") || ""}`,
+    );
     after(async () => {
       const event = normalizeTwilioWebhookEvent("incoming_call", formData);
 

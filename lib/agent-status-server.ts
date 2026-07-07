@@ -5,15 +5,23 @@ import { createClient } from "@supabase/supabase-js";
  *  `configured` is false the caller should skip the queue and dial directly. */
 export type AgentStatusResult = { configured: boolean; agents: string[] };
 
+/** Only count an admin as "online" if their presence heartbeat is newer than
+ *  this. The browser refreshes presence every ~60s, so a crashed/closed tab
+ *  drops out of the ring group within a couple of minutes instead of lingering
+ *  as a stale "online" row that would ring a dead browser. */
+const PRESENCE_FRESH_MS = 3 * 60 * 1000;
+
 export async function getOnlineAgentIdentities(): Promise<AgentStatusResult> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { configured: false, agents: [] };
   const supabase = createClient(url, key);
+  const freshSince = new Date(Date.now() - PRESENCE_FRESH_MS).toISOString();
   const { data, error } = await supabase
     .from("agent_status")
     .select("user_id")
-    .eq("status", "online");
+    .eq("status", "online")
+    .gte("updated_at", freshSince);
   // If the table doesn't exist or the query fails, treat as not configured
   if (error) return { configured: false, agents: [] };
   return {

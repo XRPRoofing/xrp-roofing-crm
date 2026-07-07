@@ -126,25 +126,35 @@ function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, on
   } else {
     for (const agentId of config.ringGroup) targets.add(agentId);
   }
-  for (const agentId of targets) {
+  const list = Array.from(targets);
+  console.log(`[call-trace] dialing ring group | clients=[${list.join(",")}] | count=${list.length}`);
+  for (const agentId of list) {
     dial.client(agentId);
   }
 }
 
 /** Fetch the agent identities to ring for an inbound call.
- *  Rings EVERY admin-access user's browser (each registers its own
- *  `agent-<id>` identity) so any available admin can answer. Also unions in
- *  any explicitly-online agents from the agent_status table when present.
- *  dialRingGroup adds the shared `crm-agent` as an ultimate fallback. */
+ *  Prefers genuinely-online admins (fresh presence in `agent_status`): when at
+ *  least one admin is online we ring ONLY them, so stale/offline browsers are
+ *  never dialed (dead legs mask who is actually available). When presence is
+ *  unavailable or reports nobody online, falls back to EVERY admin-access
+ *  user's browser (each registers its own `agent-<id>` identity) so a call is
+ *  never left ringing nobody. dialRingGroup adds `crm-agent` (mobile app +
+ *  shared fallback) on top. */
 export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
   try {
     const [online, admins] = await Promise.all([
       getOnlineAgentIdentities().catch(() => ({ configured: false, agents: [] as string[] })),
       getAdminAgentIdentities().catch(() => [] as string[]),
     ]);
-    const agents = Array.from(new Set([...(online.agents || []), ...admins]));
-    return { configured: online.configured || agents.length > 0, agents };
-  } catch {
+    const usingPresence = online.configured && online.agents.length > 0;
+    const agents = usingPresence ? online.agents : admins;
+    console.log(
+      `[call-trace] ring-group members resolved | source=${usingPresence ? "presence(online)" : "profiles(all-admins fallback)"} | online=[${(online.agents || []).join(",")}] | allAdmins=[${admins.join(",")}] | willDial=[${agents.join(",")}]`,
+    );
+    return { configured: usingPresence || agents.length > 0, agents };
+  } catch (err) {
+    console.error("[call-trace] fetchOnlineAgents failed:", err);
     return { configured: false, agents: [] };
   }
 }

@@ -366,6 +366,20 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     };
   }, [isCrewUser, currentUserId]);
 
+  // Presence heartbeat: refresh "online" periodically so a crashed/closed tab
+  // (which may never fire pagehide/beforeunload) falls out of the ring group
+  // within a couple of minutes. Inbound routing rings only admins whose
+  // presence is fresh, so this keeps the ring group limited to truly-active
+  // browsers instead of dialing stale/ghost identities.
+  useEffect(() => {
+    if (isCrewUser || !currentUserId) return;
+    const HEARTBEAT_MS = 60_000;
+    const id = setInterval(() => {
+      if (document.visibilityState !== "hidden") void reportAgentPresence("online");
+    }, HEARTBEAT_MS);
+    return () => clearInterval(id);
+  }, [isCrewUser, currentUserId]);
+
   // Listen for "answered by <name>" signals from other admins. When one arrives
   // while this browser is still ringing the same call, dismiss the popup and
   // briefly surface who took it.
