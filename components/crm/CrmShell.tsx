@@ -235,12 +235,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isCrewUser) return;
-    // Register under a per-user Voice identity so the inbound <Dial> can ring
-    // EVERY logged-in admin's browser at once (they each register a distinct
-    // agent-<id>). A single shared identity would let Twilio ring only one
-    // browser. Wait until the user id is known before registering.
-    if (!currentUserId) return;
-    const voiceIdentity = `agent-${currentUserId}`;
+    // Register under the shared "crm-agent" identity — this is the identity the
+    // inbound <Dial> always targets (see dialRingGroup in lib/twilio/server.ts),
+    // so the browser reliably receives incoming calls and the Answer popup
+    // appears. Per-user `agent-<id>` fan-out requires the profiles/agent_status
+    // tables to resolve online admins; until those exist, a per-user identity is
+    // never dialed and inbound calls can't be answered.
+    const voiceIdentity = "crm-agent";
     let mounted = true;
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -324,7 +325,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
     };
-  }, [isCrewUser, currentUserId]);
+  }, [isCrewUser]);
 
   useEffect(() => {
     function refreshUnreadTeamChatCount() {
