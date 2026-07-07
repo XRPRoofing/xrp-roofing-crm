@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
   const dept = resolveIvrDepartment(digit);
   const routingSteps = dept ? await getCallRoutingForOption(digit) : [];
 
+  console.log(
+    `[call-trace] IVR option selected | callSid=${formData.get("CallSid") || ""} | from=${callerNumber} | digit="${digit}" | department=${dept?.label ?? "invalid/none"} | routingConfigured=${routingSteps.length > 0} | onlineAgents=[${onlineAgents.agents.join(",")}]`,
+  );
+
   let twiml: string;
   let department: string | null;
   if (dept && routingSteps.length > 0) {

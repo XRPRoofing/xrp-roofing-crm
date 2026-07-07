@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
     const dialDuration = String(formData.get("DialCallDuration") || "0");
     const isBrowserOutbound = (event.from || "").startsWith("client:");
 
+    const answered = dialStatus === "answered" || (dialStatus === "completed" && Number(dialDuration) > 0);
+    console.log(
+      `[call-trace] ring group result | callSid=${event.callSid} | from=${event.from} | dialStatus=${dialStatus || "(none)"} | dialDuration=${dialDuration}s | answeredLeg=${formData.get("DialCallSid") || ""} | outcome=${answered ? "ANSWERED" : `MISSED (${dialStatus || "no dial"})`}`,
+    );
+
     await publishConversationEvent({
       ...event,
       id: event.callSid ? `${event.callSid}-dial-result` : event.id,
