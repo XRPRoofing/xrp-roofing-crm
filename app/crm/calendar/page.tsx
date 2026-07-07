@@ -958,6 +958,84 @@ export default function CalendarPage() {
     }
   }
 
+  /** Update a Google Calendar event via the existing Google API route. */
+  async function handleUpdateGoogleEvent(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!selectedEvent) return;
+
+    setUpdating(true);
+    setError("");
+    setStatusMessage("");
+
+    try {
+      const startISO = new Date(`${editForm.date}T${editForm.startTime}:00-07:00`).toISOString();
+      const endISO = new Date(`${editForm.date}T${editForm.endTime}:00-07:00`).toISOString();
+      const googleId = selectedEvent.id.slice(GCAL_PREFIX.length);
+
+      const optimisticUpdated: CalendarEvent = {
+        ...selectedEvent,
+        title: editForm.title,
+        description: editForm.description,
+        start_time: startISO,
+        end_time: endISO,
+        location: editForm.location,
+        customer_name: editForm.customer_name,
+        customer_phone: editForm.customer_phone,
+        job_kind: editForm.job_kind,
+        updated_at: new Date().toISOString(),
+      };
+      const prevEvents = events;
+      setEvents((prev) => prev.map((ev) => ev.id === selectedEvent.id ? optimisticUpdated : ev));
+      setSelectedEvent(null);
+      setEditMode(false);
+      setStatusMessage("Event updated successfully.");
+
+      const response = await fetch("/api/google-calendar/events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: googleId,
+          title: editForm.title,
+          name: editForm.customer_name || editForm.title,
+          address: editForm.location || "N/A",
+          jobKind: editForm.job_kind || "Other",
+          phone: editForm.customer_phone,
+          date: editForm.date,
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+          notes: editForm.description,
+          guestEmails: "",
+        }),
+      });
+
+      if (!response.ok) {
+        setEvents(prevEvents);
+        setError("Unable to update Google Calendar event.");
+        return;
+      }
+
+      const data = (await response.json()) as { event?: GoogleCalendarEvent };
+      if (data.event) {
+        const mapped = mapGoogleEvent(data.event);
+        setEvents((prev) => prev.map((ev) => ev.id === mapped.id ? mapped : ev));
+      }
+      broadcastCrmUpdate();
+    } catch {
+      setError("Unable to update Google Calendar event.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  /** Route the edit form submit to the correct backend (CRM vs Google). */
+  function handleEditSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (selectedEvent && isGoogleEvent(selectedEvent)) {
+      void handleUpdateGoogleEvent(e);
+    } else {
+      void handleUpdateEvent(e);
+    }
+  }
+
   async function handleDeleteEvent() {
     if (!selectedEvent) return;
     setDeleting(true);
@@ -1950,7 +2028,7 @@ export default function CalendarPage() {
       )}
 
       {/* ── Event Detail / Edit Modal ──────────────────────────────── */}
-      {selectedEvent && isGoogleEvent(selectedEvent) && (
+      {selectedEvent && isGoogleEvent(selectedEvent) && !editMode && (
         <div
           className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
           onClick={() => setSelectedEvent(null)}
@@ -2070,13 +2148,20 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
                 className="rounded-lg border border-gray-200 px-4 py-2.5 font-bold text-gray-700 hover:bg-gray-50"
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode(true)}
+                className="rounded-lg bg-blue-600 px-4 py-2.5 font-bold text-white hover:bg-blue-700"
+              >
+                Edit
               </button>
             </div>
           </div>
@@ -2238,13 +2323,13 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {selectedEvent && !isGoogleEvent(selectedEvent) && editMode && (
+      {selectedEvent && editMode && (
         <div
           className="fixed inset-0 z-50 overflow-y-auto bg-gray-950/40 p-4"
           onClick={() => { setSelectedEvent(null); setEditMode(false); }}
         >
           <form
-            onSubmit={handleUpdateEvent}
+            onSubmit={handleEditSubmit}
             onClick={(e) => e.stopPropagation()}
             className="mx-auto my-6 grid max-w-5xl gap-6 lg:grid-cols-[1fr_280px]"
           >
@@ -2450,14 +2535,18 @@ export default function CalendarPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteConfirmOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-3 font-bold text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
+                {isGoogleEvent(selectedEvent) ? (
+                  <span />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-3 font-bold text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
+                )}
                 <button
                   disabled={updating}
                   className="rounded-lg bg-blue-600 px-6 py-3 font-bold text-white disabled:bg-gray-300"
