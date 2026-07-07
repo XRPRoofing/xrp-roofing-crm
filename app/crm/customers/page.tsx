@@ -3,19 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BriefcaseBusiness, CalendarCheck2, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, Voicemail, X } from "lucide-react";
+import { BriefcaseBusiness, Camera, CalendarCheck2, Clock, Edit3, FileSignature, FileText, Image as ImageIcon, Mail, MapPin, MessageSquare, Phone, Plus, Receipt, Search, ShieldCheck, StickyNote, Trash2, UploadCloud, UserPlus, Voicemail, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { leadStages } from "@/lib/crm-data";
-import { subscribeToCrewData } from "@/lib/crew-sync";
+import { subscribeToCrewData, loadJobPhotos, type JobPhoto } from "@/lib/crew-sync";
+import { loadRecentActivities, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { customerSyncEnabled, deleteCustomerRecord, loadCustomerRecords, loadCustomerRecordsResult, subscribeToCustomerRecords, upsertCustomerRecord } from "@/lib/customer-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
-import type { ConversationChannel, ConversationMessage } from "@/types/conversations";
+import type { ConversationChannel } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
@@ -52,13 +54,6 @@ function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   );
 }
 
-// A real communication entry shown on the customer profile. Only the few
-// fields the renderer needs are kept (no fabricated ConversationRecord).
-type CommunicationEntry = {
-  conversation: { id: string; jobId?: string; customerId?: string };
-  message: ConversationMessage;
-};
-
 function eventChannel(event: TwilioConversationEvent): ConversationChannel {
   if (event.type === "incoming_sms" || event.type === "message_status") return "sms";
   if (event.type === "call_note") return "note";
@@ -73,40 +68,130 @@ function eventBody(event: TwilioConversationEvent): string {
   return "Communication";
 }
 
-// Build the customer's communication history from REAL Twilio conversation
-// events (calls, SMS, recordings, notes), matched by phone number. Returns an
-// empty list when there is no real activity — never fabricated/sample data.
-function getCustomerCommunications(customer: Customer, events: TwilioConversationEvent[]): CommunicationEntry[] {
-  const phone = digitsOnly(customer.phone);
-  if (!phone) return [];
-  return events
-    .filter((event) => digitsOnly(event.from) === phone || digitsOnly(event.to) === phone)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .map((event) => ({
-      conversation: { id: event.conversationId || event.id, jobId: event.jobId, customerId: event.customerId },
-      message: {
-        id: event.id,
-        channel: eventChannel(event),
-        direction: event.direction === "outbound" ? "outbound" : "inbound",
-        author: event.from || customer.name,
-        body: eventBody(event),
-        timestamp: new Date(event.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
-        recordingUrl: event.recordingUrl,
-      },
-    }));
+// ── Unified customer timeline ──────────────────────────────────────────────
+// A single, chronologically-sorted history of everything related to a customer:
+// calls & messages (Twilio conversation events), CRM lifecycle activity (the
+// crew_activity_log — customer/job/proposal/invoice/note/calendar events), and
+// uploaded photos. All sources are already recorded by the app; this only
+// aggregates and displays them — no new backend.
+type TimelineItem = {
+  id: string;
+  at: string; // ISO timestamp
+  icon: LucideIcon;
+  category: string;
+  title: string;
+  detail?: string;
+  actor?: string;
+  recordingUrl?: string;
+};
+
+function timelineTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function getCommunicationLabel(message: ConversationMessage) {
-  if (message.recordingUrl) return "Recording";
-  if (message.channel === "call") return "Call";
-  if (message.channel === "sms") return "Message";
-  return "CRM Note";
+function eventToTimelineItem(event: TwilioConversationEvent, customerName: string): TimelineItem {
+  const channel = eventChannel(event);
+  const dir = event.direction === "outbound" ? "Outbound" : "Inbound";
+  const category = channel === "call" ? "Call" : channel === "sms" ? "Message" : "Note";
+  const icon = event.recordingUrl ? Voicemail : channel === "call" ? Phone : channel === "sms" ? MessageSquare : FileText;
+  const title = channel === "call" ? `${dir} call` : channel === "sms" ? `${dir} message` : "Note";
+  return {
+    id: `evt-${event.id}`,
+    at: event.createdAt,
+    icon,
+    category,
+    title,
+    detail: eventBody(event),
+    actor: event.direction === "outbound" ? "Office" : customerName,
+    recordingUrl: event.recordingUrl,
+  };
 }
 
-function getCommunicationIcon(message: ConversationMessage) {
-  if (message.recordingUrl || message.channel === "call") return Voicemail;
-  if (message.channel === "sms") return MessageSquare;
-  return FileText;
+function activityIcon(activity: CrewActivity): LucideIcon {
+  const action = activity.action.toLowerCase();
+  switch (activity.module) {
+    case "Calls": return Voicemail;
+    case "SMS": return MessageSquare;
+    case "Emails": return Mail;
+    case "Jobs": return BriefcaseBusiness;
+    case "Proposal":
+    case "Estimates": return FileSignature;
+    case "Invoice":
+    case "Invoices": return Receipt;
+    case "Notes": return StickyNote;
+    case "Calendar": return CalendarCheck2;
+    case "Customers": return UserPlus;
+    default:
+      if (action.includes("call")) return Voicemail;
+      if (action.includes("sms") || action.includes("text") || action.includes("message")) return MessageSquare;
+      if (action.includes("email")) return Mail;
+      if (action.includes("photo") || action.includes("file")) return Camera;
+      return FileText;
+  }
+}
+
+function activityToTimelineItem(activity: CrewActivity): TimelineItem {
+  return {
+    id: `act-${activity.id}`,
+    at: activity.createdAt,
+    icon: activityIcon(activity),
+    category: activity.module,
+    title: activity.action,
+    detail: activity.details,
+    actor: activity.actor,
+  };
+}
+
+// Attribute a logged activity to this customer. Activities are keyed by the
+// related record id (customer id, job id, proposal id, or invoice id) or by the
+// customer name in jobName — so we match against the customer's full id set.
+function getCustomerActivities(activities: CrewActivity[], idSet: Set<string>, customerName: string): CrewActivity[] {
+  const name = normalizeText(customerName);
+  return activities.filter((activity) => idSet.has(activity.jobId) || (name.length > 0 && normalizeText(activity.jobName) === name));
+}
+
+// Merge every source into one newest-first timeline, de-duplicating a
+// synthesized "Customer created" entry when the activity log already has one.
+function buildCustomerTimeline(
+  customer: Customer,
+  events: TwilioConversationEvent[],
+  activities: CrewActivity[],
+  photos: JobPhoto[],
+): TimelineItem[] {
+  const items: TimelineItem[] = [];
+
+  events.forEach((event) => items.push(eventToTimelineItem(event, customer.name)));
+  activities.forEach((activity) => items.push(activityToTimelineItem(activity)));
+  photos.forEach((photo) =>
+    items.push({
+      id: `photo-${photo.id}`,
+      at: photo.createdAt,
+      icon: Camera,
+      category: "File",
+      title: `${photo.photoType === "Job Photo" ? "Photo" : `${photo.photoType} photo`} uploaded`,
+      detail: photo.name,
+      actor: photo.uploadedBy,
+    }),
+  );
+
+  const hasCreated = activities.some((activity) => activity.action.toLowerCase().includes("customer created"));
+  const createdTs = Number(customer.id.replace(/\D/g, ""));
+  if (!hasCreated && createdTs > 1_000_000_000_000) {
+    items.push({
+      id: `${customer.id}-created`,
+      at: new Date(createdTs).toISOString(),
+      icon: UserPlus,
+      category: "Customer",
+      title: "Customer created",
+      detail: customer.name,
+    });
+  }
+
+  return items
+    .filter((item) => item.at && !Number.isNaN(new Date(item.at).getTime()))
+    .sort((a, b) => (a.at < b.at ? 1 : -1));
 }
 
 function formatDate(value?: string) {
@@ -267,6 +352,10 @@ export default function CustomersPage() {
   // Real Twilio conversation events (calls/SMS/recordings) powering the profile
   // Communication History tab — matched to a customer by phone number.
   const [conversationEvents, setConversationEvents] = useState<TwilioConversationEvent[]>([]);
+  // CRM lifecycle activity (crew_activity_log) + the selected customer's photos
+  // power the full Communication History timeline and the Files tab.
+  const [crewActivities, setCrewActivities] = useState<CrewActivity[]>([]);
+  const [customerPhotos, setCustomerPhotos] = useState<JobPhoto[]>([]);
   // Surfaced to the user when Supabase can't load/save (e.g. the customer_records
   // table hasn't been created yet) so saves never fail silently.
   const [customersError, setCustomersError] = useState<string | null>(null);
@@ -284,9 +373,29 @@ export default function CustomersPage() {
 
   const selectedCustomer = customerList.find((customer) => customer.id === selectedCustomerId) || null;
   const selectedCustomerJobs = selectedCustomer ? getCustomerJobs(selectedCustomer, jobList) : [];
-  const selectedCustomerCommunications = selectedCustomer ? getCustomerCommunications(selectedCustomer, conversationEvents) : [];
   const selectedCustomerInvoices = selectedCustomer ? getCustomerInvoices(selectedCustomer, storedInvoices) : [];
   const selectedCustomerProposals = selectedCustomer ? getCustomerProposals(selectedCustomer, storedProposals) : [];
+
+  // Full activity timeline for the open customer: every id it owns (its own id,
+  // its jobs', proposals', and invoices' ids) plus its name is used to gather
+  // matching activity-log rows, then merged with calls/SMS and uploaded photos.
+  const selectedCustomerActivities = useMemo(() => {
+    if (!selectedCustomer) return [] as CrewActivity[];
+    const idSet = new Set<string>([selectedCustomer.id]);
+    selectedCustomerJobs.forEach((job) => idSet.add(job.id));
+    selectedCustomerProposals.forEach((proposal) => idSet.add(proposal.id));
+    selectedCustomerInvoices.forEach((invoice) => idSet.add(invoice.id));
+    return getCustomerActivities(crewActivities, idSet, selectedCustomer.name);
+  }, [selectedCustomer, selectedCustomerJobs, selectedCustomerProposals, selectedCustomerInvoices, crewActivities]);
+
+  const selectedCustomerTimeline = useMemo(() => {
+    if (!selectedCustomer) return [] as TimelineItem[];
+    const phone = digitsOnly(selectedCustomer.phone);
+    const matchedEvents = phone
+      ? conversationEvents.filter((event) => digitsOnly(event.from) === phone || digitsOnly(event.to) === phone)
+      : [];
+    return buildCustomerTimeline(selectedCustomer, matchedEvents, selectedCustomerActivities, customerPhotos);
+  }, [selectedCustomer, conversationEvents, selectedCustomerActivities, customerPhotos]);
 
   // Publish the currently-open customer to the AI assistant for context awareness.
   useAiRecordContext(
@@ -475,6 +584,39 @@ export default function CustomersPage() {
     };
   }, []);
 
+  // Load + live-subscribe to the CRM activity log so the Communication History
+  // timeline reflects lifecycle events (job/proposal/invoice/note/calendar/
+  // customer changes) recorded anywhere in the app, in real time.
+  useEffect(() => {
+    let mounted = true;
+    function refreshActivities() {
+      void loadRecentActivities(300).then((rows) => { if (mounted) setCrewActivities(rows); }).catch(() => {});
+    }
+    refreshActivities();
+    const unsubscribe = subscribeToCrewActivities(refreshActivities);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Load the open customer's uploaded photos (across all of its jobs) so the
+  // Files tab shows that customer's media and the timeline records uploads.
+  useEffect(() => {
+    let mounted = true;
+    const jobIds = selectedCustomer
+      ? Array.from(new Set(getCustomerJobs(selectedCustomer, jobList).map((job) => job.id)))
+      : [];
+    void Promise.all(jobIds.map((jobId) => loadJobPhotos(jobId).catch(() => [] as JobPhoto[])))
+      .then((results) => {
+        if (!mounted) return;
+        const all = results.flat().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        setCustomerPhotos(all);
+      })
+      .catch(() => { if (mounted) setCustomerPhotos([]); });
+    return () => { mounted = false; };
+  }, [selectedCustomerId, jobList]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Shared, device-synced customer records (manually added / edited). Loads from
   // the server, migrates any local-only customers up once, and live-updates via
   // realtime so a change on one device appears on every device.
@@ -522,6 +664,7 @@ export default function CustomersPage() {
       setCustomersError(result.error ?? null);
     }).catch(() => {});
     void listConversationEvents().then((events) => setConversationEvents(events)).catch(() => {});
+    void loadRecentActivities(300).then((rows) => setCrewActivities(rows)).catch(() => {});
   });
 
   // After every create/update/delete we await persistence then re-fetch the
@@ -769,7 +912,8 @@ export default function CustomersPage() {
                     tab === "Jobs" ? selectedCustomerJobs.length :
                     tab === "Estimates" ? selectedCustomerProposals.length :
                     tab === "Invoices" ? selectedCustomerInvoices.length :
-                    tab === "Communication History" ? selectedCustomerCommunications.length :
+                    tab === "Files" ? customerPhotos.length :
+                    tab === "Communication History" ? selectedCustomerTimeline.length :
                     null;
                   return (
                     <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-bold transition ${activeTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
@@ -889,10 +1033,28 @@ export default function CustomersPage() {
               )}
 
               {activeTab === "Files" && (
-                <section className="grid gap-3 sm:grid-cols-3">
-                  <Link href="/crm/files" className="rounded-lg border border-gray-200 bg-white p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50"><ImageIcon className="mb-2 h-5 w-5 text-blue-700" />Photos</Link>
-                  <Link href="/crm/files" className="rounded-lg border border-gray-200 bg-white p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50"><FileText className="mb-2 h-5 w-5 text-blue-700" />Documents</Link>
-                  <Link href="/crm/files" className="rounded-lg border border-gray-200 bg-white p-4 text-left font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50"><UploadCloud className="mb-2 h-5 w-5 text-blue-700" />Upload Files</Link>
+                <section className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2"><ImageIcon className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Files &amp; Photos</h3></div>
+                    <Link href="/crm/files" className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100"><UploadCloud className="h-4 w-4" />Open Files</Link>
+                  </div>
+                  {customerPhotos.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {customerPhotos.map((photo) => (
+                        <Link key={photo.id} href="/crm/files" className="group relative aspect-square overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                          {photo.dataUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={photo.dataUrl} alt={photo.name} className="h-full w-full object-cover transition group-hover:opacity-90" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-gray-300"><ImageIcon className="h-6 w-6" /></div>
+                          )}
+                          <span className="absolute bottom-0 left-0 right-0 truncate bg-black/50 px-1.5 py-0.5 text-[10px] font-bold text-white">{photo.photoType === "Job Photo" ? "Photo" : photo.photoType}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No files or photos uploaded for this customer yet. Photos taken on this customer&apos;s jobs appear here automatically.</p>
+                  )}
                 </section>
               )}
 
@@ -909,27 +1071,28 @@ export default function CustomersPage() {
 
               {activeTab === "Communication History" && (
                 <section className="rounded-lg border border-gray-200 bg-white p-4">
-                  <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Calls, Messages &amp; Recordings</h3></div>
+                  <div className="flex items-center gap-2"><Clock className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Activity Timeline</h3></div>
+                  <p className="mt-1 text-xs font-medium text-gray-500">Everything recorded for this customer — calls, messages, jobs, estimates, invoices, payments, notes, appointments, and files — newest first.</p>
                   <div className="mt-4 space-y-3">
-                    {selectedCustomerCommunications.length > 0 ? selectedCustomerCommunications.map(({ conversation, message }: CommunicationEntry) => {
-                      const Icon = getCommunicationIcon(message);
+                    {selectedCustomerTimeline.length > 0 ? selectedCustomerTimeline.map((item) => {
+                      const Icon = item.icon;
                       return (
-                        <div key={`${conversation.id}-${message.id}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div key={item.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                           <div className="flex items-start gap-3">
                             <div className="rounded-lg bg-blue-50 p-2 text-blue-700"><Icon className="h-4 w-4" /></div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-bold text-gray-900">{getCommunicationLabel(message)} • Job #{conversation.jobId || "Unassigned"}</p>
-                                <p className="text-xs font-bold text-gray-500">{message.timestamp}</p>
+                                <p className="text-sm font-bold text-gray-900">{item.title}<span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">{item.category}</span></p>
+                                <p className="text-xs font-bold text-gray-500">{timelineTime(item.at)}</p>
                               </div>
-                              <p className="mt-1 text-sm font-medium leading-5 text-gray-700">{message.body}</p>
-                              <p className="mt-2 text-xs font-bold text-gray-500">Customer #{conversation.customerId || selectedCustomer.id} • Conversation #{conversation.id}</p>
-                              {message.recordingUrl && <a href={proxyRecordingUrl(message.recordingUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-blue-700 hover:text-blue-800">Open recording</a>}
+                              {item.detail && <p className="mt-1 text-sm font-medium leading-5 text-gray-700">{item.detail}</p>}
+                              {item.actor && <p className="mt-1.5 text-xs font-bold text-gray-500">By {item.actor}</p>}
+                              {item.recordingUrl && <a href={proxyRecordingUrl(item.recordingUrl)} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-bold text-blue-700 hover:text-blue-800">Open recording</a>}
                             </div>
                           </div>
                         </div>
                       );
-                    }) : <p className="rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No linked calls, messages, or recordings yet.</p>}
+                    }) : <p className="rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No activity recorded for this customer yet. Calls, messages, jobs, estimates, invoices, notes, and files will appear here automatically.</p>}
                   </div>
                 </section>
               )}
