@@ -97,6 +97,10 @@ function eventToTimelineItem(event: TwilioConversationEvent, customerName: strin
   const category = channel === "call" ? "Call" : channel === "sms" ? "Message" : "Note";
   const icon = event.recordingUrl ? Voicemail : channel === "call" ? Phone : channel === "sms" ? MessageSquare : FileText;
   const title = channel === "call" ? `${dir} call` : channel === "sms" ? `${dir} message` : "Note";
+  const answeredByName = typeof event.payload?.answeredByName === "string" ? event.payload.answeredByName.trim() : "";
+  const actor = channel === "call" && answeredByName
+    ? `Answered by ${answeredByName}`
+    : event.direction === "outbound" ? "Office" : customerName;
   return {
     id: `evt-${event.id}`,
     at: event.createdAt,
@@ -104,7 +108,7 @@ function eventToTimelineItem(event: TwilioConversationEvent, customerName: strin
     category,
     title,
     detail: eventBody(event),
-    actor: event.direction === "outbound" ? "Office" : customerName,
+    actor,
     recordingUrl: event.recordingUrl,
   };
 }

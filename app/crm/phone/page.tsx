@@ -66,6 +66,7 @@ interface CallRecord {
   recordingUrl?: string;
   summary?: string;
   transcript?: string;
+  answeredBy?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -496,6 +497,7 @@ export default function PhonePage() {
         callSid: event.callSid || "",
         disposition: dispositions[phone] || undefined,
         customerId: customer?.id,
+        answeredBy: typeof payload.answeredByName === "string" && payload.answeredByName.trim() ? payload.answeredByName.trim() : undefined,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
         ...(() => {
@@ -961,6 +963,9 @@ export default function PhonePage() {
                         {call.direction === "inbound" ? "Incoming Call" : "Outgoing Call"}
                         {call.twilioLine ? ` · ${call.twilioLine}` : ""}
                       </p>
+                      {call.answeredBy && (
+                        <p className="mt-0.5 text-[11px] font-semibold text-green-600">Answered by {call.answeredBy}</p>
+                      )}
                       <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-400">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -1116,6 +1121,9 @@ export default function PhonePage() {
                           <StatusDot color={call.statusColor} />
                           <span className="text-sm font-semibold text-gray-800">{call.status}</span>
                         </div>
+                        {call.answeredBy && (
+                          <p className="mt-0.5 text-[11px] font-semibold text-green-600">by {call.answeredBy}</p>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">

@@ -137,6 +137,49 @@ function getConversationEventsErrorMessage(message: string) {
 }
 
 
+/** Persist which admin/user answered a given call so it shows durably in the
+ * notification bell, Phone call log, and customer-profile history. Stamps every
+ * conversation_event row for the CallSid (payload.answeredByName /
+ * answeredByUserId) so all existing views pick it up on reload and via the
+ * realtime UPDATE subscription. */
+export async function recordCallAnsweredBy(callSid: string, name: string, userId?: string) {
+  const supabase = getAdminClient();
+  if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured" };
+  if (!callSid || !name) return { ok: false as const, reason: "callSid and name are required" };
+
+  const answeredAt = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("conversation_events")
+    .select("id, payload")
+    .eq("call_sid", callSid);
+
+  if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message) };
+
+  const rows = (data || []) as Array<{ id: string; payload: Record<string, unknown> | null }>;
+  if (rows.length === 0) {
+    // No event stored yet for this call (e.g. answered before the status
+    // callback landed). Insert a lightweight marker the views can read.
+    await publishConversationEvent({
+      id: `${callSid}-answered-by`,
+      type: "call_status",
+      status: "answered",
+      callSid,
+      body: `Answered by ${name}`,
+      payload: { answeredByName: name, answeredByUserId: userId, answeredAt },
+      createdAt: answeredAt,
+    });
+    return { ok: true as const, updated: 0, inserted: 1 };
+  }
+
+  for (const row of rows) {
+    const nextPayload = { ...(row.payload || {}), answeredByName: name, answeredByUserId: userId, answeredAt };
+    await supabase.from("conversation_events").update({ payload: nextPayload }).eq("id", row.id);
+  }
+
+  return { ok: true as const, updated: rows.length, inserted: 0 };
+}
+
 /** Look up the original call event by CallSid to recover From/To phone numbers
  * that may be missing from recording-status callbacks. */
 export async function lookupCallEventByCallSid(callSid: string) {

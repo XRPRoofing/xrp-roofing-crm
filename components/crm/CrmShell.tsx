@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { broadcastCallAnswered, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { broadcastCallAnswered, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, reportCallAnswered, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
@@ -687,9 +687,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       void logCrewActivity({ jobId: "", jobName: incoming.parameters?.From || "Unknown", actor: "Office", action: "Incoming call answered", details: `Answered call from ${incoming.parameters?.From || "Unknown"}`, module: "Calls" }).catch(() => {});
 
       callChannelRef.current?.postMessage({ type: "answered" });
+      const answeredName = currentUserNameRef.current || currentUserName || "another agent";
       // Tell other admins' browsers this call was taken (and by whom) so their
       // ringing popup dismisses with an "Answered by <name>" note.
-      broadcastCallAnswered(currentUserNameRef.current || currentUserName || "another agent");
+      broadcastCallAnswered(answeredName);
+      // Durably record who answered so it shows in the bell, Phone log, and
+      // customer-profile history (the broadcast above is only an ephemeral toast).
+      void reportCallAnswered(incoming.parameters?.CallSid || "", answeredName);
     } catch {
       incomingCallRef.current = null;
       setGlobalIncomingCall(null);

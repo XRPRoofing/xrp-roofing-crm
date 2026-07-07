@@ -267,6 +267,26 @@ export function subscribeToCallSignals(onAnswered: (signal: CallAnsweredSignal) 
   };
 }
 
+// Persist who answered an inbound call (durable, unlike broadcastCallAnswered
+// which is only an ephemeral toast). Stamps the answering user's name onto the
+// stored call events so the bell, Phone log, and customer profile show it.
+export async function reportCallAnswered(callSid: string, name?: string) {
+  try {
+    if (!callSid) return;
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/twilio/calls/answered", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callSid, name, token }),
+      keepalive: true,
+    });
+  } catch {
+    // Best-effort; never block the answer flow.
+  }
+}
+
 export function broadcastCallAnswered(name: string) {
   try {
     const channel = ensureCallSignalChannel();
