@@ -112,14 +112,39 @@ function formatDurationLong(seconds: number): string {
 
 function getCallStatusLabel(event: TwilioConversationEvent): string {
   const s = event.status?.toLowerCase() || "";
-  if (s === "completed") return "Answered";
-  if (s === "no-answer" || s === "no_answer") return "No Answer";
-  if (s === "busy") return "Busy";
-  if (s === "failed") return "Failed";
-  if (s === "canceled" || s === "cancelled") return "Canceled";
-  if (s === "ringing" || s === "queued" || s === "initiated") return "Ringing";
-  if (s === "forwarded" || s === "forward") return "Forwarded";
-  if (event.type === "incoming_call" && !event.status) return "Answered";
+  const payloadStatus = String(event.payload?.CallStatus || "").toLowerCase();
+  const effectiveStatus = s || payloadStatus;
+  const isOutbound = event.direction === "outbound";
+  // The <Dial> action callback (DialCallStatus) is the authoritative signal for
+  // whether a party actually answered. The parent call's CallStatus is
+  // "completed" whenever the call ends normally — even if the caller only
+  // listened to the IVR and hung up, or nobody picked up — so "completed" must
+  // NOT be treated as "Answered" on its own for inbound calls.
+  const dial = String(event.payload?.DialCallStatus || "").toLowerCase();
+  const duration = Number(event.payload?.DialCallDuration || event.payload?.CallDuration || 0);
+
+  if (dial) {
+    if (dial === "no-answer" || dial === "no_answer") return "No Answer";
+    if (dial === "busy") return "Busy";
+    if (dial === "failed") return "Failed";
+    if (dial === "canceled" || dial === "cancelled") return "Canceled";
+    if (dial === "completed") return duration > 0 ? "Answered" : "No Answer";
+  }
+
+  if (effectiveStatus === "ringing" || effectiveStatus === "queued" || effectiveStatus === "initiated" || effectiveStatus === "in-progress") return "Ringing";
+  if (effectiveStatus === "no-answer" || effectiveStatus === "no_answer") return "No Answer";
+  if (effectiveStatus === "busy") return "Busy";
+  if (effectiveStatus === "failed") return "Failed";
+  if (effectiveStatus === "canceled" || effectiveStatus === "cancelled") return "Canceled";
+  if (effectiveStatus === "forwarded" || effectiveStatus === "forward") return "Forwarded";
+  if (effectiveStatus === "completed") {
+    // Outbound "completed" means the customer answered. Inbound "completed"
+    // with no Dial outcome means no agent leg ever connected (caller hung up in
+    // the IVR / voicemail) → not answered.
+    if (isOutbound) return duration > 0 ? "Answered" : "No Answer";
+    return "No Answer";
+  }
+  if (event.type === "incoming_call" && !event.status) return "Ringing";
   return event.status || "Unknown";
 }
 
@@ -315,9 +340,20 @@ export default function PhonePage() {
       if (!e.callSid) continue;
       if (isClientAddr(customerSide(e))) continue;
       const existing = legMap.get(e.callSid);
-      if (!existing || new Date(e.createdAt) > new Date(existing.createdAt)) {
+      if (!existing) {
         legMap.set(e.callSid, e);
+        continue;
       }
+      // Keep the most recent event as the base, but carry forward the payload
+      // fields from earlier events for the same leg. This matters because the
+      // <Dial> action callback (which carries DialCallStatus / DialCallDuration —
+      // the true "did anyone answer" outcome) usually arrives BEFORE the final
+      // parent "completed" callback, which lacks those fields. Spreading the
+      // older payload first lets the newer event win on shared keys while
+      // preserving the authoritative dial outcome.
+      const newer = new Date(e.createdAt) >= new Date(existing.createdAt) ? e : existing;
+      const older = newer === e ? existing : e;
+      legMap.set(e.callSid, { ...newer, payload: { ...older.payload, ...newer.payload } });
     }
 
     // Internal browser legs have the agent (client:crm-agent) on the agent side:

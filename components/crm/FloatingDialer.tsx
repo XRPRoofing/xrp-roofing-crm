@@ -30,7 +30,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
-import { createBrowserVoiceDevice, controlCall, listConversationEvents } from "@/lib/twilio/client";
+import { createBrowserVoiceDevice, controlCall, listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import type { Customer, Lead } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
@@ -163,6 +163,13 @@ export default function FloatingDialer({
   const ringbackRef = useRef<{ ctx: AudioContext; osc1: OscillatorNode; osc2: OscillatorNode; interval: ReturnType<typeof setInterval> } | null>(null);
   // Guards the ringing→active transition so it only fires once per call.
   const answeredRef = useRef(false);
+  // Destination number of the in-progress outbound call, used to match the
+  // customer leg's status callbacks (which arrive on a separate CallSid).
+  const activeDestRef = useRef("");
+  // Surfaced when the customer leg can't be reached (bad/unverified number,
+  // busy, or no answer) so an outbound call is never a silent mystery.
+  const [dialError, setDialError] = useState<string | null>(null);
+  const dialErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Transfer state
   const [showTransfer, setShowTransfer] = useState(false);
@@ -247,8 +254,44 @@ export default function FloatingDialer({
 
   // Stop the ringback tone if the dialer unmounts mid-call.
   useEffect(() => {
-    return () => { stopRingback(); };
+    return () => { stopRingback(); if (dialErrorTimerRef.current) clearTimeout(dialErrorTimerRef.current); };
   }, []);
+
+  // While an outbound call is being placed, watch for the customer leg failing
+  // (bad/unverified number, busy, or no answer) and surface the real reason
+  // instead of leaving the agent on an endless silent ringback. The creation
+  // failure event is published on the agent's CallSid ("-customer-failed"),
+  // while a live busy/no-answer arrives on the customer leg's own CallSid — so
+  // match by either the agent CallSid or the destination number.
+  useEffect(() => {
+    if (callState !== "connecting" && callState !== "ringing") return;
+    const unsub = subscribeToConversationEvents((event) => {
+      if (answeredRef.current) return;
+      if (event.direction !== "outbound" && !event.id.endsWith("-customer-failed")) return;
+      const dest = activeDestRef.current;
+      const toDigits = (event.to || "").replace(/\D/g, "").slice(-10);
+      const matchesSid = Boolean(callSid) && event.callSid === callSid;
+      const matchesNumber = Boolean(dest) && toDigits === dest;
+      if (!matchesSid && !matchesNumber) return;
+      const st = (event.status || "").toLowerCase();
+      const isCreationFailure = event.id.endsWith("-customer-failed");
+      if (!isCreationFailure && !["failed", "busy", "no-answer", "no_answer", "canceled", "cancelled"].includes(st)) return;
+      stopRingback();
+      const reason =
+        st === "busy" ? "The customer's line was busy."
+        : st === "no-answer" || st === "no_answer" ? "The customer didn't answer."
+        : st === "canceled" || st === "cancelled" ? "The call was canceled before connecting."
+        : (event.body && event.body.trim()) || "Couldn't reach the customer — the call didn't connect.";
+      setDialError(reason);
+      if (dialErrorTimerRef.current) clearTimeout(dialErrorTimerRef.current);
+      dialErrorTimerRef.current = setTimeout(() => setDialError(null), 8000);
+      try { browserCallRef.current?.disconnect(); } catch { /* already gone */ }
+      browserCallRef.current = null;
+      setCallState("idle");
+      setCallSid(undefined);
+    });
+    return () => { unsub(); };
+  }, [callState, callSid]);
 
   // Listen for custom events from Phone page to open SMS / New Job panels
   // Store pending action so it can be applied after the dialer opens
@@ -447,9 +490,10 @@ export default function FloatingDialer({
     if (!destination) return;
     try {
       answeredRef.current = false;
+      setDialError(null);
+      activeDestRef.current = destination.replace(/\D/g, "").slice(-10);
       setCallState("connecting");
       setMinimized(false);
-      startRingback();
       const device = voiceDeviceRef.current || await createBrowserVoiceDevice("crm-agent");
       if (!voiceDeviceRef.current) {
         (voiceDeviceRef as React.MutableRefObject<BrowserVoiceDevice | null>).current = device;
@@ -460,8 +504,11 @@ export default function FloatingDialer({
       browserCallRef.current = call as unknown as BrowserVoiceCall;
       // The agent leg is now bridged into the conference, but the customer's
       // phone is still ringing — keep showing "Calling customer…" with a
-      // ringback tone until real audio arrives from the far end.
+      // ringback tone until real audio arrives from the far end. Start the
+      // ringback only now (not during "connecting"), i.e. once the customer leg
+      // is actually being dialed.
       setCallState("ringing");
+      startRingback();
       setIsMuted(false);
       const destDigits = destination.replace(/\D/g, "");
       const matchedCustomer = customers.find((c) => c.phone?.replace(/\D/g, "") === destDigits);
@@ -794,6 +841,12 @@ export default function FloatingDialer({
         cursor: isDragging ? "grabbing" : undefined,
       }}
     >
+      {dialError && (
+        <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+          <PhoneOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{dialError}</span>
+        </div>
+      )}
       {/* ══════════ Header ══════════ */}
       <div
         className="flex items-center justify-between bg-gradient-to-b from-gray-50 to-white px-3 pb-1.5 pt-2 select-none"
