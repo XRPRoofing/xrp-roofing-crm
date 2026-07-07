@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { controlCall, createBrowserVoiceDevice, getVoiceToken, saveCallNotes, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { broadcastCallAnswered, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
@@ -78,6 +78,11 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userRole, setUserRole] = useState("admin");
   const [currentUserId, setCurrentUserId] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
+  const currentUserNameRef = useRef("");
+  // When another admin answers a ringing call, briefly show who took it.
+  const [answeredByOther, setAnsweredByOther] = useState<string | null>(null);
+  const answeredByTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CrmNotification[]>([]);
   const [unreadTeamChatCount, setUnreadTeamChatCount] = useState(0);
@@ -177,7 +182,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       }
 
       const role = getUserRole(data.session.user.user_metadata);
+      const meta = data.session.user.user_metadata || {};
+      const name =
+        (typeof meta.full_name === "string" && meta.full_name) ||
+        (typeof meta.name === "string" && meta.name) ||
+        (data.session.user.email ? data.session.user.email.split("@")[0] : "") ||
+        "";
       setCurrentUserId(data.session.user.id);
+      setCurrentUserName(name);
+      currentUserNameRef.current = name;
       setUserRole(role);
 
       if (role === "crew" && !["/crm/crew", "/crm/team-chat"].includes(pathnameRef.current)) {
@@ -235,13 +248,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isCrewUser) return;
-    // Register under the shared "crm-agent" identity — this is the identity the
-    // inbound <Dial> always targets (see dialRingGroup in lib/twilio/server.ts),
-    // so the browser reliably receives incoming calls and the Answer popup
-    // appears. Per-user `agent-<id>` fan-out requires the profiles/agent_status
-    // tables to resolve online admins; until those exist, a per-user identity is
-    // never dialed and inbound calls can't be answered.
-    const voiceIdentity = "crm-agent";
+    // Register under a per-user Voice identity (`agent-<id>`) so an inbound
+    // <Dial> can ring EVERY logged-in admin's browser at once — each admin
+    // registers a distinct identity and dialRingGroup fans the call out to all
+    // of them (resolved from the profiles table). "crm-agent" is still always a
+    // dial target as an ultimate fallback (mobile app + safety), so nothing
+    // ends up ringing nobody. Wait until the user id is known before
+    // registering.
+    if (!currentUserId) return;
+    const voiceIdentity = `agent-${currentUserId}`;
     let mounted = true;
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -287,6 +302,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           if (mounted && !incomingCallRef.current) void refreshAndRegister();
         });
         await device.register();
+        // Mark this admin online so presence-aware routing can prefer them.
+        void reportAgentPresence("online");
       } catch {
         voiceDeviceRef.current = null;
       }
@@ -325,6 +342,45 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       voiceDeviceRef.current = null;
       incomingCallRef.current = null;
     };
+  }, [isCrewUser, currentUserId]);
+
+  // Presence: mark this admin offline when the tab closes/unloads so stale
+  // "online" rows don't linger. Best-effort — ringing still targets every admin
+  // via the profiles table regardless of presence accuracy.
+  useEffect(() => {
+    if (isCrewUser || !currentUserId) return;
+    let cancelled = false;
+    function markOffline() {
+      void createClient().auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token;
+        if (token && !cancelled) beaconAgentOffline(token);
+      });
+    }
+    window.addEventListener("pagehide", markOffline);
+    window.addEventListener("beforeunload", markOffline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pagehide", markOffline);
+      window.removeEventListener("beforeunload", markOffline);
+      void reportAgentPresence("offline");
+    };
+  }, [isCrewUser, currentUserId]);
+
+  // Listen for "answered by <name>" signals from other admins. When one arrives
+  // while this browser is still ringing the same call, dismiss the popup and
+  // briefly surface who took it.
+  useEffect(() => {
+    if (isCrewUser) return;
+    return subscribeToCallSignals((signal) => {
+      if (!incomingCallRef.current) return;
+      try { incomingCallRef.current.reject(); } catch {}
+      incomingCallRef.current = null;
+      setGlobalIncomingCall(null);
+      setGlobalActiveIncomingCall(false);
+      setAnsweredByOther(signal.name);
+      if (answeredByTimerRef.current) clearTimeout(answeredByTimerRef.current);
+      answeredByTimerRef.current = setTimeout(() => setAnsweredByOther(null), 4000);
+    });
   }, [isCrewUser]);
 
   useEffect(() => {
@@ -617,6 +673,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       void logCrewActivity({ jobId: "", jobName: incoming.parameters?.From || "Unknown", actor: "Office", action: "Incoming call answered", details: `Answered call from ${incoming.parameters?.From || "Unknown"}`, module: "Calls" }).catch(() => {});
 
       callChannelRef.current?.postMessage({ type: "answered" });
+      // Tell other admins' browsers this call was taken (and by whom) so their
+      // ringing popup dismisses with an "Answered by <name>" note.
+      broadcastCallAnswered(currentUserNameRef.current || currentUserName || "another agent");
     } catch {
       incomingCallRef.current = null;
       setGlobalIncomingCall(null);
@@ -851,6 +910,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   return (
     <AiChatProvider>
     <div className="flex min-h-screen min-h-[100dvh] overflow-x-hidden bg-gray-50">
+      {/* Toast — another admin answered the ringing call */}
+      {answeredByOther && !isCrewUser && (
+        <div className="fixed top-4 left-1/2 z-[100] -translate-x-1/2 rounded-full bg-gray-900/90 px-4 py-2 text-sm font-medium text-white shadow-lg">
+          Answered by {answeredByOther}
+        </div>
+      )}
       {/* Floating Call Card — ringing */}
       {globalIncomingCall && !isCrewUser && (
         <FloatingCallCard

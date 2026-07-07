@@ -196,6 +196,86 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
 }
 
 
+// --- Agent presence -------------------------------------------------------
+// Report the current admin's online/offline state to /api/agent/presence.
+export async function reportAgentPresence(status: "online" | "offline") {
+  try {
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/agent/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, token }),
+      keepalive: true,
+    });
+  } catch {
+    // Presence is best-effort; ringing still targets all admins via profiles.
+  }
+}
+
+// Best-effort "offline" ping that survives page unload. sendBeacon cannot set
+// an Authorization header, so the JWT travels in the JSON body.
+export function beaconAgentOffline(accessToken: string) {
+  try {
+    if (typeof navigator === "undefined" || !navigator.sendBeacon) return;
+    const blob = new Blob([JSON.stringify({ status: "offline", token: accessToken })], {
+      type: "application/json",
+    });
+    navigator.sendBeacon("/api/agent/presence", blob);
+  } catch {
+    // ignore
+  }
+}
+
+// --- Ephemeral call signals (e.g. "answered by X") ------------------------
+// A lightweight Supabase Realtime broadcast channel used to tell other admins'
+// browsers that a ringing call was just answered — and by whom — so their
+// incoming-call popup can show "Answered by <name>" as it dismisses. This is
+// intentionally NOT persisted (no DB row) to avoid polluting call history.
+export type CallAnsweredSignal = { name: string; at: number };
+
+let callSignalChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+const callAnsweredListeners = new Set<(signal: CallAnsweredSignal) => void>();
+
+function ensureCallSignalChannel() {
+  if (callSignalChannel) return callSignalChannel;
+  const supabase = createClient();
+  callSignalChannel = supabase
+    .channel("crm-call-signals", { config: { broadcast: { self: false } } })
+    .on("broadcast", { event: "answered" }, (message) => {
+      const payload = (message.payload || {}) as Partial<CallAnsweredSignal>;
+      const signal: CallAnsweredSignal = {
+        name: typeof payload.name === "string" && payload.name.trim() ? payload.name : "another agent",
+        at: typeof payload.at === "number" ? payload.at : Date.now(),
+      };
+      callAnsweredListeners.forEach((cb) => cb(signal));
+    })
+    .subscribe();
+  return callSignalChannel;
+}
+
+export function subscribeToCallSignals(onAnswered: (signal: CallAnsweredSignal) => void) {
+  callAnsweredListeners.add(onAnswered);
+  ensureCallSignalChannel();
+  return () => {
+    callAnsweredListeners.delete(onAnswered);
+    if (callAnsweredListeners.size === 0 && callSignalChannel) {
+      createClient().removeChannel(callSignalChannel);
+      callSignalChannel = null;
+    }
+  };
+}
+
+export function broadcastCallAnswered(name: string) {
+  try {
+    const channel = ensureCallSignalChannel();
+    void channel.send({ type: "broadcast", event: "answered", payload: { name, at: Date.now() } });
+  } catch {
+    // Best-effort; the losing legs still dismiss via Twilio's cancel event.
+  }
+}
+
 // Shared singleton channel for conversation read states
 const readStateListeners = new Set<(conversationId: string, readAt: string) => void>();
 let readStateChannel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
