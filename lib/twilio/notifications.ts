@@ -23,6 +23,12 @@ export function getTwilioEventPhone(event: TwilioConversationEvent) {
   return event.direction === "outbound" ? event.to || event.from || "" : event.from || event.to || "";
 }
 
+/** The admin who answered this call, if it was durably recorded. */
+export function getCallAnsweredByName(event: TwilioConversationEvent) {
+  const name = event.payload.answeredByName;
+  return typeof name === "string" && name.trim() ? name.trim() : "";
+}
+
 export function getTwilioCallOutcomeLabel(event: TwilioConversationEvent) {
   const status = (event.status || "").toLowerCase();
   const payloadStatus = String(event.payload.CallStatus || "").toLowerCase();
@@ -100,9 +106,10 @@ export function createTwilioCrmNotification(event: TwilioConversationEvent) {
     const status = (event.status || String(event.payload.CallStatus || "")).toLowerCase();
     if (["ringing", "initiated", "queued", "in-progress"].includes(status)) return null;
 
+    const answeredBy = getCallAnsweredByName(event);
     return {
       title: `${direction} ${getTwilioCallOutcomeLabel(event).toLowerCase()}`,
-      message: `${name}${event.status ? ` · ${event.status}` : ""}`,
+      message: `${name}${answeredBy ? ` · Answered by ${answeredBy}` : event.status ? ` · ${event.status}` : ""}`,
     };
   }
 

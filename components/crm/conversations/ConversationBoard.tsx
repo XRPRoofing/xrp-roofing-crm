@@ -7,9 +7,9 @@ import { leads } from "@/lib/crm-data";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone, loadContactEdits, saveContactEdit, subscribeToContactEdits, type ContactEdit } from "@/lib/conversation-contact-sync";
 import type { Customer } from "@/types/crm";
 import { appointmentTypes, pipelineStages, quickTemplates } from "@/lib/crm-conversations";
-import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates, uploadMmsMedia } from "@/lib/twilio/client";
+import { controlCall, createBrowserVoiceDevice, listConversationEvents, listConversationReadStates, markConversationRead as persistConversationRead, proxyRecordingUrl, reportCallAnswered, saveCallNotes, sendSms, startOutboundCall, subscribeToConversationEvents, subscribeToConversationReadStates, uploadMmsMedia } from "@/lib/twilio/client";
 import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
-import { addTwilioCrmNotification, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
+import { addTwilioCrmNotification, getCallAnsweredByName, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { azDateTime } from "@/lib/arizona-time";
@@ -354,13 +354,15 @@ function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; o
   const eventDisposition = typeof event.payload.disposition === "string" ? event.payload.disposition : undefined;
   const callOutcome = typeof event.payload.callOutcome === "string" ? event.payload.callOutcome : "";
   const outcomeLabel = callOutcome ? callOutcome.replace(/-/g, " ").replace(/^\w/, (c: string) => c.toUpperCase()) : "";
+  const answeredBy = getCallAnsweredByName(event);
 
   return (
     <div className={`rounded-lg border px-3 py-2.5 text-sm ${isFallback ? "border-amber-100 bg-amber-50 text-amber-950" : "border-blue-100 bg-blue-50 text-blue-950"}`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <p className="flex items-center gap-1.5 font-bold">{isFallback ? <><PhoneOff className="h-3.5 w-3.5" />Call status</> : <><Sparkles className="h-3.5 w-3.5" />Call summary</>}</p>
           {outcomeLabel && isFallback && <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200">{outcomeLabel}</span>}
+          {answeredBy && <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-800 ring-1 ring-green-200">Answered by {answeredBy}</span>}
           {eventDisposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(eventDisposition)}`}>{eventDisposition}</span>}
         </div>
         <span className={`text-[11px] font-semibold ${isFallback ? "text-amber-700" : "text-blue-700"}`}>{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
@@ -389,7 +391,7 @@ function CallTranscriptModal({ event, onClose, onDeleteRecording }: { event: Twi
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <div>
             <p className="text-sm font-bold text-gray-950">Call summary</p>
-            <p className="text-xs font-semibold text-gray-500">{azDateTime(event.createdAt)}</p>
+            <p className="text-xs font-semibold text-gray-500">{azDateTime(event.createdAt)}{getCallAnsweredByName(event) ? ` · Answered by ${getCallAnsweredByName(event)}` : ""}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"><X className="h-5 w-5" /></button>
         </div>
@@ -1760,6 +1762,9 @@ export default function ConversationBoard() {
     setTwilioNotice("Incoming call connected");
     const callerPhone = incomingCall.parameters?.From || incomingFrom;
     void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || callerPhone, actor: "Office", action: "Incoming call answered", details: `Answered call from ${callerPhone}`, module: "Calls" }).catch(() => {});
+    // Durably record who answered so it shows in the bell, Phone log, and
+    // customer-profile history.
+    void reportCallAnswered(incomingCall.parameters?.CallSid || "");
   }
 
   function handleDeclineIncomingCall() {
