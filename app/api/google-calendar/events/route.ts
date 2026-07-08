@@ -17,6 +17,7 @@ const eventSchema = z.object({
   endTime: z.string().min(1),
   notes: z.string().optional(),
   guestEmails: z.string().optional(),
+  crmEventId: z.string().optional(),
 });
 
 const updateEventSchema = eventSchema.extend({ id: z.string().min(1) });
@@ -89,6 +90,9 @@ function buildGoogleEvent(data: z.infer<typeof eventSchema>) {
         crmAddress: data.address,
         crmJobKind: data.jobKind,
         crmNotes: data.notes || "",
+        // Link back to the CRM calendar event so edits/deletes stay in sync
+        // (and duplicates are avoided) without needing a DB column.
+        crmEventId: data.crmEventId || "",
       },
     },
   };
@@ -201,4 +205,26 @@ export async function PUT(req: NextRequest) {
   }
 
   return withRefreshedCookie(NextResponse.json({ event: await response.json() }), refreshedTokens);
+}
+
+export async function DELETE(req: NextRequest) {
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing event id" }, { status: 400 });
+  }
+
+  const { connected, response, refreshedTokens } = await googleCalendarFetch(req, `/calendars/primary/events/${encodeURIComponent(id)}?sendUpdates=all`, {
+    method: "DELETE",
+  });
+
+  if (!connected || !response) {
+    return NextResponse.json({ error: "Google Calendar is not connected." }, { status: 401 });
+  }
+
+  // 404/410 = already gone; treat as success so the CRM delete isn't blocked.
+  if (!response.ok && response.status !== 410 && response.status !== 404) {
+    return NextResponse.json({ error: "Unable to delete Google Calendar event." }, { status: 502 });
+  }
+
+  return withRefreshedCookie(NextResponse.json({ success: true }), refreshedTokens);
 }
