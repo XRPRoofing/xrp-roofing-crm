@@ -152,7 +152,10 @@ function getCallStatusLabel(event: TwilioConversationEvent): string {
   // outcome. Resolve it to the actual result: answered if there's talk time,
   // otherwise no answer. (A matched recording later upgrades it to Answered.)
   if (effectiveStatus === "ivr-routed" || effectiveStatus === "ivr_routed" || effectiveStatus === "routing" || effectiveStatus === "routed") {
-    return duration > 0 ? "Answered" : "No Answer";
+    // Answered on the routed number → "Answered". Not answered → keep the
+    // routing context so management can see it came in via the IVR but was
+    // missed. (A matched recording later upgrades it to "Answered".)
+    return duration > 0 ? "Answered" : "No Answer · IVR Routed";
   }
   if (event.type === "incoming_call" && !event.status) return "Ringing";
   return event.status || "Unknown";
@@ -160,7 +163,7 @@ function getCallStatusLabel(event: TwilioConversationEvent): string {
 
 function getStatusColor(status: string, direction: string): string {
   if (status === "Answered") return direction === "outbound" ? "blue" : "green";
-  if (status === "No Answer" || status === "Busy" || status === "Canceled" || status === "Failed") return "red";
+  if (status.startsWith("No Answer") || status === "Busy" || status === "Canceled" || status === "Failed") return "red";
   if (status === "Forwarded") return "orange";
   if (status === "Ringing") return "yellow";
   if (status === "Voicemail") return "gray";
@@ -611,7 +614,7 @@ export default function PhonePage() {
       // webhook says "No Answer" (e.g. an IVR-routed call answered on an
       // external business number). Trust the recording over the status field.
       let status = getCallStatusLabel(event);
-      if (hasRealRecording && (status === "No Answer" || status === "Unknown" || status === "Forwarded")) {
+      if (hasRealRecording && (status.startsWith("No Answer") || status === "Unknown" || status === "Forwarded")) {
         status = "Answered";
       }
       const dir = event.direction || "inbound";
