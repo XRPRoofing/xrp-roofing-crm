@@ -131,6 +131,31 @@ function formatMoney(value: number) {
   return `$${value.toLocaleString()}`;
 }
 
+/**
+ * Job Value input that keeps exactly what the user types. It holds its own local
+ * string state (so background refreshes / the debounced save never reset or
+ * flicker the field mid-edit) and only commits the numeric value to the job on
+ * blur or Enter. Give it a `key` of the job id so it re-initializes when a
+ * different job is opened.
+ */
+function JobValueInput({ value, onCommit, className }: { value: number; onCommit: (value: number) => void; className?: string }) {
+  const [text, setText] = useState(value ? String(value) : "");
+  const commit = () => onCommit(Number(text) || 0);
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={(event) => setText(event.target.value.replace(/[^\d.]/g, ""))}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      className={className}
+    />
+  );
+}
+
 function formatDueDate(value?: string) {
   if (!value) return "No date";
   const date = new Date(`${value}T12:00:00`);
@@ -1811,7 +1836,7 @@ export default function LeadsPage() {
                 </label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Inspection Date<input value={selectedJob.inspectionDate || ""} onChange={(event) => updateJob(selectedJob.id, { inspectionDate: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" placeholder="e.g. June 12" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" placeholder="e.g. 2008" /></label>
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Job Value<input type="number" value={selectedJob.value} onChange={(event) => updateJob(selectedJob.id, { value: Number(event.target.value) || 0 })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Job Value<JobValueInput key={selectedJob.id} value={selectedJob.value} onCommit={(value) => updateJob(selectedJob.id, { value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Assigned Rep<input value={selectedJob.assignedTo} onChange={(event) => updateJob(selectedJob.id, { assignedTo: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Lead Source<select value={selectedJob.source || ""} onChange={(event) => updateJob(selectedJob.id, { source: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none">{LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Status<select value={selectedJob.stage} onChange={(event) => updateJobStage(selectedJob.id, event.target.value as LeadStage)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none">{leadStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}</select></label>
