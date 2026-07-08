@@ -431,7 +431,14 @@ export default function PhonePage() {
     // A call can produce multiple call_recording events (processing → completed).
     // Prefer the most complete one (non-processing status, has summary, has url).
     const recordingEvents = events.filter((e) => e.type === "call_recording");
-    type RecInfo = { url?: string; summary?: string; transcript?: string };
+    type RecInfo = { url?: string; summary?: string; transcript?: string; durationSec?: number };
+    // Recording length (seconds). A recording only exists for an answered leg,
+    // so a positive value is proof the call was actually answered/recorded.
+    const recDur = (e: TwilioConversationEvent) => {
+      const raw = e.payload?.RecordingDuration ?? e.payload?.recordingDuration;
+      const n = typeof raw === "number" ? raw : Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
     const recordingMap = new Map<string, RecInfo>();
     for (const e of recordingEvents) {
       const sid = e.callSid;
@@ -440,10 +447,11 @@ export default function PhonePage() {
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
       const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
+      const durationSec = recDur(e) || existing?.durationSec;
       // Skip processing placeholders if we already have a completed one
       if (existing && e.status === "processing" && existing.summary) continue;
       if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
-        recordingMap.set(sid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript });
+        recordingMap.set(sid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript, durationSec });
       }
     }
 
@@ -478,26 +486,34 @@ export default function PhonePage() {
       const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
       const existing = recordingMap.get(customerSid);
+      const durationSec = recDur(e) || existing?.durationSec;
       if (existing && e.status === "processing" && existing.summary) continue;
       if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
-        recordingMap.set(customerSid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript });
+        recordingMap.set(customerSid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript, durationSec });
       }
     }
 
     // Fallback: build a phone+time index from recording events for calls whose
     // callSid doesn't appear in the recordingMap (Twilio may use a child leg
     // SID for the recording callback that differs from the parent call SID).
-    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string; transcript?: string }>>();
+    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string; transcript?: string; durationSec?: number }>>();
     for (const e of recordingEvents) {
-      const phone = e.direction === "inbound" ? (e.from || "") : (e.to || "");
-      const normalized = phone.replace(/\D/g, "").slice(-10);
-      if (!normalized) continue;
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
       const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
-      if (!summary && !url) continue;
-      if (!recordingByPhone.has(normalized)) recordingByPhone.set(normalized, []);
-      recordingByPhone.get(normalized)!.push({ time: new Date(e.createdAt).getTime(), url, summary, transcript });
+      const durationSec = recDur(e);
+      if (!summary && !url && !durationSec) continue;
+      // Index under BOTH the from and to numbers: a recording callback for a
+      // forwarded/IVR-routed leg often arrives without a reliable `direction`,
+      // so keying only off one side would miss the caller's number and the
+      // recording would never attach to the call row.
+      const entry = { time: new Date(e.createdAt).getTime(), url, summary, transcript, durationSec };
+      for (const side of [e.from, e.to]) {
+        const normalized = (side || "").replace(/\D/g, "").slice(-10);
+        if (!normalized) continue;
+        if (!recordingByPhone.has(normalized)) recordingByPhone.set(normalized, []);
+        recordingByPhone.get(normalized)!.push(entry);
+      }
     }
 
     // Latest saved note per call leg (by timestamp, regardless of event order).
@@ -528,8 +544,43 @@ export default function PhonePage() {
       const phone = event.direction === "inbound" ? event.from || "" : event.to || "";
       const customer = matchCustomerByPhone(phone, phoneLookup);
       const payload = event.payload || {};
-      const rawDur = payload.CallDuration ?? payload.DialCallDuration ?? payload.Duration ?? payload.duration ?? 0;
-      const duration = typeof rawDur === "number" ? rawDur : Number(rawDur) || 0;
+
+      // Resolve this call's recording once — direct callSid match first, then a
+      // phone + closest-time (within 10 min) fallback for forwarded/IVR-routed
+      // legs whose recording callback used a different SID.
+      const rec: RecInfo = (() => {
+        const bySid = recordingMap.get(event.callSid || "");
+        if (bySid?.summary || bySid?.url || bySid?.durationSec) return bySid;
+        const normalized = phone.replace(/\D/g, "").slice(-10);
+        const candidates = normalized ? recordingByPhone.get(normalized) : undefined;
+        if (!candidates?.length) return bySid || {};
+        const callTime = new Date(event.createdAt).getTime();
+        let best: typeof candidates[0] | undefined;
+        let bestDelta = Infinity;
+        for (const c of candidates) {
+          const delta = Math.abs(c.time - callTime);
+          if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
+        }
+        return {
+          url: best?.url || bySid?.url,
+          summary: best?.summary || bySid?.summary,
+          transcript: best?.transcript || bySid?.transcript,
+          durationSec: best?.durationSec || bySid?.durationSec,
+        };
+      })();
+      const hasRealRecording = Boolean(rec.url) || (rec.durationSec ?? 0) > 0;
+
+      // Duration: largest of every known source so it always shows and stays
+      // accurate — parent call length, <Dial> talk length, and the recording
+      // length (recovers duration if a status webhook was dropped).
+      const num = (v: unknown) => { const n = typeof v === "number" ? v : Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+      const duration = Math.max(
+        num(payload.CallDuration),
+        num(payload.DialCallDuration),
+        num(payload.Duration),
+        num(payload.duration),
+        num(rec.durationSec),
+      );
 
       const forwarded = isForwardedCall(event);
       let displayName: string;
@@ -549,7 +600,14 @@ export default function PhonePage() {
         continue; // skip calls with no identifiable phone number
       }
 
-      const status = getCallStatusLabel(event);
+      // A recording only exists for an answered leg, so if we matched a real
+      // recording, the call was answered — even when the parent leg's status
+      // webhook says "No Answer" (e.g. an IVR-routed call answered on an
+      // external business number). Trust the recording over the status field.
+      let status = getCallStatusLabel(event);
+      if (hasRealRecording && (status === "No Answer" || status === "Unknown" || status === "Forwarded")) {
+        status = "Answered";
+      }
       const dir = event.direction || "inbound";
 
       records.push({
@@ -561,8 +619,8 @@ export default function PhonePage() {
         direction: dir,
         status,
         statusColor: getStatusColor(status, dir),
-        duration: formatDuration(duration as number),
-        durationSec: (duration as number) || 0,
+        duration: formatDuration(duration),
+        durationSec: duration || 0,
         dateTime: azDateTime(event.createdAt),
         rawDate: event.createdAt,
         callSid: event.callSid || "",
@@ -573,23 +631,9 @@ export default function PhonePage() {
         recordingProcessing: event.callSid ? processingSids.has(event.callSid) : false,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
-        ...(() => {
-          // Try direct callSid match first
-          const bySid = recordingMap.get(event.callSid || "");
-          if (bySid?.summary || bySid?.url) return { recordingUrl: bySid.url, summary: bySid.summary, transcript: bySid.transcript };
-          // Fallback: find recording by phone + closest time (within 10 min)
-          const normalized = phone.replace(/\D/g, "").slice(-10);
-          const candidates = recordingByPhone.get(normalized);
-          if (!candidates?.length) return { recordingUrl: bySid?.url, summary: bySid?.summary, transcript: bySid?.transcript };
-          const callTime = new Date(event.createdAt).getTime();
-          let best: typeof candidates[0] | undefined;
-          let bestDelta = Infinity;
-          for (const c of candidates) {
-            const delta = Math.abs(c.time - callTime);
-            if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
-          }
-          return { recordingUrl: best?.url || bySid?.url, summary: best?.summary || bySid?.summary, transcript: best?.transcript || bySid?.transcript };
-        })(),
+        recordingUrl: rec.url,
+        summary: rec.summary,
+        transcript: rec.transcript,
       });
     }
 
