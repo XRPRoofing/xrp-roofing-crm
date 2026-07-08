@@ -430,9 +430,23 @@ export function buildRoutingStepTwiml(params: {
 
   const step = params.steps[params.stepIndex];
   if (!step) {
-    // Sequence exhausted — no one answered any step. Fall through to the same
-    // "no answer" ending used today (logs the result + hangs up).
-    response.redirect({ method: "POST" }, params.finalNoAnswerUrl);
+    // Sequence exhausted — no configured step answered. Instead of dropping the
+    // call, fail over one last time to the Main Line ring group (all online
+    // admin browsers + the shared softphone) for 30s so a routed call is never
+    // missed just because the assigned person couldn't pick up. Only if this
+    // also goes unanswered does it end (call-ended logs it + hangs up).
+    const failoverDial = response.dial({
+      answerOnBridge: true,
+      record: "record-from-answer-dual",
+      timeout: 30,
+      action: params.finalNoAnswerUrl,
+      method: "POST",
+      recordingStatusCallback: params.statusCallbackUrl,
+      recordingStatusCallbackEvent: ["completed"],
+      recordingStatusCallbackMethod: "POST",
+      ...(params.callerNumber ? { callerId: params.callerNumber } : {}),
+    });
+    dialRingGroup(failoverDial, config, params.agentStatus?.agents);
     return response.toString();
   }
 
