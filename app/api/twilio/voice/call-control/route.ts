@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
         const transferTwiml = [
           '<?xml version="1.0" encoding="UTF-8"?>',
           '<Response><Dial>',
-          `<Conference beep="false" endConferenceOnExit="true" startConferenceOnEnter="true" record="do-not-record" participantLabel="transfer">${confName}</Conference>`,
+          `<Conference beep="false" endConferenceOnExit="true" startConferenceOnEnter="true" record="record-from-start" recordingStatusCallback="${statusCallbackUrl}" recordingStatusCallbackEvent="completed" recordingStatusCallbackMethod="POST" participantLabel="transfer">${confName}</Conference>`,
           '</Dial></Response>',
         ].join('');
         await client.calls.create({
