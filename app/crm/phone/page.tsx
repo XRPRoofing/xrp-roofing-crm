@@ -33,7 +33,7 @@ import {
 import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl, reconcileRecentCalls, saveCallNotes } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
 import { azDateTime } from "@/lib/arizona-time";
-import { getTwilioLines } from "@/lib/twilio/numbers";
+import { getTwilioLines, getLineLabelForNumber } from "@/lib/twilio/numbers";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import type { Customer, Lead } from "@/types/crm";
 import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
@@ -1232,7 +1232,19 @@ export default function PhonePage() {
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <p className="text-sm text-gray-600">{call.to ? formatPhoneDisplay(call.to) : "-"}</p>
+                        {call.to ? (() => {
+                          const lineLabel = getLineLabelForNumber(call.to);
+                          return lineLabel ? (
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-gray-700">{lineLabel}</p>
+                              <p className="truncate text-xs text-gray-400">{formatPhoneDisplay(call.to)}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-600">{formatPhoneDisplay(call.to)}</p>
+                          );
+                        })() : (
+                          <p className="text-sm text-gray-600">-</p>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.dateTime}</p>
