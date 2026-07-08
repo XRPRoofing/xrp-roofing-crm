@@ -47,7 +47,11 @@ export async function POST(req: NextRequest) {
       (user.email ? user.email.split("@")[0] : "") ||
       "an agent";
 
-    const result = await recordCallAnsweredBy(callSid, fullName, user.id);
+    const from = typeof body.from === "string" && body.from.trim() ? body.from.trim() : undefined;
+    const to = typeof body.to === "string" && body.to.trim() ? body.to.trim() : undefined;
+    const direction = body.direction === "outbound" ? "outbound" : "inbound";
+
+    const result = await recordCallAnsweredBy(callSid, fullName, user.id, { from, to, direction });
     if (!result.ok) return NextResponse.json({ ok: false, warning: result.reason });
 
     return NextResponse.json({ ok: true, name: fullName, updated: result.updated, inserted: result.inserted });

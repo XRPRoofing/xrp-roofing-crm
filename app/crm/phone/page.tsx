@@ -29,7 +29,7 @@ import {
   Voicemail,
   X,
 } from "lucide-react";
-import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl } from "@/lib/twilio/client";
+import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl, reconcileRecentCalls } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
 import { azDateTime } from "@/lib/arizona-time";
 import { getTwilioLines } from "@/lib/twilio/numbers";
@@ -316,13 +316,57 @@ export default function PhonePage() {
     };
   }, []);
 
-  // Real-time subscription
+  // Re-fetch the full call history from the central store. Used to converge
+  // every admin's view when realtime may have dropped events (see below).
+  const refreshEvents = useCallback(async () => {
+    try {
+      const evts = await listConversationEvents(2000);
+      setEvents(evts);
+    } catch {
+      /* best-effort */
+    }
+  }, []);
+
+  // Real-time subscription — dedupe by id so an INSERT followed by UPDATE for
+  // the same row replaces (never duplicates) the event.
   useEffect(() => {
     const unsub = subscribeToConversationEvents((event) => {
-      setEvents((prev) => [event, ...prev]);
+      setEvents((prev) => {
+        const idx = prev.findIndex((e) => e.id === event.id);
+        if (idx === -1) return [event, ...prev];
+        const next = prev.slice();
+        next[idx] = event;
+        return next;
+      });
     });
     return unsub;
   }, []);
+
+  // Self-healing: on load, ask the server to reconcile recent calls against
+  // Twilio (backfilling anything a dropped webhook missed), then refresh so the
+  // recovered calls/recordings appear. Throttled per browser inside the helper.
+  useEffect(() => {
+    void reconcileRecentCalls().then(() => refreshEvents());
+  }, [refreshEvents]);
+
+  // Realtime resilience: Supabase channels can silently drop (network blips,
+  // laptop sleep, tab backgrounding), which would leave one admin's call
+  // history diverged from the shared source of truth. Re-fetch when the tab
+  // regains focus and on a periodic interval so every admin always converges
+  // on the same central call history.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshEvents();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
+    const interval = window.setInterval(() => void refreshEvents(), 45_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
+      window.clearInterval(interval);
+    };
+  }, [refreshEvents]);
 
   // Build call records from events
   const callRecords: CallRecord[] = useMemo(() => {
