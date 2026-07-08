@@ -24,12 +24,13 @@ import {
   PhoneOutgoing,
   Search,
   ShieldBan,
+  StickyNote,
   User,
   Users,
   Voicemail,
   X,
 } from "lucide-react";
-import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl, reconcileRecentCalls } from "@/lib/twilio/client";
+import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl, reconcileRecentCalls, saveCallNotes } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
 import { azDateTime } from "@/lib/arizona-time";
 import { getTwilioLines } from "@/lib/twilio/numbers";
@@ -67,6 +68,8 @@ interface CallRecord {
   summary?: string;
   transcript?: string;
   answeredBy?: string;
+  notes?: string;
+  recordingProcessing?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +296,7 @@ export default function PhonePage() {
   const [expandedSummary, setExpandedSummary] = useState<{ name: string; summary: string; recordingUrl?: string; transcript?: string } | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
 
+
   const twilioLines = useMemo(() => getTwilioLines(), []);
 
   // Load data
@@ -496,6 +500,29 @@ export default function PhonePage() {
       recordingByPhone.get(normalized)!.push({ time: new Date(e.createdAt).getTime(), url, summary, transcript });
     }
 
+    // Latest saved note per call leg (by timestamp, regardless of event order).
+    const notesMap = new Map<string, string>();
+    const noteTimeMap = new Map<string, number>();
+    for (const e of events) {
+      if (e.type !== "call_note" || !e.callSid) continue;
+      const note = typeof e.payload?.notes === "string" ? e.payload.notes : (e.body || "");
+      if (!note.trim()) continue;
+      const t = new Date(e.createdAt).getTime();
+      if (!noteTimeMap.has(e.callSid) || t >= (noteTimeMap.get(e.callSid) as number)) {
+        noteTimeMap.set(e.callSid, t);
+        notesMap.set(e.callSid, note);
+      }
+    }
+
+    // Calls whose recording exists but transcript/summary is not ready yet.
+    const processingSids = new Set<string>();
+    for (const e of recordingEvents) {
+      if (!e.callSid) continue;
+      const info = recordingMap.get(e.callSid);
+      const hasSummary = !!info?.summary;
+      if (e.status === "processing" && !hasSummary) processingSids.add(e.callSid);
+    }
+
     const records: CallRecord[] = [];
     for (const [, event] of callMap) {
       const phone = event.direction === "inbound" ? event.from || "" : event.to || "";
@@ -542,6 +569,8 @@ export default function PhonePage() {
         disposition: dispositions[phone] || undefined,
         customerId: customer?.id,
         answeredBy: typeof payload.answeredByName === "string" && payload.answeredByName.trim() ? payload.answeredByName.trim() : undefined,
+        notes: event.callSid ? notesMap.get(event.callSid) : undefined,
+        recordingProcessing: event.callSid ? processingSids.has(event.callSid) : false,
         tag,
         twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
         ...(() => {
@@ -749,6 +778,7 @@ export default function PhonePage() {
     if (!selectedCallId) return null;
     return callRecords.find((c) => c.id === selectedCallId) || null;
   }, [selectedCallId, callRecords]);
+
 
   // ---------------------------------------------------------------------------
   // Analytics data
@@ -1037,6 +1067,12 @@ export default function PhonePage() {
                           )}
                         </div>
                       )}
+                      {!call.recordingUrl && !call.summary && call.recordingProcessing && (
+                        <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                          Processing…
+                        </span>
+                      )}
                     </div>
 
                     {/* Status indicator */}
@@ -1134,6 +1170,7 @@ export default function PhonePage() {
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="px-6 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Answered By</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">From</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">To</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
@@ -1147,7 +1184,7 @@ export default function PhonePage() {
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {paginatedCalls.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-6 py-16 text-center">
+                      <td colSpan={10} className="px-6 py-16 text-center">
                         <PhoneOff className="mx-auto h-10 w-10 text-gray-300" />
                         <p className="mt-2 text-sm font-semibold text-gray-400">No calls yet</p>
                         <p className="text-xs text-gray-400">Your call history is empty. Start making or receiving calls.</p>
@@ -1165,8 +1202,12 @@ export default function PhonePage() {
                           <StatusDot color={call.statusColor} />
                           <span className="text-sm font-semibold text-gray-800">{call.status}</span>
                         </div>
-                        {call.answeredBy && (
-                          <p className="mt-0.5 text-[11px] font-semibold text-green-600">by {call.answeredBy}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        {call.answeredBy ? (
+                          <span className="text-sm font-semibold text-green-600">{call.answeredBy}</span>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -1213,6 +1254,11 @@ export default function PhonePage() {
                               </button>
                             )}
                           </div>
+                        ) : call.recordingProcessing ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                            Processing…
+                          </span>
                         ) : (
                           <span className="text-[11px] text-gray-300">—</span>
                         )}
@@ -1316,66 +1362,139 @@ export default function PhonePage() {
               </div>
             )}
 
-            {/* Desktop expanded call detail */}
-            {selectedCall && (
-              <div className="hidden border-t border-blue-200 bg-blue-50/30 px-6 py-4 lg:block">
-                <div className="flex flex-wrap items-start gap-6">
+          </div>
+        )}
+
+        {/* Call detail drawer (right side) */}
+        {selectedCall && (
+          <>
+            <div className="fixed inset-0 z-[95] bg-black/40" onClick={() => setSelectedCallId(null)} />
+            <div className="fixed inset-y-0 right-0 z-[96] flex w-full max-w-md flex-col bg-white shadow-2xl">
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-bold text-gray-900">{selectedCall.customerName}</h3>
+                  <p className="text-xs text-gray-500">{selectedCall.phone ? formatPhoneDisplay(selectedCall.phone) : "No number"}</p>
+                </div>
+                <button type="button" onClick={() => setSelectedCallId(null)} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+                {/* Contact & call info */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Customer</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedCall.customerName}</p>
-                    <p className="text-xs text-gray-500">{selectedCall.phone ? formatPhoneDisplay(selectedCall.phone) : "No number"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Direction</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Direction</p>
                     <p className="text-sm font-semibold text-gray-900">{selectedCall.direction === "inbound" ? "Inbound" : "Outbound"}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Status</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Status</p>
                     <div className="flex items-center gap-1.5">
                       <StatusDot color={selectedCall.statusColor} />
                       <p className="text-sm font-semibold text-gray-900">{selectedCall.status}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Duration</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Answered By</p>
+                    <p className="text-sm font-semibold text-green-600">{selectedCall.answeredBy || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Duration</p>
                     <p className="text-sm font-semibold text-gray-900">{selectedCall.duration}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Date / Time</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Date / Time</p>
                     <p className="text-sm font-semibold text-gray-900">{selectedCall.dateTime}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase text-gray-400">Call SID</p>
-                    <p className="font-mono text-xs text-gray-500">{selectedCall.callSid || "-"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {selectedCall.phone && (
-                      <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                        <Phone className="h-3.5 w-3.5 text-gray-500" />
-                        Call
-                      </button>
-                    )}
-                    {selectedCall.phone && (
-                      <button type="button" onClick={() => openSmsPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                        <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
-                        Message
-                      </button>
-                    )}
-                    <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                      <Briefcase className="h-3.5 w-3.5 text-gray-500" />
-                      New Job
-                    </button>
-                    {selectedCall.customerId && (
-                      <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
-                        <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
-                        Customer
-                      </a>
-                    )}
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Line</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.twilioLine || "—"}</p>
                   </div>
                 </div>
+
+                {/* Recording */}
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400"><Mic className="h-3 w-3" />Recording</p>
+                  {selectedCall.recordingUrl ? (
+                    <audio controls src={proxyRecordingUrl(selectedCall.recordingUrl)} className="w-full" preload="none" />
+                  ) : selectedCall.recordingProcessing ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />Processing…
+                    </span>
+                  ) : (
+                    <p className="text-xs text-gray-400">No recording available.</p>
+                  )}
+                </div>
+
+                {/* AI Summary */}
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400"><FileText className="h-3 w-3" />AI Summary</p>
+                  {selectedCall.summary ? (
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                      <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{selectedCall.summary}</p>
+                    </div>
+                  ) : selectedCall.recordingProcessing ? (
+                    <p className="text-xs text-amber-600">Processing…</p>
+                  ) : (
+                    <p className="text-xs text-gray-400">No summary yet.</p>
+                  )}
+                </div>
+
+                {/* Transcript */}
+                {selectedCall.transcript && (
+                  <details className="group rounded-lg border border-gray-200 bg-gray-50">
+                    <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-gray-500 [&::-webkit-details-marker]:hidden">
+                      Full Transcript
+                      <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
+                    </summary>
+                    <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm leading-6 text-gray-800">{selectedCall.transcript}</p>
+                  </details>
+                )}
+
+                {/* Notes */}
+                <CallNotesEditor
+                  key={selectedCall.id}
+                  callSid={selectedCall.callSid}
+                  customerId={selectedCall.customerId}
+                  disposition={selectedCall.disposition}
+                  initialNotes={selectedCall.notes || ""}
+                />
+
+                {/* Call SID */}
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Call SID</p>
+                  <p className="break-all font-mono text-xs text-gray-500">{selectedCall.callSid || "-"}</p>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-5 py-3">
+                {selectedCall.phone && (
+                  <button type="button" onClick={() => handleCallBack(selectedCall.phone)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                    <Phone className="h-3.5 w-3.5 text-gray-500" />
+                    Call
+                  </button>
+                )}
+                {selectedCall.phone && (
+                  <button type="button" onClick={() => openSmsPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                    <MessageSquare className="h-3.5 w-3.5 text-gray-500" />
+                    Message
+                  </button>
+                )}
+                <button type="button" onClick={() => openJobPanel(selectedCall.phone, selectedCall.customerName)} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                  <Briefcase className="h-3.5 w-3.5 text-gray-500" />
+                  New Job
+                </button>
+                {selectedCall.customerId && (
+                  <a href={`/crm/customers?id=${selectedCall.customerId}`} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50">
+                    <ExternalLink className="h-3.5 w-3.5 text-gray-500" />
+                    Customer
+                  </a>
+                )}
+              </div>
+            </div>
+          </>
         )}
 
         {/* ---- Phone Numbers Tab ---- */}
@@ -1797,6 +1916,62 @@ export default function PhonePage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Call notes editor (self-contained so it resets per call via key remount)
+// ---------------------------------------------------------------------------
+
+function CallNotesEditor({
+  callSid,
+  customerId,
+  disposition,
+  initialNotes,
+}: {
+  callSid: string;
+  customerId?: string;
+  disposition?: string;
+  initialNotes: string;
+}) {
+  const [draft, setDraft] = useState(initialNotes);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    if (!callSid) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      await saveCallNotes({ callSid, customerId, notes: draft.trim(), disposition });
+      setSaved(true);
+    } catch { /* surfaced via lack of confirmation */ }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400"><StickyNote className="h-3 w-3" />Notes</p>
+      <textarea
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); setSaved(false); }}
+        rows={3}
+        placeholder="Add a note about this call…"
+        className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        disabled={!callSid}
+      />
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !callSid}
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Note"}
+        </button>
+        {saved && <span className="text-xs font-semibold text-green-600">Saved</span>}
+      </div>
     </div>
   );
 }
