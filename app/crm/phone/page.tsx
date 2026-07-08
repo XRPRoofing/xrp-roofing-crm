@@ -978,7 +978,9 @@ export default function PhonePage() {
       {/* ----------------------------------------------------------------- */}
       {/* Tab content                                                        */}
       {/* ----------------------------------------------------------------- */}
-      <div className="flex-1 overflow-y-auto">
+      {/* pb-24 keeps content clear of the fixed mobile bottom nav so nothing
+          gets hidden behind it on short/landscape viewports or long lists. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-24 lg:pb-0">
         {activeTab === "Calls" && (
           <div className="flex flex-col">
             {/* ========== Mobile compact stats ========== */}
