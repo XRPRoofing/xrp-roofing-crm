@@ -449,56 +449,75 @@ export default function PhonePage() {
       return Number.isFinite(n) && n > 0 ? n : 0;
     };
     const recordingMap = new Map<string, RecInfo>();
-    for (const e of recordingEvents) {
-      const sid = e.callSid;
-      if (!sid) continue;
+    const upsertRecording = (sid: string, e: TwilioConversationEvent) => {
+      if (!sid) return;
       const existing = recordingMap.get(sid);
       const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
       const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
       const url = e.recordingUrl || "";
       const durationSec = recDur(e) || existing?.durationSec;
       // Skip processing placeholders if we already have a completed one
-      if (existing && e.status === "processing" && existing.summary) continue;
+      if (existing && e.status === "processing" && existing.summary) return;
       if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
         recordingMap.set(sid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript, durationSec });
       }
-    }
+    };
 
-    // Conference recording resolution: browser-initiated outbound calls use a
-    // conference for hold/transfer.  The recording callback arrives with
-    // payload.ConferenceSid but no callSid/from/to.  Trace through conference
-    // participant events to find the customer's callSid and attach the recording.
-    const confSidToName = new Map<string, string>();
-    const confNameToCustomer = new Map<string, string>();
+    // Conference linkage: browser-initiated outbound calls (and transfers) run
+    // through a conference named `call-<parentSid>`. The recording callback can
+    // arrive with only a ConferenceSid, or with a leg/parent callSid that ISN'T
+    // the customer leg shown in the call list — so the recording/summary would
+    // otherwise never attach to the visible row (it only surfaced in the bell).
+    // Build maps so a recording can be traced to the customer's callSid no
+    // matter which SID (or none) its callback carried.
+    const confSidToName = new Map<string, string>();          // ConferenceSid → friendly name
+    const confNameToCustomer = new Map<string, string>();     // friendly name → customer callSid
+    const confNameParticipants = new Map<string, Set<string>>(); // friendly name → participant callSids
     for (const e of events) {
       if (e.type !== "call_status") continue;
       const p = e.payload;
       if (!p) continue;
       const cs = typeof p.ConferenceSid === "string" ? p.ConferenceSid : "";
       const fn = typeof p.FriendlyName === "string" ? p.FriendlyName : "";
-      if (cs && fn && typeof fn === "string" && fn.startsWith("call-")) {
-        confSidToName.set(cs, fn);
-        if (p.ParticipantLabel === "customer" && e.callSid) {
-          confNameToCustomer.set(fn, e.callSid);
-        }
+      if (!fn || !fn.startsWith("call-")) continue;
+      if (cs) confSidToName.set(cs, fn);
+      if (e.callSid) {
+        if (!confNameParticipants.has(fn)) confNameParticipants.set(fn, new Set());
+        confNameParticipants.get(fn)!.add(e.callSid);
+      }
+      if (p.ParticipantLabel === "customer" && e.callSid) confNameToCustomer.set(fn, e.callSid);
+    }
+    // Map every participant callSid (and the parent SID embedded in the
+    // conference name) to that conference's customer callSid.
+    const sidToCustomerSid = new Map<string, string>();
+    for (const [fn, customerSid] of confNameToCustomer) {
+      const parentSid = fn.slice("call-".length);
+      if (parentSid && parentSid !== customerSid) sidToCustomerSid.set(parentSid, customerSid);
+      for (const sid of confNameParticipants.get(fn) || []) {
+        if (sid !== customerSid) sidToCustomerSid.set(sid, customerSid);
       }
     }
-    for (const e of recordingEvents) {
-      if (e.callSid) continue;
+
+    // Resolve the customer callSid for a conference recording that carried no
+    // callSid, via its ConferenceSid.
+    const conferenceCustomerSid = (e: TwilioConversationEvent): string | undefined => {
       const cs = typeof e.payload?.ConferenceSid === "string" ? e.payload.ConferenceSid : "";
-      if (!cs) continue;
+      if (!cs) return undefined;
       const fn = confSidToName.get(cs);
-      if (!fn) continue;
-      const customerSid = confNameToCustomer.get(fn);
-      if (!customerSid) continue;
-      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
-      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
-      const url = e.recordingUrl || "";
-      const existing = recordingMap.get(customerSid);
-      const durationSec = recDur(e) || existing?.durationSec;
-      if (existing && e.status === "processing" && existing.summary) continue;
-      if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
-        recordingMap.set(customerSid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript, durationSec });
+      return fn ? confNameToCustomer.get(fn) : undefined;
+    };
+
+    for (const e of recordingEvents) {
+      // Attach under the raw callSid (direct match) AND, when the call ran
+      // through a conference, under the customer leg's callSid so it lands on
+      // the row shown in the call list.
+      if (e.callSid) {
+        upsertRecording(e.callSid, e);
+        const mapped = sidToCustomerSid.get(e.callSid);
+        if (mapped) upsertRecording(mapped, e);
+      } else {
+        const customerSid = conferenceCustomerSid(e);
+        if (customerSid) upsertRecording(customerSid, e);
       }
     }
 
