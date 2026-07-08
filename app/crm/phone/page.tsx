@@ -148,6 +148,12 @@ function getCallStatusLabel(event: TwilioConversationEvent): string {
     if (isOutbound) return duration > 0 ? "Answered" : "No Answer";
     return "No Answer";
   }
+  // "ivr-routed" (and similar) is an internal routing marker, not a real call
+  // outcome. Resolve it to the actual result: answered if there's talk time,
+  // otherwise no answer. (A matched recording later upgrades it to Answered.)
+  if (effectiveStatus === "ivr-routed" || effectiveStatus === "ivr_routed" || effectiveStatus === "routing" || effectiveStatus === "routed") {
+    return duration > 0 ? "Answered" : "No Answer";
+  }
   if (event.type === "incoming_call" && !event.status) return "Ringing";
   return event.status || "Unknown";
 }
