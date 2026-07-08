@@ -270,7 +270,11 @@ export function subscribeToCallSignals(onAnswered: (signal: CallAnsweredSignal) 
 // Persist who answered an inbound call (durable, unlike broadcastCallAnswered
 // which is only an ephemeral toast). Stamps the answering user's name onto the
 // stored call events so the bell, Phone log, and customer profile show it.
-export async function reportCallAnswered(callSid: string, name?: string) {
+export async function reportCallAnswered(
+  callSid: string,
+  name?: string,
+  info?: { from?: string; to?: string; direction?: "inbound" | "outbound" },
+) {
   try {
     if (!callSid) return;
     const { data } = await createClient().auth.getSession();
@@ -279,11 +283,34 @@ export async function reportCallAnswered(callSid: string, name?: string) {
     await fetch("/api/twilio/calls/answered", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ callSid, name, token }),
+      body: JSON.stringify({ callSid, name, from: info?.from, to: info?.to, direction: info?.direction, token }),
       keepalive: true,
     });
   } catch {
     // Best-effort; never block the answer flow.
+  }
+}
+
+// Trigger the server-side self-healing reconcile that backfills any call /
+// recording / transcript / summary a dropped Twilio webhook left missing, so
+// the central call history stays complete for every admin. Throttled per
+// browser so opening the Phone page repeatedly doesn't spam Twilio.
+export async function reconcileRecentCalls(minGapMs = 180_000) {
+  try {
+    const key = "crm-last-call-reconcile";
+    const last = Number(localStorage.getItem(key) || 0);
+    if (Date.now() - last < minGapMs) return;
+    localStorage.setItem(key, String(Date.now()));
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/twilio/calls/reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    // Best-effort; realtime + periodic refetch still keep views in sync.
   }
 }
 

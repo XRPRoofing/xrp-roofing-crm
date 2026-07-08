@@ -1535,9 +1535,8 @@ export default function ConversationBoard() {
   // recently (within 30 s) to avoid redundant API calls on quick tab switches.
   const lastConversationRefreshRef = useRef(0);
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastConversationRefreshRef.current < 30_000) return;
+    function reload(force = false) {
+      if (!force && Date.now() - lastConversationRefreshRef.current < 30_000) return;
       lastConversationRefreshRef.current = Date.now();
       Promise.all([listConversationEvents(), listConversationReadStates(), loadLiveCustomers(), loadContactEdits()]).then(([events, readStates, liveCustomers, savedEdits]) => {
         liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
@@ -1552,8 +1551,19 @@ export default function ConversationBoard() {
         setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")));
       }).catch(() => {});
     }
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") reload();
+    }
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleVisibilityChange);
+    // Periodic re-sync so a foregrounded tab whose realtime channel silently
+    // dropped still converges on the shared central call history.
+    const interval = window.setInterval(() => reload(true), 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleVisibilityChange);
+      window.clearInterval(interval);
+    };
   }, []);
 
   // Load jobs, invoices, proposals for the Customer Hub panel
@@ -1762,9 +1772,14 @@ export default function ConversationBoard() {
     setTwilioNotice("Incoming call connected");
     const callerPhone = incomingCall.parameters?.From || incomingFrom;
     void logCrewActivity({ jobId: active?.id || "", jobName: active?.contact.name || callerPhone, actor: "Office", action: "Incoming call answered", details: `Answered call from ${callerPhone}`, module: "Calls" }).catch(() => {});
-    // Durably record who answered so it shows in the bell, Phone log, and
-    // customer-profile history.
-    void reportCallAnswered(incomingCall.parameters?.CallSid || "");
+    // Durably record who answered — and, if the Twilio webhooks were dropped,
+    // this also writes the complete call row (caller number + direction) so the
+    // call can never be missing from Call History for any admin.
+    void reportCallAnswered(incomingCall.parameters?.CallSid || "", undefined, {
+      from: incomingCall.parameters?.From || "",
+      to: incomingCall.parameters?.To || "",
+      direction: "inbound",
+    });
   }
 
   function handleDeclineIncomingCall() {

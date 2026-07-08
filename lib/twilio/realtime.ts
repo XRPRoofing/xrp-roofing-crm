@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 
-function getAdminClient() {
+export function getAdminClient() {
   const url = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -137,36 +137,63 @@ function getConversationEventsErrorMessage(message: string) {
 }
 
 
+type AnsweredByCallInfo = {
+  from?: string;
+  to?: string;
+  direction?: "inbound" | "outbound";
+};
+
 /** Persist which admin/user answered a given call so it shows durably in the
  * notification bell, Phone call log, and customer-profile history. Stamps every
  * conversation_event row for the CallSid (payload.answeredByName /
  * answeredByUserId) so all existing views pick it up on reload and via the
- * realtime UPDATE subscription. */
-export async function recordCallAnsweredBy(callSid: string, name: string, userId?: string) {
+ * realtime UPDATE subscription.
+ *
+ * Critically, this is also the answering browser's own durable write of the
+ * call: if the Twilio status/recording webhooks were dropped (Vercel `after()`
+ * teardown, callback 404, etc.) so NO row exists yet, we insert a COMPLETE
+ * call row — with the caller's number and direction — so the call can never be
+ * missing from the central call history for any admin, independent of Twilio. */
+export async function recordCallAnsweredBy(callSid: string, name: string, userId?: string, info?: AnsweredByCallInfo) {
   const supabase = getAdminClient();
   if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured" };
   if (!callSid || !name) return { ok: false as const, reason: "callSid and name are required" };
 
   const answeredAt = new Date().toISOString();
+  const direction = info?.direction || "inbound";
+  const from = info?.from || undefined;
+  const to = info?.to || undefined;
 
   const { data, error } = await supabase
     .from("conversation_events")
-    .select("id, payload")
+    .select("id, payload, from_phone, to_phone")
     .eq("call_sid", callSid);
 
   if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message) };
 
-  const rows = (data || []) as Array<{ id: string; payload: Record<string, unknown> | null }>;
+  const rows = (data || []) as Array<{ id: string; payload: Record<string, unknown> | null; from_phone: string | null; to_phone: string | null }>;
   if (rows.length === 0) {
-    // No event stored yet for this call (e.g. answered before the status
-    // callback landed). Insert a lightweight marker the views can read.
+    // No event stored yet for this call — the Twilio webhooks that normally
+    // create the history row were lost. Insert a COMPLETE row (with caller
+    // number + direction) so the call is never missing from Call History,
+    // Phone page, or the customer profile for any admin.
     await publishConversationEvent({
       id: `${callSid}-answered-by`,
       type: "call_status",
       status: "answered",
+      direction,
+      from,
+      to,
       callSid,
       body: `Answered by ${name}`,
-      payload: { answeredByName: name, answeredByUserId: userId, answeredAt },
+      payload: {
+        answeredByName: name,
+        answeredByUserId: userId,
+        answeredAt,
+        // Mark as a real answered leg so outcome labels read "Answered", not "Missed".
+        DialCallStatus: "answered",
+        DialCallDuration: "1",
+      },
       createdAt: answeredAt,
     });
     return { ok: true as const, updated: 0, inserted: 1 };
@@ -174,7 +201,11 @@ export async function recordCallAnsweredBy(callSid: string, name: string, userId
 
   for (const row of rows) {
     const nextPayload = { ...(row.payload || {}), answeredByName: name, answeredByUserId: userId, answeredAt };
-    await supabase.from("conversation_events").update({ payload: nextPayload }).eq("id", row.id);
+    const patch: Record<string, unknown> = { payload: nextPayload };
+    // Backfill caller number if a partial row was stored without it.
+    if (from && !row.from_phone) patch.from_phone = from;
+    if (to && !row.to_phone) patch.to_phone = to;
+    await supabase.from("conversation_events").update(patch).eq("id", row.id);
   }
 
   return { ok: true as const, updated: rows.length, inserted: 0 };

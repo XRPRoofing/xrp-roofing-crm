@@ -691,9 +691,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       // Tell other admins' browsers this call was taken (and by whom) so their
       // ringing popup dismisses with an "Answered by <name>" note.
       broadcastCallAnswered(answeredName);
-      // Durably record who answered so it shows in the bell, Phone log, and
-      // customer-profile history (the broadcast above is only an ephemeral toast).
-      void reportCallAnswered(incoming.parameters?.CallSid || "", answeredName);
+      // Durably record who answered — and, if the Twilio webhooks were dropped,
+      // this also writes the complete call row (caller number + direction) so
+      // the call can never be missing from Call History for any admin.
+      void reportCallAnswered(incoming.parameters?.CallSid || "", answeredName, {
+        from: incoming.parameters?.From || "",
+        to: incoming.parameters?.To || "",
+        direction: "inbound",
+      });
     } catch {
       incomingCallRef.current = null;
       setGlobalIncomingCall(null);
