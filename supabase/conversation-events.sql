@@ -78,3 +78,9 @@ alter table public.conversation_read_states replica identity full;
 
 alter table public.conversation_events add column if not exists recording_sid text;
 create index if not exists conversation_events_recording_sid_idx on public.conversation_events (recording_sid);
+
+-- Performance: index by contact (customer_id) and a composite (type, created_at)
+-- so paginated call-history reads and per-contact lookups stay fast as the
+-- events table grows.
+create index if not exists conversation_events_customer_id_idx on public.conversation_events (customer_id);
+create index if not exists conversation_events_type_created_at_idx on public.conversation_events (type, created_at desc);
