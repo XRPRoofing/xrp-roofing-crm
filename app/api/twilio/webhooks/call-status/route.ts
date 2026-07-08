@@ -1,11 +1,71 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createCallRecordingInsights } from "@/lib/twilio/recording-insights";
 import { normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
-import { publishConversationEvent, lookupCallEventByCallSid } from "@/lib/twilio/realtime";
+import { publishConversationEvent, lookupCallEventByCallSid, getAdminClient } from "@/lib/twilio/realtime";
 
 export const maxDuration = 60;
 
 const NO_RECORDING_STATUSES = ["no-answer", "busy", "failed", "canceled"];
+
+const MISSED_CALL_AUTO_TEXT =
+  "Hi! Sorry we missed your call at XRP Roofing — we'll get back to you shortly. You can reply right here and we'll help you out. — XRP Roofing";
+
+/**
+ * Auto-text a caller once when their inbound call is missed (no-answer / busy /
+ * failed / canceled) so no lead is left without a response. De-duplicated with a
+ * per-call marker row (`${callSid}-missed-autotext`) so re-fired webhooks and
+ * multiple call legs never send more than one text. Best-effort: any failure is
+ * logged and swallowed so it never disrupts the webhook response.
+ */
+async function maybeSendMissedCallAutoText(params: {
+  callSid: string;
+  direction?: "inbound" | "outbound";
+  caller?: string;
+  line?: string;
+  origin: string;
+}) {
+  const { callSid, direction, caller, line, origin } = params;
+
+  // Only inbound missed calls, and only to a real external phone number.
+  if (direction !== "inbound") return;
+  if (!callSid || !caller || !caller.startsWith("+") || caller.replace(/\D/g, "").length < 8) return;
+
+  const supabase = getAdminClient();
+  if (!supabase) return;
+
+  const markerId = `${callSid}-missed-autotext`;
+
+  // Claim the marker with an insert-only write; if it already exists (duplicate
+  // key), another webhook fire already sent the text, so skip.
+  const { error: claimError } = await supabase.from("conversation_events").insert({
+    id: markerId,
+    type: "call_status",
+    direction: "inbound",
+    from_phone: caller,
+    to_phone: line,
+    status: "missed-autotext",
+    call_sid: callSid,
+    body: "Missed-call auto-text queued",
+    payload: { missedCallAutoText: true },
+    created_at: new Date().toISOString(),
+  });
+
+  if (claimError) {
+    // Duplicate marker (already handled) or storage issue — either way, do not send.
+    return;
+  }
+
+  try {
+    const res = await fetch(`${origin}/api/twilio/sms/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: caller, from: line, body: MISSED_CALL_AUTO_TEXT }),
+    });
+    console.log("[Twilio Call Status] Missed-call auto-text sent", { callSid, to: caller, ok: res.ok, status: res.status });
+  } catch (error) {
+    console.error("[Twilio Call Status] Missed-call auto-text failed", error);
+  }
+}
 
 function buildFallbackCallSummary(status: string, direction?: "inbound" | "outbound"): string {
   const s = status.toLowerCase();
@@ -177,6 +237,15 @@ export async function POST(req: NextRequest) {
           createdAt: new Date().toISOString(),
         });
         console.log("[Twilio Call Status] Fallback summary published", { callSid: event.callSid, status: effectiveStatus });
+
+        // Missed inbound call → auto-text the caller once so the lead isn't dropped.
+        await maybeSendMissedCallAutoText({
+          callSid: event.callSid,
+          direction: fallbackDirection,
+          caller: fallbackFrom,
+          line: fallbackTo,
+          origin: req.nextUrl.origin,
+        });
       }
     }
 
