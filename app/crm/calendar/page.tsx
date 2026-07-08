@@ -298,6 +298,10 @@ export default function CalendarPage() {
     name?: string;
   } | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
+  // Map of CRM event id → its linked Google Calendar event id, so edits/deletes
+  // update the same Google event instead of creating duplicates. Populated from
+  // the Google events' extendedProperties.private.crmEventId on every load.
+  const crmToGoogleRef = useRef<Map<string, string>>(new Map());
 
   // URL search params for deep-linking (e.g. ?view=day&date=2026-06-22)
   const searchParams = useSearchParams();
@@ -407,6 +411,7 @@ export default function CalendarPage() {
     description: "",
     color: "blue",
     assigned_to: TEAM_MEMBERS[0].id,
+    guestEmails: "",
   });
 
   /* ── Derived values ─────────────────────────────────────────────────── */
@@ -561,9 +566,19 @@ export default function CalendarPage() {
       const gcalConnected = gcalResult.connected === true;
       setGoogleConnected(gcalConnected);
 
-      const gcalEvents: CalendarEvent[] = gcalConnected
-        ? ((gcalResult.events || []) as GoogleCalendarEvent[]).map(mapGoogleEvent)
-        : [];
+      const rawGcalEvents = (gcalConnected ? (gcalResult.events || []) : []) as GoogleCalendarEvent[];
+
+      // Rebuild the CRM-event → Google-event link map from the source of truth
+      // (each Google event carries its originating crmEventId), so edits/deletes
+      // target the existing Google event instead of creating a duplicate.
+      const linkMap = new Map<string, string>();
+      for (const ge of rawGcalEvents) {
+        const crmEventId = ge.extendedProperties?.private?.crmEventId;
+        if (crmEventId && ge.id) linkMap.set(crmEventId, ge.id);
+      }
+      crmToGoogleRef.current = linkMap;
+
+      const gcalEvents: CalendarEvent[] = rawGcalEvents.map(mapGoogleEvent);
 
       // Merge: preserve optimistic entries that haven't been confirmed yet
       setEvents((prev) => {
@@ -761,6 +776,56 @@ export default function CalendarPage() {
 
   /* ── CRUD handlers ──────────────────────────────────────────────────── */
 
+  type GoogleSyncPayload = {
+    crmEventId: string;
+    title: string;
+    name: string;
+    address: string;
+    jobKind: string;
+    phone?: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    notes?: string;
+    guestEmails?: string;
+  };
+
+  /**
+   * Push a CRM calendar event to Google Calendar and keep the two linked.
+   * If we already have a Google event for this CRM event, update it in place
+   * (PUT); otherwise create one (POST). The returned Google id is cached in
+   * crmToGoogleRef so subsequent edits/deletes target the same event instead
+   * of creating duplicates. Failures surface a non-blocking status message.
+   */
+  async function syncEventToGoogle(mode: "create" | "update", payload: GoogleSyncPayload) {
+    try {
+      const existingGoogleId = crmToGoogleRef.current.get(payload.crmEventId);
+      const method = existingGoogleId ? "PUT" : "POST";
+      const body: Record<string, unknown> = { ...payload };
+      if (existingGoogleId) body.id = existingGoogleId;
+
+      const response = await fetch("/api/google-calendar/events", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        setError("Saved to the CRM, but couldn't sync to Google Calendar. Check the Google connection at the top of the page.");
+        return;
+      }
+
+      const data = (await response.json()) as { event?: GoogleCalendarEvent };
+      if (data.event?.id && payload.crmEventId) {
+        crmToGoogleRef.current.set(payload.crmEventId, data.event.id);
+      }
+    } catch {
+      setError("Saved to the CRM, but couldn't sync to Google Calendar.");
+    }
+    // Mode is used only for readability at call sites (create vs update).
+    void mode;
+  }
+
   async function handleCreateEvent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
@@ -849,24 +914,23 @@ export default function CalendarPage() {
       // Replace optimistic event with real one (real-time subscription will also fire)
       setEvents((prev) => prev.map((ev) => ev.id === optimisticId ? result : ev));
 
-      // Sync to Google Calendar (best-effort, non-blocking)
+      // Mirror the new CRM event to Google Calendar and remember the link so
+      // later edits/deletes update the same Google event (no duplicates). Any
+      // guest emails entered send a real Google invite (sendUpdates=all).
       if (googleConnected) {
-        void fetch("/api/google-calendar/events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: savedForm.title,
-            name: savedForm.customer_name || savedForm.title,
-            address: savedForm.location || "N/A",
-            jobKind: savedForm.job_kind || "Other",
-            phone: savedForm.customer_phone,
-            date: savedForm.date,
-            startTime: savedForm.startTime,
-            endTime: savedForm.endTime,
-            notes: savedForm.description,
-            guestEmails: savedForm.guestEmails,
-          }),
-        }).catch(() => {});
+        void syncEventToGoogle("create", {
+          crmEventId: result.id || "",
+          title: savedForm.title,
+          name: savedForm.customer_name || savedForm.title,
+          address: savedForm.location || "N/A",
+          jobKind: savedForm.job_kind || "Other",
+          phone: savedForm.customer_phone,
+          date: savedForm.date,
+          startTime: savedForm.startTime,
+          endTime: savedForm.endTime,
+          notes: savedForm.description,
+          guestEmails: savedForm.guestEmails,
+        });
       }
 
       broadcastCrmUpdate();
@@ -942,6 +1006,25 @@ export default function CalendarPage() {
 
       // Replace with server response
       setEvents((prev) => prev.map((ev) => ev.id === selectedEvent.id ? result : ev));
+
+      // Keep Google Calendar in sync: update the linked event, or create one
+      // if this CRM event was never mirrored (e.g. made while Google was off).
+      if (googleConnected) {
+        void syncEventToGoogle("update", {
+          crmEventId: selectedEvent.id,
+          title: editForm.title,
+          name: editForm.customer_name || editForm.title,
+          address: editForm.location || "N/A",
+          jobKind: editForm.job_kind || "Other",
+          phone: editForm.customer_phone,
+          date: editForm.date,
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+          notes: editForm.description,
+          guestEmails: editForm.guestEmails,
+        });
+      }
+
       broadcastCrmUpdate();
       void logCrewActivity({
         jobId: selectedEvent.id,
@@ -1004,7 +1087,7 @@ export default function CalendarPage() {
           startTime: editForm.startTime,
           endTime: editForm.endTime,
           notes: editForm.description,
-          guestEmails: "",
+          guestEmails: editForm.guestEmails,
         }),
       });
 
@@ -1059,6 +1142,16 @@ export default function CalendarPage() {
         return;
       }
 
+      // Remove the mirrored Google Calendar event too (with sendUpdates=all so
+      // guests get a cancellation), if this CRM event was linked to one.
+      const linkedGoogleId = crmToGoogleRef.current.get(deletedEvent.id);
+      if (googleConnected && linkedGoogleId) {
+        crmToGoogleRef.current.delete(deletedEvent.id);
+        void fetch(`/api/google-calendar/events?id=${encodeURIComponent(linkedGoogleId)}`, {
+          method: "DELETE",
+        }).catch(() => {});
+      }
+
       broadcastCrmUpdate();
       void logCrewActivity({
         jobId: deletedEvent.id,
@@ -1093,6 +1186,7 @@ export default function CalendarPage() {
       description: selectedEvent.description,
       color: selectedEvent.color || "blue",
       assigned_to: selectedEvent.assigned_to || TEAM_MEMBERS[0].id,
+      guestEmails: "",
     });
   }, [selectedEvent]);
 
@@ -2529,6 +2623,23 @@ export default function CalendarPage() {
                         className="min-h-32 w-full rounded-lg bg-gray-100 px-4 py-3 outline-none"
                         placeholder="Add description / notes"
                       />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">
+                        Guest email(s) — send Google invite
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.guestEmails}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, guestEmails: e.target.value })
+                        }
+                        className="w-full rounded-lg bg-gray-100 px-4 py-3 outline-none"
+                        placeholder="name@example.com, name2@example.com"
+                      />
+                      <p className="mt-1 text-xs text-gray-400">
+                        Separate multiple emails with commas. Guests get a Google Calendar invite when you save.
+                      </p>
                     </div>
                   </div>
                 </div>
