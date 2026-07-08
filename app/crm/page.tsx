@@ -11,10 +11,7 @@ import {
   MailOpen,
   MessageSquare,
   PenLine,
-  Phone,
-  PhoneIncoming,
   PhoneMissed,
-  PhoneOutgoing,
   UserPlus,
   UserX,
   Zap,
@@ -351,7 +348,7 @@ export default function CrmDashboardPage() {
               <p className="text-[10px] text-gray-500">Inspections</p>
             </div>
           </button>
-          <button type="button" onClick={() => router.push("/crm/conversations")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
+          <button type="button" onClick={() => router.push("/crm/phone")} className="flex items-center gap-2 rounded-lg border border-orange-200/60 bg-white/80 px-3 py-2 text-left transition hover:bg-white hover:shadow-sm">
             <PhoneMissed className="h-4 w-4 shrink-0 text-red-500" />
             <div className="min-w-0">
               <p className={`text-lg font-bold leading-none ${todayPriorities.missedCalls > 0 ? "text-red-600" : "text-gray-800"}`}>{todayPriorities.missedCalls}</p>
@@ -415,7 +412,7 @@ export default function CrmDashboardPage() {
       </section>
       )}
 
-      {/* ── Communications (Calls + Messages merged) ─────────────── */}
+      {/* ── Messages (SMS/MMS) — voice activity lives on the Phone page ─── */}
       <section className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <button
           type="button"
@@ -423,11 +420,8 @@ export default function CrmDashboardPage() {
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-indigo-600"><Phone className="h-3.5 w-3.5" /></span>
-            <h2 className="text-sm font-bold text-gray-900">Communications</h2>
-            {callMetrics.missed > 0 && (
-              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">{callMetrics.missed} missed</span>
-            )}
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-50 text-indigo-600"><MessageSquare className="h-3.5 w-3.5" /></span>
+            <h2 className="text-sm font-bold text-gray-900">Messages</h2>
           </div>
           <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${collapsed["comms"] ? "-rotate-90" : ""}`} />
         </button>
@@ -436,15 +430,9 @@ export default function CrmDashboardPage() {
             {eventsLoading ? (
               <div className="space-y-2">{[1,2,3].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-gray-100" />)}</div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3 sm:gap-x-6">
-                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneIncoming className="h-3 w-3" />Incoming</span><span className="text-sm font-semibold text-gray-800">{callMetrics.incoming}</span></div>
-                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneOutgoing className="h-3 w-3" />Outgoing</span><span className="text-sm font-semibold text-gray-800">{callMetrics.outgoing}</span></div>
-                <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><PhoneMissed className="h-3 w-3 text-red-400" />Missed</span><span className={`text-sm font-semibold ${callMetrics.missed > 0 ? "text-red-600" : "text-gray-800"}`}>{callMetrics.missed}</span></div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:gap-x-6">
                 <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><MessageSquare className="h-3 w-3" />SMS Today</span><span className={`text-sm font-semibold ${messageMetrics.unreadSms > 0 ? "text-purple-600" : "text-gray-800"}`}>{messageMetrics.unreadSms}</span></div>
                 <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs text-gray-500"><MailOpen className="h-3 w-3" />Active Convos</span><span className="text-sm font-semibold text-gray-800">{messageMetrics.recentConversations}</span></div>
-                {callMetrics.missed > 0 && (
-                  <div className="flex items-center justify-between"><span className="flex items-center gap-1.5 text-xs font-medium text-red-600"><AlertTriangle className="h-3 w-3" />Missed Alerts</span><span className="text-sm font-bold text-red-600">{callMetrics.missed}</span></div>
-                )}
               </div>
             )}
           </div>

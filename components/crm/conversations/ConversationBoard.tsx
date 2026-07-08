@@ -90,8 +90,16 @@ function CollapsedInboxRail({ onExpand, onNew }: { onExpand: () => void; onNew: 
   );
 }
 
-const inboxFilters = ["All", "Unread", "Read", "Missed Calls", "New Leads", "Assigned"] as const;
+const inboxFilters = ["All", "Unread", "Read", "New Leads", "Assigned"] as const;
 type InboxFilter = (typeof inboxFilters)[number];
+
+// The Conversations/Messaging page is SMS/MMS-only — all voice activity lives on
+// the Phone page (single source of truth). Only text-message events feed the
+// conversation list/thread here; call events are ignored for display (they still
+// drive notifications elsewhere).
+function isSmsConversationEvent(event: TwilioConversationEvent) {
+  return event.type === "incoming_sms" || event.type === "message_status";
+}
 
 function conversationIsAssigned(conversation: ConversationRecord) {
   const rep = conversation.contact.assignedRep?.trim().toLowerCase();
@@ -105,8 +113,6 @@ function conversationMatchesFilter(conversation: ConversationRecord, filter: Inb
       return !conversation.isMissedCall && unreadCount > 0;
     case "Read":
       return !conversation.isMissedCall && unreadCount === 0;
-    case "Missed Calls":
-      return conversation.isMissedCall;
     case "New Leads":
       return conversation.isNewLead;
     case "Assigned":
@@ -1508,16 +1514,15 @@ export default function ConversationBoard() {
       liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
       contactEditsRef.current = savedEdits;
 
-      const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
+      const rawConversations = events.filter(isSmsConversationEvent).reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
       const savedConversations = [...rawConversations].sort((a, b) => {
         const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
         const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
         return tb - ta;
       });
       setConversations(savedConversations.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
-      setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")));
       setActiveConversationId((current: string) => current || savedConversations[0]?.id || "");
-      setTwilioNotice(savedConversations.length ? "Saved call and message history loaded" : "Ready for new calls and messages");
+      setTwilioNotice(savedConversations.length ? "Saved message history loaded" : "Ready for new messages");
       scrollMessageBoardToBottom();
       lastConversationRefreshRef.current = Date.now();
     }).catch((error) => {
@@ -1541,14 +1546,13 @@ export default function ConversationBoard() {
       Promise.all([listConversationEvents(), listConversationReadStates(), loadLiveCustomers(), loadContactEdits()]).then(([events, readStates, liveCustomers, savedEdits]) => {
         liveCustomerLookupRef.current = buildPhoneLookup(liveCustomers);
         contactEditsRef.current = savedEdits;
-        const rawConversations = events.reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
+        const rawConversations = events.filter(isSmsConversationEvent).reduce<ConversationRecord[]>((current, event) => upsertConversationFromEvent(current, event, readStates, liveCustomerLookupRef.current), []);
         const sorted = [...rawConversations].sort((a, b) => {
           const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
           const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
           return tb - ta;
         });
         setConversations(sorted.map((conversation) => savedEdits[conversation.id] ? { ...conversation, contact: { ...conversation.contact, ...savedEdits[conversation.id] } } : conversation));
-        setCallInsights(dedupeCallInsights(events.filter((event) => event.type === "call_recording")));
       }).catch(() => {});
     }
     function handleVisibilityChange() {
@@ -1618,19 +1622,23 @@ export default function ConversationBoard() {
         lastConversationRefreshRef.current = Date.now();
         setTwilioNotice(`${event.type.replace("_", " ")} synced${event.status ? `: ${event.status}` : ""}`);
         addTwilioCrmNotification(event);
-        setConversations((current: ConversationRecord[]) => {
-          const next = upsertConversationFromEvent(current, event, undefined, liveCustomerLookupRef.current);
-          // Re-sort so the conversation with the most recent activity is
-          // always at the top, regardless of which event type triggered it.
-          next.sort((a, b) => {
-            const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
-            const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
-            return tb - ta;
+        // Only text messages appear in the Messaging list/thread; voice events
+        // still fire notifications above but are shown on the Phone page.
+        if (isSmsConversationEvent(event)) {
+          setConversations((current: ConversationRecord[]) => {
+            const next = upsertConversationFromEvent(current, event, undefined, liveCustomerLookupRef.current);
+            // Re-sort so the conversation with the most recent activity is
+            // always at the top, regardless of which event type triggered it.
+            next.sort((a, b) => {
+              const ta = a.lastActivityIso ? new Date(a.lastActivityIso).getTime() : 0;
+              const tb = b.lastActivityIso ? new Date(b.lastActivityIso).getTime() : 0;
+              return tb - ta;
+            });
+            if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
+            return next;
           });
-          if (!activeConversationId && next[0]) queueMicrotask(() => setActiveConversationId(next[0].id));
-          return next;
-        });
-        scrollMessageBoardToBottom();
+          scrollMessageBoardToBottom();
+        }
         if (event.type === "call_recording") {
           setCallInsights((current: TwilioConversationEvent[]) => dedupeCallInsights([event, ...current]));
         }
