@@ -346,13 +346,13 @@ export function buildIvrGreetingTwiml(menuActionUrl: string, selfUrl: string, at
     retryUrl.searchParams.set("attempt", String(attempt + 1));
     response.redirect(retryUrl.toString());
   } else {
-    response.say("We did not receive a selection. Goodbye.");
-    // Redirect to incoming-call with ?missed=1 so a missed-call event is
-    // published before hanging up.  This ensures IVR-timeout calls appear as
-    // "Missed call" on the Conversations Board.
+    // No selection after all retries. Instead of hanging up (which made these
+    // calls "missed" and never rang anyone), redirect to incoming-call with
+    // ?missed=1 which now rings the operator ring group. The IVR greeting/menu
+    // wording above is unchanged.
     const missedUrl = new URL(selfUrl);
     missedUrl.searchParams.set("missed", "1");
-    response.redirect(missedUrl.toString());
+    response.redirect({ method: "POST" }, missedUrl.toString());
   }
 
   return response.toString();

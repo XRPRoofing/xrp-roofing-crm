@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { buildIvrGreetingTwiml, normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
+import { buildIvrGreetingTwiml, buildIvrMenuTwiml, fetchOnlineAgents, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
@@ -7,32 +7,49 @@ import { sendIncomingCallPushNotification } from "@/lib/push-notifications";
 
 const XML_HEADERS = { "Content-Type": "text/xml" };
 
-function handleIncomingCall(formData: FormData, req: NextRequest) {
+async function handleIncomingCall(formData: FormData, req: NextRequest) {
   const origin = req.nextUrl.origin;
   const attempt = parseInt(req.nextUrl.searchParams.get("attempt") || "0", 10) || 0;
   const isMissedIvr = req.nextUrl.searchParams.get("missed") === "1";
 
-  // IVR exhausted all retries without a digit press — record a missed call
-  // and hang up cleanly.
+  // IVR exhausted all retries without a digit press. Instead of hanging up
+  // (which silently turned these into missed calls that never rang anyone),
+  // route the caller to the operator ring group — same fan-out as pressing "0".
+  // The greeting/menu wording is unchanged; only the no-selection ending does.
   if (isMissedIvr) {
+    const callerNumber = String(formData.get("From") || "");
     console.log(
-      `[call-trace] IVR missed \u2014 caller left without pressing a key | callSid=${formData.get("CallSid") || ""} | from=${formData.get("From") || ""}`,
+      `[call-trace] IVR no selection \u2014 routing to operator ring group | callSid=${formData.get("CallSid") || ""} | from=${callerNumber}`,
+    );
+    const statusCallbackUrl = resolveCallStatusCallbackUrl(origin);
+    const actionCallbackUrl = new URL("/api/twilio/webhooks/call-ended", origin).toString();
+    const greetingRedirect = new URL("/api/twilio/webhooks/incoming-call", origin);
+    greetingRedirect.searchParams.set("attempt", "1");
+    const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
+    const onlineAgents = await fetchOnlineAgents();
+    const { twiml, department } = buildIvrMenuTwiml(
+      "0",
+      statusCallbackUrl,
+      actionCallbackUrl,
+      greetingRedirect.toString(),
+      onlineAgents,
+      queueHoldUrl,
+      callerNumber,
     );
     after(async () => {
       const event = normalizeTwilioWebhookEvent("call_status", formData);
-      await publishConversationEvent({
-        ...event,
-        id: `${event.callSid}-ivr-missed`,
-        status: "no-answer",
-        body: "Missed call \u2014 no IVR selection",
-      }).catch((err) => {
-        console.error("[incoming-call] publish missed-ivr event failed:", err);
-      });
+      await Promise.allSettled([
+        sendIncomingCallPushNotification(event.from),
+        publishConversationEvent({
+          ...event,
+          id: `${event.callSid}-ivr-nokey-operator`,
+          status: "ivr-routed",
+          body: "No IVR selection \u2014 routed to operator",
+          payload: { ...event.payload, ivrSelection: "0", ivrDepartment: department, noKeyFallback: true },
+        }),
+      ]);
     });
-    return new NextResponse(
-      '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup /></Response>',
-      { headers: XML_HEADERS },
-    );
+    return new NextResponse(twiml, { headers: XML_HEADERS });
   }
 
   const menuActionUrl = new URL("/api/twilio/webhooks/menu", origin).toString();
