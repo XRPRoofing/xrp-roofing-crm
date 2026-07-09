@@ -2025,8 +2025,8 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           <h1 className="text-base font-bold tracking-tight text-gray-950 sm:text-xl">Invoice Board</h1>
           <button onClick={handleStartInvoice} className="w-fit shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-4 sm:py-2.5 sm:text-sm">+ New Invoice</button>
         </div>
-        {/* Mobile: horizontal scroll stats / Desktop: 6-column grid */}
-        <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5 sm:mt-2.5 sm:grid sm:grid-cols-6 sm:gap-2 sm:pb-1 scrollbar-hide">
+        {/* Mobile: 3-column wrapped grid so every stat stays fully visible / Desktop: 6-column grid */}
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5 sm:mt-2.5 sm:grid-cols-6 sm:gap-2">
           {[
             ["Paid", String(boardTotals.paidCount), "text-blue-700", "bg-blue-50/50"],
             ["Unpaid", String(boardTotals.unpaid), "text-gray-950", ""],
@@ -2035,9 +2035,9 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             ["Outstanding", currency(boardTotals.balance), "text-gray-950", ""],
             ["Collection", `${boardTotals.collectionRate}%`, "text-gray-950", ""],
           ].map(([label, value, valueClass, bgClass]) => (
-            <div key={label} className={`shrink-0 rounded-md border border-gray-200 px-2 py-1.5 min-w-[70px] sm:min-w-0 sm:px-3 sm:py-2 ${bgClass || "bg-gray-50/70"}`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap sm:text-xs">{label}</p>
-              <p className={`mt-0.5 text-sm font-bold tracking-tight sm:mt-1 sm:text-base ${valueClass}`}>{value}</p>
+            <div key={label} className={`rounded-md border border-gray-200 px-2 py-1.5 sm:px-3 sm:py-2 ${bgClass || "bg-gray-50/70"}`}>
+              <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">{label}</p>
+              <p className={`mt-0.5 truncate text-sm font-bold tracking-tight sm:mt-1 sm:text-base ${valueClass}`}>{value}</p>
             </div>
           ))}
         </div>

@@ -1738,7 +1738,7 @@ export default function CalendarPage() {
       {/* Filter Bar + Toolbar */}
       <div className="sticky top-16 z-20 -mx-3 sm:-mx-5">
         {/* Dark filter bar */}
-        <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-700 bg-gray-800 px-3 py-2 scrollbar-hide sm:px-5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-700 bg-gray-800 px-3 py-2 sm:px-5">
           {/* Status Filter */}
           <button
             type="button"
@@ -1790,7 +1790,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Toolbar with view tabs */}
-        <div className="flex items-center justify-between gap-1.5 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:gap-2 sm:px-5 sm:py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-2 border-b border-gray-200 bg-white/95 px-3 py-1.5 backdrop-blur-sm sm:gap-2 sm:px-5 sm:py-2.5">
           <div className="flex items-center gap-1.5 sm:gap-3">
             <button type="button" onClick={goToToday} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:rounded-lg sm:px-4 sm:py-2 sm:text-sm">Today</button>
             <button type="button" onClick={() => navigate(-1)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100 sm:p-1.5" aria-label="Previous"><ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" /></button>
