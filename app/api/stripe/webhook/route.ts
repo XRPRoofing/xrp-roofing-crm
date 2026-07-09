@@ -5,6 +5,7 @@ import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { sendInternalInvoiceEmail } from "@/lib/invoice-emails";
 import { sendPaymentReceiptEmail } from "@/lib/invoice-customer-emails";
 import { pushServerNotification } from "@/lib/server-notifications";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 // Stripe needs the raw request body for signature verification, so this route
 // must run on the Node.js runtime (not edge) and read the body as text.
@@ -237,6 +238,14 @@ export async function POST(req: NextRequest) {
         actor: "Stripe",
         module: "Invoices",
       });
+
+      // Fire admin-defined automations (best-effort). invoice_paid only fires
+      // when the invoice is fully settled; payment_received fires on any payment.
+      const automationCtx = { customerName, customerEmail, paymentAmount: amount } as const;
+      await dispatchAutomation({ trigger: "payment_received", ...automationCtx }).catch(() => {});
+      if (status === "Paid") {
+        await dispatchAutomation({ trigger: "invoice_paid", ...automationCtx }).catch(() => {});
+      }
     }
 
     // Send payment receipt to customer (only once per invoice, only when fully paid)

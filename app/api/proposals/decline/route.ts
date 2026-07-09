@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { pushServerNotification } from "@/lib/server-notifications";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,9 @@ export async function GET(req: NextRequest) {
     actor: customerName,
     module: "Proposals",
   });
+
+  // Fire admin-defined automations for the declined proposal (best-effort).
+  await dispatchAutomation({ trigger: "proposal_declined", customerName, jobId, proposalStatus: "Declined" }).catch(() => {});
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://www.xrproofing.app").replace(/\/+$/, "");
   return new NextResponse(declinePage("Thank you for letting us know. We have noted your decision. If you change your mind in the future, please don't hesitate to reach out to us.", appUrl), { headers: { "Content-Type": "text/html" } });
