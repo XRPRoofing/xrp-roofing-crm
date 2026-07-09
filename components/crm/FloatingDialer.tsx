@@ -32,6 +32,7 @@ import {
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
+import { azDate, azTime } from "@/lib/arizona-time";
 import type { Customer, Lead } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
@@ -106,8 +107,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatCallTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return azTime(new Date(dateStr), { hour: "numeric", minute: "2-digit" });
 }
 
 function formatCallDate(dateStr: string): string {
@@ -116,7 +116,7 @@ function formatCallDate(dateStr: string): string {
   const diff = now.getTime() - d.getTime();
   if (diff < 86400000 && d.getDate() === now.getDate()) return "Today";
   if (diff < 172800000) return "Yesterday";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return azDate(d, { month: "short", day: "numeric" });
 }
 
 // ---------------------------------------------------------------------------

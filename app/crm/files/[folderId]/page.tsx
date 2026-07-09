@@ -387,7 +387,7 @@ export default function FolderGalleryPage() {
               <p className="text-2xl font-bold text-blue-700">{folder.address}</p>
               <p className="mt-1 font-bold text-gray-600">{folder.customerName}</p>
               {folder.workType && <p className="text-sm font-semibold text-gray-500">{folder.workType}</p>}
-              <p className="mt-1 text-xs font-semibold text-gray-400">Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+              <p className="mt-1 text-xs font-semibold text-gray-400">Generated {azDate(new Date(), { year: "numeric", month: "long", day: "numeric" })}</p>
             </div>
 
             {/* Summary row */}

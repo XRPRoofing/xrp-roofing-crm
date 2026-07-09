@@ -21,10 +21,11 @@ const customerSchema = z.object({
   insuranceCarrier: z.string().default(""),
   status: z.string().default("New customer"),
   lifetimeValue: z.number().default(0),
+  createdAt: z.string().optional(),
 });
 
 type Customer = z.infer<typeof customerSchema>;
-type CustomerRow = { id: string; payload: Customer };
+type CustomerRow = { id: string; payload: Customer; created_at?: string | null };
 
 function getAdminClient() {
   const url = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -58,10 +59,18 @@ export async function GET() {
   const admin = getAdminClient();
   if (!admin) return NextResponse.json({ customers: [] });
   // Newest first: customer_records.updated_at is bumped on every upsert.
-  const { data, error } = await admin
+  // Prefer the durable DB created_at (see supabase/customer-records-created-at.sql);
+  // fall back gracefully if that migration hasn't been run yet.
+  const withCreatedAt = await admin
     .from(customersTable)
-    .select("id, payload, updated_at")
+    .select("id, payload, updated_at, created_at")
     .order("updated_at", { ascending: false });
+  const fallback =
+    withCreatedAt.error && missingSchema(withCreatedAt.error)
+      ? await admin.from(customersTable).select("id, payload, updated_at").order("updated_at", { ascending: false })
+      : null;
+  const data = (fallback ?? withCreatedAt).data as CustomerRow[] | null;
+  const error = (fallback ?? withCreatedAt).error;
   if (error) {
     return NextResponse.json({
       customers: [],
@@ -71,7 +80,11 @@ export async function GET() {
     });
   }
   const customers = (data as CustomerRow[])
-    .map((row) => (row.payload ? { ...row.payload, id: row.id } : null))
+    .map((row) =>
+      row.payload
+        ? { ...row.payload, id: row.id, ...(row.created_at ? { createdAt: row.created_at } : {}) }
+        : null,
+    )
     .filter((customer): customer is Customer => Boolean(customer));
   return NextResponse.json({ customers });
 }

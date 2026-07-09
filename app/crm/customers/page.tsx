@@ -25,6 +25,7 @@ import { getCachedCustomers, refreshCrewData, refreshInvoices, getCachedInvoices
 import { logCrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
+import { azDate, azDateTime } from "@/lib/arizona-time";
 
 const customersStorageKey = "xrp-crm-customers";
 
@@ -86,7 +87,7 @@ type TimelineItem = {
 function timelineTime(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return azDateTime(date, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function eventToTimelineItem(event: TwilioConversationEvent, customerName: string): TimelineItem {
@@ -179,11 +180,11 @@ function buildCustomerTimeline(
   );
 
   const hasCreated = activities.some((activity) => activity.action.toLowerCase().includes("customer created"));
-  const createdTs = Number(customer.id.replace(/\D/g, ""));
-  if (!hasCreated && createdTs > 1_000_000_000_000) {
+  const createdIso = customerCreatedIso(customer);
+  if (!hasCreated && createdIso) {
     items.push({
       id: `${customer.id}-created`,
-      at: new Date(createdTs).toISOString(),
+      at: createdIso,
       icon: UserPlus,
       category: "Customer",
       title: "Customer created",
@@ -198,15 +199,30 @@ function buildCustomerTimeline(
 
 function formatDate(value?: string) {
   if (!value) return "Not available";
-  const date = new Date(`${value}T12:00:00`);
+  // Date-only strings (YYYY-MM-DD) are anchored at Arizona noon so the calendar
+  // day never shifts; full ISO timestamps are rendered as-is in Arizona time.
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00-07:00`) : new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return azDate(date, { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Best available creation instant for a manually-added customer: the durable DB
+// created_at (exposed by /api/customers) when present, else the id's embedded
+// epoch-ms (`C-<ms>`) for legacy rows.
+function customerCreatedIso(customer?: Customer): string | null {
+  if (!customer) return null;
+  if (customer.createdAt && !Number.isNaN(new Date(customer.createdAt).getTime())) return customer.createdAt;
+  const idTs = Number(customer.id.replace(/\D/g, ""));
+  return idTs > 1_000_000_000_000 ? new Date(idTs).toISOString() : null;
 }
 
 function getJobAddedDate(job?: Lead) {
   if (!job) return "Not available";
+  // Prefer the real DB creation timestamp; only fall back to the id-embedded
+  // timestamp or due date for legacy records that lack one.
+  if (job.createdAt && !Number.isNaN(new Date(job.createdAt).getTime())) return formatDate(job.createdAt);
   const timestamp = Number(job.id.replace(/\D/g, ""));
-  if (timestamp > 1000000000000) return formatDate(new Date(timestamp).toISOString().slice(0, 10));
+  if (timestamp > 1000000000000) return formatDate(new Date(timestamp).toISOString());
   return job.dueDate ? formatDate(job.dueDate) : "Imported record";
 }
 
@@ -756,6 +772,7 @@ export default function CustomersPage() {
 
     const newCustomer: Customer = {
       id: `C-${Date.now()}`,
+      createdAt: new Date().toISOString(),
       name: form.name.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),

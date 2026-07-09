@@ -18,6 +18,7 @@ import {
   type OfficeTaskStatus,
 } from "@/lib/office-tasks";
 import { deleteTaskFromSupabase, loadTasksFromSupabase, subscribeToTaskUpdates, upsertTaskToSupabase } from "@/lib/task-sync";
+import { azDateTime, azTime } from "@/lib/arizona-time";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { sendSms } from "@/lib/twilio/client";
@@ -27,7 +28,7 @@ import { getTwilioLines } from "@/lib/twilio/numbers";
 
 function fmt(iso: string) {
   if (!iso) return "";
-  try { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return iso; }
+  try { return azDateTime(new Date(iso), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return iso; }
 }
 
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
@@ -319,7 +320,7 @@ export default function TasksPage() {
             <div className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${loading ? "bg-orange-400 animate-pulse" : "bg-blue-500"}`} />
               <p className="text-xs font-semibold text-gray-500">
-                {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${lastSync.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+                {loading ? "Syncing…" : `Live · ${tasks.length} tasks${lastSync ? ` · Updated ${azTime(lastSync, { hour: "2-digit", minute: "2-digit" })}` : ""}`}
               </p>
             </div>
           </div>

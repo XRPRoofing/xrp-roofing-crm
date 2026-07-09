@@ -7,6 +7,7 @@ import {
   ImageDown, Info, Map, MessageCircle, Pencil, Play, Share2,
   Shield, Smartphone, Star, Tag, Trash2, Video, X,
 } from "lucide-react";
+import { azDateTime } from "@/lib/arizona-time";
 
 type PhotoTypeOption = "Before" | "Progress" | "After" | "Job Photo";
 const PHOTO_TYPE_OPTIONS: { value: PhotoTypeOption; label: string; color: string }[] = [
@@ -43,7 +44,7 @@ function formatUploadedAt(value?: string) {
   try {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString("en-US", {
+    return azDateTime(date, {
       month: "short",
       day: "numeric",
       year: "numeric",

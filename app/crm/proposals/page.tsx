@@ -2093,7 +2093,7 @@ export default function ProposalsPage() {
                 <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Signed In Person</p>
                   <p className="mt-0.5 text-sm text-gray-700">Signed by: {activeProposal.offlineSignedBy || activeProposal.customerName}</p>
-                  {activeProposal.offlineSignedAt && <p className="text-xs text-gray-500">Date: {new Date(activeProposal.offlineSignedAt).toLocaleDateString()} at {new Date(activeProposal.offlineSignedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
+                  {activeProposal.offlineSignedAt && <p className="text-xs text-gray-500">Date: {azDate(activeProposal.offlineSignedAt)} at {azTime(activeProposal.offlineSignedAt, { hour: "2-digit", minute: "2-digit" })}</p>}
                 </div>
               )}
               {activeProposal.offlineSignatureFile && (
@@ -2692,8 +2692,8 @@ export default function ProposalsPage() {
 
                 {/* Date/Time display */}
                 <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
-                  <span>Date: {new Date().toLocaleDateString()}</span>
-                  <span>Time: {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span>Date: {azDate(new Date())}</span>
+                  <span>Time: {azTime(new Date(), { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
 
                 {/* Actions */}

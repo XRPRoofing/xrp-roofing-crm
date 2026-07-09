@@ -161,7 +161,7 @@ export default function CrmDashboardPage() {
 
   /* ── Widget computed data ────────────────────────────────────────── */
 
-  const todayStr = useMemo(() => new Date().toLocaleDateString("en-CA"), []);
+  const todayStr = useMemo(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Phoenix" }), []);
   const isToday = useCallback((dateStr?: string) => {
     if (!dateStr) return false;
     return dateStr.startsWith(todayStr);

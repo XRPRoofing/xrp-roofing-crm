@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Check } from "lucide-react";
 import { requestOpenInvoice } from "@/lib/crm-board-nav";
 import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { azDate } from "@/lib/arizona-time";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
@@ -60,9 +61,9 @@ function lastPaymentDate(inv: LoadedInvoice): string | undefined {
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? new Date(`${dateStr}T12:00:00-07:00`) : new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return azDate(d, { month: "short", day: "numeric" });
 }
 
 export default function PaymentsPage() {

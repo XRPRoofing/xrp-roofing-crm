@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { azDateTime } from "@/lib/arizona-time";
 import {
   Bell,
   Clock,
@@ -62,7 +63,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 
 function fmt(iso?: string) {
   if (!iso) return "—";
-  try { return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return iso; }
+  try { return azDateTime(new Date(iso), { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return iso; }
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
