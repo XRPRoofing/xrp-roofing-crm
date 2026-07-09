@@ -21,7 +21,7 @@ import type { ConversationChannel } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
-import { getCachedCustomers, refreshCrewData, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCustomers, refreshCrewData, refreshInvoices, getCachedInvoices, refreshProposals, getCachedProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
@@ -248,6 +248,35 @@ type StoredInvoice = {
   lineItems?: StoredInvoiceLineItem[];
 };
 
+// Invoices come from two shapes: the board's local records (`email`/`phone`)
+// and Supabase (`clientEmail`/`clientPhone`, mapped by invoice-sync). Coalesce
+// both so contact-matching works no matter which device/source produced them.
+type RawInvoice = StoredInvoice & {
+  isDeleted?: boolean;
+  customerName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+};
+
+function normalizeStoredInvoice(raw: RawInvoice): StoredInvoice {
+  return {
+    ...raw,
+    clientName: raw.clientName || raw.customerName || "",
+    email: raw.email || raw.clientEmail || "",
+    phone: raw.phone || raw.clientPhone || "",
+  };
+}
+
+// Union two lists by id; `preferred` (the shared Supabase copy) wins over
+// `fallback` (local) so every device shows the same authoritative record while
+// still surfacing any local-only records that haven't synced yet.
+function mergeById<T extends { id: string }>(preferred: T[], fallback: T[]): T[] {
+  const map = new Map<string, T>();
+  fallback.forEach((item) => map.set(item.id, item));
+  preferred.forEach((item) => map.set(item.id, item));
+  return Array.from(map.values());
+}
+
 function normalizeText(value?: string) {
   return (value || "").toLowerCase().trim();
 }
@@ -271,10 +300,10 @@ function getActiveJobCount(customer: Customer, jobs: Lead[]) {
   return getCustomerJobs(customer, jobs).filter((job) => !["completed", "paid"].includes(job.stage)).length;
 }
 
-function readStoredInvoices(): StoredInvoice[] {
+function readStoredInvoices(): RawInvoice[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem("xrp-crm-invoices") || "[]") as StoredInvoice[];
+    return JSON.parse(window.localStorage.getItem("xrp-crm-invoices") || "[]") as RawInvoice[];
   } catch {
     return [];
   }
@@ -545,17 +574,49 @@ export default function CustomersPage() {
   // tabs. They are re-read on mount, on window focus, and on cross-tab storage
   // changes so the profile always reflects the latest records without a refresh.
   useEffect(() => {
-    function refreshRecords() {
-      setStoredInvoices(readStoredInvoices());
-      setStoredProposals(readStoredProposals());
-      setCustomerNotes(readCustomerNotes());
+    let mounted = true;
+
+    // Invoices/estimates are the same shared Supabase records the boards use —
+    // load them from the shared cache and merge with any local-only records so
+    // the tabs are populated and consistent on every device (not just the one
+    // that created them), while never showing fewer records than before.
+    async function refreshInvoicesMerged() {
+      const local = readStoredInvoices().map(normalizeStoredInvoice);
+      let remote: StoredInvoice[] = [];
+      try { remote = (await refreshInvoices<RawInvoice>()).map(normalizeStoredInvoice); } catch { /* offline: keep local */ }
+      if (mounted) setStoredInvoices(mergeById(remote, local));
     }
+    async function refreshProposalsMerged() {
+      const local = readStoredProposals();
+      let remote: StoredProposal[] = [];
+      try { remote = await refreshProposals<StoredProposal>(); } catch { /* offline: keep local */ }
+      if (mounted) setStoredProposals(mergeById(remote, local));
+    }
+    function refreshRecords() {
+      setCustomerNotes(readCustomerNotes());
+      void refreshInvoicesMerged();
+      void refreshProposalsMerged();
+    }
+
+    // Seed instantly from cache (if warm) so the tabs render without waiting.
+    const cachedInvoices = getCachedInvoices<RawInvoice>();
+    if (cachedInvoices) setStoredInvoices(mergeById(cachedInvoices.map(normalizeStoredInvoice), readStoredInvoices().map(normalizeStoredInvoice)));
+    const cachedProposals = getCachedProposals<StoredProposal>();
+    if (cachedProposals) setStoredProposals(mergeById(cachedProposals, readStoredProposals()));
+
     refreshRecords();
+    const onInvoices = () => { void refreshInvoicesMerged(); };
+    const onProposals = () => { void refreshProposalsMerged(); };
     window.addEventListener("focus", refreshRecords);
     window.addEventListener("storage", refreshRecords);
+    window.addEventListener(CACHE_EVENTS.invoices, onInvoices);
+    window.addEventListener(CACHE_EVENTS.proposals, onProposals);
     return () => {
+      mounted = false;
       window.removeEventListener("focus", refreshRecords);
       window.removeEventListener("storage", refreshRecords);
+      window.removeEventListener(CACHE_EVENTS.invoices, onInvoices);
+      window.removeEventListener(CACHE_EVENTS.proposals, onProposals);
     };
   }, []);
 
@@ -667,6 +728,8 @@ export default function CustomersPage() {
 
   useAutoRefresh(() => {
     void refreshCrewData().then((data) => setJobList(data.jobs)).catch(() => {});
+    void refreshInvoices(true).catch(() => {});
+    void refreshProposals(true).catch(() => {});
     void loadCustomerRecordsResult().then((result) => {
       setSavedCustomers(result.customers);
       setCustomersError(result.error ?? null);
