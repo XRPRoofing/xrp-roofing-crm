@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   Clock,
+  Copy,
   GitBranch,
+  Pause,
+  Play,
   Plus,
   Search,
   Settings2,
@@ -28,22 +31,24 @@ import {
   TRIGGER_CATEGORIES,
   TRIGGER_META,
   WORKFLOW_TEMPLATES,
-  addWorkflowRule,
-  deleteWorkflowRule,
-  readWorkflowLog,
-  readWorkflowRules,
-  seedDefaultWorkflows,
-  toggleWorkflowRule,
-  updateWorkflowRule,
   type WorkflowAction,
   type WorkflowActionType,
   type WorkflowCondition,
   type WorkflowConditionField,
   type WorkflowConditionOp,
-  type WorkflowLogEntry,
-  type WorkflowRule,
   type WorkflowTrigger,
 } from "@/lib/workflow-engine";
+import {
+  createRule,
+  duplicateRule,
+  loadRules,
+  loadRuns,
+  patchRule,
+  removeRule,
+  testRule,
+  type LoadResult,
+} from "@/lib/automation/client";
+import type { AutomationRule, AutomationRun } from "@/lib/automation/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,12 +75,15 @@ export default function AutomationsPage() {
   const [settings, setSettings] = useState<AutomationSettings>(DEFAULT_AUTOMATION_SETTINGS);
 
   // Workflow state
-  const [workflowRules, setWorkflowRules] = useState<WorkflowRule[]>([]);
-  const [workflowLog, setWorkflowLog] = useState<WorkflowLogEntry[]>([]);
+  const [workflowRules, setWorkflowRules] = useState<AutomationRule[]>([]);
+  const [workflowRuns, setWorkflowRuns] = useState<AutomationRun[]>([]);
+  const [storageMode, setStorageMode] = useState<LoadResult["mode"]>("local");
   const [showBuilder, setShowBuilder] = useState(false);
-  const [editingRule, setEditingRule] = useState<WorkflowRule | null>(null);
+  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
   const [showLog, setShowLog] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ruleId: string; text: string; ok: boolean } | null>(null);
 
   // Builder form
   const [builderName, setBuilderName] = useState("");
@@ -84,30 +92,31 @@ export default function AutomationsPage() {
   const [builderConditions, setBuilderConditions] = useState<WorkflowCondition[]>([{ field: "always", operator: "exists", value: "" }]);
   const [builderActions, setBuilderActions] = useState<WorkflowAction[]>([{ type: "log_activity", params: { message: "" } }]);
 
+  async function refreshRules() {
+    const result = await loadRules();
+    setWorkflowRules(result.rules);
+    setStorageMode(result.mode);
+  }
+
+  async function refreshRuns() {
+    setWorkflowRuns(await loadRuns());
+  }
+
   useEffect(() => {
-    seedDefaultWorkflows();
-    const loadState = () => {
-      setSettings(readAutomationSettings());
-      setWorkflowRules(readWorkflowRules());
-      setWorkflowLog(readWorkflowLog());
-    };
-    loadState();
-    window.addEventListener("crm-automation-settings-updated", loadState);
-    window.addEventListener("crm-automation-log-updated", loadState);
-    window.addEventListener(AUTOMATION_LOG_KEY, loadState);
-    window.addEventListener("crm-workflow-rules-updated", loadState);
-    window.addEventListener("crm-workflow-log-updated", loadState);
+    const loadNotifications = () => setSettings(readAutomationSettings());
+    loadNotifications();
+    refreshRules();
+    refreshRuns();
+    window.addEventListener("crm-automation-settings-updated", loadNotifications);
+    window.addEventListener(AUTOMATION_LOG_KEY, loadNotifications);
     return () => {
-      window.removeEventListener("crm-automation-settings-updated", loadState);
-      window.removeEventListener("crm-automation-log-updated", loadState);
-      window.removeEventListener(AUTOMATION_LOG_KEY, loadState);
-      window.removeEventListener("crm-workflow-rules-updated", loadState);
-      window.removeEventListener("crm-workflow-log-updated", loadState);
+      window.removeEventListener("crm-automation-settings-updated", loadNotifications);
+      window.removeEventListener(AUTOMATION_LOG_KEY, loadNotifications);
     };
   }, []);
 
   const enabledCount = useMemo(() => (Object.keys(settings) as AutomationId[]).filter((id) => settings[id].enabled).length, [settings]);
-  const enabledWorkflows = workflowRules.filter((r) => r.enabled).length;
+  const enabledWorkflows = workflowRules.filter((r) => r.enabled && r.status !== "paused").length;
 
   // Filter rules by search
   const filteredRules = useMemo(() => {
@@ -123,7 +132,7 @@ export default function AutomationsPage() {
 
   // ── Builder functions ──────────────────────────────────────────────────────
 
-  function openBuilder(rule?: WorkflowRule) {
+  function openBuilder(rule?: AutomationRule) {
     if (rule) {
       setEditingRule(rule);
       setBuilderName(rule.name);
@@ -142,28 +151,62 @@ export default function AutomationsPage() {
     setShowBuilder(true);
   }
 
-  function saveRule() {
+  async function saveRule() {
     if (!builderName.trim()) return;
     if (editingRule) {
-      updateWorkflowRule(editingRule.id, { name: builderName, description: builderDescription, trigger: builderTrigger, conditions: builderConditions, actions: builderActions });
+      await patchRule(editingRule.id, { name: builderName, description: builderDescription, trigger: builderTrigger, conditions: builderConditions, actions: builderActions }, storageMode);
     } else {
-      addWorkflowRule({ name: builderName, description: builderDescription, trigger: builderTrigger, conditions: builderConditions, actions: builderActions, enabled: true });
+      await createRule({ name: builderName, description: builderDescription, trigger: builderTrigger, conditions: builderConditions, actions: builderActions, enabled: true, status: "active" }, storageMode);
     }
-    setWorkflowRules(readWorkflowRules());
+    await refreshRules();
     setShowBuilder(false);
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!confirm("Delete this automation rule?")) return;
-    deleteWorkflowRule(id);
-    setWorkflowRules(readWorkflowRules());
+    await removeRule(id, storageMode);
+    await refreshRules();
   }
 
-  function addFromTemplate(idx: number) {
+  async function handleToggle(rule: AutomationRule, enabled: boolean) {
+    await patchRule(rule.id, { enabled }, storageMode);
+    await refreshRules();
+  }
+
+  async function handlePauseResume(rule: AutomationRule) {
+    await patchRule(rule.id, { status: rule.status === "paused" ? "active" : "paused" }, storageMode);
+    await refreshRules();
+  }
+
+  async function handleDuplicate(rule: AutomationRule) {
+    await duplicateRule(rule, storageMode);
+    await refreshRules();
+  }
+
+  async function handleRunNow(rule: AutomationRule) {
+    if (storageMode !== "server") {
+      setTestResult({ ruleId: rule.id, text: "Run Now needs shared storage — apply supabase/automation-engine.sql first.", ok: false });
+      return;
+    }
+    setBusyRuleId(rule.id);
+    setTestResult(null);
+    const res = await testRule(rule.id);
+    setBusyRuleId(null);
+    if (res.error) {
+      setTestResult({ ruleId: rule.id, text: res.error, ok: false });
+    } else if (res.run) {
+      const ok = res.run.status !== "failed";
+      setTestResult({ ruleId: rule.id, text: res.run.status === "skipped" ? "Conditions not met — nothing ran." : res.run.actionsExecuted.join(", ") || "Ran with no actions.", ok });
+    }
+    await refreshRules();
+    await refreshRuns();
+  }
+
+  async function addFromTemplate(idx: number) {
     const t = WORKFLOW_TEMPLATES[idx];
     if (!t) return;
-    addWorkflowRule({ ...t });
-    setWorkflowRules(readWorkflowRules());
+    await createRule({ ...t, status: "active" }, storageMode);
+    await refreshRules();
   }
 
   // ── Notification helpers ───────────────────────────────────────────────────
@@ -215,6 +258,13 @@ export default function AutomationsPage() {
         </div>
       </div>
 
+      {/* Local-only notice (shared storage not yet active) */}
+      {activeTab === "workflows" && storageMode === "local" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-[11px] font-semibold text-amber-800">
+          Rules are saved on this device only. To share automations across all admins and run them from live events, apply <span className="font-mono">supabase/automation-engine.sql</span> once in Supabase.
+        </div>
+      )}
+
       {/* Activity Log */}
       {showLog && (
         <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -222,7 +272,7 @@ export default function AutomationsPage() {
             <h2 className="text-sm font-bold text-gray-800">Activity Log</h2>
             <button type="button" onClick={() => setShowLog(false)} className="rounded p-1 hover:bg-gray-100"><X className="h-4 w-4 text-gray-400" /></button>
           </div>
-          {workflowLog.length === 0 ? (
+          {workflowRuns.length === 0 ? (
             <p className="py-6 text-center text-xs font-semibold text-gray-400">No workflow activity yet.</p>
           ) : (
             <div className="max-h-64 overflow-y-auto">
@@ -231,16 +281,24 @@ export default function AutomationsPage() {
                   <tr className="border-b border-gray-100 text-left font-bold uppercase tracking-wider text-gray-400">
                     <th className="pb-2 pr-3">Rule</th>
                     <th className="pb-2 pr-3">Trigger</th>
-                    <th className="pb-2 pr-3">Actions</th>
+                    <th className="pb-2 pr-3">Status</th>
+                    <th className="pb-2 pr-3">Actions / Error</th>
                     <th className="pb-2">Time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {workflowLog.slice(0, 30).map((e) => (
+                  {workflowRuns.slice(0, 50).map((e) => (
                     <tr key={e.id}>
                       <td className="py-1.5 pr-3 font-bold text-gray-700">{e.ruleName}</td>
-                      <td className="py-1.5 pr-3 text-gray-500">{TRIGGER_META[e.trigger]?.label}</td>
-                      <td className="py-1.5 pr-3"><span className="text-blue-600">{e.actionsExecuted.join(", ")}</span></td>
+                      <td className="py-1.5 pr-3 text-gray-500">{TRIGGER_META[e.trigger]?.label || e.trigger}</td>
+                      <td className="py-1.5 pr-3">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${e.status === "success" ? "bg-green-50 text-green-700" : e.status === "failed" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+                          {e.status}{e.source === "test" ? " · test" : ""}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-3">
+                        {e.error ? <span className="text-red-600">{e.error}</span> : <span className="text-blue-600">{e.actionsExecuted.join(", ")}</span>}
+                      </td>
                       <td className="py-1.5 text-gray-400">{fmt(e.executedAt)}</td>
                     </tr>
                   ))}
@@ -363,11 +421,26 @@ export default function AutomationsPage() {
                   </div>
                 </div>
 
+                {/* Audit (edit only) */}
+                {editingRule && (
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-[11px] text-gray-500">
+                    <span className="font-bold text-gray-600">Audit:</span>{" "}
+                    Created {fmt(editingRule.createdAt)}{editingRule.createdBy ? ` by ${editingRule.createdBy}` : ""} ·
+                    {" "}Last edited {fmt(editingRule.updatedAt)}{editingRule.updatedBy ? ` by ${editingRule.updatedBy}` : ""}
+                    {editingRule.lastError ? <span className="ml-1 text-red-600">· Last error: {editingRule.lastError}</span> : null}
+                  </div>
+                )}
+
                 {/* Save */}
                 <div className="flex gap-2 pt-2">
                   <button type="button" onClick={saveRule} disabled={!builderName.trim()} className="rounded-lg bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">
                     {editingRule ? "Save Changes" : "Create Rule"}
                   </button>
+                  {editingRule && (
+                    <button type="button" onClick={() => handleRunNow(editingRule)} disabled={busyRuleId === editingRule.id} className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+                      {busyRuleId === editingRule.id ? "Running…" : "Run Now / Test"}
+                    </button>
+                  )}
                   <button type="button" onClick={() => setShowBuilder(false)} className="rounded-lg border border-gray-200 px-5 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
                 </div>
               </div>
@@ -435,8 +508,14 @@ export default function AutomationsPage() {
                       {filteredRules.map((rule) => (
                         <tr key={rule.id} className={`transition hover:bg-gray-50/50 ${!rule.enabled ? "opacity-50" : ""}`}>
                           <td className="px-4 py-3">
-                            <p className="font-bold text-gray-800">{rule.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-800">{rule.name}</p>
+                              {rule.status === "paused" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Paused</span>}
+                            </div>
                             <p className="mt-0.5 text-[11px] text-gray-400 line-clamp-1">{rule.description}</p>
+                            {testResult && testResult.ruleId === rule.id && (
+                              <p className={`mt-1 text-[11px] font-semibold ${testResult.ok ? "text-green-600" : "text-red-600"}`}>{testResult.ok ? "Test: " : "Test failed: "}{testResult.text}</p>
+                            )}
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
@@ -452,16 +531,25 @@ export default function AutomationsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden lg:table-cell text-[11px] text-gray-400">
-                            {rule.lastTriggered ? fmt(rule.lastTriggered) : "Never"}
-                            {rule.triggerCount > 0 && <span className="ml-1 text-gray-300">({rule.triggerCount}x)</span>}
+                            <div>{rule.lastRunAt || rule.lastTriggered ? fmt(rule.lastRunAt || rule.lastTriggered) : "Never"}
+                              {rule.triggerCount > 0 && <span className="ml-1 text-gray-300">({rule.triggerCount}x)</span>}</div>
+                            <div className="mt-0.5 flex items-center gap-2">
+                              {rule.lastSuccessAt && <span className="text-green-600">✓ {fmt(rule.lastSuccessAt)}</span>}
+                              {rule.lastFailedAt && <span className="text-red-500" title={rule.lastError}>✕ {fmt(rule.lastFailedAt)}</span>}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <Toggle enabled={rule.enabled} onChange={(v) => { toggleWorkflowRule(rule.id, v); setWorkflowRules(readWorkflowRules()); }} />
+                            <Toggle enabled={rule.enabled} onChange={(v) => handleToggle(rule, v)} />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button type="button" onClick={() => openBuilder(rule)} className="rounded-md px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50">Edit</button>
-                              <button type="button" onClick={() => handleDelete(rule.id)} className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                            <div className="flex items-center justify-end gap-0.5">
+                              <button type="button" onClick={() => handleRunNow(rule)} disabled={busyRuleId === rule.id} className="rounded-md px-2 py-1.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-50" title="Run now / test">{busyRuleId === rule.id ? "…" : "Run"}</button>
+                              <button type="button" onClick={() => openBuilder(rule)} className="rounded-md px-2 py-1.5 text-[11px] font-bold text-gray-600 hover:bg-gray-100">Edit</button>
+                              <button type="button" onClick={() => handlePauseResume(rule)} className="rounded-md p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600" title={rule.status === "paused" ? "Resume" : "Pause"}>
+                                {rule.status === "paused" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                              </button>
+                              <button type="button" onClick={() => handleDuplicate(rule)} className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Duplicate"><Copy className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => handleDelete(rule.id)} className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </td>
                         </tr>

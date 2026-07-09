@@ -6,6 +6,7 @@ import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 const MMS_BUCKET = "mms-media";
 
@@ -81,6 +82,9 @@ export async function POST(req: NextRequest) {
     const source = getLeadSourceForNumber(event.to || "", "Inbound SMS");
     await ensureCustomerFromLeadServer({ name: event.from, phone: event.from, status: "New lead", source });
   } catch {}
+
+  // Fire admin-defined automations for the inbound SMS (best-effort).
+  await dispatchAutomation({ trigger: "sms_received", customerPhone: event.from, phone: event.from, line: event.to }).catch(() => {});
 
   return new NextResponse("<Response></Response>", { headers: { "Content-Type": "text/xml" } });
 }

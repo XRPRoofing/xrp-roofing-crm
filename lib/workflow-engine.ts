@@ -21,28 +21,43 @@ export type WorkflowTrigger =
   | "invoice_viewed"
   | "invoice_paid"
   | "invoice_overdue"
+  // Payments
+  | "payment_received"
   // Calls
   | "call_missed"
   | "call_incoming"
+  | "call_outgoing"
+  | "call_ivr_routed"
+  | "call_answered"
   | "call_completed"
   | "voicemail_received"
   // Messages
   | "sms_sent"
   | "sms_received"
+  | "email_sent"
+  | "email_received"
   | "no_reply"
   // Customers
   | "customer_added"
+  | "customer_tag_added"
   | "customer_no_response"
   // Calendar
   | "calendar_event_moved"
   | "schedule_updated"
   | "appointment_created"
+  | "appointment_updated"
   // Files
   | "photos_uploaded"
   | "video_uploaded"
+  | "file_uploaded"
   // Estimates
   | "estimate_sent"
-  | "estimate_created";
+  | "estimate_created"
+  // Proposals (declined)
+  | "proposal_declined"
+  // System
+  | "manual_trigger"
+  | "scheduled_time";
 
 export type WorkflowConditionField =
   | "schedule_date_exists"
@@ -71,7 +86,17 @@ export type WorkflowActionType =
   | "mark_invoice_paid"
   | "assign_crew"
   | "create_reminder"
-  | "notify_admin";
+  | "notify_admin"
+  | "create_task"
+  | "create_job"
+  | "add_note"
+  | "add_tag"
+  | "remove_tag"
+  | "update_customer"
+  | "wait"
+  | "if_else"
+  | "trigger_webhook"
+  | "end_workflow";
 
 export type WorkflowAction = {
   type: WorkflowActionType;
@@ -107,7 +132,7 @@ export type WorkflowLogEntry = {
 
 // ── Trigger metadata ─────────────────────────────────────────────────────────
 
-export type TriggerCategory = "Jobs" | "Proposals" | "Invoices" | "Calls" | "Messages" | "Customers" | "Calendar" | "Files" | "Estimates";
+export type TriggerCategory = "Jobs" | "Proposals" | "Invoices" | "Payments" | "Calls" | "Messages" | "Customers" | "Calendar" | "Files" | "Estimates" | "System";
 
 export const TRIGGER_META: Record<WorkflowTrigger, { label: string; description: string; icon: string; category: TriggerCategory }> = {
   // Jobs
@@ -122,37 +147,50 @@ export const TRIGGER_META: Record<WorkflowTrigger, { label: string; description:
   proposal_signed:       { label: "Proposal Signed",         description: "When a customer signs/approves a proposal",           icon: "✍️", category: "Proposals" },
   proposal_not_signed:   { label: "Proposal Not Signed",     description: "When proposal hasn't been signed after X time",       icon: "⏰", category: "Proposals" },
   proposal_expired:      { label: "Proposal Expired",        description: "When a proposal passes its expiration date",          icon: "❌", category: "Proposals" },
+  proposal_declined:     { label: "Proposal Declined",       description: "When a customer declines a proposal",                 icon: "🚫", category: "Proposals" },
   // Invoices
   invoice_created:       { label: "Invoice Created",         description: "When a new invoice is generated",                     icon: "🧾", category: "Invoices" },
   invoice_sent:          { label: "Invoice Sent",            description: "When an invoice is sent to a customer",               icon: "📧", category: "Invoices" },
   invoice_viewed:        { label: "Invoice Viewed",          description: "When a customer opens the invoice link",              icon: "👁️", category: "Invoices" },
   invoice_paid:          { label: "Payment Received",        description: "When customer payment is received",                   icon: "💰", category: "Invoices" },
   invoice_overdue:       { label: "Invoice Overdue",         description: "When an invoice passes its due date unpaid",          icon: "🚨", category: "Invoices" },
+  payment_received:      { label: "Payment Received",        description: "When any customer payment is received",               icon: "💵", category: "Payments" },
   // Calls
   call_missed:           { label: "Missed Call",             description: "When an incoming call is missed",                     icon: "📵", category: "Calls" },
   call_incoming:         { label: "Incoming Call",           description: "When a new call comes in",                            icon: "📞", category: "Calls" },
+  call_outgoing:         { label: "Outgoing Call",           description: "When an outbound call is placed",                     icon: "📲", category: "Calls" },
+  call_ivr_routed:       { label: "IVR Routed",              description: "When a call is routed through the IVR menu",          icon: "🔀", category: "Calls" },
+  call_answered:         { label: "Call Answered",           description: "When a call is answered",                             icon: "✅", category: "Calls" },
   call_completed:        { label: "Call Completed",          description: "When a call ends",                                    icon: "☎️", category: "Calls" },
   voicemail_received:    { label: "Voicemail Received",      description: "When a voicemail is left",                            icon: "🎤", category: "Calls" },
   // Messages
   sms_sent:              { label: "SMS Sent",                description: "When an SMS is sent to a customer",                   icon: "💬", category: "Messages" },
   sms_received:          { label: "SMS Received",            description: "When a customer sends an SMS",                        icon: "📩", category: "Messages" },
+  email_sent:            { label: "Email Sent",              description: "When an email is sent to a customer",                 icon: "📧", category: "Messages" },
+  email_received:        { label: "Email Received",          description: "When a customer email is received",                   icon: "📬", category: "Messages" },
   no_reply:              { label: "No Reply",                description: "When a customer doesn't respond after X hours",       icon: "🔕", category: "Messages" },
   // Customers
   customer_added:        { label: "New Customer Added",      description: "When a new customer is created in the CRM",           icon: "👤", category: "Customers" },
+  customer_tag_added:    { label: "Customer Tag Added",      description: "When a tag is added to a customer",                   icon: "🏷️", category: "Customers" },
   customer_no_response:  { label: "Customer No Response",    description: "When a customer hasn't responded for X days",         icon: "😶", category: "Customers" },
   // Calendar
   calendar_event_moved:  { label: "Calendar Event Moved",    description: "When a calendar event is dragged to a new date",      icon: "📅", category: "Calendar" },
   schedule_updated:      { label: "Schedule Updated",        description: "When a job schedule date/time is changed",            icon: "🗓️", category: "Calendar" },
   appointment_created:   { label: "Appointment Created",     description: "When a new appointment is added to the calendar",     icon: "📆", category: "Calendar" },
+  appointment_updated:   { label: "Appointment Updated",     description: "When an appointment is rescheduled or edited",        icon: "🗓️", category: "Calendar" },
   // Files
   photos_uploaded:       { label: "Photos Uploaded",         description: "When photos are uploaded to a job",                   icon: "📷", category: "Files" },
   video_uploaded:        { label: "Video Uploaded",          description: "When a video is uploaded to a job",                   icon: "🎥", category: "Files" },
+  file_uploaded:         { label: "File Uploaded",           description: "When any file is uploaded to a job or customer",      icon: "📎", category: "Files" },
   // Estimates
   estimate_sent:         { label: "Estimate Sent",           description: "When an estimate is sent to a customer",              icon: "📨", category: "Estimates" },
   estimate_created:      { label: "Estimate Created",        description: "When a new estimate is created",                      icon: "📝", category: "Estimates" },
+  // System
+  manual_trigger:        { label: "Manual Trigger",          description: "Run only when triggered by hand (Run Now)",           icon: "👆", category: "System" },
+  scheduled_time:        { label: "Scheduled Time",          description: "Run on a schedule (processed by the automations cron)", icon: "⏱️", category: "System" },
 };
 
-export const TRIGGER_CATEGORIES: TriggerCategory[] = ["Jobs", "Proposals", "Invoices", "Calls", "Messages", "Customers", "Calendar", "Files", "Estimates"];
+export const TRIGGER_CATEGORIES: TriggerCategory[] = ["Jobs", "Proposals", "Invoices", "Payments", "Calls", "Messages", "Customers", "Calendar", "Files", "Estimates", "System"];
 
 export const CONDITION_FIELD_META: Record<WorkflowConditionField, { label: string }> = {
   schedule_date_exists: { label: "Schedule Date Exists" },
@@ -224,6 +262,66 @@ export const ACTION_TYPE_META: Record<WorkflowActionType, { label: string; descr
     description: "Send an urgent notification to all admins",
     icon: "🚨",
     paramFields: [{ key: "message", label: "Alert Message", type: "text" }],
+  },
+  create_task: {
+    label: "Create Task",
+    description: "Create an office task",
+    icon: "🗒️",
+    paramFields: [{ key: "title", label: "Task Title", type: "text" }, { key: "assignee", label: "Assignee", type: "text" }],
+  },
+  create_job: {
+    label: "Create Job",
+    description: "Create a new job record",
+    icon: "🏗️",
+    paramFields: [{ key: "title", label: "Job Title", type: "text" }, { key: "stage", label: "Initial Stage", type: "text" }],
+  },
+  add_note: {
+    label: "Add Note",
+    description: "Add a note to the customer or job",
+    icon: "📌",
+    paramFields: [{ key: "note", label: "Note", type: "text" }],
+  },
+  add_tag: {
+    label: "Add Tag",
+    description: "Add a tag to the customer",
+    icon: "🏷️",
+    paramFields: [{ key: "tag", label: "Tag", type: "text" }],
+  },
+  remove_tag: {
+    label: "Remove Tag",
+    description: "Remove a tag from the customer",
+    icon: "➖",
+    paramFields: [{ key: "tag", label: "Tag", type: "text" }],
+  },
+  update_customer: {
+    label: "Update Customer",
+    description: "Update a field on the customer record",
+    icon: "✏️",
+    paramFields: [{ key: "field", label: "Field", type: "text" }, { key: "value", label: "Value", type: "text" }],
+  },
+  wait: {
+    label: "Wait",
+    description: "Pause the workflow before the next action",
+    icon: "⏳",
+    paramFields: [{ key: "delay_minutes", label: "Wait (minutes)", type: "text" }],
+  },
+  if_else: {
+    label: "If / Else",
+    description: "Branch the workflow on a condition",
+    icon: "🔀",
+    paramFields: [{ key: "field", label: "Field", type: "text" }, { key: "equals", label: "Equals", type: "text" }],
+  },
+  trigger_webhook: {
+    label: "Trigger Webhook",
+    description: "Send an HTTP POST to an external URL",
+    icon: "🔗",
+    paramFields: [{ key: "url", label: "Webhook URL", type: "text" }],
+  },
+  end_workflow: {
+    label: "End Workflow",
+    description: "Stop processing further actions",
+    icon: "🛑",
+    paramFields: [],
   },
 };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createCallRecordingInsights } from "@/lib/twilio/recording-insights";
 import { normalizeTwilioWebhookEvent } from "@/lib/twilio/server";
 import { publishConversationEvent, lookupCallEventByCallSid, getAdminClient } from "@/lib/twilio/realtime";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 export const maxDuration = 60;
 
@@ -193,6 +194,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Answered/recorded call → fire admin-defined automations (best-effort).
+    if (event.recordingUrl && event.callSid) {
+      await dispatchAutomation({ trigger: "call_completed", customerPhone: event.from, phone: event.from, line: event.to }).catch(() => {});
+    }
+
     // For calls that end without a recording (no-answer, busy, failed,
     // canceled), publish a call_recording event with a status-based fallback
     // summary so the Conversation Board always shows a Call Summary card.
@@ -246,6 +252,11 @@ export async function POST(req: NextRequest) {
           line: fallbackTo,
           origin: req.nextUrl.origin,
         });
+
+        // Fire admin-defined automations for this missed call (best-effort).
+        if ((fallbackDirection || "").toLowerCase() === "inbound") {
+          await dispatchAutomation({ trigger: "call_missed", customerPhone: fallbackFrom, phone: fallbackFrom, line: fallbackTo }).catch(() => {});
+        }
       }
     }
 

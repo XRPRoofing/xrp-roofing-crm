@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 const schema = z.object({
   toName: z.string().min(1),
@@ -81,6 +82,9 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       throw new Error(await response.text());
     }
+
+    // Fire admin-defined automations for the sent proposal (best-effort).
+    await dispatchAutomation({ trigger: "proposal_sent", customerName: data.toName, customerEmail: data.toEmail, proposalStatus: "Sent" }).catch(() => {});
 
     return NextResponse.json({ ok: true });
   } catch (error) {

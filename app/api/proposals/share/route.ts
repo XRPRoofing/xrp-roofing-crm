@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "@/lib/supabase/url";
 import { applyProposalLock } from "@/lib/proposal-lock";
 import { pushServerNotification } from "@/lib/server-notifications";
+import { dispatchAutomation } from "@/lib/automation/engine.server";
 
 const proposalSchema = z.record(z.string(), z.unknown()).and(z.object({ id: z.string().min(1) }));
 
@@ -184,6 +185,9 @@ export async function PATCH(req: NextRequest) {
           });
         } catch { /* ignore — job update is best-effort */ }
       }
+
+      // Fire admin-defined automations for the signed proposal (best-effort).
+      await dispatchAutomation({ trigger: "proposal_signed", customerName: proposalCustomerName, jobId, proposalStatus: "Signed", jobStage: "approved" }).catch(() => {});
     }
 
     return NextResponse.json({ proposal: nextProposal });
