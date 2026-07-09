@@ -32,9 +32,9 @@ function fmt(iso: string) {
 
 function MetricCard({ label, value, active, onClick, color }: { label: string; value: number; active: boolean; onClick: () => void; color: string }) {
   return (
-    <button type="button" onClick={onClick} className={`flex flex-col items-start rounded-md border p-2 sm:p-3.5 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
+    <button type="button" onClick={onClick} className={`flex w-full min-w-0 flex-col items-start rounded-md border p-2 sm:p-3.5 text-left transition hover:shadow-md ${active ? "ring-2 ring-blue-500 " + color : "border-gray-200 bg-white"}`}>
       <span className="text-base sm:text-2xl font-bold text-blue-700">{value}</span>
-      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
+      <span className="w-full break-words text-[10px] sm:text-xs font-bold uppercase tracking-wide text-gray-500 leading-tight">{label}</span>
     </button>
   );
 }
@@ -355,7 +355,7 @@ export default function TasksPage() {
       </div>
 
         {/* Metrics */}
-        <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-6 xl:grid-cols-11">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-6 xl:grid-cols-11">
           <MetricCard label="Scheduled"   value={metrics.scheduled}   active={filterStatus === "Job Scheduled"}         onClick={() => setFilterStatus(filterStatus === "Job Scheduled" ? null : "Job Scheduled")}         color="bg-blue-50 border-blue-300" />
           <MetricCard label="In Progress" value={metrics.inProgress}  active={filterStatus === "Job In Progress"}       onClick={() => setFilterStatus(filterStatus === "Job In Progress" ? null : "Job In Progress")}       color="bg-orange-50 border-orange-300" />
           <MetricCard label="Completed"   value={metrics.completed}   active={filterStatus === "Job Completed"}         onClick={() => setFilterStatus(filterStatus === "Job Completed" ? null : "Job Completed")}         color="bg-blue-50 border-blue-300" />
