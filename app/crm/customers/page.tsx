@@ -48,9 +48,7 @@ function readRawLocalCustomers(): Customer[] {
 function getCustomerJobs(customer: Customer, jobs: Lead[]) {
   return jobs.filter((job) =>
     customer.id === `C-${job.id}` ||
-    (customer.email && job.email && job.email === customer.email) ||
-    (customer.phone && job.phone && job.phone === customer.phone) ||
-    (customer.name && job.name && job.name.toLowerCase() === customer.name.toLowerCase())
+    customerMatchesContact(customer, { name: job.name, email: job.email, phone: job.phone })
   );
 }
 
@@ -451,6 +449,12 @@ export default function CustomersPage() {
   function openInvoice(id: string) {
     requestOpenInvoice(id);
     router.push("/crm/invoices");
+  }
+
+  // Open the full Job Details card on the Jobs Board (same record, no copy) —
+  // the board deep-links to a job via ?job=<id>.
+  function openJob(id: string) {
+    router.push(`/crm/leads?job=${encodeURIComponent(id)}`);
   }
 
   function createInvoice(customer: Customer) {
@@ -971,7 +975,7 @@ export default function CustomersPage() {
                   <div className="flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">Jobs</h3></div>
                   <div className="mt-4 space-y-3">
                     {selectedCustomerJobs.length > 0 ? selectedCustomerJobs.map((job) => (
-                      <div key={job.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                      <button type="button" key={job.id} onClick={() => openJob(job.id)} className="block w-full rounded-lg border border-gray-100 bg-gray-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
                         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
                           <div>
                             <p className="font-bold text-gray-900">{job.roofType}</p>
@@ -984,7 +988,7 @@ export default function CustomersPage() {
                           <p>Due: {formatDate(job.dueDate)}</p>
                           <p>Completed: {getJobCompletedDate([job])}</p>
                         </div>
-                      </div>
+                      </button>
                     )) : <p className="rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No related jobs found yet.</p>}
                   </div>
                 </section>
