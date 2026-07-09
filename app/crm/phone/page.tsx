@@ -567,6 +567,29 @@ export default function PhonePage() {
       if (e.status === "processing" && !hasSummary) processingSids.add(e.callSid);
     }
 
+    // Latest saved note per call leg (by timestamp, regardless of event order).
+    const notesMap = new Map<string, string>();
+    const noteTimeMap = new Map<string, number>();
+    for (const e of events) {
+      if (e.type !== "call_note" || !e.callSid) continue;
+      const note = typeof e.payload?.notes === "string" ? e.payload.notes : (e.body || "");
+      if (!note.trim()) continue;
+      const t = new Date(e.createdAt).getTime();
+      if (!noteTimeMap.has(e.callSid) || t >= (noteTimeMap.get(e.callSid) as number)) {
+        noteTimeMap.set(e.callSid, t);
+        notesMap.set(e.callSid, note);
+      }
+    }
+
+    // Calls whose recording exists but transcript/summary is not ready yet.
+    const processingSids = new Set<string>();
+    for (const e of recordingEvents) {
+      if (!e.callSid) continue;
+      const info = recordingMap.get(e.callSid);
+      const hasSummary = !!info?.summary;
+      if (e.status === "processing" && !hasSummary) processingSids.add(e.callSid);
+    }
+
     const records: CallRecord[] = [];
     for (const [, event] of callMap) {
       const phone = event.direction === "inbound" ? event.from || "" : event.to || "";

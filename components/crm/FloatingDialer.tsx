@@ -150,6 +150,7 @@ export default function FloatingDialer({
   const [dialNumber, setDialNumber] = useState("");
   const [selectedCallerId, setSelectedCallerId] = useState(phoneNumbers[0]?.number || "");
   const [callerIdOpen, setCallerIdOpen] = useState(false);
+  const [linePickerOpen, setLinePickerOpen] = useState(false);
 
   // Call state
   const [callState, setCallState] = useState<CallState>("idle");
@@ -1082,6 +1083,49 @@ export default function FloatingDialer({
           {/* ── Keypad Tab ── */}
           {activeTab === "keypad" && (
             <div className="flex flex-1 flex-col px-5 pb-3 pt-2">
+              {/* Calling-from line selector (prominent — pick before dialing) */}
+              {phoneNumbers.length > 1 && (
+                <div className="relative mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setLinePickerOpen((v) => !v)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left transition hover:bg-gray-100"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <PhoneOutgoing className="h-4 w-4 shrink-0 text-blue-500" />
+                      <span className="flex min-w-0 flex-col leading-tight">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Calling from</span>
+                        <span className="truncate text-sm font-semibold text-gray-800">
+                          {currentLine ? `${currentLine.label} · ${formatPhone(currentLine.number)}` : "No line"}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition ${linePickerOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {linePickerOpen && (
+                    <>
+                      <button type="button" className="fixed inset-0 z-10" onClick={() => setLinePickerOpen(false)} />
+                      <div className="absolute inset-x-0 top-full z-20 mt-1 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl">
+                        {phoneNumbers.map((pn) => (
+                          <button
+                            key={pn.number}
+                            type="button"
+                            onClick={() => { setSelectedCallerId(pn.number); setLinePickerOpen(false); }}
+                            className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-gray-50 ${selectedCallerId === pn.number ? "bg-blue-50" : ""}`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${selectedCallerId === pn.number ? "bg-blue-500" : "bg-gray-300"}`} />
+                            <div className="min-w-0">
+                              <p className={`truncate text-sm font-semibold ${selectedCallerId === pn.number ? "text-blue-700" : "text-gray-700"}`}>{pn.label}</p>
+                              <p className="text-xs text-gray-400">{formatPhone(pn.number)}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Number display */}
               <div className="mb-3 text-center">
                 <input
