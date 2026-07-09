@@ -560,10 +560,15 @@ html, body {
     max-width: 100%;
     box-sizing: border-box;
   }
-  /* Ensure all cards/sections don't overflow */
+  /* Ensure all cards/sections don't overflow horizontally.
+     Use `clip` (not `hidden`): `overflow-x: hidden` forces `overflow-y` to
+     compute to `auto`, turning this wrapper into a vertical scroll container,
+     which breaks child `sticky top-16` toolbars (they offset 64px from this
+     wrapper instead of the viewport, leaving a blank gap at the top). `clip`
+     clips horizontally without establishing a scroll container. */
   .crm-main > div {
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 }
 
