@@ -14,7 +14,7 @@ import { syncJobToCalendar, toArizonaISO } from "@/lib/calendar-sync";
 import { createClient } from "@/lib/supabase/client";
 import { createManualFolder } from "@/lib/manual-folders";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import { azDateTime } from "@/lib/arizona-time";
+import { azDateTime, azDate } from "@/lib/arizona-time";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
@@ -158,9 +158,9 @@ function JobValueInput({ value, onCommit, className }: { value: number; onCommit
 
 function formatDueDate(value?: string) {
   if (!value) return "No date";
-  const date = new Date(`${value}T12:00:00`);
+  const date = new Date(`${value}T12:00:00-07:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return azDate(date, { month: "short", day: "numeric" });
 }
 
 function formatJobAge(createdAt?: string): string | null {

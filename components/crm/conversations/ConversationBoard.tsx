@@ -12,7 +12,7 @@ import { useVoiceDevice } from "@/lib/twilio/voice-device-context";
 import { addTwilioCrmNotification, getCallAnsweredByName, getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import { logCrewActivity } from "@/lib/crew-activity";
-import { azDateTime } from "@/lib/arizona-time";
+import { azDateTime, azDate, azTime } from "@/lib/arizona-time";
 import { refreshCrewData, getCachedCrewData, CACHE_EVENTS } from "@/lib/data-cache";
 import { refreshInvoices, getCachedInvoices } from "@/lib/data-cache";
 import { refreshProposals, getCachedProposals } from "@/lib/data-cache";
@@ -371,7 +371,7 @@ function CallInsightsCard({ event, onOpen }: { event: TwilioConversationEvent; o
           {answeredBy && <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-800 ring-1 ring-green-200">Answered by {answeredBy}</span>}
           {eventDisposition && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${getDispositionBadgeStyle(eventDisposition)}`}>{eventDisposition}</span>}
         </div>
-        <span className={`text-[11px] font-semibold ${isFallback ? "text-amber-700" : "text-blue-700"}`}>{new Date(event.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+        <span className={`text-[11px] font-semibold ${isFallback ? "text-amber-700" : "text-blue-700"}`}>{azTime(event.createdAt, { hour: "numeric", minute: "2-digit" })}</span>
       </div>
       {isProcessing ? (
         <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-blue-700"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />Generating summary…</p>
@@ -654,7 +654,7 @@ function formatActivityTime(isoString: string): string {
   if (diffHours < 24) return `${diffHours} hr ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return azDate(date, { month: "short", day: "numeric" });
 }
 
 function getCallDurationLabel(event: TwilioConversationEvent) {
@@ -747,7 +747,7 @@ function createMessageFromEvent(event: TwilioConversationEvent, fallbackLine?: s
     direction,
     author: direction === "outbound" ? "XRP Roofing" : formatPhoneIdentity(event.from || "Customer"),
     body: event.body || fallbackBody,
-    timestamp: new Date(event.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    timestamp: azDateTime(event.createdAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
     status: messageStatus,
     recordingUrl: event.recordingUrl,
     line,

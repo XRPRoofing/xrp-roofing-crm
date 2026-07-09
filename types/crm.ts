@@ -35,6 +35,7 @@ export interface Customer {
   insuranceCarrier: string;
   status: string;
   lifetimeValue: number;
+  createdAt?: string;
 }
 
 export interface Task {
