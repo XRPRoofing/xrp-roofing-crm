@@ -31,6 +31,7 @@ type MergedLeg = TwilioConversationEvent & {
 };
 
 const ACTIVE_STATUSES = new Set(["queued", "initiated", "ringing", "in-progress"]);
+const ROUTED_LEG_MATCH_WINDOW_MS = 10 * 60_000;
 
 function text(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -51,6 +52,20 @@ function getStatus(event: TwilioConversationEvent) {
 
 function getRootSid(event: TwilioConversationEvent) {
   return text(event.payload?.RootCallSid) || event.callSid || "";
+}
+
+function isIvrRoutedEvent(event: TwilioConversationEvent) {
+  const status = getStatus(event);
+  return Boolean(event.payload?.ivrDepartment || event.payload?.IvrDepartment || event.payload?.IsRoutedLeg)
+    || ["ivr-routed", "ivr_routed", "routing", "routed"].includes(status);
+}
+
+function isUnlinkedRoutedChild(leg: MergedLeg) {
+  return leg.direction === "outbound"
+    && !isClientAddress(leg.from)
+    && !isClientAddress(leg.to)
+    && !findTwilioLine(leg.from || "")
+    && !findTwilioLine(leg.to || "");
 }
 
 function mergeLegEvents(events: TwilioConversationEvent[]) {
@@ -136,18 +151,42 @@ function latest(values: string[]) {
 
 export function normalizeCallHistory(events: TwilioConversationEvent[]): NormalizedCallHistoryRecord[] {
   const legs = mergeLegEvents(events);
+  const routedRoots = Array.from(legs.values()).filter((leg) =>
+    leg.direction === "inbound"
+    && Boolean(configuredLineFor("inbound", [leg]))
+    && leg.events.some(isIvrRoutedEvent),
+  );
+  const routedRootByChildSid = new Map<string, string>();
+  for (const root of routedRoots) {
+    for (const event of root.events) {
+      const childSid = text(event.payload?.DialCallSid);
+      if (childSid) routedRootByChildSid.set(childSid, getRootSid(root));
+    }
+  }
+
+  const rootByLegSid = new Map<string, string>();
+  for (const leg of legs.values()) {
+    let rootSid = text(leg.payload?.RootCallSid) || routedRootByChildSid.get(leg.callSid || "");
+    if (!rootSid && isUnlinkedRoutedChild(leg)) {
+      const childAt = new Date(leg.firstAt).getTime();
+      const inferredRoot = routedRoots
+        .map((root) => ({ root, delta: childAt - new Date(root.firstAt).getTime() }))
+        .filter(({ root, delta }) => root.from === leg.from && delta >= 0 && delta <= ROUTED_LEG_MATCH_WINDOW_MS)
+        .sort((a, b) => a.delta - b.delta)[0]?.root;
+      rootSid = inferredRoot ? getRootSid(inferredRoot) : "";
+    }
+    rootByLegSid.set(leg.callSid || "", rootSid || leg.callSid || "");
+  }
+
   const groups = new Map<string, MergedLeg[]>();
   for (const leg of legs.values()) {
-    const rootSid = getRootSid(leg);
+    const rootSid = rootByLegSid.get(leg.callSid || "") || "";
     if (!rootSid) continue;
     if (rootSid === leg.callSid && (isClientAddress(leg.from) || isClientAddress(leg.to))) continue;
     const group = groups.get(rootSid) || [];
     group.push(leg);
     groups.set(rootSid, group);
   }
-
-  const rootByLegSid = new Map<string, string>();
-  for (const leg of legs.values()) rootByLegSid.set(leg.callSid || "", getRootSid(leg));
 
   const conferenceNameBySid = new Map<string, string>();
   const conferenceCustomerByName = new Map<string, string>();
@@ -202,11 +241,7 @@ export function normalizeCallHistory(events: TwilioConversationEvent[]): Normali
     const companyLine = configuredLineFor(direction, groupLegs);
     const customerPhone = customerPhoneFor(direction, groupLegs, companyLine);
     const groupEvents = groupLegs.flatMap((leg) => leg.events);
-    const ivrRouted = groupEvents.some((event) => {
-      const status = getStatus(event);
-      return Boolean(event.payload?.ivrDepartment || event.payload?.IvrDepartment || event.payload?.IsRoutedLeg)
-        || ["ivr-routed", "ivr_routed", "routing", "routed"].includes(status);
-    });
+    const ivrRouted = groupEvents.some(isIvrRoutedEvent);
     const forwarded = groupEvents.some((event) => Boolean(
       event.payload?.ForwardedFrom || event.payload?.forwardedFrom || event.payload?.RoutedTo,
     ) || ["forwarded", "forward"].includes(getStatus(event)));
