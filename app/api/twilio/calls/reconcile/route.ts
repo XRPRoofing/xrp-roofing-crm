@@ -13,7 +13,7 @@ export const maxDuration = 60;
  * / summary that a dropped webhook left missing, so every admin always sees the
  * same complete history. Auth: Supabase JWT (Bearer header or body `token`).
  */
-async function handle(req: NextRequest, jwt: string, sinceMinutes?: number) {
+async function handle(req: NextRequest, jwt: string, opts: { sinceMinutes?: number; maxCalls?: number; maxRecordings?: number }) {
   if (!jwt) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabaseUrl = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -24,7 +24,7 @@ async function handle(req: NextRequest, jwt: string, sinceMinutes?: number) {
   const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
   if (authError || !user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  const result = await reconcileRecentCalls(sinceMinutes ? { sinceMinutes } : undefined);
+  const result = await reconcileRecentCalls(opts);
   return NextResponse.json(result);
 }
 
@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
     const headerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
     const jwt = headerToken || (typeof body.token === "string" ? body.token : "");
     const sinceMinutes = typeof body.sinceMinutes === "number" ? body.sinceMinutes : undefined;
-    return await handle(req, jwt, sinceMinutes);
+    const maxCalls = typeof body.maxCalls === "number" ? body.maxCalls : undefined;
+    const maxRecordings = typeof body.maxRecordings === "number" ? body.maxRecordings : undefined;
+    return await handle(req, jwt, { sinceMinutes, maxCalls, maxRecordings });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "reconcile error" });
   }

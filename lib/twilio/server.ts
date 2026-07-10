@@ -539,7 +539,7 @@ export function normalizeCallNote(payload: TwilioCallNotePayload): TwilioConvers
     customerId: payload.customerId,
     jobId: payload.jobId,
     body: payload.disposition ? `${payload.disposition}: ${payload.notes}` : payload.notes,
-    payload: { notes: payload.notes, disposition: payload.disposition },
+    payload: { notes: payload.notes, disposition: payload.disposition, tags: payload.tags || [] },
     createdAt: new Date().toISOString(),
   };
 }

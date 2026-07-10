@@ -11,12 +11,8 @@ export function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-export async function publishConversationEvent(event: TwilioConversationEvent) {
-  const supabase = getAdminClient();
-
-  if (!supabase) return { stored: false, reason: "Supabase realtime storage is not configured" };
-
-  const row = {
+function toConversationEventRow(event: TwilioConversationEvent) {
+  return {
     id: event.id,
     type: event.type,
     direction: event.direction,
@@ -32,6 +28,14 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
     payload: event.payload,
     created_at: event.createdAt,
   };
+}
+
+export async function publishConversationEvent(event: TwilioConversationEvent) {
+  const supabase = getAdminClient();
+
+  if (!supabase) return { stored: false, reason: "Supabase realtime storage is not configured" };
+
+  const row = toConversationEventRow(event);
 
   // Try insert first. On conflict (duplicate id), do a selective update that
   // preserves non-empty body and recording_url — Twilio status callbacks often
@@ -91,6 +95,17 @@ export async function publishConversationEvent(event: TwilioConversationEvent) {
   return { stored: true };
 }
 
+export async function appendConversationEvent(event: TwilioConversationEvent) {
+  const supabase = getAdminClient();
+  if (!supabase) return { stored: false, reason: "Supabase realtime storage is not configured" };
+
+  const { error } = await supabase.from("conversation_events").insert(toConversationEventRow(event));
+  const isConflict = error && (error.code === "23505" || error.message.includes("duplicate"));
+  if (isConflict) return { stored: false, duplicate: true };
+  if (error) return { stored: false, reason: getConversationEventsErrorMessage(error.message) };
+  return { stored: true };
+}
+
 function mapConversationEventRow(row: Record<string, unknown>): TwilioConversationEvent {
   return {
     id: String(row.id),
@@ -115,17 +130,24 @@ export async function listConversationEvents(limit = 1000) {
 
   if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured", events: [] };
 
-  // Fetch the newest N events (descending) then reverse to chronological order
-  // so conversation building works correctly.
-  const { data, error } = await supabase
-    .from("conversation_events")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const requested = Math.min(Math.max(Math.floor(limit), 1), 100_000);
+  const rows: Record<string, unknown>[] = [];
+  const pageSize = 1000;
 
-  if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), events: [] };
+  for (let offset = 0; offset < requested; offset += pageSize) {
+    const pageLimit = Math.min(pageSize, requested - offset);
+    const { data, error } = await supabase
+      .from("conversation_events")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageLimit - 1);
 
-  return { ok: true as const, events: ((data || []) as Record<string, unknown>[]).map(mapConversationEventRow).reverse() };
+    if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), events: [] };
+    rows.push(...((data || []) as Record<string, unknown>[]));
+    if (!data || data.length < pageLimit) break;
+  }
+
+  return { ok: true as const, events: rows.map(mapConversationEventRow).reverse() };
 }
 
 function getConversationEventsErrorMessage(message: string) {

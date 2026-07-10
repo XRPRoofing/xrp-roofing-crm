@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -16,7 +16,6 @@ import {
   MessageSquare,
   Mic,
   Phone,
-  Play,
   PhoneCall,
   PhoneIncoming,
   PhoneMissed,
@@ -32,7 +31,8 @@ import {
 } from "lucide-react";
 import { listConversationEvents, subscribeToConversationEvents, sendSms, proxyRecordingUrl, reconcileRecentCalls, saveCallNotes } from "@/lib/twilio/client";
 import { loadLiveCustomers, buildPhoneLookup, matchCustomerByPhone } from "@/lib/conversation-contact-sync";
-import { azDateTime } from "@/lib/arizona-time";
+import { azDateTime, azParts } from "@/lib/arizona-time";
+import { normalizeCallHistory } from "@/lib/twilio/call-history";
 import { getTwilioLines, getLineLabelForNumber } from "@/lib/twilio/numbers";
 import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import type { Customer, Lead } from "@/types/crm";
@@ -58,7 +58,9 @@ interface CallRecord {
   duration: string;
   durationSec: number;
   dateTime: string;
+  endDateTime?: string;
   rawDate: string;
+  rawEndDate?: string;
   callSid: string;
   disposition?: string;
   customerId?: string;
@@ -69,6 +71,7 @@ interface CallRecord {
   transcript?: string;
   answeredBy?: string;
   notes?: string;
+  tags: string[];
   recordingProcessing?: boolean;
 }
 
@@ -95,6 +98,8 @@ const LEAD_DISPOSITIONS = [
   "Spam",
 ] as const;
 
+const CALL_TAGS = ["Priority", "Follow Up", "Existing Customer", "Spam"] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -114,70 +119,14 @@ function formatDurationLong(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
-function getCallStatusLabel(event: TwilioConversationEvent): string {
-  const s = event.status?.toLowerCase() || "";
-  const payloadStatus = String(event.payload?.CallStatus || "").toLowerCase();
-  const effectiveStatus = s || payloadStatus;
-  const isOutbound = event.direction === "outbound";
-  // The <Dial> action callback (DialCallStatus) is the authoritative signal for
-  // whether a party actually answered. The parent call's CallStatus is
-  // "completed" whenever the call ends normally — even if the caller only
-  // listened to the IVR and hung up, or nobody picked up — so "completed" must
-  // NOT be treated as "Answered" on its own for inbound calls.
-  const dial = String(event.payload?.DialCallStatus || "").toLowerCase();
-  const duration = Number(event.payload?.DialCallDuration || event.payload?.CallDuration || 0);
-
-  if (dial) {
-    if (dial === "no-answer" || dial === "no_answer") return "No Answer";
-    if (dial === "busy") return "Busy";
-    if (dial === "failed") return "Failed";
-    if (dial === "canceled" || dial === "cancelled") return "Canceled";
-    if (dial === "completed") return duration > 0 ? "Answered" : "No Answer";
-  }
-
-  if (effectiveStatus === "ringing" || effectiveStatus === "queued" || effectiveStatus === "initiated" || effectiveStatus === "in-progress") return "Ringing";
-  if (effectiveStatus === "no-answer" || effectiveStatus === "no_answer") return "No Answer";
-  if (effectiveStatus === "busy") return "Busy";
-  if (effectiveStatus === "failed") return "Failed";
-  if (effectiveStatus === "canceled" || effectiveStatus === "cancelled") return "Canceled";
-  if (effectiveStatus === "forwarded" || effectiveStatus === "forward") return "Forwarded";
-  if (effectiveStatus === "completed") {
-    // Outbound "completed" means the customer answered. Inbound "completed"
-    // with no Dial outcome means no agent leg ever connected (caller hung up in
-    // the IVR / voicemail) → not answered.
-    if (isOutbound) return duration > 0 ? "Answered" : "No Answer";
-    return "No Answer";
-  }
-  // "ivr-routed" (and similar) is an internal routing marker, not a real call
-  // outcome. Resolve it to the actual result: answered if there's talk time,
-  // otherwise no answer. (A matched recording later upgrades it to Answered.)
-  if (effectiveStatus === "ivr-routed" || effectiveStatus === "ivr_routed" || effectiveStatus === "routing" || effectiveStatus === "routed") {
-    // Answered on the routed number → "Answered". Not answered → keep the
-    // routing context so management can see it came in via the IVR but was
-    // missed. (A matched recording later upgrades it to "Answered".)
-    return duration > 0 ? "Answered" : "No Answer · IVR Routed";
-  }
-  if (event.type === "incoming_call" && !event.status) return "Ringing";
-  return event.status || "Unknown";
-}
-
 function getStatusColor(status: string, direction: string): string {
-  if (status === "Answered") return direction === "outbound" ? "blue" : "green";
-  if (status.startsWith("No Answer") || status === "Busy" || status === "Canceled" || status === "Failed") return "red";
+  if (status.startsWith("Answered")) return "green";
+  if (status === "Outbound") return "blue";
+  if (status.startsWith("Missed") || status === "No Answer") return "red";
   if (status === "Forwarded") return "orange";
   if (status === "Ringing") return "yellow";
   if (status === "Voicemail") return "gray";
   return direction === "outbound" ? "blue" : "green";
-}
-
-function isForwardedCall(event: TwilioConversationEvent): boolean {
-  const s = event.status?.toLowerCase() || "";
-  if (s === "forwarded" || s === "forward") return true;
-  const payload = event.payload || {};
-  if (typeof payload.ForwardedFrom === "string" && payload.ForwardedFrom) return true;
-  if (typeof payload.forwardedFrom === "string" && payload.forwardedFrom) return true;
-  if (typeof payload.Direction === "string" && payload.Direction.toLowerCase().includes("forward")) return true;
-  return false;
 }
 
 function formatPhoneDisplay(phone: string): string {
@@ -221,12 +170,6 @@ function loadDispositions(): Record<string, string> {
   }
 }
 
-function saveDisposition(phone: string, disposition: string) {
-  const d = loadDispositions();
-  d[phone] = disposition;
-  localStorage.setItem("xrp-phone-dispositions", JSON.stringify(d));
-}
-
 function loadBlockedNumbers(): string[] {
   try {
     return JSON.parse(localStorage.getItem("xrp-phone-blocked") || "[]") as string[];
@@ -265,8 +208,9 @@ export default function PhonePage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("Calls");
   const [callFilter, setCallFilter] = useState<CallFilter>("All");
+  const [lineFilter, setLineFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [dispositions, setDispositions] = useState<Record<string, string>>(() => loadDispositions());
+  const legacyDispositions = useMemo(() => loadDispositions(), []);
   const [showDispositionPicker, setShowDispositionPicker] = useState<string | null>(null);
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [blockedNumbers, setBlockedNumbers] = useState<string[]>(() => loadBlockedNumbers());
@@ -313,7 +257,7 @@ export default function PhonePage() {
     let mounted = true;
     async function load() {
       try {
-        const [evts, custs] = await Promise.all([listConversationEvents(2000), loadLiveCustomers()]);
+        const [evts, custs] = await Promise.all([listConversationEvents(100_000), loadLiveCustomers()]);
         if (!mounted) return;
         setEvents(evts);
         setPhoneLookup(buildPhoneLookup(custs));
@@ -333,7 +277,7 @@ export default function PhonePage() {
   // every admin's view when realtime may have dropped events (see below).
   const refreshEvents = useCallback(async () => {
     try {
-      const evts = await listConversationEvents(2000);
+      const evts = await listConversationEvents(100_000);
       setEvents(evts);
     } catch {
       /* best-effort */
@@ -359,7 +303,7 @@ export default function PhonePage() {
   // Twilio (backfilling anything a dropped webhook missed), then refresh so the
   // recovered calls/recordings appear. Throttled per browser inside the helper.
   useEffect(() => {
-    void reconcileRecentCalls().then(() => refreshEvents());
+    void reconcileRecentCalls({ sinceMinutes: 43_200, maxCalls: 500, maxRecordings: 2 }).then(() => refreshEvents());
   }, [refreshEvents]);
 
   // Realtime resilience: Supabase channels can silently drop (network blips,
@@ -381,305 +325,59 @@ export default function PhonePage() {
     };
   }, [refreshEvents]);
 
-  // Build call records from events
+  // Build one customer-facing record per root call. Child browser/external legs,
+  // recordings, notes, and reconciled Twilio metadata are folded into that row.
   const callRecords: CallRecord[] = useMemo(() => {
-    const callEvents = events.filter((e) => e.type === "incoming_call" || e.type === "call_status");
-    const normalizePhone = (value: string) => (value || "").replace(/\D/g, "").slice(-10);
-    const isClientAddr = (value: string) => (value || "").replace(/^\+/, "").startsWith("client:");
-    // The agent side is the CRM browser client; the customer side is the real
-    // phone number. Which side each maps to depends on call direction.
-    const agentSide = (e: TwilioConversationEvent) => (e.direction === "outbound" ? e.from || e.to : e.to || e.from) || "";
-    const customerSide = (e: TwilioConversationEvent) => (e.direction === "outbound" ? e.to || e.from : e.from || e.to) || "";
-
-    // Dedup per call leg (callSid), keeping the most recent status. Drop legs
-    // that carry no real customer number (customer side is a client: address).
-    const legMap = new Map<string, TwilioConversationEvent>();
-    for (const e of callEvents) {
-      if (!e.callSid) continue;
-      if (isClientAddr(customerSide(e))) continue;
-      const existing = legMap.get(e.callSid);
-      if (!existing) {
-        legMap.set(e.callSid, e);
-        continue;
-      }
-      // Keep the most recent event as the base, but carry forward the payload
-      // fields from earlier events for the same leg. This matters because the
-      // <Dial> action callback (which carries DialCallStatus / DialCallDuration —
-      // the true "did anyone answer" outcome) usually arrives BEFORE the final
-      // parent "completed" callback, which lacks those fields. Spreading the
-      // older payload first lets the newer event win on shared keys while
-      // preserving the authoritative dial outcome.
-      const newer = new Date(e.createdAt) >= new Date(existing.createdAt) ? e : existing;
-      const older = newer === e ? existing : e;
-      legMap.set(e.callSid, { ...newer, payload: { ...older.payload, ...newer.payload } });
-    }
-
-    // Internal browser legs have the agent (client:crm-agent) on the agent side:
-    //  - inbound  <Dial><Client> leg  → to = client:crm-agent (duplicates the
-    //    real inbound PSTN leg) → always drop.
-    //  - outbound agent leg published by the TwiML route → from = client:crm-agent.
-    //    The real customer leg (Twilio # → customer) is dialed into the
-    //    conference best-effort, so drop the agent leg ONLY when that real-number
-    //    sibling exists — otherwise keep it so the outbound call is never lost.
-    const realOutbound = [...legMap.values()]
-      .filter((e) => e.direction === "outbound" && !isClientAddr(agentSide(e)))
-      .map((e) => ({ norm: normalizePhone(customerSide(e)), t: new Date(e.createdAt).getTime() }));
-    const callMap = new Map<string, TwilioConversationEvent>();
-    for (const [sid, e] of legMap) {
-      if (isClientAddr(agentSide(e))) {
-        if (e.direction === "inbound") continue;
-        const norm = normalizePhone(customerSide(e));
-        const t = new Date(e.createdAt).getTime();
-        const hasSibling = realOutbound.some((s) => s.norm === norm && Math.abs(s.t - t) < 5 * 60 * 1000);
-        if (hasSibling) continue;
-      }
-      callMap.set(sid, e);
-    }
-
-    // Build recording + summary map from call_recording events
-    // A call can produce multiple call_recording events (processing → completed).
-    // Prefer the most complete one (non-processing status, has summary, has url).
-    const recordingEvents = events.filter((e) => e.type === "call_recording");
-    type RecInfo = { url?: string; summary?: string; transcript?: string; durationSec?: number };
-    // Recording length (seconds). A recording only exists for an answered leg,
-    // so a positive value is proof the call was actually answered/recorded.
-    const recDur = (e: TwilioConversationEvent) => {
-      const raw = e.payload?.RecordingDuration ?? e.payload?.recordingDuration;
-      const n = typeof raw === "number" ? raw : Number(raw);
-      return Number.isFinite(n) && n > 0 ? n : 0;
-    };
-    const recordingMap = new Map<string, RecInfo>();
-    const upsertRecording = (sid: string, e: TwilioConversationEvent) => {
-      if (!sid) return;
-      const existing = recordingMap.get(sid);
-      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
-      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
-      const url = e.recordingUrl || "";
-      const durationSec = recDur(e) || existing?.durationSec;
-      // Skip processing placeholders if we already have a completed one
-      if (existing && e.status === "processing" && existing.summary) return;
-      if (!existing || (summary && !existing.summary) || (url && !existing.url) || e.status !== "processing") {
-        recordingMap.set(sid, { url: url || existing?.url, summary: (e.status !== "processing" ? summary : "") || existing?.summary || summary, transcript: transcript || existing?.transcript, durationSec });
-      }
-    };
-
-    // Conference linkage: browser-initiated outbound calls (and transfers) run
-    // through a conference named `call-<parentSid>`. The recording callback can
-    // arrive with only a ConferenceSid, or with a leg/parent callSid that ISN'T
-    // the customer leg shown in the call list — so the recording/summary would
-    // otherwise never attach to the visible row (it only surfaced in the bell).
-    // Build maps so a recording can be traced to the customer's callSid no
-    // matter which SID (or none) its callback carried.
-    const confSidToName = new Map<string, string>();          // ConferenceSid → friendly name
-    const confNameToCustomer = new Map<string, string>();     // friendly name → customer callSid
-    const confNameParticipants = new Map<string, Set<string>>(); // friendly name → participant callSids
-    for (const e of events) {
-      if (e.type !== "call_status") continue;
-      const p = e.payload;
-      if (!p) continue;
-      const cs = typeof p.ConferenceSid === "string" ? p.ConferenceSid : "";
-      const fn = typeof p.FriendlyName === "string" ? p.FriendlyName : "";
-      if (!fn || !fn.startsWith("call-")) continue;
-      if (cs) confSidToName.set(cs, fn);
-      if (e.callSid) {
-        if (!confNameParticipants.has(fn)) confNameParticipants.set(fn, new Set());
-        confNameParticipants.get(fn)!.add(e.callSid);
-      }
-      if (p.ParticipantLabel === "customer" && e.callSid) confNameToCustomer.set(fn, e.callSid);
-    }
-    // Map every participant callSid (and the parent SID embedded in the
-    // conference name) to that conference's customer callSid.
-    const sidToCustomerSid = new Map<string, string>();
-    for (const [fn, customerSid] of confNameToCustomer) {
-      const parentSid = fn.slice("call-".length);
-      if (parentSid && parentSid !== customerSid) sidToCustomerSid.set(parentSid, customerSid);
-      for (const sid of confNameParticipants.get(fn) || []) {
-        if (sid !== customerSid) sidToCustomerSid.set(sid, customerSid);
-      }
-    }
-
-    // Resolve the customer callSid for a conference recording that carried no
-    // callSid, via its ConferenceSid.
-    const conferenceCustomerSid = (e: TwilioConversationEvent): string | undefined => {
-      const cs = typeof e.payload?.ConferenceSid === "string" ? e.payload.ConferenceSid : "";
-      if (!cs) return undefined;
-      const fn = confSidToName.get(cs);
-      return fn ? confNameToCustomer.get(fn) : undefined;
-    };
-
-    for (const e of recordingEvents) {
-      // Attach under the raw callSid (direct match) AND, when the call ran
-      // through a conference, under the customer leg's callSid so it lands on
-      // the row shown in the call list.
-      if (e.callSid) {
-        upsertRecording(e.callSid, e);
-        const mapped = sidToCustomerSid.get(e.callSid);
-        if (mapped) upsertRecording(mapped, e);
-      } else {
-        const customerSid = conferenceCustomerSid(e);
-        if (customerSid) upsertRecording(customerSid, e);
-      }
-    }
-
-    // Fallback: build a phone+time index from recording events for calls whose
-    // callSid doesn't appear in the recordingMap (Twilio may use a child leg
-    // SID for the recording callback that differs from the parent call SID).
-    const recordingByPhone = new Map<string, Array<{ time: number; url?: string; summary?: string; transcript?: string; durationSec?: number }>>();
-    for (const e of recordingEvents) {
-      const summary = typeof e.payload?.summary === "string" ? e.payload.summary : (e.body || "");
-      const transcript = typeof e.payload?.transcript === "string" ? e.payload.transcript : "";
-      const url = e.recordingUrl || "";
-      const durationSec = recDur(e);
-      if (!summary && !url && !durationSec) continue;
-      // Index under BOTH the from and to numbers: a recording callback for a
-      // forwarded/IVR-routed leg often arrives without a reliable `direction`,
-      // so keying only off one side would miss the caller's number and the
-      // recording would never attach to the call row.
-      const entry = { time: new Date(e.createdAt).getTime(), url, summary, transcript, durationSec };
-      for (const side of [e.from, e.to]) {
-        const normalized = (side || "").replace(/\D/g, "").slice(-10);
-        if (!normalized) continue;
-        if (!recordingByPhone.has(normalized)) recordingByPhone.set(normalized, []);
-        recordingByPhone.get(normalized)!.push(entry);
-      }
-    }
-
-    // Latest saved note per call leg (by timestamp, regardless of event order).
-    const notesMap = new Map<string, string>();
-    const noteTimeMap = new Map<string, number>();
-    for (const e of events) {
-      if (e.type !== "call_note" || !e.callSid) continue;
-      const note = typeof e.payload?.notes === "string" ? e.payload.notes : (e.body || "");
-      if (!note.trim()) continue;
-      const t = new Date(e.createdAt).getTime();
-      if (!noteTimeMap.has(e.callSid) || t >= (noteTimeMap.get(e.callSid) as number)) {
-        noteTimeMap.set(e.callSid, t);
-        notesMap.set(e.callSid, note);
-      }
-    }
-
-    // Calls whose recording exists but transcript/summary is not ready yet.
-    const processingSids = new Set<string>();
-    for (const e of recordingEvents) {
-      if (!e.callSid) continue;
-      const info = recordingMap.get(e.callSid);
-      const hasSummary = !!info?.summary;
-      if (e.status === "processing" && !hasSummary) processingSids.add(e.callSid);
-    }
-
-    const records: CallRecord[] = [];
-    for (const [, event] of callMap) {
-      const phone = event.direction === "inbound" ? event.from || "" : event.to || "";
-      const customer = matchCustomerByPhone(phone, phoneLookup);
-      const payload = event.payload || {};
-
-      // Resolve this call's recording once — direct callSid match first, then a
-      // phone + closest-time (within 10 min) fallback for forwarded/IVR-routed
-      // legs whose recording callback used a different SID.
-      const rec: RecInfo = (() => {
-        const bySid = recordingMap.get(event.callSid || "");
-        if (bySid?.summary || bySid?.url || bySid?.durationSec) return bySid;
-        const normalized = phone.replace(/\D/g, "").slice(-10);
-        const candidates = normalized ? recordingByPhone.get(normalized) : undefined;
-        if (!candidates?.length) return bySid || {};
-        const callTime = new Date(event.createdAt).getTime();
-        let best: typeof candidates[0] | undefined;
-        let bestDelta = Infinity;
-        for (const c of candidates) {
-          const delta = Math.abs(c.time - callTime);
-          if (delta < bestDelta && delta < 600_000) { bestDelta = delta; best = c; }
-        }
-        return {
-          url: best?.url || bySid?.url,
-          summary: best?.summary || bySid?.summary,
-          transcript: best?.transcript || bySid?.transcript,
-          durationSec: best?.durationSec || bySid?.durationSec,
-        };
-      })();
-      const hasRealRecording = Boolean(rec.url) || (rec.durationSec ?? 0) > 0;
-
-      // Duration: largest of every known source so it always shows and stays
-      // accurate — parent call length, <Dial> talk length, and the recording
-      // length (recovers duration if a status webhook was dropped).
-      const num = (v: unknown) => { const n = typeof v === "number" ? v : Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
-      const duration = Math.max(
-        num(payload.CallDuration),
-        num(payload.DialCallDuration),
-        num(payload.Duration),
-        num(payload.duration),
-        num(rec.durationSec),
-      );
-
-      const forwarded = isForwardedCall(event);
-      let displayName: string;
-      let tag: CallRecord["tag"];
-
-      if (forwarded && !customer && !phone) {
-        displayName = "Forwarded Call";
-        tag = "Forwarded";
-      } else if (forwarded) {
-        displayName = customer?.name || (phone ? formatPhoneDisplay(phone) : "Forwarded Call");
-        tag = "Forwarded";
-      } else if (customer?.name) {
-        displayName = customer.name;
-      } else if (phone) {
-        displayName = formatPhoneDisplay(phone);
-      } else {
-        continue; // skip calls with no identifiable phone number
-      }
-
-      // A recording only exists for an answered leg, so if we matched a real
-      // recording, the call was answered — even when the parent leg's status
-      // webhook says "No Answer" (e.g. an IVR-routed call answered on an
-      // external business number). Trust the recording over the status field.
-      let status = getCallStatusLabel(event);
-      if (hasRealRecording && (status.startsWith("No Answer") || status === "Unknown" || status === "Forwarded")) {
-        status = "Answered";
-      }
-      const dir = event.direction || "inbound";
-
-      records.push({
-        id: event.id,
-        customerName: displayName,
-        phone,
-        from: event.from || "",
-        to: event.to || "",
-        direction: dir,
-        status,
-        statusColor: getStatusColor(status, dir),
-        duration: formatDuration(duration),
-        durationSec: duration || 0,
-        dateTime: azDateTime(event.createdAt),
-        rawDate: event.createdAt,
-        callSid: event.callSid || "",
-        disposition: dispositions[phone] || undefined,
+    const records = normalizeCallHistory(events).flatMap((call): CallRecord[] => {
+      if (!call.customerPhone) return [];
+      const customer = matchCustomerByPhone(call.customerPhone, phoneLookup);
+      const unknownCaller = !customer;
+      const tags = Array.from(new Set([...call.tags, ...(unknownCaller ? ["Unknown Caller"] : [])]));
+      const answeredBy = call.answeredBy?.startsWith("+") ? formatPhoneDisplay(call.answeredBy) : call.answeredBy;
+      return [{
+        id: call.callSid,
+        customerName: customer?.name || formatPhoneDisplay(call.customerPhone),
+        phone: call.customerPhone,
+        from: call.from,
+        to: call.to,
+        direction: call.direction,
+        status: call.status,
+        statusColor: getStatusColor(call.status, call.direction),
+        duration: formatDuration(call.durationSec),
+        durationSec: call.durationSec,
+        dateTime: azDateTime(call.startAt),
+        endDateTime: call.endAt ? azDateTime(call.endAt) : undefined,
+        rawDate: call.startAt,
+        rawEndDate: call.endAt,
+        callSid: call.callSid,
+        disposition: call.disposition || legacyDispositions[call.customerPhone],
         customerId: customer?.id,
-        answeredBy: typeof payload.answeredByName === "string" && payload.answeredByName.trim() ? payload.answeredByName.trim() : undefined,
-        notes: event.callSid ? notesMap.get(event.callSid) : undefined,
-        recordingProcessing: event.callSid ? processingSids.has(event.callSid) : false,
-        tag,
-        twilioLine: event.to && dir === "inbound" ? formatPhoneDisplay(event.to) : event.from && dir === "outbound" ? formatPhoneDisplay(event.from) : undefined,
-        recordingUrl: rec.url,
-        summary: rec.summary,
-        transcript: rec.transcript,
-      });
-    }
-
-    records.sort((a, b) => new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime());
+        answeredBy,
+        notes: call.notes,
+        tags,
+        recordingProcessing: call.recordingProcessing,
+        tag: call.forwarded ? "Forwarded" : unknownCaller ? "Unknown Caller" : undefined,
+        twilioLine: call.companyLine,
+        recordingUrl: call.recordingUrl,
+        summary: call.summary,
+        transcript: call.transcript,
+      }];
+    });
     return records;
-  }, [events, dispositions, phoneLookup]);
+  }, [events, legacyDispositions, phoneLookup]);
 
   // Stats
   const stats = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayCalls = callRecords.filter((c) => c.rawDate.slice(0, 10) === todayStr);
-    const missed = callRecords.filter(
-      (c) => c.status === "No Answer" || c.status === "Busy" || c.status === "Canceled"
-    );
-    const inbound = callRecords.filter((c) => c.direction === "inbound");
-    const outbound = callRecords.filter((c) => c.direction === "outbound");
-    const answered = callRecords.filter((c) => c.status === "Answered");
-    const totalDuration = answered.reduce((sum, c) => sum + c.durationSec, 0);
+    const today = azParts(new Date());
+    const todayCalls = callRecords.filter((call) => {
+      const date = azParts(new Date(call.rawDate));
+      return date.year === today.year && date.month === today.month && date.day === today.day;
+    });
+    const missed = callRecords.filter((call) => call.status.startsWith("Missed") || call.status === "No Answer");
+    const inbound = callRecords.filter((call) => call.direction === "inbound");
+    const outbound = callRecords.filter((call) => call.direction === "outbound");
+    const answered = callRecords.filter((call) => call.status.startsWith("Answered") || call.status === "Outbound");
+    const totalDuration = answered.reduce((sum, call) => sum + call.durationSec, 0);
     const avgDuration = answered.length > 0 ? Math.round(totalDuration / answered.length) : 0;
 
     return {
@@ -699,27 +397,47 @@ export default function PhonePage() {
 
     if (callFilter === "Inbound") filtered = filtered.filter((c) => c.direction === "inbound");
     else if (callFilter === "Outbound") filtered = filtered.filter((c) => c.direction === "outbound");
-    else if (callFilter === "Missed") filtered = filtered.filter((c) => c.status === "No Answer" || c.status === "Busy" || c.status === "Canceled");
-    else if (callFilter === "Forwarded") filtered = filtered.filter((c) => c.tag === "Forwarded");
+    else if (callFilter === "Missed") filtered = filtered.filter((call) => call.status.startsWith("Missed") || call.status === "No Answer");
+    else if (callFilter === "Forwarded") filtered = filtered.filter((call) => call.tags.includes("Forwarded"));
+
+    if (lineFilter !== "all") filtered = filtered.filter((call) => call.twilioLine === lineFilter);
 
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(
-        (c) => c.customerName.toLowerCase().includes(q) || c.phone.includes(q) || (c.disposition && c.disposition.toLowerCase().includes(q))
+        (call) => call.customerName.toLowerCase().includes(q)
+          || call.phone.includes(q)
+          || call.callSid.toLowerCase().includes(q)
+          || Boolean(call.disposition?.toLowerCase().includes(q))
+          || call.tags.some((tag) => tag.toLowerCase().includes(q)),
       );
     }
 
     return filtered;
-  }, [callRecords, callFilter, search]);
+  }, [callRecords, callFilter, lineFilter, search]);
 
   const paginatedCalls = useMemo(() => filteredCalls.slice(0, perPage), [filteredCalls, perPage]);
 
-  // Handle disposition change
-  const handleDisposition = useCallback((phone: string, disposition: string) => {
-    saveDisposition(phone, disposition);
-    setDispositions(loadDispositions());
+  const saveCallMetadata = useCallback(async (call: CallRecord, disposition: string | undefined, tags: string[]) => {
+    await saveCallNotes({
+      callSid: call.callSid,
+      customerId: call.customerId,
+      notes: call.notes || "",
+      disposition,
+      tags,
+    });
     setShowDispositionPicker(null);
-  }, []);
+    await refreshEvents();
+  }, [refreshEvents]);
+
+  const handleDisposition = useCallback((call: CallRecord, disposition: string) => {
+    void saveCallMetadata(call, disposition, call.tags);
+  }, [saveCallMetadata]);
+
+  const handleTagToggle = useCallback((call: CallRecord, tag: string) => {
+    const tags = call.tags.includes(tag) ? call.tags.filter((value) => value !== tag) : [...call.tags, tag];
+    void saveCallMetadata(call, call.disposition, tags);
+  }, [saveCallMetadata]);
 
   // Block number
   const handleBlockNumber = useCallback(
@@ -1043,6 +761,15 @@ export default function PhonePage() {
                     {f}
                   </button>
                 ))}
+                <select
+                  value={lineFilter}
+                  onChange={(event) => setLineFilter(event.target.value)}
+                  aria-label="Filter calls by company line"
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 outline-none"
+                >
+                  <option value="all">All Lines</option>
+                  {twilioLines.map((line) => <option key={line.number} value={line.number}>{line.label}</option>)}
+                </select>
               </div>
               {/* Desktop search + pagination */}
               <div className="hidden items-center gap-3 lg:flex">
@@ -1108,8 +835,8 @@ export default function PhonePage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-500">
-                        {call.direction === "inbound" ? "Incoming Call" : "Outgoing Call"}
-                        {call.twilioLine ? ` · ${call.twilioLine}` : ""}
+                        {call.status}
+                        {call.twilioLine ? ` · ${getLineLabelForNumber(call.twilioLine) || formatPhoneDisplay(call.twilioLine)}` : ""}
                       </p>
                       {call.answeredBy && (
                         <p className="mt-0.5 text-[11px] font-semibold text-green-600">Answered by {call.answeredBy}</p>
@@ -1121,11 +848,14 @@ export default function PhonePage() {
                         </span>
                         <span>{call.dateTime}</span>
                       </div>
-                      {call.disposition && (
-                        <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>
-                          {call.disposition}
-                        </span>
-                      )}
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {call.disposition && (
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}>
+                            {call.disposition}
+                          </span>
+                        )}
+                        {call.tags.map((tag) => <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">{tag}</span>)}
+                      </div>
                       {(call.recordingUrl || call.summary) && (
                         <div className="mt-2 space-y-1 rounded-md bg-blue-50/60 px-2.5 py-2">
                           {call.recordingUrl && <audio controls src={proxyRecordingUrl(call.recordingUrl)} className="h-7 w-full max-w-[220px]" preload="none" />}
@@ -1138,6 +868,12 @@ export default function PhonePage() {
                               <FileText className="h-3 w-3" />
                               View AI Summary
                             </button>
+                          )}
+                          {!call.summary && call.recordingProcessing && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                              Transcript and summary processing…
+                            </span>
                           )}
                         </div>
                       )}
@@ -1179,7 +915,7 @@ export default function PhonePage() {
                       onClick={() => setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id)}
                       className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 active:bg-gray-50"
                     >
-                      + Tag
+                      Disposition / Tags
                     </button>
                   </div>
 
@@ -1190,10 +926,20 @@ export default function PhonePage() {
                         <button
                           key={d}
                           type="button"
-                          onClick={() => handleDisposition(call.phone, d)}
+                          onClick={() => handleDisposition(call, d)}
                           className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${getDispositionColor(d)} active:opacity-70`}
                         >
                           {d}
+                        </button>
+                      ))}
+                      {CALL_TAGS.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleTagToggle(call, tag)}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${call.tags.includes(tag) ? "bg-blue-50 text-blue-700 ring-blue-200" : "bg-gray-50 text-gray-600 ring-gray-200"}`}
+                        >
+                          {tag}
                         </button>
                       ))}
                     </div>
@@ -1250,7 +996,7 @@ export default function PhonePage() {
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Time</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Recording / Summary</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Duration</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Disposition</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Disposition / Tags</th>
                     <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-500">Line</th>
                     <th className="pr-6 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-gray-500">Quick Action</th>
                   </tr>
@@ -1294,31 +1040,22 @@ export default function PhonePage() {
                             <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                           )}
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-gray-900">{call.customerName}</p>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); openJobPanel(call.phone, call.customerName); }}
-                              className="block truncate text-xs text-gray-400 hover:text-blue-500 hover:underline"
-                            >
-                              {call.from ? formatPhoneDisplay(call.from) : "-"}
-                            </button>
+                            <p className="truncate text-sm font-semibold text-gray-900">
+                              {call.direction === "inbound" ? call.customerName : getLineLabelForNumber(call.from) || "Company Line"}
+                            </p>
+                            <p className="truncate text-xs text-gray-400">{call.from ? formatPhoneDisplay(call.from) : "-"}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        {call.to ? (() => {
-                          const lineLabel = getLineLabelForNumber(call.to);
-                          return lineLabel ? (
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-gray-700">{lineLabel}</p>
-                              <p className="truncate text-xs text-gray-400">{formatPhoneDisplay(call.to)}</p>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-600">{formatPhoneDisplay(call.to)}</p>
-                          );
-                        })() : (
-                          <p className="text-sm text-gray-600">-</p>
-                        )}
+                        {call.to ? (
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-700">
+                              {call.direction === "outbound" ? call.customerName : getLineLabelForNumber(call.to) || "Company Line"}
+                            </p>
+                            <p className="truncate text-xs text-gray-400">{formatPhoneDisplay(call.to)}</p>
+                          </div>
+                        ) : <p className="text-sm text-gray-600">-</p>}
                       </td>
                       <td className="px-3 py-3">
                         <p className="text-sm text-gray-600">{call.dateTime}</p>
@@ -1357,50 +1094,59 @@ export default function PhonePage() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="relative">
-                          {call.disposition ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id);
-                              }}
-                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${getDispositionColor(call.disposition)}`}
-                            >
-                              {call.disposition}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id);
-                              }}
-                              className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-                            >
-                              + Tag
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setShowDispositionPicker(showDispositionPicker === call.id ? null : call.id);
+                            }}
+                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${call.disposition ? getDispositionColor(call.disposition) : "bg-gray-100 text-gray-400 ring-gray-200 hover:text-gray-600"}`}
+                          >
+                            {call.disposition || "Set"}
+                          </button>
+                          <div className="mt-1 flex max-w-48 flex-wrap gap-1">
+                            {call.tags.map((tag) => <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">{tag}</span>)}
+                          </div>
                           {showDispositionPicker === call.id && (
-                            <div className="absolute left-0 top-7 z-50 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
-                              {LEAD_DISPOSITIONS.map((d) => (
+                            <div className="absolute left-0 top-7 z-50 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+                              <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Disposition</p>
+                              {LEAD_DISPOSITIONS.map((disposition) => (
                                 <button
-                                  key={d}
+                                  key={disposition}
                                   type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDisposition(call.phone, d);
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDisposition(call, disposition);
                                   }}
                                   className="w-full px-3 py-1.5 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                 >
-                                  {d}
+                                  {disposition}
                                 </button>
                               ))}
+                              <p className="border-t border-gray-100 px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Tags</p>
+                              <div className="flex flex-wrap gap-1 px-2 pb-2">
+                                {CALL_TAGS.map((tag) => (
+                                  <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={(event) => { event.stopPropagation(); handleTagToggle(call, tag); }}
+                                    className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 ${call.tags.includes(tag) ? "bg-blue-50 text-blue-700 ring-blue-200" : "bg-gray-50 text-gray-600 ring-gray-200"}`}
+                                  >
+                                    {tag}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="px-3 py-3">
-                        <p className="text-xs text-gray-400">{call.twilioLine || "-"}</p>
+                        {call.twilioLine ? (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600">{getLineLabelForNumber(call.twilioLine) || "Company Line"}</p>
+                            <p className="text-[11px] text-gray-400">{formatPhoneDisplay(call.twilioLine)}</p>
+                          </div>
+                        ) : <p className="text-xs text-gray-400">-</p>}
                       </td>
                       <td className="pr-6 py-3">
                         <div className="flex items-center justify-end gap-1.5">
@@ -1490,12 +1236,24 @@ export default function PhonePage() {
                     <p className="text-sm font-semibold text-gray-900">{selectedCall.duration}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Date / Time</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Started</p>
                     <p className="text-sm font-semibold text-gray-900">{selectedCall.dateTime}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Line</p>
-                    <p className="text-sm font-semibold text-gray-900">{selectedCall.twilioLine || "—"}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Ended</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.endDateTime || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">From</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.from ? formatPhoneDisplay(selectedCall.from) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">To</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.to ? formatPhoneDisplay(selectedCall.to) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Company Line</p>
+                    <p className="text-sm font-semibold text-gray-900">{selectedCall.twilioLine ? `${getLineLabelForNumber(selectedCall.twilioLine) || "Company Line"} · ${formatPhoneDisplay(selectedCall.twilioLine)}` : "—"}</p>
                   </div>
                 </div>
 
@@ -1538,12 +1296,22 @@ export default function PhonePage() {
                   </details>
                 )}
 
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Disposition / Tags</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedCall.disposition && <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${getDispositionColor(selectedCall.disposition)}`}>{selectedCall.disposition}</span>}
+                    {selectedCall.tags.map((tag) => <span key={tag} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">{tag}</span>)}
+                    {!selectedCall.disposition && selectedCall.tags.length === 0 && <span className="text-xs text-gray-400">None</span>}
+                  </div>
+                </div>
+
                 {/* Notes */}
                 <CallNotesEditor
                   key={selectedCall.id}
                   callSid={selectedCall.callSid}
                   customerId={selectedCall.customerId}
                   disposition={selectedCall.disposition}
+                  tags={selectedCall.tags}
                   initialNotes={selectedCall.notes || ""}
                 />
 
@@ -1588,13 +1356,8 @@ export default function PhonePage() {
           <div className="p-4 lg:p-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {twilioLines.map((line) => {
-                const lineCalls = callRecords.filter((c) => {
-                  const lineNum = line.number.replace(/\D/g, "");
-                  const fromDigits = (c.from || "").replace(/\D/g, "");
-                  const toDigits = (c.to || "").replace(/\D/g, "");
-                  return fromDigits.endsWith(lineNum.slice(-10)) || toDigits.endsWith(lineNum.slice(-10));
-                });
-                const missed = lineCalls.filter((c) => c.status === "No Answer" || c.status === "Busy" || c.status === "Canceled").length;
+                const lineCalls = callRecords.filter((call) => call.twilioLine === line.number);
+                const missed = lineCalls.filter((call) => call.status.startsWith("Missed") || call.status === "No Answer").length;
                 return (
                   <div key={line.key} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
@@ -2014,11 +1777,13 @@ function CallNotesEditor({
   callSid,
   customerId,
   disposition,
+  tags,
   initialNotes,
 }: {
   callSid: string;
   customerId?: string;
   disposition?: string;
+  tags: string[];
   initialNotes: string;
 }) {
   const [draft, setDraft] = useState(initialNotes);
@@ -2030,7 +1795,7 @@ function CallNotesEditor({
     setSaving(true);
     setSaved(false);
     try {
-      await saveCallNotes({ callSid, customerId, notes: draft.trim(), disposition });
+      await saveCallNotes({ callSid, customerId, notes: draft.trim(), disposition, tags });
       setSaved(true);
     } catch { /* surfaced via lack of confirmation */ }
     setSaving(false);
