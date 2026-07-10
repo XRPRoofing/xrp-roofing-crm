@@ -124,6 +124,12 @@ export function createTwilioCrmNotification(event: TwilioConversationEvent) {
 }
 
 export function addTwilioCrmNotification(event: TwilioConversationEvent) {
+  if (
+    Number(event.payload.reconciledCallMetadataVersion || 0) > 0
+    || event.payload.source === "twilio-reconciliation"
+    || event.payload.reconciledFromTwilio === true
+  ) return;
+
   const notification = createTwilioCrmNotification(event);
   if (!notification) return;
 
