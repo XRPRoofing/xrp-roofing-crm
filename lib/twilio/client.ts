@@ -295,8 +295,14 @@ export async function reportCallAnswered(
 // recording / transcript / summary a dropped Twilio webhook left missing, so
 // the central call history stays complete for every admin. Throttled per
 // browser so opening the Phone page repeatedly doesn't spam Twilio.
-export async function reconcileRecentCalls(minGapMs = 180_000) {
+export async function reconcileRecentCalls(opts?: {
+  minGapMs?: number;
+  sinceMinutes?: number;
+  maxCalls?: number;
+  maxRecordings?: number;
+}) {
   try {
+    const minGapMs = opts?.minGapMs ?? 180_000;
     const key = "crm-last-call-reconcile";
     const last = Number(localStorage.getItem(key) || 0);
     if (Date.now() - last < minGapMs) return;
@@ -307,7 +313,12 @@ export async function reconcileRecentCalls(minGapMs = 180_000) {
     await fetch("/api/twilio/calls/reconcile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({
+        token,
+        sinceMinutes: opts?.sinceMinutes,
+        maxCalls: opts?.maxCalls,
+        maxRecordings: opts?.maxRecordings,
+      }),
     });
   } catch {
     // Best-effort; realtime + periodic refetch still keep views in sync.

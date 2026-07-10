@@ -6,8 +6,11 @@ import { publishConversationEvent } from "@/lib/twilio/realtime";
 const noteSchema = z.object({
   callSid: z.string().min(1),
   conversationId: z.string().optional(),
+  customerId: z.string().optional(),
+  jobId: z.string().optional(),
   notes: z.string(),
   disposition: z.string().optional(),
+  tags: z.array(z.string().min(1)).max(20).optional(),
 });
 
 export async function POST(req: NextRequest) {
