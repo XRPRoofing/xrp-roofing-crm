@@ -21,6 +21,13 @@ const eventSchema = z.object({
 });
 
 const updateEventSchema = eventSchema.extend({ id: z.string().min(1) });
+const moveEventSchema = z.object({
+  id: z.string().min(1),
+  date: z.string().min(1),
+  endDate: z.string().min(1).optional(),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
+});
 
 type GoogleTokens = {
   access_token?: string;
@@ -202,6 +209,28 @@ export async function PUT(req: NextRequest) {
 
   if (!response.ok) {
     return NextResponse.json({ error: "Unable to update Google Calendar event. Please reconnect Google Calendar." }, { status: 502 });
+  }
+
+  return withRefreshedCookie(NextResponse.json({ event: await response.json() }), refreshedTokens);
+}
+
+export async function PATCH(req: NextRequest) {
+  const payload = moveEventSchema.parse(await req.json());
+  const { id, date, endDate, startTime, endTime } = payload;
+  const { connected, response, refreshedTokens } = await googleCalendarFetch(req, `/calendars/primary/events/${encodeURIComponent(id)}?sendUpdates=all`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      start: { dateTime: `${date}T${startTime}:00`, timeZone: "America/Phoenix" },
+      end: { dateTime: `${endDate || date}T${endTime}:00`, timeZone: "America/Phoenix" },
+    }),
+  });
+
+  if (!connected || !response) {
+    return NextResponse.json({ error: "Google Calendar is not connected." }, { status: 401 });
+  }
+
+  if (!response.ok) {
+    return NextResponse.json({ error: "Unable to move Google Calendar event. Please reconnect Google Calendar." }, { status: 502 });
   }
 
   return withRefreshedCookie(NextResponse.json({ event: await response.json() }), refreshedTokens);

@@ -95,6 +95,8 @@ export function createTwilioCrmNotification(event: TwilioConversationEvent) {
   const name = findContactName(phone);
   const direction = event.direction === "outbound" ? "Outbound" : "Inbound";
 
+  if (event.type === "message_status" && event.direction === "outbound") return null;
+
   if (event.type === "incoming_sms" || event.type === "message_status") {
     return {
       title: `${direction} text ${event.type === "message_status" ? event.status || "sent" : "received"}`,

@@ -9,7 +9,7 @@
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import type { CrmNotification } from "@/lib/crm-notifications";
-import { readCrmNotifications, readDeletedNotificationIds, saveCrmNotifications } from "@/lib/crm-notifications";
+import { isUserFacingCrmNotification, readCrmNotifications, readDeletedNotificationIds, saveCrmNotifications } from "@/lib/crm-notifications";
 
 const TABLE = "crm_notifications";
 
@@ -77,27 +77,17 @@ export async function loadNotificationsFromSupabase(): Promise<CrmNotification[]
     // Merge: remote notifications take priority, keep any local-only ones
     const remoteIds = new Set(remote.map((n) => n.id));
     const localOnly = readCrmNotifications().filter((n) => !remoteIds.has(n.id));
-    const merged = [...remote, ...localOnly].slice(0, 80);
+    const merged = [...remote, ...localOnly].filter(isUserFacingCrmNotification).slice(0, 80);
 
-    // Dedup notifications with identical title+message (keeps the most recent).
-    // Old bug created duplicate "Payment received" notifications with unique
-    // timestamp-based IDs for the same invoice on every page load.
-    const seen = new Map<string, number>();
-    const duplicateIds: string[] = [];
-    const deduped = merged.filter((n, i) => {
+    // Dedup notifications with identical title+message for display while
+    // leaving persisted notification history untouched.
+    const seen = new Set<string>();
+    const deduped = merged.filter((n) => {
       const key = `${n.title}::${n.message}`;
-      if (seen.has(key)) {
-        duplicateIds.push(n.id);
-        return false;
-      }
-      seen.set(key, i);
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
-
-    // Fire-and-forget cleanup of duplicate rows from Supabase
-    if (duplicateIds.length > 0) {
-      void supabase.from(TABLE).delete().in("id", duplicateIds).then(() => {});
-    }
 
     // Filter out notifications the user has locally deleted (prevents reappearance)
     const deletedIds = readDeletedNotificationIds();
