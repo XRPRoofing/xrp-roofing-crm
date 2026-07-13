@@ -302,6 +302,7 @@ export default function CalendarPage() {
   // update the same Google event instead of creating duplicates. Populated from
   // the Google events' extendedProperties.private.crmEventId on every load.
   const crmToGoogleRef = useRef<Map<string, string>>(new Map());
+  const [crmToGoogleLinks, setCrmToGoogleLinks] = useState<Map<string, string>>(new Map());
 
   // URL search params for deep-linking (e.g. ?view=day&date=2026-06-22)
   const searchParams = useSearchParams();
@@ -577,8 +578,15 @@ export default function CalendarPage() {
         if (crmEventId && ge.id) linkMap.set(crmEventId, ge.id);
       }
       crmToGoogleRef.current = linkMap;
+      setCrmToGoogleLinks(linkMap);
 
-      const gcalEvents: CalendarEvent[] = rawGcalEvents.map(mapGoogleEvent);
+      const crmEventIds = new Set(crmEvents.map((event) => event.id));
+      const gcalEvents: CalendarEvent[] = rawGcalEvents
+        .filter((event) => {
+          const crmEventId = event.extendedProperties?.private?.crmEventId;
+          return !crmEventId || !crmEventIds.has(crmEventId);
+        })
+        .map(mapGoogleEvent);
 
       // Merge: preserve optimistic entries that haven't been confirmed yet
       setEvents((prev) => {
@@ -697,32 +705,90 @@ export default function CalendarPage() {
     setDragOverDate(null);
   }
 
-  async function handleDrop(e: React.DragEvent, dateKey: string) {
+  async function handleDrop(e: React.DragEvent, dateKey: string, hour?: number) {
     e.preventDefault();
     setDragOverDate(null);
     const eventId = e.dataTransfer.getData("text/plain") || dragEventId;
     setDragEventId(null);
     if (!eventId) return;
-    const ev = events.find((x) => x.id === eventId);
-    if (!ev) return;
-    const [y, m, d] = dateKey.split("-").map(Number);
-    const oldStart = new Date(ev.start_time);
-    const oldEnd = new Date(ev.end_time);
-    const diff = oldEnd.getTime() - oldStart.getTime();
-    const newStart = new Date(oldStart);
-    newStart.setFullYear(y, m - 1, d);
-    const newEnd = new Date(newStart.getTime() + diff);
-    const updated = { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), updated_at: new Date().toISOString() };
-    setEvents((prev) => prev.map((x) => x.id === eventId ? updated : x));
-    setStatusMessage("Event moved.");
-    setTimeout(() => setStatusMessage(""), 2000);
+
+    const event = events.find((item) => item.id === eventId);
+    if (!event) return;
+
+    const oldStart = new Date(event.start_time);
+    const oldEnd = new Date(event.end_time);
+    const duration = oldEnd.getTime() - oldStart.getTime();
+    const targetTime = hour === undefined ? isoTime(oldStart) : `${String(hour).padStart(2, "0")}:00`;
+    const newStart = new Date(`${dateKey}T${targetTime}:00-07:00`);
+    const newEnd = new Date(newStart.getTime() + duration);
+    const updated = {
+      ...event,
+      start_time: newStart.toISOString(),
+      end_time: newEnd.toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    let rollbackUi = true;
+
+    setError("");
+    setStatusMessage("Moving event...");
+    setEvents((prev) => prev.map((item) => item.id === eventId ? updated : item));
+
     try {
-      const { updateCalendarEvent } = await import("@/lib/calendar-sync");
-      await updateCalendarEvent(eventId, { start_time: updated.start_time, end_time: updated.end_time });
+      const moveGoogleEvent = async (googleId: string) => {
+        const response = await fetch("/api/google-calendar/events", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: googleId,
+            date: isoDate(newStart),
+            endDate: isoDate(newEnd),
+            startTime: isoTime(newStart),
+            endTime: isoTime(newEnd),
+          }),
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as { event?: GoogleCalendarEvent };
+        return data.event ? mapGoogleEvent(data.event) : null;
+      };
+
+      if (isGoogleEvent(event)) {
+        const movedGoogleEvent = await moveGoogleEvent(event.id.slice(GCAL_PREFIX.length));
+        if (!movedGoogleEvent) throw new Error("Unable to move Google Calendar event.");
+        setEvents((prev) => prev.map((item) => item.id === eventId ? movedGoogleEvent : item));
+      } else {
+        const savedEvent = await updateCalendarEvent(eventId, {
+          start_time: updated.start_time,
+          end_time: updated.end_time,
+        });
+        if (!savedEvent) throw new Error("Unable to move event.");
+        setEvents((prev) => prev.map((item) => item.id === eventId ? savedEvent : item));
+
+        const linkedGoogleId = crmToGoogleLinks.get(eventId);
+        if (googleConnected && linkedGoogleId) {
+          const movedGoogleEvent = await moveGoogleEvent(linkedGoogleId);
+          if (!movedGoogleEvent) {
+            const restoredEvent = await updateCalendarEvent(eventId, {
+              start_time: event.start_time,
+              end_time: event.end_time,
+            });
+            if (!restoredEvent) {
+              rollbackUi = false;
+              throw new Error("Google sync failed and the CRM rollback could not be confirmed. Refresh the calendar before trying again.");
+            }
+            throw new Error("Google Calendar sync failed. The event was returned to its original time.");
+          }
+        }
+      }
+
       broadcastCrmUpdate();
-    } catch {
-      setEvents((prev) => prev.map((x) => x.id === eventId ? ev : x));
-      setError("Failed to move event.");
+      setStatusMessage("Event moved.");
+      setTimeout(() => setStatusMessage(""), 2000);
+    } catch (error) {
+      if (rollbackUi) {
+        setEvents((prev) => prev.map((item) => item.id === eventId ? event : item));
+      }
+      setStatusMessage("");
+      setError(error instanceof Error ? error.message : "Failed to move event.");
     }
   }
 
@@ -818,6 +884,7 @@ export default function CalendarPage() {
       const data = (await response.json()) as { event?: GoogleCalendarEvent };
       if (data.event?.id && payload.crmEventId) {
         crmToGoogleRef.current.set(payload.crmEventId, data.event.id);
+        setCrmToGoogleLinks(new Map(crmToGoogleRef.current));
       }
     } catch {
       setError("Saved to the CRM, but couldn't sync to Google Calendar.");
@@ -1147,6 +1214,7 @@ export default function CalendarPage() {
       const linkedGoogleId = crmToGoogleRef.current.get(deletedEvent.id);
       if (googleConnected && linkedGoogleId) {
         crmToGoogleRef.current.delete(deletedEvent.id);
+        setCrmToGoogleLinks(new Map(crmToGoogleRef.current));
         void fetch(`/api/google-calendar/events?id=${encodeURIComponent(linkedGoogleId)}`, {
           method: "DELETE",
         }).catch(() => {});
@@ -1461,7 +1529,7 @@ export default function CalendarPage() {
                     style={{ minHeight: `${cellHeight}px` }}
                     onDragOver={(e) => handleDragOver(e, key)}
                     onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, key)}
+                    onDrop={(e) => handleDrop(e, key, hour)}
                   >
                     {hourEvents.map((ev) => {
                       const span = Math.max(

@@ -14,6 +14,10 @@ export type CrmNotification = {
 export const crmNotificationsStorageKey = "xrp-crm-notifications";
 const crmDeletedNotificationsStorageKey = "xrp-crm-deleted-notifications";
 
+export function isUserFacingCrmNotification(notification: CrmNotification) {
+  return !(notification.module === "Conversations" && notification.title.startsWith("Outbound text "));
+}
+
 export function readDeletedNotificationIds() {
   if (typeof window === "undefined") return [] as string[];
 
@@ -36,7 +40,11 @@ export function readCrmNotifications() {
 
   try {
     const deletedIds = readDeletedNotificationIds();
-    const filtered = (JSON.parse(savedNotifications) as CrmNotification[]).filter((notification) => notification.status !== "deleted" && !deletedIds.includes(notification.id));
+    const filtered = (JSON.parse(savedNotifications) as CrmNotification[]).filter((notification) => (
+      notification.status !== "deleted"
+      && !deletedIds.includes(notification.id)
+      && isUserFacingCrmNotification(notification)
+    ));
     // Dedup by title+message (keeps the first = most recent, since ordered newest-first)
     const seen = new Set<string>();
     return filtered.filter((n) => {
