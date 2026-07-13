@@ -719,7 +719,15 @@ export default function CalendarPage() {
     const oldEnd = new Date(event.end_time);
     const duration = oldEnd.getTime() - oldStart.getTime();
     const targetTime = hour === undefined ? isoTime(oldStart) : `${String(hour).padStart(2, "0")}:00`;
-    const newStart = new Date(`${dateKey}T${targetTime}:00-07:00`);
+    // dateKey is an internal grid key ("YYYY-M-D" with a 0-based, unpadded month),
+    // not an ISO date. Rebuild a valid Arizona-time (UTC-7, no DST) ISO string.
+    const [keyYear, keyMonth0, keyDay] = dateKey.split("-").map(Number);
+    const isoDayKey = `${keyYear}-${String(keyMonth0 + 1).padStart(2, "0")}-${String(keyDay).padStart(2, "0")}`;
+    const newStart = new Date(`${isoDayKey}T${targetTime}:00-07:00`);
+    if (Number.isNaN(newStart.getTime())) {
+      setError("Failed to move event.");
+      return;
+    }
     const newEnd = new Date(newStart.getTime() + duration);
     const updated = {
       ...event,
