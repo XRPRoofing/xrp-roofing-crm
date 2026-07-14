@@ -156,6 +156,75 @@ function JobValueInput({ value, onCommit, className }: { value: number; onCommit
   );
 }
 
+// Local-state text input: displays what the user types and only pulls in
+// external (realtime) updates when the field is not focused. This prevents the
+// value from flickering/reverting mid-keystroke when a Supabase realtime echo
+// refreshes the jobs list while typing. Live edits still propagate via onChange.
+function JobTextInput({
+  value,
+  onChange,
+  type,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [text, setText] = useState(value);
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setText(value);
+  }, [value]);
+  return (
+    <input
+      type={type}
+      value={text}
+      placeholder={placeholder}
+      className={className}
+      onFocus={() => { focusedRef.current = true; }}
+      onBlur={() => { focusedRef.current = false; setText(value); }}
+      onChange={(event) => {
+        setText(event.target.value);
+        onChange(event.target.value);
+      }}
+    />
+  );
+}
+
+function JobTextArea({
+  value,
+  onChange,
+  rows,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+  className?: string;
+}) {
+  const [text, setText] = useState(value);
+  const focusedRef = useRef(false);
+  useEffect(() => {
+    if (!focusedRef.current) setText(value);
+  }, [value]);
+  return (
+    <textarea
+      value={text}
+      rows={rows}
+      className={className}
+      onFocus={() => { focusedRef.current = true; }}
+      onBlur={() => { focusedRef.current = false; setText(value); }}
+      onChange={(event) => {
+        setText(event.target.value);
+        onChange(event.target.value);
+      }}
+    />
+  );
+}
+
 function formatDueDate(value?: string) {
   if (!value) return "No date";
   const date = new Date(`${value}T12:00:00-07:00`);
@@ -1813,36 +1882,36 @@ export default function LeadsPage() {
 
             <div className="space-y-3 p-4">
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Customer Name<input value={selectedJob.name} onChange={(event) => updateJob(selectedJob.id, { name: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">City<input value={selectedJob.city} onChange={(event) => updateJob(selectedJob.id, { city: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Customer Name<JobTextInput key={selectedJob.id} value={selectedJob.name} onChange={(value) => updateJob(selectedJob.id, { name: value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">City<JobTextInput key={selectedJob.id} value={selectedJob.city} onChange={(value) => updateJob(selectedJob.id, { city: value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Phone
                   <div className="flex items-center gap-1">
-                    <input value={selectedJob.phone} onChange={(event) => updateJob(selectedJob.id, { phone: event.target.value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
+                    <JobTextInput key={selectedJob.id} value={selectedJob.phone} onChange={(value) => updateJob(selectedJob.id, { phone: value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
                     {selectedJob.phone && <button type="button" onClick={() => { const digits = selectedJob.phone.replace(/[^\d+]/g, ""); if (digits) window.dispatchEvent(new CustomEvent("crm:open-dialer", { detail: { phone: digits } })); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Phone className="h-4 w-4" /></button>}
                     {selectedJob.phone && <button onClick={() => setSmsTarget({ phone: selectedJob.phone, name: selectedJob.name })} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-green-500 text-white hover:bg-green-600"><MessageSquare className="h-4 w-4" /></button>}
                   </div>
                 </label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Email
                   <div className="flex items-center gap-1">
-                    <input type="email" value={selectedJob.email} onChange={(event) => updateJob(selectedJob.id, { email: event.target.value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
+                    <JobTextInput key={selectedJob.id} type="email" value={selectedJob.email} onChange={(value) => updateJob(selectedJob.id, { email: value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
                     {selectedJob.email && <a href={`mailto:${selectedJob.email}`} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><Mail className="h-4 w-4" /></a>}
                   </div>
                 </label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Address
                   <div className="flex items-center gap-1">
-                    <input value={selectedJob.address} onChange={(event) => updateJob(selectedJob.id, { address: event.target.value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
+                    <JobTextInput key={selectedJob.id} value={selectedJob.address} onChange={(value) => updateJob(selectedJob.id, { address: value })} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" />
                     {selectedJob.address && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedJob.address}, ${selectedJob.city}, AZ`)}`} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600"><MapPin className="h-4 w-4" /></a>}
                   </div>
                 </label>
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Year of Roof / House<input value={selectedJob.roofYear || ""} onChange={(event) => updateJob(selectedJob.id, { roofYear: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" placeholder="e.g. 2008" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Year of Roof / House<JobTextInput key={selectedJob.id} value={selectedJob.roofYear || ""} onChange={(value) => updateJob(selectedJob.id, { roofYear: value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" placeholder="e.g. 2008" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Job Value<JobValueInput key={selectedJob.id} value={selectedJob.value} onCommit={(value) => updateJob(selectedJob.id, { value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Assigned Rep<input value={selectedJob.assignedTo} onChange={(event) => updateJob(selectedJob.id, { assignedTo: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Assigned Rep<JobTextInput key={selectedJob.id} value={selectedJob.assignedTo} onChange={(value) => updateJob(selectedJob.id, { assignedTo: value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Lead Source<select value={selectedJob.source || ""} onChange={(event) => updateJob(selectedJob.id, { source: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none">{LEAD_SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Status<select value={selectedJob.stage} onChange={(event) => updateJobStage(selectedJob.id, event.target.value as LeadStage)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none">{leadStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}</select></label>
                 <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500">Due Date<input type="date" value={selectedJob.dueDate || ""} onChange={(event) => updateJob(selectedJob.id, { dueDate: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
-                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Next Action<input value={selectedJob.nextAction || ""} onChange={(event) => updateJob(selectedJob.id, { nextAction: event.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Next Action<JobTextInput key={selectedJob.id} value={selectedJob.nextAction || ""} onChange={(value) => updateJob(selectedJob.id, { nextAction: value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 {selectedJob.callNotes && (
-                  <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Call Notes<textarea value={selectedJob.callNotes} onChange={(event) => updateJob(selectedJob.id, { callNotes: event.target.value })} rows={3} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
+                  <label className="grid gap-1 text-xs font-medium uppercase tracking-wide text-gray-500 sm:col-span-2">Call Notes<JobTextArea key={selectedJob.id} value={selectedJob.callNotes || ""} onChange={(value) => updateJob(selectedJob.id, { callNotes: value })} rows={3} className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium normal-case tracking-normal text-gray-900 outline-none" /></label>
                 )}
               </div>
 
