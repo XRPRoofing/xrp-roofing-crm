@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "sales_rep" | "office_staff";
 
-export type LeadStage = "new_lead" | "inspection_scheduled" | "inspection_complete" | "estimate_sent" | "follow_up" | "waiting_approval" | "approved" | "scheduled" | "in_progress" | "final_inspection" | "completed" | "paid";
+export type LeadStage = "new_lead" | "inspection_scheduled" | "inspection_complete" | "disqualified" | "estimate_sent" | "follow_up" | "declined_lost" | "waiting_approval" | "approved" | "scheduled" | "in_progress" | "final_inspection" | "completed" | "paid";
 
 export type Priority = "low" | "medium" | "high" | "urgent";
 

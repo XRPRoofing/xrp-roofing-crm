@@ -197,7 +197,7 @@ function getSourceColor(source: string) {
 }
 
 function getUrgency(job: Lead) {
-  if (!job.dueDate || job.stage === "completed" || job.stage === "paid") return { label: "On Track", className: "border-l-blue-500", dot: "bg-blue-500", text: "text-blue-700" };
+  if (!job.dueDate || job.stage === "completed" || job.stage === "paid" || job.stage === "disqualified" || job.stage === "declined_lost") return { label: "On Track", className: "border-l-blue-500", dot: "bg-blue-500", text: "text-blue-700" };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(`${job.dueDate}T00:00:00`);
@@ -1129,7 +1129,7 @@ export default function LeadsPage() {
         const due = new Date(`${job.dueDate}T00:00:00`);
         return due >= now && due <= weekEnd;
       }).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
-      { label: "Active Jobs", value: filteredJobs.filter((job) => !["completed", "paid"].includes(job.stage)).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
+      { label: "Active Jobs", value: filteredJobs.filter((job) => !["completed", "paid", "disqualified", "declined_lost"].includes(job.stage)).length, tone: "text-blue-700 bg-blue-50 border-blue-100" },
       { label: "Completed This Month", value: filteredJobs.filter((job) => {
         if (!["completed", "paid"].includes(job.stage)) return false;
         const dateStr = (job as Lead & { originalDueDate?: string }).originalDueDate;
