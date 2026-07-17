@@ -103,6 +103,7 @@ export function toArizonaISO(date: string, time?: string): string {
 
 // ── Job ↔ Calendar Event linking (localStorage map) ───────────────
 const JOB_CAL_MAP_KEY = "xrp:job-calendar-map";
+const CALENDAR_JOB_MAP_KEY = "xrp:calendar-job-map";
 
 function readJobCalMap(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -114,20 +115,53 @@ function writeJobCalMap(map: Record<string, string>) {
   localStorage.setItem(JOB_CAL_MAP_KEY, JSON.stringify(map));
 }
 
+function readCalJobMap(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const map = JSON.parse(localStorage.getItem(CALENDAR_JOB_MAP_KEY) || "{}") as Record<string, string>;
+    // Seed the reverse map from the legacy job→calendar map on first read
+    const legacy = JSON.parse(localStorage.getItem(JOB_CAL_MAP_KEY) || "{}") as Record<string, string>;
+    for (const [jobId, eventId] of Object.entries(legacy)) {
+      if (eventId && !map[eventId]) map[eventId] = jobId;
+    }
+    return map;
+  } catch { return {}; }
+}
+
+function writeCalJobMap(map: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CALENDAR_JOB_MAP_KEY, JSON.stringify(map));
+}
+
 export function linkJobToCalendarEvent(jobId: string, calendarEventId: string) {
   const map = readJobCalMap();
   map[jobId] = calendarEventId;
   writeJobCalMap(map);
+
+  const reverseMap = readCalJobMap();
+  reverseMap[calendarEventId] = jobId;
+  writeCalJobMap(reverseMap);
 }
 
 export function getCalendarEventIdForJob(jobId: string): string | null {
   return readJobCalMap()[jobId] || null;
 }
 
+export function getJobIdForCalendarEvent(calendarEventId: string): string | null {
+  return readCalJobMap()[calendarEventId] || null;
+}
+
 export function unlinkJobFromCalendarEvent(jobId: string) {
   const map = readJobCalMap();
+  const eventId = map[jobId];
   delete map[jobId];
   writeJobCalMap(map);
+
+  if (eventId) {
+    const reverseMap = readCalJobMap();
+    delete reverseMap[eventId];
+    writeCalJobMap(reverseMap);
+  }
 }
 
 /**

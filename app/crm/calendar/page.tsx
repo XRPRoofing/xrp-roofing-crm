@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAutoRefresh, broadcastCrmUpdate } from "@/lib/use-auto-refresh";
 import { azNoon, azParts } from "@/lib/arizona-time";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
@@ -31,10 +31,13 @@ import {
   updateCalendarEvent,
   deleteCalendarEvent,
   subscribeToCalendarUpdates,
+  getJobIdForCalendarEvent,
   type CalendarEvent,
 } from "@/lib/calendar-sync";
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import { logCrewActivity } from "@/lib/crew-activity";
+import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
+import type { Lead } from "@/types/crm";
 
 // Arizona Mountain Time
 const ARIZONA_TIMEZONE = "America/Phoenix";
@@ -283,6 +286,46 @@ function mapGoogleEvent(ge: GoogleCalendarEvent): CalendarEvent {
   };
 }
 
+/* ── Resolve a calendar event to its linked job record ─────────────────── */
+
+function resolveLinkedJobId(event: CalendarEvent, jobs: Lead[]): string | null {
+  // 1) Direct localStorage link (job scheduling flow)
+  const direct = getJobIdForCalendarEvent(event.id);
+  if (direct) return direct;
+
+  // 2) Fallback: match by customer name / phone / address / job kind
+  const name = event.customer_name?.trim().toLowerCase();
+  const phone = event.customer_phone?.replace(/\D/g, "");
+  const location = event.location?.trim().toLowerCase();
+  const kind = event.job_kind?.trim().toLowerCase();
+  if (!name && !phone && !location) return null;
+
+  const matches = jobs.filter((job) => {
+    const jobName = job.name?.trim().toLowerCase();
+    const jobPhone = job.phone?.replace(/\D/g, "");
+    const jobAddress = job.address?.trim().toLowerCase();
+    const fullAddress = `${jobAddress}${job.city ? `, ${job.city.trim().toLowerCase()}` : ""}`;
+    const jobKind = job.roofType?.trim().toLowerCase();
+
+    const nameMatch = name && jobName === name;
+    const phoneMatch = phone && jobPhone && phone === jobPhone;
+    const addressMatch = location && (jobAddress === location || fullAddress.includes(location) || location.includes(jobAddress));
+    const kindMatch = kind && jobKind && (jobKind === kind || kind.includes(jobKind) || jobKind.includes(kind));
+
+    return (nameMatch || phoneMatch || addressMatch) && (!kind || !jobKind || kindMatch || nameMatch || phoneMatch);
+  });
+
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0].id;
+
+  // If multiple, prefer the one whose roofType best matches the event job_kind
+  const best = matches.find((job) => {
+    const jobKind = job.roofType?.trim().toLowerCase();
+    return kind && jobKind && (jobKind === kind || kind.includes(jobKind) || jobKind.includes(kind));
+  });
+  return best ? best.id : matches[0].id;
+}
+
 /* ── Main Component ────────────────────────────────────────────────────── */
 
 export default function CalendarPage() {
@@ -306,6 +349,7 @@ export default function CalendarPage() {
 
   // URL search params for deep-linking (e.g. ?view=day&date=2026-06-22)
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -337,6 +381,15 @@ export default function CalendarPage() {
     }
   }, [searchParams]);
 
+  // Load jobs once for event → job matching
+  useEffect(() => {
+    const cached = getCachedCrewData();
+    if (cached) setJobs(cached.jobs);
+    refreshCrewData()
+      .then((data) => setJobs(data.jobs))
+      .catch(() => {});
+  }, []);
+
   // Mobile week view: selected day index within the week (0–6)
   const [mobileWeekDayIdx, setMobileWeekDayIdx] = useState(() => azParts(new Date()).dow);
 
@@ -352,6 +405,13 @@ export default function CalendarPage() {
   // Click-to-call state
   const [callPickerEvent, setCallPickerEvent] = useState<CalendarEvent | null>(null);
   const twilioLines = useMemo(() => getTwilioLines(), []);
+
+  // Jobs loaded for linking calendar events to existing job records
+  const [jobs, setJobs] = useState<Lead[]>([]);
+  const selectedEventJobId = useMemo(
+    () => (selectedEvent ? resolveLinkedJobId(selectedEvent, jobs) : null),
+    [selectedEvent, jobs],
+  );
 
   // Team & color filters
   const [enabledTeam, setEnabledTeam] = useState<Set<string>>(
@@ -2318,7 +2378,21 @@ export default function CalendarPage() {
               )}
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              {selectedEventJobId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const jobId = selectedEventJobId;
+                    setSelectedEvent(null);
+                    router.push(`/crm/leads?job=${encodeURIComponent(jobId)}&from=calendar`);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2.5 font-bold text-white hover:bg-orange-700"
+                >
+                  <Briefcase className="h-4 w-4" />
+                  Open Job Card
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedEvent(null)}
@@ -2472,7 +2546,21 @@ export default function CalendarPage() {
                 <Trash2 className="h-4 w-4" />
                 Delete
               </button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {selectedEventJobId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const jobId = selectedEventJobId;
+                      setSelectedEvent(null);
+                      router.push(`/crm/leads?job=${encodeURIComponent(jobId)}&from=calendar`);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-2 text-sm font-bold text-white hover:bg-orange-700 sm:px-4 sm:py-2.5"
+                  >
+                    <Briefcase className="h-4 w-4" />
+                    Open Job Card
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSelectedEvent(null)}

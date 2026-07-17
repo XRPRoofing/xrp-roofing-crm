@@ -664,6 +664,7 @@ export default function LeadsPage() {
     jobCardHashRef.current = false;
     const url = new URL(window.location.href);
     url.searchParams.delete("job");
+    url.searchParams.delete("from");
     url.hash = "";
     history.replaceState(history.state, "", url.pathname + url.search);
   }, []);
@@ -1805,6 +1806,16 @@ export default function LeadsPage() {
                   <p className="truncate text-sm font-bold text-gray-500"><AddressLink value={`${selectedJob.address}, ${selectedJob.city}, AZ`} /></p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+                  {searchParams.get("from") === "calendar" && (
+                    <button
+                      type="button"
+                      onClick={() => router.push("/crm/calendar")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 sm:gap-1.5 sm:px-3 sm:py-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">Back to Calendar</span>
+                    </button>
+                  )}
                   <button type="button" onClick={() => deleteJob(selectedJob)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 sm:gap-1.5 sm:px-3 sm:py-2"><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">Delete Job</span></button>
                   <button type="button" onClick={closeJobCard} className="pointer-events-auto relative rounded-lg p-2 text-gray-400 hover:bg-gray-100"><X className="h-5 w-5" /></button>
                 </div>

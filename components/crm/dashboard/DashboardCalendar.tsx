@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { azNoon, azParts, AZ_TZ } from "@/lib/arizona-time";
-import { loadCalendarEvents, subscribeToCalendarUpdates, type CalendarEvent as CrmCalEvent } from "@/lib/calendar-sync";
+import { loadCalendarEvents, subscribeToCalendarUpdates, getJobIdForCalendarEvent, type CalendarEvent as CrmCalEvent } from "@/lib/calendar-sync";
 
 type CalendarEvent = {
   id: string;
@@ -273,6 +273,13 @@ export default function DashboardCalendar() {
                               : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
                           }`}
                           onClick={() => {
+                            // CRM event ids are prefixed with "crm:"; strip to look up the stored link
+                            const crmEventId = ev.id.startsWith("crm:") ? ev.id.slice(4) : ev.id;
+                            const linkedJobId = getJobIdForCalendarEvent(crmEventId);
+                            if (linkedJobId) {
+                              router.push(`/crm/leads?job=${encodeURIComponent(linkedJobId)}&from=calendar`);
+                              return;
+                            }
                             const mm = String(dp.month + 1).padStart(2, "0");
                             const dd = String(dp.day).padStart(2, "0");
                             router.push(`/crm/calendar?view=day&date=${dp.year}-${mm}-${dd}`);
