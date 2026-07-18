@@ -34,6 +34,11 @@ import {
   getJobIdForCalendarEvent,
   type CalendarEvent,
 } from "@/lib/calendar-sync";
+import {
+  EVENT_COLORS,
+  TEAM_MEMBERS,
+  resolveEventColor,
+} from "@/lib/calendar-colors";
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
@@ -174,50 +179,6 @@ function isoTime(d: Date): string {
   })
     .format(d)
     .replace(/^24/, "00");
-}
-
-/* ── Color palette for events ──────────────────────────────────────────── */
-
-type ColorConfig = { id: string; label: string; color: string; dot: string };
-
-const EVENT_COLORS: ColorConfig[] = [
-  { id: "blue", label: "Blue", color: "bg-blue-50 text-blue-700 border-blue-200", dot: "bg-blue-500" },
-  { id: "red", label: "Red", color: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500" },
-  { id: "green", label: "Green", color: "bg-green-50 text-green-700 border-green-200", dot: "bg-green-500" },
-  { id: "purple", label: "Purple", color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" },
-  { id: "orange", label: "Orange", color: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" },
-  { id: "pink", label: "Pink", color: "bg-pink-50 text-pink-700 border-pink-200", dot: "bg-pink-400" },
-  { id: "cyan", label: "Teal", color: "bg-cyan-50 text-cyan-700 border-cyan-200", dot: "bg-cyan-500" },
-  { id: "yellow", label: "Yellow", color: "bg-yellow-50 text-yellow-800 border-yellow-200", dot: "bg-yellow-400" },
-  { id: "gray", label: "Gray", color: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-gray-500" },
-  { id: "indigo", label: "Indigo", color: "bg-indigo-50 text-indigo-700 border-indigo-200", dot: "bg-indigo-500" },
-  { id: "emerald", label: "Emerald", color: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-600" },
-];
-
-const DEFAULT_COLOR = EVENT_COLORS[0];
-
-function getColorConfig(colorId: string): ColorConfig {
-  return EVENT_COLORS.find((c) => c.id === colorId) || DEFAULT_COLOR;
-}
-
-/* ── Team members ──────────────────────────────────────────────────────── */
-
-const TEAM_MEMBERS = [
-  { id: "jonathan", name: "Jonathan Gonzalez", email: "info@xrproofing.com", teamColor: "blue" as const },
-  { id: "darwin", name: "Darwin Rodas Garcia", email: "", teamColor: "green" as const },
-  { id: "office", name: "Office", email: "info@xrproofing.com", teamColor: "purple" as const },
-];
-
-const TEAM_COLOR_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  green: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", dot: "bg-green-500" },
-  blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  orange: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
-  purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", dot: "bg-purple-500" },
-};
-
-function getTeamColor(memberId: string) {
-  const member = TEAM_MEMBERS.find((m) => m.id === memberId);
-  return member ? TEAM_COLOR_STYLES[member.teamColor] || TEAM_COLOR_STYLES.blue : null;
 }
 
 const JOB_KINDS = ["Roof Inspection", "Repair", "Roof Replacement", "Maintenance", "Maintenance Inspection", "Emergency Repair", "Estimate", "Other"];
@@ -1341,8 +1302,8 @@ export default function CalendarPage() {
   /* ── Render helpers ─────────────────────────────────────────────────── */
 
   function renderEventChip(event: CalendarEvent, compact = false) {
-    const tc = getTeamColor(event.assigned_to);
-    const chipColor = tc ? `${tc.bg} ${tc.text} ${tc.border}` : getColorConfig(event.color).color;
+    const ec = resolveEventColor(event);
+    const chipColor = `${ec.bg} ${ec.text} ${ec.border}`;
     const time = formatEventTime(event);
     const isGcal = isGoogleEvent(event);
     const hasPhone = Boolean(event.customer_phone?.replace(/[^\d+]/g, ""));
@@ -1459,11 +1420,11 @@ export default function CalendarPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {dayEvents.map((ev) => {
-                const tc = getTeamColor(ev.assigned_to);
-                const dotColor = tc?.dot || "bg-gray-400";
-                const cardBg = tc ? `${tc.bg}` : "bg-white";
-                const cardBorder = tc ? tc.border : "border-gray-200";
-                const cardText = tc ? tc.text : "text-gray-700";
+                const ec = resolveEventColor(ev);
+                const dotColor = ec.dot;
+                const cardBg = ec.bg;
+                const cardBorder = ec.border;
+                const cardText = ec.text;
                 const assignedName = getAssignedName(ev.assigned_to);
                 return (
                   <button
@@ -1604,8 +1565,8 @@ export default function CalendarPage() {
                         1,
                         eventEndHour(ev) - eventHour(ev),
                       );
-                      const wtc = getTeamColor(ev.assigned_to);
-                      const wColor = wtc ? `${wtc.bg} ${wtc.text} ${wtc.border}` : getColorConfig(ev.color).color;
+                      const ec = resolveEventColor(ev);
+                      const wColor = `${ec.bg} ${ec.text} ${ec.border}`;
                       const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                       return (
                         <div key={ev.id} className="group/ev absolute inset-x-0.5 z-10" style={{ top: 0, height: `${span * cellHeight}px` }}>
@@ -1786,8 +1747,8 @@ export default function CalendarPage() {
                         1,
                         eventEndHour(ev) - eventHour(ev),
                       );
-                      const dtc = getTeamColor(ev.assigned_to);
-                      const dColor = dtc ? `${dtc.bg} ${dtc.text} ${dtc.border}` : getColorConfig(ev.color).color;
+                      const ec = resolveEventColor(ev);
+                      const dColor = `${ec.bg} ${ec.text} ${ec.border}`;
                       const evHasPhone = Boolean(ev.customer_phone?.replace(/[^\d+]/g, ""));
                       return (
                         <div key={ev.id} className="group/ev absolute inset-x-1 z-10" style={{ top: 0, height: `${span * 56}px` }}>

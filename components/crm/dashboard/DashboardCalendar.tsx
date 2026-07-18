@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { Calendar, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { azNoon, azParts, AZ_TZ } from "@/lib/arizona-time";
 import { loadCalendarEvents, subscribeToCalendarUpdates, getJobIdForCalendarEvent, type CalendarEvent as CrmCalEvent } from "@/lib/calendar-sync";
+import { resolveEventColor } from "@/lib/calendar-colors";
 
 type CalendarEvent = {
   id: string;
   summary?: string;
   start?: { date?: string; dateTime?: string };
   end?: { date?: string; dateTime?: string };
+  color?: string;
+  assigned_to?: string;
   extendedProperties?: {
     private?: {
       crmName?: string;
@@ -128,6 +131,8 @@ export default function DashboardCalendar() {
           summary: ce.title,
           start: { dateTime: ce.start_time },
           end: { dateTime: ce.end_time },
+          color: ce.color,
+          assigned_to: ce.assigned_to,
           extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
         }));
 
@@ -156,6 +161,8 @@ export default function DashboardCalendar() {
           summary: ce.title,
           start: { dateTime: ce.start_time },
           end: { dateTime: ce.end_time },
+          color: ce.color,
+          assigned_to: ce.assigned_to,
           extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
         }));
         setEvents((prev) => {
@@ -263,15 +270,11 @@ export default function DashboardCalendar() {
                     dayEvents.slice(0, 6).map((ev) => {
                       const time = formatEventTime(ev);
                       const title = ev.summary || "Untitled";
-                      const isMaterial = title.toLowerCase().includes("material");
+                      const ec = resolveEventColor({ color: ev.color, assigned_to: ev.assigned_to });
                       return (
                         <div
                           key={ev.id}
-                          className={`cursor-pointer rounded px-2 py-1.5 text-[11px] leading-snug transition hover:opacity-80 ${
-                            isMaterial
-                              ? "border-l-2 border-orange-400 bg-orange-50 text-orange-800"
-                              : "border-l-2 border-blue-300 bg-blue-50/50 text-gray-700"
-                          }`}
+                          className={`cursor-pointer rounded px-2 py-1.5 text-[11px] leading-snug transition hover:opacity-80 border-l-2 ${ec.border} ${ec.bg} ${ec.text}`}
                           onClick={() => {
                             // CRM event ids are prefixed with "crm:"; strip to look up the stored link
                             const crmEventId = ev.id.startsWith("crm:") ? ev.id.slice(4) : ev.id;
