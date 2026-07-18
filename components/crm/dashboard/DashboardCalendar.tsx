@@ -18,6 +18,7 @@ type CalendarEvent = {
     private?: {
       crmName?: string;
       crmJobKind?: string;
+      crmJobId?: string;
     };
   };
 };
@@ -133,7 +134,7 @@ export default function DashboardCalendar() {
           end: { dateTime: ce.end_time },
           color: ce.color,
           assigned_to: ce.assigned_to,
-          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
+          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind, crmJobId: ce.job_id } },
         }));
 
         setEvents([...(data.events || []), ...mappedCrm]);
@@ -163,7 +164,7 @@ export default function DashboardCalendar() {
           end: { dateTime: ce.end_time },
           color: ce.color,
           assigned_to: ce.assigned_to,
-          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind } },
+          extendedProperties: { private: { crmName: ce.customer_name, crmJobKind: ce.job_kind, crmJobId: ce.job_id } },
         }));
         setEvents((prev) => {
           const nonCrm = prev.filter((e) => !e.id.startsWith("crm:"));
@@ -278,7 +279,7 @@ export default function DashboardCalendar() {
                           onClick={() => {
                             // CRM event ids are prefixed with "crm:"; strip to look up the stored link
                             const crmEventId = ev.id.startsWith("crm:") ? ev.id.slice(4) : ev.id;
-                            const linkedJobId = getJobIdForCalendarEvent(crmEventId);
+                            const linkedJobId = ev.extendedProperties?.private?.crmJobId || getJobIdForCalendarEvent(crmEventId);
                             if (linkedJobId) {
                               router.push(`/crm/leads?job=${encodeURIComponent(linkedJobId)}&from=calendar`);
                               return;

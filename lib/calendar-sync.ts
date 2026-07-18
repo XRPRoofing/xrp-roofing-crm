@@ -20,6 +20,7 @@ export type CalendarEvent = {
   customer_name: string;
   customer_phone: string;
   job_kind: string;
+  job_id?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -174,12 +175,13 @@ export async function syncJobToCalendar(
   eventData: Omit<CalendarEvent, "id" | "created_at" | "updated_at">,
 ): Promise<string | null> {
   const existingId = getCalendarEventIdForJob(jobId);
+  const payload = { ...eventData, job_id: jobId };
   if (existingId) {
-    const result = await updateCalendarEvent(existingId, eventData);
+    const result = await updateCalendarEvent(existingId, payload);
     if (result) return result.id;
     // If update failed (event deleted?), fall through to create
   }
-  const created = await createCalendarEvent(eventData);
+  const created = await createCalendarEvent(payload);
   if (created) {
     linkJobToCalendarEvent(jobId, created.id);
     return created.id;

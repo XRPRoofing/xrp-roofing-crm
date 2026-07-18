@@ -32,8 +32,12 @@ import {
   deleteCalendarEvent,
   subscribeToCalendarUpdates,
   getJobIdForCalendarEvent,
+  linkJobToCalendarEvent,
   type CalendarEvent,
 } from "@/lib/calendar-sync";
+import { createClient } from "@/lib/supabase/client";
+import { findOrCreateCustomer } from "@/lib/customer-sync";
+import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 import {
   EVENT_COLORS,
   TEAM_MEMBERS,
@@ -42,6 +46,7 @@ import {
 import { getTwilioLines } from "@/lib/twilio/numbers";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { getCachedCrewData, refreshCrewData } from "@/lib/data-cache";
+import { createManualFolder } from "@/lib/manual-folders";
 import type { Lead } from "@/types/crm";
 
 // Arizona Mountain Time
@@ -250,7 +255,10 @@ function mapGoogleEvent(ge: GoogleCalendarEvent): CalendarEvent {
 /* ── Resolve a calendar event to its linked job record ─────────────────── */
 
 function resolveLinkedJobId(event: CalendarEvent, jobs: Lead[]): string | null {
-  // 1) Direct localStorage link (job scheduling flow)
+  // 1) Database-backed job_id (source of truth)
+  if (event.job_id) return event.job_id;
+
+  // 2) Direct localStorage cache (legacy fallback)
   const direct = getJobIdForCalendarEvent(event.id);
   if (direct) return direct;
 
@@ -287,6 +295,42 @@ function resolveLinkedJobId(event: CalendarEvent, jobs: Lead[]): string | null {
   return best ? best.id : matches[0].id;
 }
 
+/* ── Job creation helpers ──────────────────────────────────────────────── */
+
+function getCityFromAddress(address?: string) {
+  const parts = (address || "").split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : "Phoenix";
+}
+
+function toArizonaDate(isoString?: string) {
+  if (!isoString) return "";
+  try {
+    return new Date(isoString).toLocaleDateString("en-CA", { timeZone: ARIZONA_TIMEZONE });
+  } catch {
+    return isoString.slice(0, 10);
+  }
+}
+
+function resolveTeamName(assignedToId?: string) {
+  if (!assignedToId) return "Office";
+  const member = TEAM_MEMBERS.find((m) => m.id === assignedToId);
+  if (member) return member.name;
+  const byName = TEAM_MEMBERS.find((m) => m.name.toLowerCase() === assignedToId.toLowerCase());
+  return byName?.name || assignedToId || "Office";
+}
+
+function formatEventDateTime(start?: string, end?: string, allDay?: boolean) {
+  if (!start) return "";
+  if (allDay) {
+    return new Intl.DateTimeFormat("en-US", { dateStyle: "full", timeZone: ARIZONA_TIMEZONE }).format(new Date(start));
+  }
+  const startText = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: ARIZONA_TIMEZONE }).format(new Date(start));
+  const endText = end
+    ? new Intl.DateTimeFormat("en-US", { timeStyle: "short", timeZone: ARIZONA_TIMEZONE }).format(new Date(end))
+    : "";
+  return endText ? `${startText} — ${endText}` : startText;
+}
+
 /* ── Main Component ────────────────────────────────────────────────────── */
 
 export default function CalendarPage() {
@@ -301,6 +345,10 @@ export default function CalendarPage() {
     phone: string;
     name?: string;
   } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [addToJobsConfirmOpen, setAddToJobsConfirmOpen] = useState(false);
+  const [addToJobsBusy, setAddToJobsBusy] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   // Map of CRM event id → its linked Google Calendar event id, so edits/deletes
   // update the same Google event instead of creating duplicates. Populated from
@@ -341,6 +389,39 @@ export default function CalendarPage() {
       if (y && m && d) setCurrentDate(azNoon(y, m - 1, d));
     }
   }, [searchParams]);
+
+  // Admin check: Add to Jobs is admin-only
+  useEffect(() => {
+    let mounted = true;
+    async function checkAdmin() {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!user || !mounted) {
+          if (mounted) setIsAdmin(false);
+          return;
+        }
+        const userName =
+          typeof user.user_metadata?.name === "string"
+            ? user.user_metadata.name
+            : user.email || "Office";
+        if (mounted) setCurrentUserName(userName);
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        const metaRole = typeof user.user_metadata?.role === "string" ? user.user_metadata.role : undefined;
+        const role = !error && profile?.role ? profile.role : metaRole || "admin";
+        if (mounted) setIsAdmin(role === "admin");
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
+    }
+    void checkAdmin();
+    return () => { mounted = false; };
+  }, []);
 
   // Load jobs once for event → job matching
   useEffect(() => {
@@ -1262,6 +1343,114 @@ export default function CalendarPage() {
       setError("Unable to delete event.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleAddEventToJobs() {
+    if (!selectedEvent) return;
+
+    setAddToJobsBusy(true);
+    setError("");
+    setStatusMessage("");
+
+    try {
+      // Final duplicate guard: re-check for an existing linked job
+      if (selectedEvent.job_id || getJobIdForCalendarEvent(selectedEvent.id) || resolveLinkedJobId(selectedEvent, jobs)) {
+        setStatusMessage("This event is already linked to a job.");
+        setAddToJobsConfirmOpen(false);
+        setAddToJobsBusy(false);
+        return;
+      }
+
+      const fullAddress = selectedEvent.location || "";
+      const addressParts = fullAddress.split(",").map((p) => p.trim()).filter(Boolean);
+      const street = addressParts[0] || fullAddress;
+      const city = getCityFromAddress(fullAddress);
+      const propertyAddress = fullAddress ? `${street}, ${city}, AZ` : "";
+
+      const customerName = selectedEvent.customer_name || selectedEvent.title;
+      const customer = await findOrCreateCustomer({
+        name: customerName,
+        phone: selectedEvent.customer_phone,
+        propertyAddress,
+        roofDetails: selectedEvent.job_kind,
+        status: "New lead",
+        source: "Calendar",
+        lifetimeValue: 0,
+      });
+
+      const assignedName = resolveTeamName(selectedEvent.assigned_to);
+      const eventDate = toArizonaDate(selectedEvent.start_time);
+      const eventDateTime = formatEventDateTime(
+        selectedEvent.start_time,
+        selectedEvent.end_time,
+        selectedEvent.all_day,
+      );
+      const jobKind = selectedEvent.job_kind || "Roofing";
+
+      const newJob: Lead = {
+        id: `J-${Date.now()}`,
+        name: customer.name || customerName,
+        email: customer.email || "",
+        phone: customer.phone || selectedEvent.customer_phone || "",
+        address: street || "Address pending",
+        city,
+        stage: "new_lead",
+        value: 0,
+        assignedTo: assignedName,
+        roofType: jobKind,
+        source: "Calendar",
+        lastActivity: `Event: ${selectedEvent.title} (${eventDateTime})`,
+        nextAction: "Schedule inspection",
+        dueDate: eventDate,
+        callNotes: `Calendar event ID: ${selectedEvent.id}\n\n${selectedEvent.description || ""}`.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const baseRecord = leadToJobRecord(newJob);
+      const jobRecord = {
+        ...baseRecord,
+        assignedCrew: assignedName !== "Office" ? [assignedName] : baseRecord.assignedCrew,
+        scheduleDate: eventDate || baseRecord.scheduleDate,
+        jobNotes: `Calendar event: ${selectedEvent.id}\n\n${selectedEvent.description || ""}`.trim(),
+      };
+      await upsertJobRecord(jobRecord);
+
+      // Persist the link in the calendar event and update local caches
+      const updatedEvent = await updateCalendarEvent(selectedEvent.id, { job_id: newJob.id });
+      if (updatedEvent) {
+        setEvents((prev) => prev.map((ev) => (ev.id === selectedEvent.id ? { ...ev, job_id: newJob.id } : ev)));
+        setSelectedEvent((prev) => (prev ? { ...prev, job_id: newJob.id } : null));
+      }
+      linkJobToCalendarEvent(newJob.id, selectedEvent.id);
+
+      // Refresh jobs so Open Job Card appears
+      const refreshed = await refreshCrewData();
+      setJobs(refreshed.jobs);
+
+      // Auto-create a matching Files folder (best-effort)
+      void createManualFolder({
+        name: `${newJob.name} - ${newJob.address || "Address pending"}`.trim(),
+        address: newJob.address || "Address pending",
+        customerName: newJob.name,
+        workType: newJob.roofType || "Roofing",
+      }).catch(() => {});
+
+      void logCrewActivity({
+        jobId: newJob.id,
+        jobName: newJob.name,
+        actor: currentUserName || "Office",
+        action: "Job created from calendar",
+        details: `${newJob.address}, ${newJob.city} — ${newJob.roofType}`,
+        module: "Jobs",
+      }).catch(() => {});
+
+      setAddToJobsConfirmOpen(false);
+      setStatusMessage("This customer has been added to Jobs.");
+    } catch (err) {
+      setError("Unable to add event to jobs.");
+    } finally {
+      setAddToJobsBusy(false);
     }
   }
 
@@ -2508,7 +2697,7 @@ export default function CalendarPage() {
                 Delete
               </button>
               <div className="flex flex-wrap gap-2">
-                {selectedEventJobId && (
+                {selectedEventJobId ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -2521,7 +2710,16 @@ export default function CalendarPage() {
                     <Briefcase className="h-4 w-4" />
                     Open Job Card
                   </button>
-                )}
+                ) : isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setAddToJobsConfirmOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white hover:bg-green-700 sm:px-4 sm:py-2.5"
+                  >
+                    <Briefcase className="h-4 w-4" />
+                    Add to Jobs
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setSelectedEvent(null)}
@@ -2876,6 +3074,45 @@ export default function CalendarPage() {
                 className="rounded-lg bg-red-600 px-4 py-2 font-bold text-white hover:bg-red-700 disabled:bg-gray-300"
               >
                 {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Jobs Confirmation */}
+      {addToJobsConfirmOpen && selectedEvent && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900">Add to Jobs</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Create a new Job Card for this calendar event?
+            </p>
+            <div className="mt-3 space-y-1.5 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+              <p><span className="font-semibold">Customer:</span> {selectedEvent.customer_name || "(no customer name)"}</p>
+              <p><span className="font-semibold">Phone:</span> {selectedEvent.customer_phone || "(no phone)"}</p>
+              <p><span className="font-semibold">Title:</span> {selectedEvent.title || "Untitled"}</p>
+              <p><span className="font-semibold">When:</span> {formatEventDateTime(selectedEvent.start_time, selectedEvent.end_time, selectedEvent.all_day)}</p>
+              <p><span className="font-semibold">Address:</span> {selectedEvent.location || "(no address)"}</p>
+              <p><span className="font-semibold">Type:</span> {selectedEvent.job_kind || "Roofing"}</p>
+              <p><span className="font-semibold">Assigned to:</span> {TEAM_MEMBERS.find((m) => m.id === selectedEvent.assigned_to)?.name || selectedEvent.assigned_to || "Office"}</p>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={addToJobsBusy}
+                onClick={() => setAddToJobsConfirmOpen(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={addToJobsBusy}
+                onClick={() => void handleAddEventToJobs()}
+                className="rounded-lg bg-green-600 px-4 py-2 font-bold text-white hover:bg-green-700 disabled:bg-gray-300"
+              >
+                {addToJobsBusy ? "Adding..." : "Add to Jobs"}
               </button>
             </div>
           </div>

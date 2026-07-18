@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     customer_name: body.customer_name || "",
     customer_phone: body.customer_phone || "",
     job_kind: body.job_kind || "",
+    job_id: body.job_id || null,
     created_by: body.created_by || "",
     created_at: now,
     updated_at: now,
@@ -96,7 +97,7 @@ export async function PUT(req: NextRequest) {
   const fields = [
     "title", "description", "start_time", "end_time", "all_day",
     "location", "color", "assigned_to", "customer_name", "customer_phone",
-    "job_kind",
+    "job_kind", "job_id",
   ];
   for (const f of fields) {
     if (body[f] !== undefined) updates[f] = body[f];
