@@ -12,9 +12,14 @@ export type BrowserVoiceCall = {
   disconnect: () => void;
   reject: () => void;
   mute?: (shouldMute: boolean) => void;
+  sendDigits?: (digits: string) => void;
+  isMuted?: () => boolean;
   on: {
-    (event: "accept" | "disconnect" | "error" | "cancel", handler: (error?: Error) => void): void;
+    (event: "accept" | "disconnect" | "error" | "cancel" | "reject" | "ringing", handler: (error?: Error) => void): void;
     (event: "volume", handler: (inputVolume: number, outputVolume: number) => void): void;
+    (event: "mute" | "unmute", handler: () => void): void;
+    (event: "reconnect" | "reconnecting" | "reconnected", handler: (error?: Error) => void): void;
+    (event: "warning", handler: (data: Record<string, unknown>) => void): void;
   };
   parameters?: Record<string, string>;
 };

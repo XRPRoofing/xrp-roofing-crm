@@ -8,6 +8,7 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
 import { broadcastCallAnswered, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, reportCallAnswered, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { initVoiceDiagnostics, attachVoiceDeviceDiagnostics, attachVoiceCallDiagnostics, logVoiceDiagnostic } from "@/lib/twilio/voice-diagnostics";
 import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
 import { subscribeToCrewData } from "@/lib/crew-sync";
@@ -269,6 +270,8 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         }
 
         voiceDeviceRef.current = device;
+        initVoiceDiagnostics();
+        attachVoiceDeviceDiagnostics(device, voiceIdentity);
         device.on("incoming", (call) => {
           const incoming = call as BrowserVoiceCall;
           // Prevent duplicate popups — ignore if a call is already ringing or active
@@ -278,6 +281,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           }
           const phone = incoming.parameters?.From || "Unknown number";
           incomingCallRef.current = incoming;
+          attachVoiceCallDiagnostics(incoming, incoming.parameters?.CallSid || "unknown", "inbound");
           setGlobalIncomingCall({ name: phone, phone });
 
 
@@ -673,6 +677,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         callChannelRef.current?.postMessage({ type: "ended" });
       });
 
+      logVoiceDiagnostic({
+        type: "action-accept",
+        callSid: incoming.parameters?.CallSid,
+        direction: "inbound",
+        payload: { from: incoming.parameters?.From, to: incoming.parameters?.To },
+      });
       // Accept while audio context is still active (ringtone playing).
       // Clearing globalIncomingCall stops the ringtone which can suspend the
       // browser audio context and cause the WebRTC stream to fail.
@@ -707,7 +717,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
 
   function handleDeclineGlobalIncomingCall() {
     try {
-      incomingCallRef.current?.reject();
+      const call = incomingCallRef.current;
+      logVoiceDiagnostic({
+        type: "action-decline",
+        callSid: call?.parameters?.CallSid,
+        direction: "inbound",
+        payload: { from: call?.parameters?.From },
+      });
+      call?.reject();
     } catch {}
     incomingCallRef.current = null;
     setGlobalIncomingCall(null);
@@ -715,9 +732,16 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   }
 
   function handleEndGlobalIncomingCall() {
-    const endedSid = incomingCallRef.current?.parameters?.CallSid;
+    const call = incomingCallRef.current;
+    const endedSid = call?.parameters?.CallSid;
+    logVoiceDiagnostic({
+      type: "action-end",
+      callSid: endedSid,
+      direction: "inbound",
+      payload: { from: call?.parameters?.From },
+    });
     try {
-      incomingCallRef.current?.disconnect();
+      call?.disconnect();
     } catch {}
     incomingCallRef.current = null;
     setGlobalActiveIncomingCall(false);
@@ -731,6 +755,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const call = incomingCallRef.current;
     if (!call) return;
     const next = !globalIncomingMuted;
+    logVoiceDiagnostic({
+      type: "action-mute",
+      callSid: call.parameters?.CallSid,
+      direction: "inbound",
+      payload: { willMute: next, isMuted: call.isMuted?.() },
+    });
     try { call.mute?.(next); } catch {}
     setGlobalIncomingMuted(next);
   }
@@ -767,6 +797,12 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     setFwdDest(dest);
     setFwdStatus("forwarding");
     try {
+      logVoiceDiagnostic({
+        type: "action-forward",
+        callSid,
+        direction: "inbound",
+        payload: { forwardTo: dest },
+      });
       await controlCall({ callSid, action: "forward", forwardTo: dest });
       incomingCallRef.current = null;
       setGlobalActiveIncomingCall(false);
@@ -788,8 +824,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     const call = incomingCallRef.current;
     const callSid = call?.parameters?.CallSid;
     if (!callSid) return;
+    const action = globalIncomingHeld ? "resume" : "hold";
+    logVoiceDiagnostic({
+      type: action === "hold" ? "action-hold" : "action-resume",
+      callSid,
+      direction: "inbound",
+      payload: { currentHeld: globalIncomingHeld },
+    });
     try {
-      const action = globalIncomingHeld ? "resume" : "hold";
       await controlCall({ callSid, action });
       // Mute/unmute audio via the SDK as a local hold indicator
       try { call?.mute?.(!globalIncomingHeld); } catch {}

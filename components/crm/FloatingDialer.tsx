@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
+import { initVoiceDiagnostics, attachVoiceDeviceDiagnostics, attachVoiceCallDiagnostics, logVoiceDiagnostic } from "@/lib/twilio/voice-diagnostics";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { azDate, azTime } from "@/lib/arizona-time";
 import type { Customer, Lead } from "@/types/crm";
@@ -489,6 +490,7 @@ export default function FloatingDialer({
     const destination = numberOverride || dialNumber.trim();
     if (!destination) return;
     try {
+      initVoiceDiagnostics();
       answeredRef.current = false;
       setDialError(null);
       activeDestRef.current = destination.replace(/\D/g, "").slice(-10);
@@ -498,10 +500,23 @@ export default function FloatingDialer({
       if (!voiceDeviceRef.current) {
         (voiceDeviceRef as React.MutableRefObject<BrowserVoiceDevice | null>).current = device;
       }
+      attachVoiceDeviceDiagnostics(device, "crm-agent");
+      logVoiceDiagnostic({
+        type: "action-start",
+        direction: "outbound",
+        payload: { destination, callerId: selectedCallerId },
+      });
       const connectParams: Record<string, string> = { To: destination };
       if (selectedCallerId) connectParams.CallerId = selectedCallerId;
       const call = await device.connect({ params: connectParams });
       browserCallRef.current = call as unknown as BrowserVoiceCall;
+      const outboundSid = browserCallRef.current?.parameters?.CallSid || "unknown";
+      if (browserCallRef.current) {
+        if (browserCallRef.current.parameters?.CallSid) {
+          setCallSid(browserCallRef.current.parameters.CallSid);
+        }
+        attachVoiceCallDiagnostics(browserCallRef.current, outboundSid, "outbound");
+      }
       // The agent leg is now bridged into the conference, but the customer's
       // phone is still ringing — keep showing "Calling customer…" with a
       // ringback tone until real audio arrives from the far end. Start the
@@ -523,6 +538,16 @@ export default function FloatingDialer({
       const existingSid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
       if (existingSid) setCallSid(existingSid);
       call.on("accept", () => {
+        const acceptedSid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
+        if (acceptedSid) {
+          setCallSid(acceptedSid);
+          logVoiceDiagnostic({
+            type: "action-accept",
+            callSid: acceptedSid,
+            direction: "outbound",
+            payload: { destination, callerId: selectedCallerId },
+          });
+        }
         const sid = (call as unknown as BrowserVoiceCall).parameters?.CallSid;
         if (sid) setCallSid(sid);
       });
@@ -547,6 +572,12 @@ export default function FloatingDialer({
         setShowTransfer(false);
         setShowInCallKeypad(false);
         if (endedSid) onCallEnd?.(endedSid);
+        logVoiceDiagnostic({
+          type: "action-end",
+          callSid: endedSid,
+          direction: "outbound",
+          payload: { destination },
+        });
       });
       call.on("error", () => {
         stopRingback();
@@ -561,6 +592,12 @@ export default function FloatingDialer({
 
   function handleEndCall() {
     const endedSid = callSid;
+    logVoiceDiagnostic({
+      type: "action-end",
+      callSid: endedSid,
+      direction: "outbound",
+      payload: {},
+    });
     stopRingback();
     browserCallRef.current?.disconnect();
     browserCallRef.current = null;
@@ -574,13 +611,26 @@ export default function FloatingDialer({
 
   function handleMute() {
     if (!browserCallRef.current) return;
-    browserCallRef.current.mute?.(!isMuted);
+    const next = !isMuted;
+    logVoiceDiagnostic({
+      type: "action-mute",
+      callSid: callSid || browserCallRef.current?.parameters?.CallSid,
+      direction: "outbound",
+      payload: { willMute: next, isMuted: browserCallRef.current.isMuted?.() },
+    });
+    browserCallRef.current.mute?.(next);
     setIsMuted((v) => !v);
   }
 
   async function handleHold() {
     if (!callSid) return;
     const action = callState === "held" ? "resume" : "hold";
+    logVoiceDiagnostic({
+      type: action === "hold" ? "action-hold" : "action-resume",
+      callSid,
+      direction: "outbound",
+      payload: { currentState: callState },
+    });
     try {
       await controlCall({ callSid, action });
       setCallState(callState === "held" ? "active" : "held");
@@ -605,6 +655,12 @@ export default function FloatingDialer({
       setCallState("forwarding");
       setShowTransfer(false);
       setShowInCallKeypad(false);
+      logVoiceDiagnostic({
+        type: "action-forward",
+        callSid,
+        direction: "outbound",
+        payload: { forwardTo: dest },
+      });
       await controlCall({ callSid, action: "forward", forwardTo: dest });
       setForwardingStatus("ringing");
       void logCrewActivity({ jobId: "", jobName: dialNumber || dest, actor: "Office", action: "Call forwarded", details: `Forwarded to ${dest}`, module: "Calls" }).catch(() => {});
