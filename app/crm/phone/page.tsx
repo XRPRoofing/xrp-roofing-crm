@@ -22,6 +22,7 @@ import {
   PhoneOff,
   PhoneOutgoing,
   Search,
+  Settings,
   ShieldBan,
   StickyNote,
   User,
@@ -40,6 +41,8 @@ import { leadToJobRecord, upsertJobRecord } from "@/lib/crew-sync";
 import { syncJobToCalendar, toArizonaISO } from "@/lib/calendar-sync";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
 import { createManualFolder } from "@/lib/manual-folders";
+import { createClient } from "@/lib/supabase/client";
+import IvrSettingsPanel from "@/components/crm/IvrSettingsPanel";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +82,7 @@ interface CallRecord {
 // Constants
 // ---------------------------------------------------------------------------
 
-const TABS = ["Calls", "Phone Numbers", "Call Analytics", "Blocked Numbers", "Voicemail"] as const;
+const TABS = ["Calls", "Phone Numbers", "Call Analytics", "Blocked Numbers", "IVR", "Voicemail"] as const;
 type Tab = (typeof TABS)[number];
 
 const CALL_FILTERS = ["All", "Inbound", "Outbound", "Missed", "Forwarded"] as const;
@@ -217,6 +220,7 @@ export default function PhonePage() {
   const [blockInput, setBlockInput] = useState("");
   const [perPage, setPerPage] = useState(25);
   const [actionSheetCallId, setActionSheetCallId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Right-side New Job panel
   const [jobPanelOpen, setJobPanelOpen] = useState(false);
@@ -251,6 +255,37 @@ export default function PhonePage() {
 
 
   const twilioLines = useMemo(() => getTwilioLines(), []);
+
+  // Admin check for IVR settings tab. Use profiles.role as the authoritative source,
+  // falling back to user_metadata.role to match CrmShell behavior.
+  useEffect(() => {
+    let mounted = true;
+    async function checkAdmin() {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!user || !mounted) {
+          if (mounted) setIsAdmin(false);
+          return;
+        }
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        const metaRole = typeof user.user_metadata?.role === "string" ? user.user_metadata.role : undefined;
+        const role = !error && profile?.role ? profile.role : metaRole || "admin";
+        if (mounted) setIsAdmin(role === "admin");
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
+    }
+    void checkAdmin();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Load data
   useEffect(() => {
@@ -671,25 +706,29 @@ export default function PhonePage() {
 
         {/* Tabs */}
         <div className="-mb-3 mt-3 flex items-center gap-0.5 overflow-x-auto scrollbar-hide">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition lg:px-4 lg:text-sm ${
-                activeTab === tab
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
-            >
-              {tab === "Calls" && <PhoneCall className="mr-1 inline h-3.5 w-3.5" />}
-              {tab === "Phone Numbers" && <Phone className="mr-1 inline h-3.5 w-3.5" />}
-              {tab === "Call Analytics" && <BarChart3 className="mr-1 inline h-3.5 w-3.5" />}
-              {tab === "Blocked Numbers" && <ShieldBan className="mr-1 inline h-3.5 w-3.5" />}
-              {tab === "Voicemail" && <Voicemail className="mr-1 inline h-3.5 w-3.5" />}
-              {tab}
-            </button>
-          ))}
+          {TABS.map((tab) => {
+            if (tab === "IVR" && !isAdmin) return null;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs font-semibold transition lg:px-4 lg:text-sm ${
+                  activeTab === tab
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`}
+              >
+                {tab === "Calls" && <PhoneCall className="mr-1 inline h-3.5 w-3.5" />}
+                {tab === "Phone Numbers" && <Phone className="mr-1 inline h-3.5 w-3.5" />}
+                {tab === "Call Analytics" && <BarChart3 className="mr-1 inline h-3.5 w-3.5" />}
+                {tab === "Blocked Numbers" && <ShieldBan className="mr-1 inline h-3.5 w-3.5" />}
+                {tab === "IVR" && <Settings className="mr-1 inline h-3.5 w-3.5" />}
+                {tab === "Voicemail" && <Voicemail className="mr-1 inline h-3.5 w-3.5" />}
+                {tab}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1539,6 +1578,9 @@ export default function PhonePage() {
             </div>
           </div>
         )}
+
+        {/* ---- IVR Settings Tab ---- */}
+        {activeTab === "IVR" && <IvrSettingsPanel isAdmin={isAdmin} />}
       </div>
 
       {/* ---- Right-side New Job Panel ---- */}
