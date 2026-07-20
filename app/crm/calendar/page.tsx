@@ -19,12 +19,14 @@ import {
   PhoneOutgoing,
   Plus,
   RefreshCw,
+  Route,
   Trash2,
   User,
   X,
 } from "lucide-react";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
+import CalendarRoutePlanner from "@/components/crm/CalendarRoutePlanner";
 import {
   loadCalendarEvents,
   createCalendarEvent,
@@ -437,6 +439,7 @@ export default function CalendarPage() {
 
   // Modal state
   const [newScheduleOpen, setNewScheduleOpen] = useState(false);
+  const [routePlannerOpen, setRoutePlannerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
@@ -2102,6 +2105,19 @@ export default function CalendarPage() {
               ))}
             </div>
 
+            <button
+              type="button"
+              onClick={() => setRoutePlannerOpen((p) => !p)}
+              className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition sm:px-4 sm:py-2 sm:text-sm ${
+                routePlannerOpen
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+              aria-label={routePlannerOpen ? "Close route planner" : "Open route planner"}
+            >
+              <Route className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Route</span>
+            </button>
+
             <button type="button" onClick={() => setNewScheduleOpen(true)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 sm:px-4 sm:py-2 sm:text-sm">
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Event</span>
             </button>
@@ -3325,6 +3341,17 @@ export default function CalendarPage() {
           </div>
         </div>
       )}
+
+      {/* Route Planner drawer */}
+      <CalendarRoutePlanner
+        open={routePlannerOpen}
+        onClose={() => setRoutePlannerOpen(false)}
+        currentDate={currentDate}
+        events={events}
+        jobs={jobs}
+        selectedEvent={selectedEvent}
+        onSelectEvent={(event) => setSelectedEvent(event)}
+      />
     </div>
   );
 }
