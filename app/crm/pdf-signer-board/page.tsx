@@ -342,6 +342,7 @@ export default function PdfSignerBoardPage() {
                     {filteredDocs.length === 0 && <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">No documents found.</td></tr>}
                     {filteredDocs.map((doc) => {
                       const sc = statusColors[doc.status];
+                      const isDraft = doc.status === "Draft";
                       return (
                         <tr key={doc.id} className="border-b border-gray-50 transition hover:bg-gray-50/50">
                           <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${sc.bg} ${sc.text}`}><Pencil className={`h-3 w-3 ${sc.icon}`} />{doc.status}</span></td>
@@ -354,15 +355,16 @@ export default function PdfSignerBoardPage() {
                           <td className="px-4 py-3">
                             <div className="relative flex items-center justify-end gap-2" ref={actionsOpenId === doc.id ? actionsRef : undefined}>
                               <button onClick={() => setPreviewDoc(doc)} className="text-sm font-semibold text-blue-600 hover:text-blue-800">Preview</button>
+                              {isDraft && <button onClick={() => openFieldEditor(doc)} className="text-sm font-semibold text-blue-600 hover:text-blue-800">Edit fields</button>}
                               <button onClick={() => setActionsOpenId(actionsOpenId === doc.id ? null : doc.id)} className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><MoreHorizontal className="h-4 w-4" /></button>
                               {actionsOpenId === doc.id && (
-                                <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
-                                  {doc.status === "Draft" && <button onClick={() => { setSendDoc(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Send className="h-3.5 w-3.5" /> Send for signature</button>}
+                                <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-xl">
+                                  {isDraft && <button onClick={() => { setSendDoc(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Send className="h-3.5 w-3.5" /> Send for signature</button>}
                                   {doc.status !== "Completed" && doc.status !== "Voided" && <button onClick={() => { setSigningDoc(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><FileSignature className="h-3.5 w-3.5" /> Sign now</button>}
                                   {(doc.status === "Completed" || doc.originalPdfUrl) && <button onClick={() => { handleDownload(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Download className="h-3.5 w-3.5" /> Download</button>}
-                                  <button onClick={() => { openFieldEditor(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Pencil className="h-3.5 w-3.5" /> Edit fields</button>
+                                  {!isDraft && <button onClick={() => { openFieldEditor(doc); setActionsOpenId(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><Pencil className="h-3.5 w-3.5" /> Edit fields</button>}
                                   {doc.status !== "Voided" && doc.status !== "Completed" && <button onClick={() => handleVoidDoc(doc)} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"><X className="h-3.5 w-3.5" /> Void</button>}
-                                  {doc.status === "Draft" && <button onClick={() => handleDeleteDoc(doc.id)} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Delete</button>}
+                                  {isDraft && <button onClick={() => handleDeleteDoc(doc.id)} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Delete</button>}
                                 </div>
                               )}
                             </div>
@@ -378,6 +380,7 @@ export default function PdfSignerBoardPage() {
                 {filteredDocs.length === 0 && <p className="py-12 text-center text-sm text-gray-400">No documents found.</p>}
                 {filteredDocs.map((doc) => {
                   const sc = statusColors[doc.status];
+                  const isDraft = doc.status === "Draft";
                   return (
                     <div key={doc.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                       <div className="flex items-start justify-between">
@@ -388,10 +391,11 @@ export default function PdfSignerBoardPage() {
                           <p className="truncate text-xs text-gray-400">{doc.jobAddress}</p>
                         </div>
                         <div className="ml-2 flex shrink-0 gap-1">
-                          <button onClick={() => setPreviewDoc(doc)} className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50"><Eye className="h-4 w-4" /></button>
-                          {doc.status !== "Completed" && doc.status !== "Voided" && <button onClick={() => setSigningDoc(doc)} className="rounded-md p-1.5 text-green-600 hover:bg-green-50"><FileSignature className="h-4 w-4" /></button>}
-                          {(doc.status === "Completed" || doc.originalPdfUrl) && <button onClick={() => handleDownload(doc)} className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100"><Download className="h-4 w-4" /></button>}
-                          {doc.status === "Draft" && <button onClick={() => handleDeleteDoc(doc.id)} className="rounded-md p-1.5 text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>}
+                          <button onClick={() => setPreviewDoc(doc)} className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50" title="Preview"><Eye className="h-4 w-4" /></button>
+                          {isDraft && <button onClick={() => openFieldEditor(doc)} className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50" title="Edit fields"><Pencil className="h-4 w-4" /></button>}
+                          {doc.status !== "Completed" && doc.status !== "Voided" && <button onClick={() => setSigningDoc(doc)} className="rounded-md p-1.5 text-green-600 hover:bg-green-50" title="Sign now"><FileSignature className="h-4 w-4" /></button>}
+                          {(doc.status === "Completed" || doc.originalPdfUrl) && <button onClick={() => handleDownload(doc)} className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100" title="Download"><Download className="h-4 w-4" /></button>}
+                          {isDraft && <button onClick={() => handleDeleteDoc(doc.id)} className="rounded-md p-1.5 text-red-500 hover:bg-red-50" title="Delete"><Trash2 className="h-4 w-4" /></button>}
                         </div>
                       </div>
                       <div className="mt-3 flex items-center gap-4 border-t border-gray-100 pt-2 text-xs text-gray-400"><span>Created {formatShortDate(doc.dateCreated)}</span>{doc.dateCompleted && <span>Completed {formatShortDate(doc.dateCompleted)}</span>}<span className="ml-auto">{doc.createdBy}</span></div>
