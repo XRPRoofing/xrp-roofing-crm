@@ -22,6 +22,7 @@ import {
   PhoneOutgoing,
   Play,
   Search,
+  Stethoscope,
   User,
   Users,
   Volume2,
@@ -31,7 +32,7 @@ import {
 } from "lucide-react";
 import type { BrowserVoiceCall, BrowserVoiceDevice } from "@/lib/twilio/client";
 import { createBrowserVoiceDevice, controlCall, listConversationEvents, subscribeToConversationEvents } from "@/lib/twilio/client";
-import { initVoiceDiagnostics, attachVoiceDeviceDiagnostics, attachVoiceCallDiagnostics, logVoiceDiagnostic } from "@/lib/twilio/voice-diagnostics";
+import { initVoiceDiagnostics, attachVoiceDeviceDiagnostics, attachVoiceCallDiagnostics, logVoiceDiagnostic, downloadVoiceDiagnostics } from "@/lib/twilio/voice-diagnostics";
 import { getTwilioCallOutcomeLabel } from "@/lib/twilio/notifications";
 import { azDate, azTime } from "@/lib/arizona-time";
 import type { Customer, Lead } from "@/types/crm";
@@ -958,6 +959,14 @@ export default function FloatingDialer({
 
         {/* Window controls */}
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => downloadVoiceDiagnostics()}
+            title="Download call diagnostics (for troubleshooting audio issues)"
+            className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-blue-600"
+          >
+            <Stethoscope className="h-4 w-4" />
+          </button>
           <button type="button" onClick={() => setMinimized(true)} className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
             <Minus className="h-4 w-4" />
           </button>
