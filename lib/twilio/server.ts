@@ -430,8 +430,12 @@ export function ivrDepartmentSay(label: IvrDepartment): string {
  *  greeting, and loop the caller back to the menu forever — so such a step must
  *  be skipped. Mirrors the guard the legacy simultaneous-ring path applies. */
 function isSelfReferentialNumber(rawNumber: string | undefined, config: ReturnType<typeof getTwilioConfig>): boolean {
-  const number = normalizePhoneForTwiml(rawNumber);
-  const selfNumber = normalizePhoneForTwiml(config.phoneNumber);
+  // Canonicalize both sides to E.164 so a step saved without the country code
+  // (e.g. "6233000611" or "(623) 300-0611") still matches this line's own
+  // number ("+16233000611"). normalizePhoneForTwiml only strips punctuation, so
+  // "6233000611" !== "+16233000611" and the self-dial loop slipped through.
+  const number = toE164(rawNumber?.trim() || "");
+  const selfNumber = toE164(config.phoneNumber || "");
   return Boolean(number && selfNumber && number === selfNumber);
 }
 
