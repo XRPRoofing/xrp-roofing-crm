@@ -243,6 +243,28 @@ export default function CalendarRoutePlanner({
     return buildRouteStops(filtered, jobsById);
   }, [eventsForDate, effectiveRoster, jobsById, selectedMemberId]);
 
+  // Temporary diagnostics for production matching issue
+  useEffect(() => {
+    if (!effectiveRoster) return;
+    const diagnostics = eventsForDate.slice(0, 20).map((e) => {
+      const resolved = resolveRouteAssignee(e, effectiveRoster, jobsById);
+      return {
+        eventId: e.id,
+        assigned_to: e.assigned_to,
+        resolvedMemberId: resolved.memberId,
+        resolvedKind: resolved.kind,
+      };
+    });
+    console.info("[RoutePlanner] diagnostics", {
+      currentDateKey,
+      selectedMemberId,
+      eventsForDateCount: eventsForDate.length,
+      selectedStopsCount: selectedStops.length,
+      selectableMembers: selectableMembers.map((m) => ({ id: m.id, name: m.name, legacyIds: m.legacyIds })),
+      sampleEvents: diagnostics,
+    });
+  }, [currentDateKey, selectedMemberId, eventsForDate, effectiveRoster, jobsById, selectedStops, selectableMembers]);
+
   useEffect(() => {
     if (!open) return;
     if (selectedStops.length === 0) {

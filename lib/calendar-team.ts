@@ -132,7 +132,25 @@ export function buildTeamRoster(
     const byEmail = legacy.email ? roster.byEmail.get(legacyEmail) : undefined;
     const byName = legacyNameKey ? roster.byName.get(legacyNameKey) : undefined;
 
-    const match = byId ?? (legacy.email ? byEmail : undefined) ?? byName;
+    let match = byId ?? (legacy.email ? byEmail : undefined) ?? byName;
+
+    // Fallback: legacy id or name is a substring of the profile's name or email local part.
+    // This links legacy TEAM_MEMBERS ids (e.g. "jonathan") to profiles whose full name
+    // contains that id (e.g. "Jonathan Gonzalez"), even when emails do not match exactly.
+    if (!match) {
+      for (const member of members) {
+        if (member.source !== "profile") continue;
+        const nameKey = normalizeName(member.name);
+        const emailLocal = member.email ? normalizeIdentifier(member.email).split("@")[0] : "";
+        if (
+          (legacyId && (nameKey.includes(legacyId) || emailLocal.includes(legacyId))) ||
+          (legacyNameKey && (nameKey.includes(legacyNameKey) || emailLocal.includes(legacyNameKey)))
+        ) {
+          match = member;
+          break;
+        }
+      }
+    }
 
     if (match) {
       if (!match.legacyIds.includes(legacyId)) match.legacyIds.push(legacyId);

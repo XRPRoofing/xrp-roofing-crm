@@ -33,6 +33,9 @@ export async function GET(_req: NextRequest) {
   const profiles = (data || []) as ProfileLike[];
   const roster = buildTeamRoster(profiles);
 
+  // Temporary diagnostics for production member matching
+  console.info("[team/roster] members", roster.members.map((m) => ({ id: m.id, name: m.name, source: m.source, legacyIds: m.legacyIds })));
+
   return NextResponse.json({
     members: roster.members.map((m) => ({
       id: m.id,

@@ -130,6 +130,15 @@ export async function POST(req: NextRequest) {
   const stops = Array.isArray(body.stops) ? body.stops : [];
   const startAddress = body.startAddress?.trim() || "";
 
+  // Temporary diagnostics for production member matching
+  console.info("[calendar/route] request", {
+    memberId: body.memberId,
+    date: body.date,
+    startAddress,
+    stopsCount: stops.length,
+    keyPresent: Boolean(getApiKey()),
+  });
+
   if (stops.length === 0) {
     return NextResponse.json(buildError("No stops for the selected date", []));
   }
