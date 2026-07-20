@@ -203,7 +203,7 @@ export function subscribeToConversationEvents(onEvent: (event: TwilioConversatio
 
 // --- Agent presence -------------------------------------------------------
 // Report the current admin's online/offline state to /api/agent/presence.
-export async function reportAgentPresence(status: "online" | "offline") {
+export async function reportAgentPresence(status: "online" | "offline" | "busy") {
   try {
     const { data } = await createClient().auth.getSession();
     const token = data.session?.access_token;
@@ -216,6 +216,25 @@ export async function reportAgentPresence(status: "online" | "offline") {
     });
   } catch {
     // Presence is best-effort; ringing still targets all admins via profiles.
+  }
+}
+
+// Ask the server to connect this now-free admin to the next caller waiting in
+// the hold queue (if any). Called right after a call ends. Best-effort: a
+// failure just means the queued caller keeps waiting for the next free admin.
+export async function connectNextQueuedCall() {
+  try {
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/twilio/queue/connect-next", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+      keepalive: true,
+    });
+  } catch {
+    // ignore — dequeue is best-effort.
   }
 }
 

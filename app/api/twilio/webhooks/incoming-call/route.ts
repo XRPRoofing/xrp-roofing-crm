@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { buildIvrGreetingTwiml, buildIvrMenuTwiml, fetchOnlineAgents, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
+import { buildIvrGreetingTwiml, buildIvrMenuTwiml, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl, resolveInboundAgents } from "@/lib/twilio/server";
 import { ensureCustomerFromLeadServer } from "@/lib/customers/ensure-server";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { getLeadSourceForNumber } from "@/lib/twilio/numbers";
@@ -26,7 +26,13 @@ async function handleIncomingCall(formData: FormData, req: NextRequest) {
     const greetingRedirect = new URL("/api/twilio/webhooks/incoming-call", origin);
     greetingRedirect.searchParams.set("attempt", "1");
     const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
-    const onlineAgents = await fetchOnlineAgents();
+    const { status: onlineAgents, shouldQueue } = await resolveInboundAgents();
+    const queue = shouldQueue
+      ? {
+          waitUrl: new URL("/api/twilio/webhooks/queue-wait", origin).toString(),
+          actionUrl: new URL("/api/twilio/webhooks/queue-action", origin).toString(),
+        }
+      : undefined;
     const { twiml, department } = buildIvrMenuTwiml(
       "0",
       statusCallbackUrl,
@@ -35,6 +41,7 @@ async function handleIncomingCall(formData: FormData, req: NextRequest) {
       onlineAgents,
       queueHoldUrl,
       callerNumber,
+      queue,
     );
     after(async () => {
       const event = normalizeTwilioWebhookEvent("call_status", formData);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { buildIvrMenuTwiml, buildRoutingStepTwiml, fetchOnlineAgents, ivrDepartmentSay, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl, resolveIvrDepartment } from "@/lib/twilio/server";
+import { buildIvrMenuTwiml, buildRoutingStepTwiml, ivrDepartmentSay, normalizeTwilioWebhookEvent, resolveCallStatusCallbackUrl, resolveInboundAgents, resolveIvrDepartment } from "@/lib/twilio/server";
 import { getCallRoutingForOption } from "@/lib/twilio/routing-server";
 import { routeStepUrlFor } from "@/lib/twilio/routing-urls";
 import { publishConversationEvent } from "@/lib/twilio/realtime";
@@ -18,9 +18,12 @@ export async function POST(req: NextRequest) {
   greetingRedirect.searchParams.set("attempt", "1");
   const greetingRedirectUrl = greetingRedirect.toString();
   const queueHoldUrl = new URL("/api/twilio/webhooks/queue-hold", origin).toString();
+  const queueWaitUrl = new URL("/api/twilio/webhooks/queue-wait", origin).toString();
+  const queueActionUrl = new URL("/api/twilio/webhooks/queue-action", origin).toString();
 
   const callerNumber = formData.get("From")?.toString() || "";
-  const onlineAgents = await fetchOnlineAgents();
+  const { status: onlineAgents, shouldQueue } = await resolveInboundAgents();
+  const queue = shouldQueue ? { waitUrl: queueWaitUrl, actionUrl: queueActionUrl } : undefined;
 
   // Configurable step-based routing: if this option has a saved sequence, ring
   // its steps one after another (failover). If no config exists, fall back to
@@ -46,10 +49,11 @@ export async function POST(req: NextRequest) {
       agentStatus: onlineAgents,
       callerNumber,
       sayText: ivrDepartmentSay(dept.label),
+      queue,
     });
     department = dept.label;
   } else {
-    ({ twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl, callerNumber));
+    ({ twiml, department } = buildIvrMenuTwiml(digit, statusCallbackUrl, actionCallbackUrl, greetingRedirectUrl, onlineAgents, queueHoldUrl, callerNumber, queue));
   }
 
   if (department) {

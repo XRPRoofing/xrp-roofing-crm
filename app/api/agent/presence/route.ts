@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const status = body.status === "online" ? "online" : "offline";
+    const status =
+      body.status === "online" ? "online" : body.status === "busy" ? "busy" : "offline";
 
     const supabaseUrl = normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

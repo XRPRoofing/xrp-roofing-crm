@@ -1,7 +1,8 @@
 import twilio from "twilio";
 import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig, toE164 } from "@/lib/twilio/config";
 import { findTwilioLine, resolveFromNumber } from "@/lib/twilio/numbers";
-import { getAdminAgentIdentities, getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
+import { getAdminAgentIdentities, getBusyAgentCount, getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
+import { QUEUE_NAME } from "@/lib/twilio/queue-config";
 import type { RoutingStep } from "@/lib/twilio/routing-types";
 import type { TwilioCallNotePayload, TwilioCallPayload, TwilioConversationEvent, TwilioSmsPayload } from "@/types/twilio-conversations";
 
@@ -176,6 +177,102 @@ export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
   } catch (err) {
     console.error("[call-trace] fetchOnlineAgents failed:", err);
     return { configured: false, agents: [] };
+  }
+}
+
+/**
+ * Decide how an inbound IVR call should be routed with respect to the busy
+ * queue. Distinguishes the three cases that plain `fetchOnlineAgents` masks
+ * (its all-admins fallback hides "everyone is busy"):
+ *
+ *  - Some admins are free            -> ring only those free admins.
+ *  - Presence works, all busy        -> `shouldQueue` so the caller waits on
+ *                                       hold instead of ringing dead browsers.
+ *  - Nobody online / presence off    -> current behavior: ring every admin as
+ *                                       a safety net (never silently drop).
+ *
+ * `shouldQueue` is only ever true when presence is configured AND at least one
+ * admin is on a call, so a presence outage can never trap callers in a queue.
+ */
+export async function resolveInboundAgents(): Promise<{ status: AgentStatusResult; shouldQueue: boolean }> {
+  try {
+    const [online, admins] = await Promise.all([
+      getOnlineAgentIdentities().catch(() => ({ configured: false, agents: [] as string[] })),
+      getAdminAgentIdentities().catch(() => [] as string[]),
+    ]);
+
+    if (online.configured && online.agents.length > 0) {
+      return { status: { configured: true, agents: online.agents }, shouldQueue: false };
+    }
+
+    if (online.configured) {
+      const busy = await getBusyAgentCount().catch(() => 0);
+      if (busy > 0) {
+        console.log(`[call-trace] all ${busy} online admin(s) busy — routing caller to hold queue`);
+        return { status: { configured: true, agents: [] }, shouldQueue: true };
+      }
+    }
+
+    // Nobody online (or presence not configured): ring every admin as before.
+    return { status: { configured: admins.length > 0, agents: admins }, shouldQueue: false };
+  } catch (err) {
+    console.error("[call-trace] resolveInboundAgents failed:", err);
+    return { status: { configured: false, agents: [] }, shouldQueue: false };
+  }
+}
+
+/**
+ * Build TwiML that places the caller into the shared Twilio hold queue. Played
+ * only when every admin is on a call. `waitUrl` supplies hold music + enforces
+ * the max wait; `actionUrl` fires when the caller leaves the queue.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function appendEnqueue(response: any, waitUrl: string, actionUrl: string) {
+  response.say(
+    "All of our team members are currently helping other customers. Please stay on the line and your call will be answered in the order it was received.",
+  );
+  response.enqueue(
+    { waitUrl, waitUrlMethod: "POST", action: actionUrl, method: "POST" },
+    QUEUE_NAME,
+  );
+}
+
+export function buildEnqueueTwiml(waitUrl: string, actionUrl: string): string {
+  const response = new twilio.twiml.VoiceResponse();
+  appendEnqueue(response, waitUrl, actionUrl);
+  return response.toString();
+}
+
+/**
+ * Ring a now-free admin's browser and bridge them to the caller waiting at the
+ * front of the hold queue. Placed as a fresh call to the agent's client whose
+ * TwiML `<Dial><Queue>` dequeues the oldest caller when the admin answers.
+ * No-ops (returns false) when the queue is empty, so it's safe to call on every
+ * call-end. Best-effort: any Twilio error fails soft.
+ */
+export async function connectAgentToQueue(agentIdentity: string, origin: string): Promise<boolean> {
+  const client = getTwilioClient();
+  if (!client || !agentIdentity) return false;
+  const config = getTwilioConfig();
+  if (!config.phoneNumber) return false;
+  try {
+    const queues = await client.queues.list({ limit: 50 });
+    const queue = queues.find((q) => q.friendlyName === QUEUE_NAME);
+    if (!queue || (queue.currentSize ?? 0) < 1) return false;
+
+    const connectUrl = new URL("/api/twilio/webhooks/queue-connect", origin).toString();
+    await client.calls.create({
+      to: `client:${agentIdentity}`,
+      from: config.phoneNumber,
+      url: connectUrl,
+      method: "POST",
+      timeout: 30,
+    });
+    console.log(`[call-trace] dequeue — ringing free admin ${agentIdentity} for queued caller (queueSize=${queue.currentSize})`);
+    return true;
+  } catch (err) {
+    console.error("[call-trace] connectAgentToQueue failed:", err);
+    return false;
   }
 }
 
@@ -472,6 +569,7 @@ export function buildRoutingStepTwiml(params: {
   agentStatus?: AgentStatusResult;
   callerNumber?: string;
   sayText?: string;
+  queue?: { waitUrl: string; actionUrl: string };
 }): string {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -504,6 +602,14 @@ export function buildRoutingStepTwiml(params: {
   }
 
   if (!hasTargets) {
+    // Ring-group step with nobody free. If every admin is on a call, hold the
+    // caller in the queue instead of announcing "no agents"; otherwise keep the
+    // existing fail-over-to-next-step behavior unchanged.
+    const isRingGroupStep = !step || step.type === "ring_group";
+    if (params.queue && isRingGroupStep) {
+      appendEnqueue(response, params.queue.waitUrl, params.queue.actionUrl);
+      return response.toString();
+    }
     response.say("No agents are available to take your call.");
     response.redirect({ method: "POST" }, redirectUrl);
     return response.toString();
@@ -537,6 +643,7 @@ export function buildIvrMenuTwiml(
   agentStatus?: AgentStatusResult,
   queueHoldUrl?: string,
   _callerNumber?: string,
+  queue?: { waitUrl: string; actionUrl: string },
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -552,6 +659,14 @@ export function buildIvrMenuTwiml(
   const sayDepartment = () => {
     response.say(ivrDepartmentSay(dept.label));
   };
+
+  // Every admin is on a call — hold the caller in the shared queue instead of
+  // ringing busy browsers or dropping to the no-agents ending.
+  if (queue) {
+    sayDepartment();
+    appendEnqueue(response, queue.waitUrl, queue.actionUrl);
+    return { twiml: response.toString(), department: dept.label };
+  }
 
   const status = agentStatus || { configured: false, agents: [] };
 
