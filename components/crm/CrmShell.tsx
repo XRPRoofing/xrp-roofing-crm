@@ -251,11 +251,9 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     if (isCrewUser) return;
     // Register under a per-user Voice identity (`agent-<id>`) so an inbound
     // <Dial> can ring EVERY logged-in admin's browser at once — each admin
-    // registers a distinct identity and dialRingGroup fans the call out to all
-    // of them (resolved from the profiles table). "crm-agent" is still always a
-    // dial target as an ultimate fallback (mobile app + safety), so nothing
-    // ends up ringing nobody. Wait until the user id is known before
-    // registering.
+    // registers a distinct identity and dialRingGroup fans the call out to
+    // online agents or the configured ring group. Wait until the user id is
+    // known before registering.
     if (!currentUserId) return;
     const voiceIdentity = `agent-${currentUserId}`;
     let mounted = true;
@@ -308,7 +306,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         await device.register();
         // Mark this admin online so presence-aware routing can prefer them.
         void reportAgentPresence("online");
-      } catch {
+      } catch (err) {
+        console.error("[CrmShell] Voice device registration failed:", err);
+        logVoiceDiagnostic({
+          type: "device-error",
+          payload: {
+            identity: voiceIdentity,
+            error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+          },
+        });
         voiceDeviceRef.current = null;
       }
     }

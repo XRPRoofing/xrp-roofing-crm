@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sid: message.sid, status: message.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to send SMS";
-    return NextResponse.json({ error: message }, { status: 503 });
+    const isValidationError = message === "Invalid destination phone number";
+    return NextResponse.json({ error: message }, { status: isValidationError ? 400 : 503 });
   }
 }

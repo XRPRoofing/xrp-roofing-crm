@@ -1,5 +1,5 @@
 import twilio from "twilio";
-import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig } from "@/lib/twilio/config";
+import { getTwilioConfig, hasTwilioMessagingConfig, hasTwilioVoiceConfig, toE164 } from "@/lib/twilio/config";
 import { findTwilioLine, resolveFromNumber } from "@/lib/twilio/numbers";
 import { getAdminAgentIdentities, getOnlineAgentIdentities, type AgentStatusResult } from "@/lib/agent-status-server";
 import type { RoutingStep } from "@/lib/twilio/routing-types";
@@ -33,33 +33,44 @@ export async function sendConversationSms(payload: TwilioSmsPayload) {
 
   if (!client) throw new Error("Twilio client could not be created");
 
+  const toNumber = toE164(payload.to);
+  if (!toNumber) {
+    throw new Error("Invalid destination phone number");
+  }
+
   const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID || "";
   const fromNumber = resolveFromNumber(payload.from);
 
-  // When a Messaging Service is configured, route ONLY through it (no `from`).
-  // Passing `from` alongside messagingServiceSid can bypass 10DLC campaign
-  // routing and cause carriers to flag the message as "Spam Likely".
-  // The Messaging Service automatically selects the correct number from its
-  // sender pool (linked to the 10DLC campaign).
-  if (messagingServiceSid) {
-    console.log(`[twilio:sms] to=${payload.to} messagingService=${messagingServiceSid} (requested from=${payload.from ?? "undefined"})`);
-    return client.messages.create({
-      to: payload.to,
-      messagingServiceSid,
+  try {
+    // When a Messaging Service is configured, route ONLY through it (no `from`).
+    // Passing `from` alongside messagingServiceSid can bypass 10DLC campaign
+    // routing and cause carriers to flag the message as "Spam Likely".
+    // The Messaging Service automatically selects the correct number from its
+    // sender pool (linked to the 10DLC campaign).
+    if (messagingServiceSid) {
+      console.log(`[twilio:sms] to=${toNumber} messagingService=${messagingServiceSid} (requested from=${payload.from ?? "undefined"})`);
+      return await client.messages.create({
+        to: toNumber,
+        messagingServiceSid,
+        body: payload.body,
+        mediaUrl: payload.mediaUrl,
+        statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
+      });
+    }
+
+    console.log(`[twilio:sms] to=${toNumber} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
+    return await client.messages.create({
+      to: toNumber,
+      from: fromNumber,
       body: payload.body,
       mediaUrl: payload.mediaUrl,
       statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
     });
+  } catch (err) {
+    const twilioError = err as { code?: string; message?: string; moreInfo?: string };
+    console.error(`[twilio:sms] failed to send message | to=${toNumber} | code=${twilioError.code || "unknown"} | message=${twilioError.message || "unknown"}${twilioError.moreInfo ? ` | moreInfo=${twilioError.moreInfo}` : ""}`);
+    throw new Error(twilioError.message || "Unable to send SMS");
   }
-
-  console.log(`[twilio:sms] to=${payload.to} from=${fromNumber} (requested=${payload.from ?? "undefined"})`);
-  return client.messages.create({
-    to: payload.to,
-    from: fromNumber,
-    body: payload.body,
-    mediaUrl: payload.mediaUrl,
-    statusCallback: process.env.TWILIO_MESSAGE_STATUS_WEBHOOK_URL,
-  });
 }
 
 // The status-callback env var (TWILIO_CALL_STATUS_WEBHOOK_URL) sometimes still
@@ -109,28 +120,37 @@ function normalizePhoneForTwiml(value?: string) {
 }
 
 /**
+ * Resolve the client identities that should be rung for an inbound call.
+ * Priority: onlineAgents (from availability system) > TWILIO_RING_GROUP env var.
+ * No phantom fallback is added — every identity returned here must be actively
+ * registered by a browser/softphone.
+ */
+function resolveRingGroupTargets(config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]): string[] {
+  const targets: string[] = [];
+  const source = onlineAgents && onlineAgents.length > 0 ? onlineAgents : config.ringGroup;
+  for (const agentId of source) {
+    if (agentId && !targets.includes(agentId)) targets.push(agentId);
+  }
+  return targets;
+}
+
+/**
  * Dial all available agents simultaneously.
- * Priority: onlineAgents (from availability system) > TWILIO_RING_GROUP env var > "crm-agent".
- * Always ensures at least one target exists (crm-agent as ultimate fallback).
+ * Adds <Client> nouns for online agents or the TWILIO_RING_GROUP env var.
+ * Returns the list of client identities actually dialed.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]) {
-  // The in-app softphone (CrmShell / FloatingDialer / ConversationBoard) always
-  // registers its Twilio Voice device under the shared "crm-agent" identity, so
-  // "crm-agent" must ALWAYS be a dial target — otherwise inbound calls ring
-  // per-user identities (agent-<id>) or the ring-group only and the browser
-  // never receives the call, leaving no way to answer.
-  const targets = new Set<string>(["crm-agent"]);
-  if (onlineAgents && onlineAgents.length > 0) {
-    for (const agentId of onlineAgents) targets.add(agentId);
+function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, onlineAgents?: string[]): string[] {
+  const targets = resolveRingGroupTargets(config, onlineAgents);
+  if (targets.length > 0) {
+    console.log(`[call-trace] dialing ring group | clients=[${targets.join(",")}] | count=${targets.length}`);
+    for (const agentId of targets) {
+      dial.client(agentId);
+    }
   } else {
-    for (const agentId of config.ringGroup) targets.add(agentId);
+    console.log("[call-trace] ring group is empty | no clients to dial");
   }
-  const list = Array.from(targets);
-  console.log(`[call-trace] dialing ring group | clients=[${list.join(",")}] | count=${list.length}`);
-  for (const agentId of list) {
-    dial.client(agentId);
-  }
+  return targets;
 }
 
 /** Fetch the agent identities to ring for an inbound call.
@@ -139,8 +159,8 @@ function dialRingGroup(dial: any, config: ReturnType<typeof getTwilioConfig>, on
  *  never dialed (dead legs mask who is actually available). When presence is
  *  unavailable or reports nobody online, falls back to EVERY admin-access
  *  user's browser (each registers its own `agent-<id>` identity) so a call is
- *  never left ringing nobody. dialRingGroup adds `crm-agent` (mobile app +
- *  shared fallback) on top. */
+ *  never left ringing nobody. */
+
 export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
   try {
     const [online, admins] = await Promise.all([
@@ -160,14 +180,13 @@ export async function fetchOnlineAgents(): Promise<AgentStatusResult> {
 }
 
 /** Check if any agents are available to take calls.
- *  The shared "crm-agent" browser softphone is ALWAYS a dial target (see
- *  dialRingGroup), so the in-app softphone can always receive the call. We
- *  therefore never trap callers in the hold queue — an unanswered <Dial> falls
- *  through to its `action` callback (voicemail / call-ended) after `timeout`,
- *  which is the correct "no answer" path rather than an endless hold loop.
+ *  True when at least one online agent is present or TWILIO_RING_GROUP is
+ *  configured. No phantom fallback is assumed, so callers can route to the
+ *  no-agents / hold queue path when nobody is available.
  */
-export function hasAvailableAgents(_status: AgentStatusResult): boolean {
-  return true;
+export function hasAvailableAgents(status: AgentStatusResult): boolean {
+  const config = getTwilioConfig();
+  return status.agents.length > 0 || config.ringGroup.length > 0;
 }
 
 /**
@@ -179,7 +198,7 @@ export function buildQueueHoldTwiml(
   statusCallbackUrl: string,
   actionCallbackUrl: string,
   queueHoldUrl: string,
-  callerNumber?: string,
+  _callerNumber?: string,
 ): string {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -195,13 +214,17 @@ export function buildQueueHoldTwiml(
       recordingStatusCallback: statusCallbackUrl,
       recordingStatusCallbackEvent: ["completed"],
       recordingStatusCallbackMethod: "POST",
-      // Show customer's number to staff; customer only sees the Twilio number they called
-      ...(callerNumber ? { callerId: callerNumber } : {}),
     });
-    dialRingGroup(dial, config, agentStatus.agents);
+    const dialedClients = dialRingGroup(dial, config, agentStatus.agents);
     const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
-    if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
+    const hasForward = Boolean(inboundForwardNumber && inboundForwardNumber !== config.phoneNumber);
+    if (hasForward) {
       dial.number(inboundForwardNumber);
+    }
+    if (dialedClients.length === 0 && !hasForward) {
+      response.say("No agents are available to take your call.");
+      response.redirect({ method: "POST" }, actionCallbackUrl);
+      return response.toString();
     }
   } else {
     response.say("Please wait, all agents are busy. Your call is important to us.");
@@ -212,9 +235,19 @@ export function buildQueueHoldTwiml(
   return response.toString();
 }
 
-export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL, actionCallbackUrl = statusCallbackUrl, onlineAgents?: string[], callerNumber?: string) {
+export function buildIncomingCallTwiml(statusCallbackUrl: string = process.env.TWILIO_CALL_STATUS_WEBHOOK_URL || "", actionCallbackUrl: string = statusCallbackUrl, onlineAgents?: string[], _callerNumber?: string) {
   const response = new twilio.twiml.VoiceResponse();
   const config = getTwilioConfig();
+  const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
+  const hasForward = Boolean(inboundForwardNumber && inboundForwardNumber !== config.phoneNumber);
+  const clientTargets = resolveRingGroupTargets(config, onlineAgents);
+
+  if (clientTargets.length === 0 && !hasForward) {
+    response.say("No agents are available to take your call.");
+    response.redirect({ method: "POST" }, actionCallbackUrl);
+    return response.toString();
+  }
+
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
@@ -224,16 +257,13 @@ export function buildIncomingCallTwiml(statusCallbackUrl = process.env.TWILIO_CA
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
-    // Show customer's number to staff; customer only sees the Twilio number they called
-    ...(callerNumber ? { callerId: callerNumber } : {}),
   });
 
-  dialRingGroup(dial, config, onlineAgents);
+  for (const agentId of clientTargets) {
+    dial.client(agentId);
+  }
 
-  // Forwarding to the Twilio number itself would loop the call back into this
-  // webhook, so only forward to a different (real) phone.
-  const inboundForwardNumber = normalizePhoneForTwiml(config.inboundForwardNumber);
-  if (inboundForwardNumber && inboundForwardNumber !== config.phoneNumber) {
+  if (hasForward) {
     dial.number(inboundForwardNumber);
   }
 
@@ -395,15 +425,20 @@ export function ivrDepartmentSay(label: IvrDepartment): string {
   return "Connecting you to the operator.";
 }
 
-/** Ring the targets for a single routing step onto an existing <Dial>. */
+/** Ring the targets for a single routing step onto an existing <Dial>.
+ *  Returns true if at least one target was added. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyRoutingStepTargets(dial: any, step: RoutingStep, config: ReturnType<typeof getTwilioConfig>, agentStatus?: AgentStatusResult) {
+function applyRoutingStepTargets(dial: any, step: RoutingStep, config: ReturnType<typeof getTwilioConfig>, agentStatus?: AgentStatusResult): boolean {
   if (step.type === "ring_group") {
-    dialRingGroup(dial, config, agentStatus?.agents);
-    return;
+    const targets = dialRingGroup(dial, config, agentStatus?.agents);
+    return targets.length > 0;
   }
   const number = normalizePhoneForTwiml(step.number);
-  if (number) dial.number(number);
+  if (number) {
+    dial.number(number);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -429,39 +464,48 @@ export function buildRoutingStepTwiml(params: {
   if (params.stepIndex === 0 && params.sayText) response.say(params.sayText);
 
   const step = params.steps[params.stepIndex];
+  let redirectUrl: string;
+  let hasTargets = false;
+
   if (!step) {
-    // Sequence exhausted — no configured step answered. Instead of dropping the
-    // call, fail over one last time to the Main Line ring group (all online
-    // admin browsers + the shared softphone) for 30s so a routed call is never
-    // missed just because the assigned person couldn't pick up. Only if this
-    // also goes unanswered does it end (call-ended logs it + hangs up).
-    const failoverDial = response.dial({
-      answerOnBridge: true,
-      record: "record-from-answer-dual",
-      timeout: 30,
-      action: params.finalNoAnswerUrl,
-      method: "POST",
-      recordingStatusCallback: params.statusCallbackUrl,
-      recordingStatusCallbackEvent: ["completed"],
-      recordingStatusCallbackMethod: "POST",
-      ...(params.callerNumber ? { callerId: params.callerNumber } : {}),
-    });
-    dialRingGroup(failoverDial, config, params.agentStatus?.agents);
+    // Sequence exhausted — no configured step answered. Fail over one last time
+    // to the Main Line ring group if any agents are available.
+    const targets = resolveRingGroupTargets(config, params.agentStatus?.agents);
+    hasTargets = targets.length > 0;
+    redirectUrl = params.finalNoAnswerUrl;
+  } else {
+    redirectUrl = params.nextStepUrlFor(params.option, params.stepIndex + 1);
+    if (step.type === "ring_group") {
+      const targets = resolveRingGroupTargets(config, params.agentStatus?.agents);
+      hasTargets = targets.length > 0;
+    } else {
+      hasTargets = Boolean(normalizePhoneForTwiml(step.number));
+    }
+  }
+
+  if (!hasTargets) {
+    response.say("No agents are available to take your call.");
+    response.redirect({ method: "POST" }, redirectUrl);
     return response.toString();
   }
 
   const dial = response.dial({
     answerOnBridge: true,
     record: "record-from-answer-dual",
-    timeout: step.seconds,
-    action: params.nextStepUrlFor(params.option, params.stepIndex + 1),
+    timeout: step ? step.seconds : 30,
+    action: redirectUrl,
     method: "POST",
     recordingStatusCallback: params.statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
-    ...(params.callerNumber ? { callerId: params.callerNumber } : {}),
   });
-  applyRoutingStepTargets(dial, step, config, params.agentStatus);
+
+  if (!step) {
+    dialRingGroup(dial, config, params.agentStatus?.agents);
+  } else {
+    applyRoutingStepTargets(dial, step, config, params.agentStatus);
+  }
+
   return response.toString();
 }
 
@@ -472,7 +516,7 @@ export function buildIvrMenuTwiml(
   greetingRedirectUrl: string,
   agentStatus?: AgentStatusResult,
   queueHoldUrl?: string,
-  callerNumber?: string,
+  _callerNumber?: string,
 ) {
   const config = getTwilioConfig();
   const response = new twilio.twiml.VoiceResponse();
@@ -504,8 +548,17 @@ export function buildIvrMenuTwiml(
     return { twiml: response.toString(), department: dept.label };
   }
 
-  // Agents available (or system not configured — fall through to crm-agent)
   sayDepartment();
+
+  const forwardTo = normalizePhoneForTwiml(dept.number);
+  const hasForward = Boolean(forwardTo && forwardTo !== config.phoneNumber);
+  const clientTargets = resolveRingGroupTargets(config, status.agents);
+
+  if (clientTargets.length === 0 && !hasForward) {
+    response.say("No agents are available to take your call.");
+    response.redirect({ method: "POST" }, actionCallbackUrl);
+    return { twiml: response.toString(), department: dept.label };
+  }
 
   const dial = response.dial({
     answerOnBridge: true,
@@ -516,14 +569,13 @@ export function buildIvrMenuTwiml(
     recordingStatusCallback: statusCallbackUrl,
     recordingStatusCallbackEvent: ["completed"],
     recordingStatusCallbackMethod: "POST",
-    // Show customer's number to staff; customer only sees the Twilio number they called
-    ...(callerNumber ? { callerId: callerNumber } : {}),
   });
 
-  // dialRingGroup guarantees at least crm-agent as ultimate fallback
-  dialRingGroup(dial, config, status.agents);
-  const forwardTo = normalizePhoneForTwiml(dept.number);
-  if (forwardTo && forwardTo !== config.phoneNumber) {
+  for (const agentId of clientTargets) {
+    dial.client(agentId);
+  }
+
+  if (hasForward) {
     dial.number(forwardTo);
   }
 
