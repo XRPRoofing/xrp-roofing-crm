@@ -89,6 +89,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   const [unreadTeamChatCount, setUnreadTeamChatCount] = useState(0);
   const voiceDeviceRef = useRef<BrowserVoiceDevice | null>(null);
   const incomingCallRef = useRef<BrowserVoiceCall | null>(null);
+  // True only while an incoming call is still RINGING (popup shown, not yet
+  // answered on this browser). Used so the "answered elsewhere" signal only
+  // dismisses a ringing popup and never touches a call this admin has answered.
+  const incomingRingingRef = useRef(false);
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const [globalActiveIncomingCall, setGlobalActiveIncomingCall] = useState(false);
   const [globalIncomingMuted, setGlobalIncomingMuted] = useState(false);
@@ -279,11 +283,13 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
           }
           const phone = incoming.parameters?.From || "Unknown number";
           incomingCallRef.current = incoming;
+          incomingRingingRef.current = true;
           attachVoiceCallDiagnostics(incoming, incoming.parameters?.CallSid || "unknown", "inbound");
           setGlobalIncomingCall({ name: phone, phone });
 
 
           incoming.on("cancel", () => {
+            incomingRingingRef.current = false;
             incomingCallRef.current = null;
             setGlobalIncomingCall(null);
             setGlobalActiveIncomingCall(false);
@@ -396,8 +402,15 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isCrewUser) return;
     return subscribeToCallSignals((signal) => {
-      if (!incomingCallRef.current) return;
-      try { incomingCallRef.current.reject(); } catch {}
+      // Only dismiss a still-RINGING popup. Never touch a call this admin has
+      // already answered (that call stays until a human ends it).
+      if (!incomingRingingRef.current) return;
+      // Do NOT reject() the call: with a shared ring group / the same admin on
+      // multiple tabs or devices, that reject declines the whole Twilio client
+      // leg and drops the call for the admin who just answered. Twilio already
+      // cancels the other endpoints natively (their `cancel` event dismisses
+      // the popup). We simply clear the local ringing UI here.
+      incomingRingingRef.current = false;
       incomingCallRef.current = null;
       setGlobalIncomingCall(null);
       setGlobalActiveIncomingCall(false);
@@ -692,6 +705,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       // Accept while audio context is still active (ringtone playing).
       // Clearing globalIncomingCall stops the ringtone which can suspend the
       // browser audio context and cause the WebRTC stream to fail.
+      incomingRingingRef.current = false;
       incoming.accept();
 
       // Now safe to clear ringing state and transition to active card
@@ -732,6 +746,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
       });
       call?.reject();
     } catch {}
+    incomingRingingRef.current = false;
     incomingCallRef.current = null;
     setGlobalIncomingCall(null);
     callChannelRef.current?.postMessage({ type: "declined" });
