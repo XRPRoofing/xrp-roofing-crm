@@ -276,9 +276,14 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
         attachVoiceDeviceDiagnostics(device, voiceIdentity);
         device.on("incoming", (call) => {
           const incoming = call as BrowserVoiceCall;
-          // Prevent duplicate popups — ignore if a call is already ringing or active
+          // A call is already ringing/active on this device. With the same admin
+          // signed in on multiple tabs/devices (one Twilio identity), or when
+          // Twilio re-forks the INVITE after a mid-ring token refresh / device
+          // re-registration, the SDK can raise a second "incoming" for the SAME
+          // call leg. Rejecting it would decline the shared Twilio client leg and
+          // drop the call the admin is about to answer (leg ends "busy"). Ignore
+          // the duplicate and keep the current call intact — never auto-reject.
           if (incomingCallRef.current) {
-            try { incoming.reject(); } catch {}
             return;
           }
           const phone = incoming.parameters?.From || "Unknown number";
