@@ -425,6 +425,16 @@ export function ivrDepartmentSay(label: IvrDepartment): string {
   return "Connecting you to the operator.";
 }
 
+/** True when a configured forward number is this line's own Twilio number.
+ *  Dialing it would place a fresh inbound call to ourselves, re-enter the IVR
+ *  greeting, and loop the caller back to the menu forever — so such a step must
+ *  be skipped. Mirrors the guard the legacy simultaneous-ring path applies. */
+function isSelfReferentialNumber(rawNumber: string | undefined, config: ReturnType<typeof getTwilioConfig>): boolean {
+  const number = normalizePhoneForTwiml(rawNumber);
+  const selfNumber = normalizePhoneForTwiml(config.phoneNumber);
+  return Boolean(number && selfNumber && number === selfNumber);
+}
+
 /** Ring the targets for a single routing step onto an existing <Dial>.
  *  Returns true if at least one target was added. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -434,7 +444,7 @@ function applyRoutingStepTargets(dial: any, step: RoutingStep, config: ReturnTyp
     return targets.length > 0;
   }
   const number = normalizePhoneForTwiml(step.number);
-  if (number) {
+  if (number && !isSelfReferentialNumber(step.number, config)) {
     dial.number(number);
     return true;
   }
@@ -478,6 +488,12 @@ export function buildRoutingStepTwiml(params: {
     if (step.type === "ring_group") {
       const targets = resolveRingGroupTargets(config, params.agentStatus?.agents);
       hasTargets = targets.length > 0;
+    } else if (isSelfReferentialNumber(step.number, config)) {
+      // This step points at our own inbound line — dialing it would loop the
+      // caller straight back into the IVR menu. Skip it silently and advance to
+      // the next configured step instead of announcing "no agents".
+      response.redirect({ method: "POST" }, redirectUrl);
+      return response.toString();
     } else {
       hasTargets = Boolean(normalizePhoneForTwiml(step.number));
     }
