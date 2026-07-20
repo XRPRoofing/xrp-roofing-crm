@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { deleteCrmNotification, markCrmNotificationsRead, readCrmNotifications, type CrmNotification } from "@/lib/crm-notifications";
 import { incrementTeamChatUnreadCount, markTeamChatRead, readTeamChatUnreadCount, teamChatRoomId, teamChatTableName, type TeamChatMessage } from "@/lib/team-chat";
-import { broadcastCallAnswered, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, reportCallAnswered, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
+import { broadcastCallAnswered, connectNextQueuedCall, controlCall, createBrowserVoiceDevice, getVoiceToken, reportAgentPresence, reportCallAnswered, beaconAgentOffline, saveCallNotes, subscribeToCallSignals, subscribeToConversationEvents, type BrowserVoiceCall, type BrowserVoiceDevice } from "@/lib/twilio/client";
 import { initVoiceDiagnostics, attachVoiceDeviceDiagnostics, attachVoiceCallDiagnostics, logVoiceDiagnostic } from "@/lib/twilio/voice-diagnostics";
 import { addTwilioCrmNotification } from "@/lib/twilio/notifications";
 import { VoiceDeviceProvider } from "@/lib/twilio/voice-device-context";
@@ -93,6 +93,10 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
   // answered on this browser). Used so the "answered elsewhere" signal only
   // dismisses a ringing popup and never touches a call this admin has answered.
   const incomingRingingRef = useRef(false);
+  // Tracks whether this admin is currently on a call (inbound or outbound) so we
+  // can report "busy" presence — which keeps inbound routing from ringing a
+  // browser that's mid-call and drives the "all admins busy -> queue" decision.
+  const onCallRef = useRef(false);
   const [globalIncomingCall, setGlobalIncomingCall] = useState<{ name: string; phone: string } | null>(null);
   const [globalActiveIncomingCall, setGlobalActiveIncomingCall] = useState(false);
   const [globalIncomingMuted, setGlobalIncomingMuted] = useState(false);
@@ -396,10 +400,26 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     if (isCrewUser || !currentUserId) return;
     const HEARTBEAT_MS = 60_000;
     const id = setInterval(() => {
-      if (document.visibilityState !== "hidden") void reportAgentPresence("online");
+      // Preserve "busy" while on a call so the heartbeat doesn't reset an
+      // on-call admin back to "online" (which would ring them / skip the queue).
+      if (document.visibilityState !== "hidden") {
+        void reportAgentPresence(onCallRef.current ? "busy" : "online");
+      }
     }, HEARTBEAT_MS);
     return () => clearInterval(id);
   }, [isCrewUser, currentUserId]);
+
+  // Reflect on-call state into presence: mark this admin "busy" while on any
+  // call (inbound or outbound) and back to "online" when it ends. When a call
+  // ends, also ask the server to connect us to the next queued caller (if any).
+  useEffect(() => {
+    if (isCrewUser || !currentUserId) return;
+    const onCall = globalActiveIncomingCall || globalCallActive;
+    if (onCall === onCallRef.current) return;
+    onCallRef.current = onCall;
+    void reportAgentPresence(onCall ? "busy" : "online");
+    if (!onCall) void connectNextQueuedCall();
+  }, [globalActiveIncomingCall, globalCallActive, isCrewUser, currentUserId]);
 
   // Listen for "answered by <name>" signals from other admins. When one arrives
   // while this browser is still ringing the same call, dismiss the popup and

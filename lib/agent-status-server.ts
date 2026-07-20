@@ -30,6 +30,29 @@ export async function getOnlineAgentIdentities(): Promise<AgentStatusResult> {
   };
 }
 
+/** Count admins who are currently on a call (`status = "busy"` with a fresh
+ *  heartbeat). Used to decide whether an inbound caller should be queued (all
+ *  admins busy) versus sent to the normal no-agents ending (nobody online at
+ *  all). Fails soft to 0 so a presence/table error never forces queueing. */
+export async function getBusyAgentCount(): Promise<number> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return 0;
+  try {
+    const supabase = createClient(url, key);
+    const freshSince = new Date(Date.now() - PRESENCE_FRESH_MS).toISOString();
+    const { count, error } = await supabase
+      .from("agent_status")
+      .select("user_id", { count: "exact", head: true })
+      .eq("status", "busy")
+      .gte("updated_at", freshSince);
+    if (error) return 0;
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Return the Voice identities (`agent-<user_id>`) for every admin-access user.
  * Used so an inbound call rings ALL logged-in admins at once — the browser of

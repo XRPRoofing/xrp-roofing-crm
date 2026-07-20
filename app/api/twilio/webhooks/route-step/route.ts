@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildRoutingStepTwiml, fetchOnlineAgents, resolveCallStatusCallbackUrl } from "@/lib/twilio/server";
+import { buildRoutingStepTwiml, resolveCallStatusCallbackUrl, resolveInboundAgents } from "@/lib/twilio/server";
 import { getCallRoutingForOption } from "@/lib/twilio/routing-server";
 import { routeStepUrlFor } from "@/lib/twilio/routing-urls";
 
@@ -27,7 +27,13 @@ export async function POST(req: NextRequest) {
   const callerNumber = formData.get("From")?.toString() || "";
 
   const steps = await getCallRoutingForOption(option);
-  const onlineAgents = await fetchOnlineAgents();
+  const { status: onlineAgents, shouldQueue } = await resolveInboundAgents();
+  const queue = shouldQueue
+    ? {
+        waitUrl: new URL("/api/twilio/webhooks/queue-wait", origin).toString(),
+        actionUrl: new URL("/api/twilio/webhooks/queue-action", origin).toString(),
+      }
+    : undefined;
 
   const twiml = buildRoutingStepTwiml({
     steps,
@@ -38,6 +44,7 @@ export async function POST(req: NextRequest) {
     finalNoAnswerUrl,
     agentStatus: onlineAgents,
     callerNumber,
+    queue,
   });
 
   return new NextResponse(twiml, { headers: XML_HEADERS });
