@@ -30,6 +30,7 @@ import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { listProjects, listProjectPhotos, matchProjectByAddress, ensureProjectForJob, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
+import { loadDocumentsByJob, type PdfDocument } from "@/lib/pdf-signer-db";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
 
@@ -575,6 +576,7 @@ export default function LeadsPage() {
   const [fileError, setFileError] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
   const [jobActivities, setJobActivities] = useState<CrewActivity[]>([]);
+  const [jobPdfDocs, setJobPdfDocs] = useState<PdfDocument[]>([]);
   const [ccProjects, setCcProjects] = useState<CompanyCamProject[]>([]);
   const [ccPhotos, setCcPhotos] = useState<CompanyCamPhoto[]>([]);
   const [ccMatchedProject, setCcMatchedProject] = useState<CompanyCamProject | null>(null);
@@ -778,6 +780,7 @@ export default function LeadsPage() {
       setJobFiles([]);
       setJobNotes([]);
       setJobActivities([]);
+      setJobPdfDocs([]);
       setNoteDraft("");
       setActivityOpen(false);
       setChecklistOpen(false);
@@ -788,6 +791,7 @@ export default function LeadsPage() {
     let mounted = true;
     void loadJobPhotos(selectedJobId).then((photos) => { if (mounted) setJobFiles(photos); }).catch(() => {});
     void loadJobActivities(selectedJobId).then((acts) => { if (mounted) setJobActivities(acts); }).catch(() => {});
+    void loadDocumentsByJob(selectedJobId).then((docs) => { if (mounted) setJobPdfDocs(docs); }).catch(() => {});
     return () => { mounted = false; };
   }, [selectedJobId]);
 
@@ -2065,9 +2069,24 @@ export default function LeadsPage() {
                       ) : null;
                     })()}
 
+                    {/* Linked PDF Signer documents */}
+                    {jobPdfDocs.length > 0 && (
+                      <div className="space-y-2">
+                        {jobPdfDocs.map((doc) => (
+                          <a key={doc.id} href={doc.signedPdfUrl || doc.originalPdfUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-left transition hover:bg-blue-100">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="h-4 w-4 shrink-0 text-blue-600" />
+                              <span className="truncate text-sm font-bold text-blue-800">{doc.title}</span>
+                            </div>
+                            <span className="ml-2 shrink-0 rounded-full bg-blue-200 px-2 py-0.5 text-xs font-bold text-blue-700">{doc.status}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
                     {/* No linked documents message */}
-                    {getLinkedProposals(selectedJob.id).length === 0 && getLinkedInvoices(selectedJob.id).length === 0 && (
-                      <p className="text-xs font-semibold text-gray-400">No proposals or invoices linked to this job yet.</p>
+                    {getLinkedProposals(selectedJob.id).length === 0 && getLinkedInvoices(selectedJob.id).length === 0 && jobPdfDocs.length === 0 && (
+                      <p className="text-xs font-semibold text-gray-400">No proposals, invoices, or signed PDFs linked to this job yet.</p>
                     )}
 
                     {/* Action buttons */}

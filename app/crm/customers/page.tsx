@@ -26,6 +26,7 @@ import { logCrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { azDate, azDateTime } from "@/lib/arizona-time";
+import { loadDocumentsByCustomer, type PdfDocument } from "@/lib/pdf-signer-db";
 
 const customersStorageKey = "xrp-crm-customers";
 
@@ -235,7 +236,7 @@ function getStageLabel(job: Lead) {
   return leadStages.find((stage) => stage.id === job.stage)?.label || job.stage.replace(/_/g, " ");
 }
 
-const profileTabs = ["Contact Info", "Jobs", "Estimates", "Invoices", "Files", "Notes", "Communication History"] as const;
+const profileTabs = ["Contact Info", "Jobs", "Estimates", "Invoices", "Files", "PDF Documents", "Notes", "Communication History"] as const;
 type ProfileTab = (typeof profileTabs)[number];
 
 const customerNotesKey = "xrp-crm-customer-notes";
@@ -403,6 +404,7 @@ export default function CustomersPage() {
   // power the full Communication History timeline and the Files tab.
   const [crewActivities, setCrewActivities] = useState<CrewActivity[]>([]);
   const [customerPhotos, setCustomerPhotos] = useState<JobPhoto[]>([]);
+  const [customerPdfDocs, setCustomerPdfDocs] = useState<PdfDocument[]>([]);
   // Surfaced to the user when Supabase can't load/save (e.g. the customer_records
   // table hasn't been created yet) so saves never fail silently.
   const [customersError, setCustomersError] = useState<string | null>(null);
@@ -699,8 +701,11 @@ export default function CustomersPage() {
         setCustomerPhotos(all);
       })
       .catch(() => { if (mounted) setCustomerPhotos([]); });
+    void loadDocumentsByCustomer(selectedCustomer?.id, selectedCustomer?.name)
+      .then((docs) => { if (mounted) setCustomerPdfDocs(docs); })
+      .catch(() => { if (mounted) setCustomerPdfDocs([]); });
     return () => { mounted = false; };
-  }, [selectedCustomerId, jobList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCustomerId, jobList, selectedCustomer?.id, selectedCustomer?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Shared, device-synced customer records (manually added / edited). Loads from
   // the server, migrates any local-only customers up once, and live-updates via
@@ -1001,6 +1006,7 @@ export default function CustomersPage() {
                     tab === "Estimates" ? selectedCustomerProposals.length :
                     tab === "Invoices" ? selectedCustomerInvoices.length :
                     tab === "Files" ? customerPhotos.length :
+                    tab === "PDF Documents" ? customerPdfDocs.length :
                     tab === "Communication History" ? selectedCustomerTimeline.length :
                     null;
                   return (
@@ -1143,6 +1149,29 @@ export default function CustomersPage() {
                   ) : (
                     <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No files or photos uploaded for this customer yet. Photos taken on this customer&apos;s jobs appear here automatically.</p>
                   )}
+                </section>
+              )}
+
+              {activeTab === "PDF Documents" && (
+                <section className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-700" /><h3 className="text-lg font-bold text-blue-700">PDF Documents</h3></div>
+                    <Link href="/crm/pdf-signer-board" className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100"><Plus className="h-4 w-4" />PDF Signer</Link>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {customerPdfDocs.length > 0 ? customerPdfDocs.map((doc) => (
+                      <a key={doc.id} href={doc.signedPdfUrl || doc.originalPdfUrl} target="_blank" rel="noreferrer" className="flex w-full items-start justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900">{doc.title}</p>
+                          <p className="truncate text-sm font-bold text-gray-500">{doc.jobAddress || selectedCustomer.propertyAddress}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${doc.status === "Completed" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>{doc.status}</span>
+                          {doc.dateCompleted && <p className="mt-1 text-xs font-bold text-gray-400">{formatDate(doc.dateCompleted)}</p>}
+                        </div>
+                      </a>
+                    )) : <p className="rounded-lg bg-gray-50 p-4 text-sm font-bold text-gray-500">No PDF documents for this customer yet. Use the PDF Signer to send and complete documents.</p>}
+                  </div>
                 </section>
               )}
 
