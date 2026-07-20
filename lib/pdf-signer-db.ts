@@ -211,6 +211,35 @@ export async function voidDocument(id: string): Promise<PdfDocument> {
   return document;
 }
 
+export type CreateRecipientInput = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: PdfRecipient["role"];
+  label?: string;
+};
+
+export async function createDocumentRecipient(documentId: string, input: CreateRecipientInput): Promise<PdfRecipient> {
+  ensureSupabase();
+  const { recipient } = await apiFetch<{ recipient: PdfRecipient }>(
+    `/api/pdf-documents/${encodeURIComponent(documentId)}/recipients`,
+    {
+      method: "POST",
+      json: input,
+    },
+  );
+  if (!recipient) throw new Error("Recipient could not be created");
+  return recipient;
+}
+
+export async function loadDocumentRecipients(documentId: string): Promise<PdfRecipient[]> {
+  ensureSupabase();
+  const { recipients } = await apiFetch<{ recipients: PdfRecipient[] }>(
+    `/api/pdf-documents/${encodeURIComponent(documentId)}/recipients`,
+  );
+  return recipients ?? [];
+}
+
 export async function sendReminder(id: string, recipientId?: string): Promise<void> {
   ensureSupabase();
   await apiFetch<{ ok: true }>(`/api/pdf-documents/${encodeURIComponent(id)}/remind`, {

@@ -66,10 +66,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       await addAuditEvent(admin, { documentId: doc.id, recipientId: recipient.id, eventType: "Viewed", actor: recipient.name || "recipient", ipAddress: ip, userAgent: ua });
     }
 
+    const recipientFields =
+      doc.fields?.filter((f) => !f.recipientId || f.recipientId === recipient.id) ?? [];
+
     return NextResponse.json({
       document: { ...doc, originalPdfUrl },
       recipient,
-      fields: doc.fields,
+      fields: recipientFields,
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Unable to load signing page" }, { status: 500 });

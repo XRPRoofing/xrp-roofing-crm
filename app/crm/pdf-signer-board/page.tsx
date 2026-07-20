@@ -15,6 +15,7 @@ import {
   voidDocument,
   uploadPdfFile,
   updateDocumentFields,
+  createDocumentRecipient,
   getLegacyMigrationStats,
   migrateLegacyDocuments,
   clearMigrationFlag,
@@ -26,9 +27,8 @@ import {
   type PdfDocument,
   type PdfDocStatus,
   type PdfTemplate,
-  type PdfField,
-  type FieldType,
 } from "@/lib/pdf-signer-db";
+import PdfFieldEditor from "./PdfFieldEditor";
 
 const statusColors: Record<PdfDocStatus, { bg: string; text: string; icon: string }> = {
   Draft: { bg: "bg-orange-50", text: "text-orange-700", icon: "text-orange-500" },
@@ -40,9 +40,7 @@ const statusColors: Record<PdfDocStatus, { bg: string; text: string; icon: strin
   Expired: { bg: "bg-gray-100", text: "text-gray-700", icon: "text-gray-500" },
   Voided: { bg: "bg-gray-100", text: "text-gray-700", icon: "text-gray-500" },
 };
-
 const filterTabs: ("All docs" | PdfDocStatus)[] = ["All docs", "Draft", "Sent", "Viewed", "Partially Completed", "Completed", "Voided"];
-const fieldTypeOptions: FieldType[] = ["signature", "initials", "text", "date", "full_name", "phone", "email", "address", "checkbox", "radio", "dropdown", "label"];
 
 function Toast({ message, type, onDismiss }: { message: string; type: "success" | "error"; onDismiss: () => void }) {
   useEffect(() => { const t = setTimeout(onDismiss, 4000); return () => clearTimeout(t); }, [onDismiss]);
@@ -110,7 +108,6 @@ export default function PdfSignerBoardPage() {
   const [signingDoc, setSigningDoc] = useState<PdfDocument | null>(null);
   const [sendDoc, setSendDoc] = useState<PdfDocument | null>(null);
   const [fieldEditorDoc, setFieldEditorDoc] = useState<PdfDocument | null>(null);
-  const [fieldEditorFields, setFieldEditorFields] = useState<PdfField[]>([]);
 
   const [docForm, setDocForm] = useState({ jobAddress: "", customerName: "", documentName: "", createdBy: "" });
   const [docFile, setDocFile] = useState<{ name: string; path: string } | null>(null);
@@ -255,17 +252,17 @@ export default function PdfSignerBoardPage() {
     try {
       const full = await loadDocument(doc.id);
       setFieldEditorDoc(full);
-      setFieldEditorFields(full.fields || []);
     } catch (err) { showToast(err instanceof Error ? err.message : "Failed to load fields", "error"); }
   }
 
-  async function saveFieldEditor() {
+  async function handleFieldEditorSave(fields: { id?: string; type: string; label?: string; placeholder?: string; page: number; x: number; y: number; width?: number; height?: number; required?: boolean; options?: string[]; recipientId?: string }[]) {
     if (!fieldEditorDoc) return;
     try {
-      const saved = await updateDocumentFields(fieldEditorDoc.id, fieldEditorFields);
+      const saved = await updateDocumentFields(fieldEditorDoc.id, fields as any);
       setFieldEditorDoc((prev) => (prev ? { ...prev, fields: saved } : prev));
       showToast("Fields saved");
       await refresh();
+      setFieldEditorDoc(null);
     } catch (err) { showToast(err instanceof Error ? err.message : "Failed to save fields", "error"); }
   }
 
@@ -284,17 +281,6 @@ export default function PdfSignerBoardPage() {
   }
 
   function toggleSort(field: "dateCreated" | "dateCompleted") { if (sortField === field) setSortAsc((v) => !v); else { setSortField(field); setSortAsc(false); } }
-
-  function addField() {
-    const last = fieldEditorFields[fieldEditorFields.length - 1];
-    setFieldEditorFields((prev) => [...prev, { id: newDocId(), documentId: fieldEditorDoc?.id || "", type: "text", label: "New field", page: last?.page ?? 0, x: 50, y: (last?.y ?? 0) + 50, width: 200, height: 30, required: true, options: [] }]);
-  }
-
-  function updateField(index: number, patch: Partial<PdfField>) {
-    setFieldEditorFields((prev) => { const next = [...prev]; next[index] = { ...next[index], ...patch } as PdfField; return next; });
-  }
-
-  function removeField(index: number) { setFieldEditorFields((prev) => prev.filter((_, i) => i !== index)); }
 
   return (
     <div className="space-y-0">
@@ -340,7 +326,7 @@ export default function PdfSignerBoardPage() {
 
           {loading ? <p className="py-12 text-center text-sm text-gray-400">Loading...</p> : (
             <>
-              <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm md:block">
+              <div className="hidden rounded-xl border border-gray-200 bg-white shadow-sm md:block">
                 <table className="w-full text-left text-sm">
                   <thead><tr className="border-b border-gray-100 bg-gray-50/60">
                     <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
@@ -544,32 +530,16 @@ export default function PdfSignerBoardPage() {
       )}
 
       {fieldEditorDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFieldEditorDoc(null)}>
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-gray-900">Edit fields: {fieldEditorDoc.title}</h2><button onClick={() => setFieldEditorDoc(null)} className="rounded-md p-1 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button></div>
-            <div className="mt-4 space-y-3">
-              {fieldEditorFields.length === 0 && <p className="text-sm text-gray-500">No fields. Add a signature or text field below.</p>}
-              {fieldEditorFields.map((field, i) => (
-                <div key={field.id} className="grid gap-2 rounded border border-gray-200 p-3 text-sm sm:grid-cols-12">
-                  <div className="sm:col-span-2"><label className="text-xs text-gray-500">Type</label><select value={field.type} onChange={(e) => updateField(i, { type: e.target.value as FieldType })} className={inputClass}>{fieldTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>
-                  <div className="sm:col-span-3"><label className="text-xs text-gray-500">Label</label><input className={inputClass} value={field.label || ""} onChange={(e) => updateField(i, { label: e.target.value })} /></div>
-                  <div className="sm:col-span-1"><label className="text-xs text-gray-500">Page</label><input type="number" min={0} className={inputClass} value={field.page} onChange={(e) => updateField(i, { page: Number(e.target.value) || 0 })} /></div>
-                  <div className="sm:col-span-1"><label className="text-xs text-gray-500">X</label><input type="number" className={inputClass} value={field.x} onChange={(e) => updateField(i, { x: Number(e.target.value) || 0 })} /></div>
-                  <div className="sm:col-span-1"><label className="text-xs text-gray-500">Y</label><input type="number" className={inputClass} value={field.y} onChange={(e) => updateField(i, { y: Number(e.target.value) || 0 })} /></div>
-                  <div className="sm:col-span-1"><label className="text-xs text-gray-500">W</label><input type="number" className={inputClass} value={field.width || 200} onChange={(e) => updateField(i, { width: Number(e.target.value) || 0 })} /></div>
-                  <div className="sm:col-span-1"><label className="text-xs text-gray-500">H</label><input type="number" className={inputClass} value={field.height || 60} onChange={(e) => updateField(i, { height: Number(e.target.value) || 0 })} /></div>
-                  <div className="sm:col-span-2"><label className="text-xs text-gray-500">Options</label><input className={inputClass} value={(field.options || []).join(", ")} onChange={(e) => updateField(i, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} placeholder="opt1, opt2" /></div>
-                  <div className="flex items-end gap-2 sm:col-span-12">
-                    <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={field.required} onChange={(e) => updateField(i, { required: e.target.checked })} className="rounded" /> Required</label>
-                    <button onClick={() => removeField(i)} className="ml-auto text-xs text-red-600 hover:underline">Remove</button>
-                  </div>
-                </div>
-              ))}
-              <button onClick={addField} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">+ Add field</button>
-            </div>
-            <div className="mt-6 flex justify-end gap-2"><button onClick={() => setFieldEditorDoc(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button><button onClick={saveFieldEditor} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save fields</button></div>
-          </div>
-        </div>
+        <PdfFieldEditor
+          document={fieldEditorDoc}
+          recipients={fieldEditorDoc.recipients || []}
+          onSave={handleFieldEditorSave}
+          onCancel={() => setFieldEditorDoc(null)}
+          onCreateRecipient={async (input) => {
+            if (!fieldEditorDoc) throw new Error("No document open");
+            return createDocumentRecipient(fieldEditorDoc.id, input);
+          }}
+        />
       )}
 
       {migrationOpen && (
