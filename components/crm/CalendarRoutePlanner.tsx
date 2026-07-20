@@ -245,24 +245,51 @@ export default function CalendarRoutePlanner({
 
   // Temporary diagnostics for production matching issue
   useEffect(() => {
-    if (!effectiveRoster) return;
-    const diagnostics = eventsForDate.slice(0, 20).map((e) => {
-      const resolved = resolveRouteAssignee(e, effectiveRoster, jobsById);
-      return {
-        eventId: e.id,
-        assigned_to: e.assigned_to,
-        resolvedMemberId: resolved.memberId,
-        resolvedKind: resolved.kind,
-      };
+    const allEventsSample = events.slice(0, 10).map((e) => ({
+      id: e.id,
+      start_time: e.start_time,
+      eventDateKey: eventToDateKey(e),
+      assigned_to: e.assigned_to,
+    }));
+    console.info("[RoutePlanner] date filter", {
+      currentDate: currentDate.toISOString(),
+      currentDateKey,
+      totalEventsCount: events.length,
+      eventsForDateCount: eventsForDate.length,
+      allEventsSample,
     });
-    console.info("[RoutePlanner] diagnostics", {
+  }, [currentDate, currentDateKey, events, eventsForDate]);
+
+  useEffect(() => {
+    if (!effectiveRoster) return;
+    const filteredCount = eventsForDate.filter((e) => {
+      const resolved = resolveRouteAssignee(e, effectiveRoster, jobsById);
+      return resolved.memberId === selectedMemberId;
+    }).length;
+    console.info("[RoutePlanner] member filter", {
       currentDateKey,
       selectedMemberId,
       eventsForDateCount: eventsForDate.length,
-      selectedStopsCount: selectedStops.length,
-      selectableMembers: selectableMembers.map((m) => ({ id: m.id, name: m.name, legacyIds: m.legacyIds })),
-      sampleEvents: diagnostics,
+      filteredCount,
+      selectableMembers: selectableMembers.map((m) => ({ id: m.id, name: m.name, source: m.source, legacyIds: m.legacyIds })),
     });
+
+    if (selectedStops.length === 0 && eventsForDate.length > 0) {
+      const assignedToDump = eventsForDate.slice(0, 100).map((e) => {
+        const resolved = resolveRouteAssignee(e, effectiveRoster, jobsById);
+        return {
+          eventId: e.id,
+          start_time: e.start_time,
+          eventDateKey: eventToDateKey(e),
+          assigned_to: e.assigned_to,
+          created_by: e.created_by,
+          job_id: e.job_id,
+          resolvedMemberId: resolved.memberId,
+          resolvedKind: resolved.kind,
+        };
+      });
+      console.info("[RoutePlanner] assigned_to dump (filter returned zero)", assignedToDump);
+    }
   }, [currentDateKey, selectedMemberId, eventsForDate, effectiveRoster, jobsById, selectedStops, selectableMembers]);
 
   useEffect(() => {
@@ -283,6 +310,12 @@ export default function CalendarRoutePlanner({
     let cancelled = false;
     setRouteLoading(true);
     setRouteError(null);
+
+    console.info("[RoutePlanner] calling /api/calendar/route", {
+      date: currentDate.toISOString(),
+      memberId: selectedMemberId,
+      stopsCount: selectedStops.length,
+    });
 
     fetch("/api/calendar/route", {
       method: "POST",
