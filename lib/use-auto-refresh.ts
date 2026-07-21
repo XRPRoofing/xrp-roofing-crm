@@ -56,6 +56,19 @@ export function useAutoRefresh(onRefresh: () => void) {
       }, 300);
     };
 
+    // Force an immediate refresh regardless of the cooldown. Used for strong
+    // staleness signals — regaining network connectivity, or the page being
+    // restored from the back/forward (bfcache) — which are extremely common on
+    // phones that roam between Wi-Fi and cellular or switch between apps. In
+    // those cases realtime WebSocket events may have been missed while the
+    // socket was down, so we always re-fetch rather than trust the cooldown.
+    const runNow = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      dirty = false;
+      lastRun = Date.now();
+      callbackRef.current();
+    };
+
     const markDirty = () => { dirty = true; };
 
     const onVisible = () => {
@@ -64,8 +77,19 @@ export function useAutoRefresh(onRefresh: () => void) {
       }
     };
 
+    // The device came back online (e.g. cellular reconnected, roamed networks).
+    const onOnline = () => { runNow(); };
+
+    // Page restored from bfcache (mobile app-switch / back navigation). The
+    // `persisted` flag means the JS timers were frozen, so data is stale.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) runNow();
+    };
+
     window.addEventListener("focus", runIfNeeded);
     window.addEventListener("storage", markDirty);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisible);
 
     let bc: BroadcastChannel | null = null;
@@ -87,6 +111,8 @@ export function useAutoRefresh(onRefresh: () => void) {
     return () => {
       window.removeEventListener("focus", runIfNeeded);
       window.removeEventListener("storage", markDirty);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisible);
       if (bc) { try { bc.close(); } catch { /* ignore */ } }
       if (debounceTimer) clearTimeout(debounceTimer);

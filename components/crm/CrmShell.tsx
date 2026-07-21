@@ -958,6 +958,40 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Connection-recovery re-sync: when the device regains network connectivity
+  // (roaming between Wi-Fi and cellular, patchy mobile data in the US or the
+  // Philippines) or the tab returns to the foreground, force a full refresh of
+  // every shared cache. This catches any realtime events that were missed while
+  // the WebSocket was down, so users never have to hard-refresh to see the
+  // latest data. The realtime subscriptions above handle the live path; this is
+  // the safety net for the offline/background gaps that phones hit constantly.
+  useEffect(() => {
+    if (!hasSupabaseConfig()) return;
+    if (typeof window === "undefined") return;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const resync = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        void refreshCrewData(true).catch(() => {});
+        void refreshInvoices(true).catch(() => {});
+        void refreshProposals(true).catch(() => {});
+        void refreshCustomers(true).catch(() => {});
+      }, 400);
+    };
+    const onOnline = () => resync();
+    const onVisible = () => { if (document.visibilityState === "visible") resync(); };
+    const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) resync(); };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   useEffect(() => { void loadCustomerRecords(); }, []);
 
   const unreadNotifications = notifications.filter((notification) => !notification.read && notification.status !== "archived").length;
