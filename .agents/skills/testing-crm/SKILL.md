@@ -73,6 +73,18 @@ Twilio Voice SDK won't initialize without real API keys, so you can't make actua
 ### Production domain
 The CRM production domain is `https://www.xrproofing.app`. Twilio webhooks and TwiML App must point to this domain. Google Maps API key referrer restrictions must include `www.xrproofing.app/*`.
 
+### Zero-write Phone preview verification
+When a preview reads production-backed Phone history but must not modify live data:
+
+1. Attach a CDP request-interception guard before navigating to the preview and keep the same page target for the entire run.
+2. Allow GET/HEAD/OPTIONS. Fulfill `POST /api/twilio/calls/reconcile` locally with HTTP 200 and zero additions. Block every other POST/PUT/PATCH/DELETE before network transmission.
+3. If the saved Supabase token is expired, obtain explicit approval for one authentication-only `POST /auth/v1/token`; do not treat it as a CRM write.
+4. Do not reload, close, or navigate away while the guard is attached. A browser lifecycle action may detach interception before the next request.
+5. Capture `conversation_events` before and after with GET-only snapshots. Compare every pre-existing ID byte-for-byte and separately attribute new IDs from concurrent production activity.
+6. Stop network capture before any browser lifecycle action. Report locally fulfilled, blocked, authentication-only, and successful write counts separately.
+
+For realtime normalization, search an exact known caller and wait beyond the page's 45-second refetch interval without changing the search. Verify the same root row before and after the refetch; this distinguishes immediate folding from reconciliation-dependent repair.
+
 ## Proposals
 The proposal system is at `/crm/proposals`. In local mode, proposals are stored in localStorage.
 
