@@ -83,34 +83,50 @@ function useGoogleMapsLoader() {
       return;
     }
 
+    // Surfaces InvalidKeyMapError, RefererNotAllowedMapError, ApiNotActivatedMapError, etc.
+    (window as unknown as Record<string, unknown>).gm_authFailure = () => {
+      setError("Google Maps API key error (InvalidKey / RefererNotAllowed / ApiNotActivated). Check the browser console for the exact error code.");
+    };
+
     const scriptId = "google-maps-script";
     const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
 
-    if (existing) {
+    const waitForMapReady = (onReady: () => void, onTimeout: () => void) => {
       const iv = setInterval(() => {
         if (getGoogleApi()?.maps?.Map) {
           clearInterval(iv);
-          setLoaded(true);
+          onReady();
         }
       }, 100);
       const to = setTimeout(() => {
         clearInterval(iv);
-        if (!getGoogleApi()?.maps?.Map) setError("Google Maps failed to load");
+        onTimeout();
       }, 10000);
       return () => {
         clearInterval(iv);
         clearTimeout(to);
       };
+    };
+
+    if (existing) {
+      return waitForMapReady(
+        () => setLoaded(true),
+        () => setError("Google Maps failed to load"),
+      );
     }
 
     const script = document.createElement("script");
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=__gmRoutePlannerInit`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setLoaded(true);
+    (window as unknown as Record<string, unknown>).__gmRoutePlannerInit = () => setLoaded(true);
     script.onerror = () => setError("Google Maps failed to load");
     document.head.appendChild(script);
+
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__gmRoutePlannerInit;
+    };
   }, []);
 
   return { loaded, error };
@@ -290,6 +306,21 @@ export default function CalendarRoutePlanner({
       cancelled = true;
     };
   }, [open, currentDate, selectedMemberId, startAddress, selectedStops]);
+
+  // Create the map instance as soon as the script is ready so we can surface
+  // Google auth/key errors and never leave the map container as a gray box.
+  useEffect(() => {
+    const google = getGoogleApi();
+    if (!mapLoaded || !mapRef.current || !google?.maps?.Map || mapInstanceRef.current) return;
+
+    mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+      center: { lat: 33.4484, lng: -112.074 },
+      zoom: 9,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    });
+  }, [mapLoaded]);
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || !route) return;
