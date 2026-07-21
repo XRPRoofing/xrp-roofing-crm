@@ -585,6 +585,10 @@ export default function LeadsPage() {
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const pendingUpdatesRef = useRef<Record<string, Partial<Lead>>>({});
+  // Display overlay of local edits, kept until the server row reflects them
+  // (reconciled per field in mergePendingJobs). Separate from the write-queue
+  // above so DB writes/activity logs still fire exactly once per edit.
+  const optimisticJobEditsRef = useRef<Record<string, Partial<Lead>>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedJobIdRef = useRef<string | null>(null);
   useEffect(() => { selectedJobIdRef.current = selectedJobId; }, [selectedJobId]);
@@ -1154,6 +1158,31 @@ export default function LeadsPage() {
     }).filter((m) => m.total > 0);
   }, [jobs]);
 
+  // Merge locally-pending edits over freshly-fetched server rows. A pending
+  // edit is kept until the server row actually reflects it (reconciled per
+  // field), then pruned. This is what stops a background refresh that lands
+  // before our debounced save has round-tripped from reverting — and flickering
+  // away — what the user just typed on a job card.
+  function mergePendingJobs(serverJobs: Lead[]): Lead[] {
+    const pending = optimisticJobEditsRef.current;
+    const sameValue = (a: unknown, b: unknown) => {
+      const norm = (v: unknown) => (v === undefined || v === null ? "" : String(v));
+      return norm(a) === norm(b);
+    };
+    return serverJobs.map((job) => {
+      const n = normalizeJob(job);
+      const patch = pending[n.id];
+      if (!patch) return n;
+      const remaining: Partial<Lead> = {};
+      (Object.keys(patch) as (keyof Lead)[]).forEach((key) => {
+        if (!sameValue(n[key], patch[key])) Object.assign(remaining, { [key]: patch[key] });
+      });
+      if (Object.keys(remaining).length > 0) pending[n.id] = remaining;
+      else delete pending[n.id];
+      return { ...n, ...remaining };
+    });
+  }
+
   useEffect(() => {
     migrateStaleDueDates();
     let mounted = true;
@@ -1185,8 +1214,7 @@ export default function LeadsPage() {
     const unsubscribe = subscribeToCrewData(() => {
       void refreshCrewData().then((data) => {
         if (mounted) {
-          const pending = pendingUpdatesRef.current;
-          setJobs(data.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
+          setJobs(mergePendingJobs(data.jobs));
           setJobNotes(data.notes);
         }
       }).catch(() => {});
@@ -1198,8 +1226,7 @@ export default function LeadsPage() {
       if (!initialDone) return; // skip until initial load completes — prevents stale flash
       const cached = getCachedCrewData();
       if (cached && mounted) {
-        const pending = pendingUpdatesRef.current;
-        setJobs(cached.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
+        setJobs(mergePendingJobs(cached.jobs));
         setJobNotes(cached.notes);
       }
     }
@@ -1213,8 +1240,7 @@ export default function LeadsPage() {
 
   useAutoRefresh(() => {
     void refreshCrewData().then((data) => {
-      const pending = pendingUpdatesRef.current;
-      setJobs(data.jobs.map((j) => { const n = normalizeJob(j); return pending[n.id] ? { ...n, ...pending[n.id] } : n; }));
+      setJobs(mergePendingJobs(data.jobs));
       setJobNotes(data.notes);
     }).catch(() => {});
     void refreshProposals<ProposalSnap>().then((proposals) => {
@@ -1310,6 +1336,7 @@ export default function LeadsPage() {
   function updateJob(jobId: string, updates: Partial<Lead>) {
     setJobs((currentJobs) => currentJobs.map((job) => job.id === jobId ? { ...job, ...updates } : job));
     pendingUpdatesRef.current[jobId] = { ...pendingUpdatesRef.current[jobId], ...updates };
+    optimisticJobEditsRef.current[jobId] = { ...optimisticJobEditsRef.current[jobId], ...updates };
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(flushPendingUpdates, 500);
   }
