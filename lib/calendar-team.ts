@@ -47,6 +47,17 @@ export function normalizeName(value: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function firstNameKey(value: string): string {
+  const first = value.trim().split(/\s+/)[0];
+  return normalizeName(first);
+}
+
+const ROUTE_PLANNER_HIDDEN_NAMES = new Set(["lyca", "devintest"]);
+
+function isRoutePlannerHiddenName(name: string): boolean {
+  return ROUTE_PLANNER_HIDDEN_NAMES.has(normalizeName(name));
+}
+
 function looksLikeEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -107,11 +118,82 @@ function rebuildRosterIndexes(roster: TeamRoster): void {
   }
 }
 
+function mergeProfileMembers(target: TeamMember, source: TeamMember): void {
+  const sourceId = normalizeIdentifier(source.id);
+  if (sourceId && !target.legacyIds.includes(sourceId)) target.legacyIds.push(sourceId);
+
+  const sourceEmail = normalizeIdentifier(source.email);
+  if (sourceEmail && !target.legacyIds.includes(sourceEmail)) target.legacyIds.push(sourceEmail);
+
+  const sourceNameKey = normalizeName(source.name);
+  if (sourceNameKey && !target.legacyIds.includes(sourceNameKey)) target.legacyIds.push(sourceNameKey);
+
+  if (!target.name && source.name) target.name = source.name;
+  if (!target.email && source.email) target.email = source.email;
+  if (!target.role && source.role) target.role = source.role;
+}
+
+function deduplicateProfileMembers(members: TeamMember[]): TeamMember[] {
+  const sorted = [...members].sort((a, b) => {
+    const lenA = normalizeName(a.name).length;
+    const lenB = normalizeName(b.name).length;
+    if (lenA !== lenB) return lenB - lenA;
+    return (b.email?.length || 0) - (a.email?.length || 0);
+  });
+
+  const firstNameCount = new Map<string, number>();
+  for (const m of sorted) {
+    const key = firstNameKey(m.name);
+    firstNameCount.set(key, (firstNameCount.get(key) || 0) + 1);
+  }
+
+  const result: TeamMember[] = [];
+  const byFullName = new Map<string, TeamMember>();
+  const byFirstName = new Map<string, TeamMember>();
+
+  for (const member of sorted) {
+    const fullKey = normalizeName(member.name);
+    const firstKey = firstNameKey(member.name);
+    const hidden = isRoutePlannerHiddenName(member.name);
+
+    const existingFull = byFullName.get(fullKey);
+    if (existingFull && hidden === isRoutePlannerHiddenName(existingFull.name)) {
+      mergeProfileMembers(existingFull, member);
+      continue;
+    }
+
+    const existingFirst = byFirstName.get(firstKey);
+    if (
+      existingFirst &&
+      !hidden &&
+      !isRoutePlannerHiddenName(existingFirst.name) &&
+      (firstNameCount.get(firstKey) || 0) <= 2
+    ) {
+      const existingFullKey = normalizeName(existingFirst.name);
+      if (
+        existingFullKey.startsWith(fullKey) &&
+        existingFullKey !== fullKey &&
+        firstNameKey(existingFirst.name) === fullKey
+      ) {
+        mergeProfileMembers(existingFirst, member);
+        continue;
+      }
+    }
+
+    const copy = { ...member };
+    result.push(copy);
+    byFullName.set(fullKey, copy);
+    byFirstName.set(firstKey, copy);
+  }
+
+  return result;
+}
+
 export function buildTeamRoster(
   profiles: ProfileLike[] = [],
   legacyMembers = TEAM_MEMBERS,
 ): TeamRoster {
-  const members: TeamMember[] = profiles.map(buildMemberFromProfile);
+  const members: TeamMember[] = deduplicateProfileMembers(profiles.map(buildMemberFromProfile));
 
   const roster: TeamRoster = {
     members,
@@ -165,6 +247,10 @@ export function buildTeamRoster(
     }
 
     members.push(buildMemberFromLegacy(legacy));
+  }
+
+  for (const member of members) {
+    if (isRoutePlannerHiddenName(member.name)) member.isSelectable = false;
   }
 
   rebuildRosterIndexes(roster);
