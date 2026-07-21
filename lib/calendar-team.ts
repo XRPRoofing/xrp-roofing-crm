@@ -128,37 +128,39 @@ export function buildTeamRoster(
     const legacyEmail = normalizeIdentifier(legacy.email);
     const legacyNameKey = normalizeName(legacy.name);
 
+    const matches = new Set<TeamMember>();
+
     const byId = roster.byId.get(legacyId);
-    const byEmail = legacy.email ? roster.byEmail.get(legacyEmail) : undefined;
-    const byName = legacyNameKey ? roster.byName.get(legacyNameKey) : undefined;
+    if (byId) matches.add(byId);
 
-    let match = byId ?? (legacy.email ? byEmail : undefined) ?? byName;
+    if (legacyNameKey) {
+      const byName = roster.byName.get(legacyNameKey);
+      if (byName) matches.add(byName);
+    }
 
-    // Fallback: legacy id or name is a substring of the profile's name or email local part.
-    // This links legacy TEAM_MEMBERS ids (e.g. "jonathan") to profiles whose full name
-    // contains that id (e.g. "Jonathan Gonzalez"), even when emails do not match exactly.
-    if (!match) {
-      for (const member of members) {
-        if (member.source !== "profile") continue;
-        const nameKey = normalizeName(member.name);
-        const emailLocal = member.email ? normalizeIdentifier(member.email).split("@")[0] : "";
-        if (
-          (legacyId && (nameKey.includes(legacyId) || emailLocal.includes(legacyId))) ||
-          (legacyNameKey && (nameKey.includes(legacyNameKey) || emailLocal.includes(legacyNameKey)))
-        ) {
-          match = member;
-          break;
-        }
+    // Add the legacy id/email to every profile whose normalized name or email local
+    // part contains the legacy id or legacy name. This prevents a single shared
+    // email (e.g. info@xrproofing.com) from incorrectly swallowing a legacy id.
+    for (const member of members) {
+      if (member.source !== "profile") continue;
+      const nameKey = normalizeName(member.name);
+      const emailLocal = member.email ? normalizeIdentifier(member.email).split("@")[0] : "";
+      if (
+        (legacyId && (nameKey.includes(legacyId) || emailLocal.includes(legacyId))) ||
+        (legacyNameKey && (nameKey.includes(legacyNameKey) || emailLocal.includes(legacyNameKey)))
+      ) {
+        matches.add(member);
       }
     }
 
-    if (match) {
-      if (!match.legacyIds.includes(legacyId)) match.legacyIds.push(legacyId);
-      const legacyNormEmail = normalizeIdentifier(legacy.email);
-      if (legacy.email && !match.legacyIds.includes(legacyNormEmail)) {
-        match.legacyIds.push(legacyNormEmail);
+    if (matches.size > 0) {
+      for (const match of matches) {
+        if (!match.legacyIds.includes(legacyId)) match.legacyIds.push(legacyId);
+        if (legacy.email && !match.legacyIds.includes(legacyEmail)) {
+          match.legacyIds.push(legacyEmail);
+        }
+        if (!match.name && legacy.name) match.name = legacy.name;
       }
-      if (!match.name && legacy.name) match.name = legacy.name;
       continue;
     }
 
@@ -188,12 +190,65 @@ function resolveString(value: string, roster: TeamRoster): ResolvedAssignee {
   const trimmed = value.trim();
   if (!trimmed) return { kind: "unassigned", memberId: UNASSIGNED_ID, input: "" };
 
-  const existing = findMemberByString(trimmed, roster);
-  if (existing) {
-    return { kind: "roster", memberId: existing.id, input: trimmed };
+  const parts = trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    const existing = findMemberByString(part, roster);
+    if (existing) {
+      return { kind: "roster", memberId: existing.id, input: part };
+    }
   }
 
   return { kind: "adHoc", memberId: normalizeIdentifier(trimmed), input: trimmed };
+}
+
+function resolveInputs(
+  event: CalendarEvent,
+  jobsById: Record<string, RouteJob> = {},
+): string[] {
+  const inputs: string[] = [];
+  if (event.assigned_to?.trim()) inputs.push(event.assigned_to.trim());
+
+  const isGcal = event.id.startsWith("gcal:");
+  if (isGcal && event.created_by?.trim()) inputs.push(event.created_by.trim());
+
+  if (event.job_id && jobsById[event.job_id]) {
+    const job = jobsById[event.job_id];
+    const jobAssignee =
+      job.assignedTo?.trim() ||
+      job.assignedCrew?.find((c) => c.trim())?.trim() ||
+      "";
+    if (jobAssignee) inputs.push(jobAssignee);
+  }
+
+  return inputs;
+}
+
+export function eventMatchesMember(
+  event: CalendarEvent,
+  roster: TeamRoster,
+  memberId: string,
+  jobsById: Record<string, RouteJob> = {},
+): boolean {
+  if (memberId === UNASSIGNED_ID) {
+    return resolveInputs(event, jobsById).length === 0;
+  }
+
+  const inputs = resolveInputs(event, jobsById);
+  for (const input of inputs) {
+    const whole = findMemberByString(input, roster);
+    if (whole && whole.id === memberId) return true;
+
+    const parts = input.split(",").map((p) => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (part === input) continue;
+      const existing = findMemberByString(part, roster);
+      if (existing && existing.id === memberId) return true;
+    }
+
+    if (!whole && normalizeIdentifier(input) === memberId) return true;
+  }
+
+  return false;
 }
 
 export function resolveRouteAssignee(
