@@ -1001,6 +1001,7 @@ export default function CrmShell({ children }: { children: React.ReactNode }) {
     { href: "/crm", label: "Home", icon: LayoutDashboard },
     { href: "/crm/leads", label: "Jobs", icon: BriefcaseBusiness },
     { href: "/crm/customers", label: "Clients", icon: UsersRound },
+    { href: "/crm/phone", label: "Phone", icon: Phone },
     { href: "/crm/calendar", label: "Calendar", icon: CalendarDays },
     { href: "/crm/payments", label: "Pay", icon: CreditCard },
     { href: "/crm/invoices", label: "Invoices", icon: ClipboardList },
