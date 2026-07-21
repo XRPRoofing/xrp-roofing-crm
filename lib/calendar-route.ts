@@ -29,6 +29,7 @@ export type RouteLeg = {
   durationSeconds: number;
   startLocation: { lat: number; lng: number };
   endLocation: { lat: number; lng: number };
+  fromStartAddress?: boolean;
 };
 
 export type RouteWarning = {

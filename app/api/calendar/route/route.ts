@@ -48,6 +48,28 @@ function getApiKey(): string | undefined {
   return process.env.GOOGLE_ROUTES_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 }
 
+async function geocodeAddress(
+  address: string,
+  apiKey: string,
+): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`,
+    );
+    const data = (await response.json()) as {
+      status?: string;
+      results?: { geometry?: { location?: { lat: number; lng: number } } }[];
+    };
+    const location = data.results?.[0]?.geometry?.location;
+    if (data.status === "OK" && location) {
+      return { lat: location.lat, lng: location.lng };
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function buildError(message: string, stops: RouteStop[]): RouteResult {
   return {
     path: [],
@@ -59,60 +81,70 @@ function buildError(message: string, stops: RouteStop[]): RouteResult {
   };
 }
 
-function computeWarnings(stops: RouteStop[], legs: RouteLeg[]): RouteWarning[] {
+function computeWarnings(
+  stops: RouteStop[],
+  legs: RouteLeg[],
+  startAddress = "",
+): RouteWarning[] {
   const warnings: RouteWarning[] = [];
 
   for (const leg of legs) {
     const fromIndex = leg.fromStopIndex;
     const toIndex = leg.toStopIndex;
 
-    if (fromIndex < 0 || toIndex < 1 || fromIndex >= stops.length || toIndex >= stops.length) {
-      continue;
-    }
+    if (toIndex < 0 || toIndex >= stops.length) continue;
 
-    const fromStop = stops[fromIndex];
     const toStop = stops[toIndex];
-    if (!fromStop || !toStop) continue;
-    if (fromStop.all_day || toStop.all_day) continue;
+    if (!toStop) continue;
 
-    const fromEnd = new Date(fromStop.end_time).getTime();
-    const toStart = new Date(toStop.start_time).getTime();
-    if (!Number.isFinite(fromEnd) || !Number.isFinite(toStart)) continue;
+    const fromStop =
+      !leg.fromStartAddress && fromIndex >= 0 && fromIndex < stops.length
+        ? stops[fromIndex]
+        : undefined;
+    const fromTitle = leg.fromStartAddress ? startAddress || "Start" : fromStop?.title || "Previous";
 
-    const gapMs = toStart - fromEnd;
-    const travelMs = leg.durationSeconds * 1000;
+    if (toStop.all_day || fromStop?.all_day) continue;
 
-    if (travelMs > gapMs) {
-      warnings.push({
-        type: "insufficient_travel",
-        fromStopIndex: fromIndex,
-        toStopIndex: toIndex,
-        message: `Not enough travel time between ${fromStop.title} and ${toStop.title}`,
-        severity: "warning",
-      });
+    if (!leg.fromStartAddress && fromStop) {
+      const fromEnd = new Date(fromStop.end_time).getTime();
+      const toStart = new Date(toStop.start_time).getTime();
+      if (Number.isFinite(fromEnd) && Number.isFinite(toStart)) {
+        const gapMs = toStart - fromEnd;
+        const travelMs = leg.durationSeconds * 1000;
+
+        if (travelMs > gapMs) {
+          warnings.push({
+            type: "insufficient_travel",
+            fromStopIndex: fromIndex,
+            toStopIndex: toIndex,
+            message: `Not enough travel time between ${fromStop.title} and ${toStop.title}`,
+            severity: "warning",
+          });
+        }
+
+        const LARGE_GAP_MINUTES = 120;
+        if (gapMs - travelMs > LARGE_GAP_MINUTES * 60 * 1000) {
+          warnings.push({
+            type: "large_gap",
+            fromStopIndex: fromIndex,
+            toStopIndex: toIndex,
+            message: `Large gap between ${fromStop.title} and ${toStop.title}`,
+            severity: "info",
+          });
+        }
+      }
     }
 
     const LONG_DRIVE_MILES = 50;
     const LONG_DRIVE_MINUTES = 60;
-    const LARGE_GAP_MINUTES = 120;
 
     if (leg.distanceMeters > LONG_DRIVE_MILES * 1609.344 || leg.durationSeconds > LONG_DRIVE_MINUTES * 60) {
       warnings.push({
         type: "long_drive",
         fromStopIndex: fromIndex,
         toStopIndex: toIndex,
-        message: `Long drive from ${fromStop.title} to ${toStop.title}`,
+        message: `Long drive from ${fromTitle} to ${toStop.title}`,
         severity: "warning",
-      });
-    }
-
-    if (gapMs - travelMs > LARGE_GAP_MINUTES * 60 * 1000) {
-      warnings.push({
-        type: "large_gap",
-        fromStopIndex: fromIndex,
-        toStopIndex: toIndex,
-        message: `Large gap between ${fromStop.title} and ${toStop.title}`,
-        severity: "info",
       });
     }
   }
@@ -134,23 +166,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(buildError("No stops for the selected date", []));
   }
 
-  const unmappedStops = stops.filter((s) => !s.address?.trim());
-  if (unmappedStops.length > 0) {
-    return NextResponse.json(
-      buildError("Route unavailable — verify property address", stops),
-      { status: 400 },
-    );
-  }
+  const routedStops = stops
+    .map((stop, index) => ({ stop, originalIndex: index }))
+    .filter(({ stop }) => stop.address?.trim());
 
-  let origin: { address?: string } | undefined;
-  let destination: { address?: string } | undefined;
-  let intermediates: { address?: string }[] = [];
-
-  if (startAddress) {
-    origin = { address: startAddress };
-    destination = { address: stops[stops.length - 1].address };
-    intermediates = stops.slice(0, -1).map((s) => ({ address: s.address }));
-  } else if (stops.length === 1) {
+  if (routedStops.length === 0) {
     return NextResponse.json({
       path: [],
       legs: [],
@@ -158,10 +178,24 @@ export async function POST(req: NextRequest) {
       totalDurationSeconds: 0,
       warnings: [],
     });
+  }
+
+  let origin: { address?: string } | undefined;
+  let destination: { address?: string } | undefined;
+  let intermediates: { address?: string }[] = [];
+
+  if (startAddress && routedStops.length > 0) {
+    origin = { address: startAddress };
+    destination = { address: routedStops[routedStops.length - 1].stop.address };
+    intermediates = routedStops.slice(0, -1).map(({ stop }) => ({ address: stop.address }));
+  } else if (routedStops.length === 1) {
+    origin = { address: routedStops[0].stop.address };
+    destination = { address: routedStops[0].stop.address };
+    intermediates = [];
   } else {
-    origin = { address: stops[0].address };
-    destination = { address: stops[stops.length - 1].address };
-    intermediates = stops.slice(1, -1).map((s) => ({ address: s.address }));
+    origin = { address: routedStops[0].stop.address };
+    destination = { address: routedStops[routedStops.length - 1].stop.address };
+    intermediates = routedStops.slice(1, -1).map(({ stop }) => ({ address: stop.address }));
   }
 
   if (intermediates.length > MAX_INTERMEDIATES) {
@@ -213,6 +247,27 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const message = googleData?.error?.message || `Google Routes API returned ${response.status}`;
+      if (!startAddress && routedStops.length === 1) {
+        const loc = await geocodeAddress(routedStops[0].stop.address, apiKey);
+        if (loc) {
+          const stopIndex = routedStops[0].originalIndex;
+          const leg: RouteLeg = {
+            fromStopIndex: stopIndex,
+            toStopIndex: stopIndex,
+            distanceMeters: 0,
+            durationSeconds: 0,
+            startLocation: loc,
+            endLocation: loc,
+          };
+          return NextResponse.json({
+            path: [],
+            legs: [leg],
+            totalDistanceMeters: 0,
+            totalDurationSeconds: 0,
+            warnings: [],
+          });
+        }
+      }
       return NextResponse.json(buildError(message, stops), { status: response.status });
     }
   } catch (err) {
@@ -222,7 +277,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const route = googleData?.routes?.[0];
+  let route = googleData?.routes?.[0];
+
+  if (!route && !startAddress && routedStops.length === 1) {
+    const loc = await geocodeAddress(routedStops[0].stop.address, apiKey);
+    if (loc) {
+      const stopIndex = routedStops[0].originalIndex;
+      const leg: RouteLeg = {
+        fromStopIndex: stopIndex,
+        toStopIndex: stopIndex,
+        distanceMeters: 0,
+        durationSeconds: 0,
+        startLocation: loc,
+        endLocation: loc,
+      };
+      return NextResponse.json({
+        path: [],
+        legs: [leg],
+        totalDistanceMeters: 0,
+        totalDurationSeconds: 0,
+        warnings: [],
+      });
+    }
+  }
+
   if (!route) {
     return NextResponse.json(buildError("No route found — verify the addresses", stops), { status: 400 });
   }
@@ -241,18 +319,29 @@ export async function POST(req: NextRequest) {
 
     let fromStopIndex: number;
     let toStopIndex: number;
+    let fromStartAddressLeg = false;
 
     if (startAddress) {
-      fromStopIndex = index - 1;
-      toStopIndex = index;
+      if (index === 0) {
+        fromStartAddressLeg = true;
+        fromStopIndex = -1;
+        toStopIndex = routedStops[0]?.originalIndex ?? 0;
+      } else {
+        fromStopIndex = routedStops[index - 1]?.originalIndex ?? 0;
+        toStopIndex = routedStops[index]?.originalIndex ?? 0;
+      }
+    } else if (routedStops.length === 1) {
+      fromStopIndex = routedStops[0]?.originalIndex ?? 0;
+      toStopIndex = routedStops[0]?.originalIndex ?? 0;
     } else {
-      fromStopIndex = index;
-      toStopIndex = index + 1;
+      fromStopIndex = routedStops[index]?.originalIndex ?? 0;
+      toStopIndex = routedStops[index + 1]?.originalIndex ?? 0;
     }
 
     return {
       fromStopIndex,
       toStopIndex,
+      fromStartAddress: fromStartAddressLeg,
       distanceMeters: leg.distanceMeters || 0,
       durationSeconds: parseGoogleDuration(leg.duration),
       startLocation: { lat: startLat, lng: startLng },
@@ -264,7 +353,7 @@ export async function POST(req: NextRequest) {
   const totalDurationSeconds =
     parseGoogleDuration(route.duration) || legs.reduce((sum, l) => sum + l.durationSeconds, 0);
 
-  const warnings = computeWarnings(stops, legs);
+  const warnings = computeWarnings(stops, legs, startAddress);
 
   const result: RouteResult = {
     path,

@@ -121,16 +121,17 @@ function dateKeyFromDate(d: Date): string {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
-function getStopPositions(stops: RouteStop[], legs: RouteLeg[], startAddress: string): GoogleLatLng[] {
-  if (legs.length === 0) return [];
-  const positions: GoogleLatLng[] = [];
+function getStopPositions(stops: RouteStop[], legs: RouteLeg[]): (GoogleLatLng | undefined)[] {
+  const positions: (GoogleLatLng | undefined)[] = new Array(stops.length);
   for (let i = 0; i < stops.length; i++) {
-    if (startAddress) {
-      const leg = legs[i];
-      if (leg) positions.push(leg.endLocation);
-    } else {
-      const leg = i === 0 ? legs[0] : legs[i - 1];
-      if (leg) positions.push(i === 0 ? leg.startLocation : leg.endLocation);
+    const toLeg = legs.find((l) => l.toStopIndex === i);
+    if (toLeg) {
+      positions[i] = toLeg.endLocation;
+      continue;
+    }
+    const fromLeg = legs.find((l) => !l.fromStartAddress && l.fromStopIndex === i);
+    if (fromLeg) {
+      positions[i] = fromLeg.startLocation;
     }
   }
   return positions;
@@ -160,7 +161,7 @@ export default function CalendarRoutePlanner({
   const mapInstanceRef = useRef<GoogleMap | null>(null);
   const markersRef = useRef<GoogleMarker[]>([]);
   const polylineRef = useRef<GooglePolyline | null>(null);
-  const stopPositionsRef = useRef<GoogleLatLng[]>([]);
+  const stopPositionsRef = useRef<(GoogleLatLng | undefined)[]>([]);
 
   const currentDateKey = useMemo(() => dateKeyFromDate(currentDate), [currentDate]);
   const jobsById = useMemo(() => {
@@ -252,13 +253,6 @@ export default function CalendarRoutePlanner({
       return;
     }
 
-    const unmapped = selectedStops.filter((s) => !s.address);
-    if (unmapped.length > 0) {
-      setRoute(null);
-      setRouteError("Route unavailable — verify property address");
-      return;
-    }
-
     let cancelled = false;
     setRouteLoading(true);
     setRouteError(null);
@@ -303,7 +297,7 @@ export default function CalendarRoutePlanner({
     if (!google?.maps) return;
 
     const stops = route.stops || selectedStops;
-    const positions = getStopPositions(stops, route.legs, startAddress);
+    const positions = getStopPositions(stops, route.legs);
     stopPositionsRef.current = positions;
 
     markersRef.current.forEach((m) => m.setMap(null));
@@ -313,8 +307,10 @@ export default function CalendarRoutePlanner({
       polylineRef.current = null;
     }
 
-    if (positions.length === 1) {
-      const single = positions[0];
+    const validPositions = positions.filter((p): p is GoogleLatLng => !!p);
+
+    if (validPositions.length === 1) {
+      const single = validPositions[0];
       if (!mapInstanceRef.current) {
         mapInstanceRef.current = new google.maps.Map(mapRef.current, {
           center: single,
@@ -327,12 +323,12 @@ export default function CalendarRoutePlanner({
         mapInstanceRef.current.setCenter(single);
         mapInstanceRef.current.setZoom(15);
       }
-    } else {
+    } else if (validPositions.length > 1 || route.path.length > 1) {
       const bounds = new google.maps.LatLngBounds();
       if (route.path.length > 0) {
         for (const point of route.path) bounds.extend(point);
       } else {
-        for (const point of positions) bounds.extend(point);
+        for (const point of validPositions) bounds.extend(point);
       }
 
       if (!mapInstanceRef.current) {
@@ -348,24 +344,28 @@ export default function CalendarRoutePlanner({
       mapInstanceRef.current.fitBounds(bounds);
     }
 
-    const map = mapInstanceRef.current!;
+    const map = mapInstanceRef.current;
 
-    for (let i = 0; i < positions.length; i++) {
-      const marker = new google.maps.Marker({
-        map,
-        position: positions[i],
-        title: stops[i]?.title || `Stop ${i + 1}`,
-        label: String(i + 1),
-      });
-      marker.addListener("click", () => {
-        setHighlightedIndex(i);
-        const event = eventsForDate.find((e) => e.id === stops[i]?.eventId);
-        if (event) onSelectEvent(event);
-      });
-      markersRef.current.push(marker);
+    if (map) {
+      for (let i = 0; i < stops.length; i++) {
+        const pos = positions[i];
+        if (!pos) continue;
+        const marker = new google.maps.Marker({
+          map,
+          position: pos,
+          title: stops[i]?.title || `Stop ${i + 1}`,
+          label: String(i + 1),
+        });
+        marker.addListener("click", () => {
+          setHighlightedIndex(i);
+          const event = eventsForDate.find((e) => e.id === stops[i]?.eventId);
+          if (event) onSelectEvent(event);
+        });
+        markersRef.current.push(marker);
+      }
     }
 
-    if (route.path.length > 1) {
+    if (map && route.path.length > 1) {
       polylineRef.current = new google.maps.Polyline({
         map,
         path: route.path,
@@ -384,7 +384,7 @@ export default function CalendarRoutePlanner({
         polylineRef.current = null;
       }
     };
-  }, [mapLoaded, route, startAddress, selectedStops, eventsForDate, onSelectEvent]);
+  }, [mapLoaded, route, selectedStops, eventsForDate, onSelectEvent]);
 
   const handleSelectStop = (index: number) => {
     setHighlightedIndex(index);
@@ -503,6 +503,7 @@ export default function CalendarRoutePlanner({
                   const leg = route?.legs.find((l) => l.toStopIndex === index);
                   const warnings = warningForStop(index);
                   const isHighlighted = highlightedIndex === index;
+                  const isUnmapped = stop.isUnmapped || !stop.address;
                   return (
                     <button
                       key={stop.eventId}
@@ -514,7 +515,11 @@ export default function CalendarRoutePlanner({
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600 text-xs font-bold text-white">
+                        <div
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                            isUnmapped ? "bg-gray-400" : "bg-green-600"
+                          }`}
+                        >
                           {index + 1}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -527,14 +532,17 @@ export default function CalendarRoutePlanner({
                           )}
                           <div className="flex items-center gap-1 text-sm text-gray-500">
                             <MapPin className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{stop.address || stop.location || "No address"}</span>
+                            <span className="truncate">
+                              {stop.address || stop.location || "No address – skipped from route."}
+                            </span>
                           </div>
                           {stop.jobKind && (
                             <div className="text-xs text-gray-500">{stop.jobKind}</div>
                           )}
-                          {leg && (
+                          {leg && !isUnmapped && (
                             <div className="mt-1 text-xs text-gray-500">
-                              From previous: {formatDistance(leg.distanceMeters)} · {formatDuration(leg.durationSeconds)}
+                              {leg.fromStartAddress ? "From start" : "From previous"}: {" "}
+                              {formatDistance(leg.distanceMeters)} · {formatDuration(leg.durationSeconds)}
                             </div>
                           )}
                           {warnings.map((w, wi) => (
