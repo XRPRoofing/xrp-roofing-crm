@@ -50,6 +50,13 @@ type PublicProposal = {
   lastViewedAt?: string;
   declinedAt?: string;
   lineItems?: ProposalLineItem[];
+  inspectionPhotos?: InspectionPhoto[];
+};
+
+type InspectionPhoto = {
+  label?: string;
+  image?: string;
+  note?: string;
 };
 
 type ProposalLineItem = {
@@ -126,6 +133,11 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
   const [depositError, setDepositError] = useState("");
 
   const showPackages = proposal.showPackages !== false;
+
+  const projectPhotos = useMemo(
+    () => (proposal.inspectionPhotos || []).filter((photo) => photo.image),
+    [proposal.inspectionPhotos],
+  );
 
   // Calculate deposit amount
   const depositAmount = useMemo(() => {
@@ -377,6 +389,29 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
               </div>
             )}
           </section>
+
+          {projectPhotos.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+              <h2 className="text-base font-black text-[#0A3D91]">Project Photos</h2>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {projectPhotos.map((photo, index) => (
+                  <figure key={index} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <img
+                      src={photo.image}
+                      alt={photo.label || `Project photo ${index + 1}`}
+                      className="h-44 w-full object-cover"
+                    />
+                    {(photo.label || photo.note) && (
+                      <figcaption className="px-3 py-2">
+                        {photo.label && <p className="text-sm font-bold text-slate-700">{photo.label}</p>}
+                        {photo.note && <p className="mt-0.5 text-xs leading-5 text-slate-500">{photo.note}</p>}
+                      </figcaption>
+                    )}
+                  </figure>
+                ))}
+              </div>
+            </section>
+          )}
 
           {showPackages && (
           <section>
