@@ -24,6 +24,8 @@ import type { Lead } from "@/types/crm";
 import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
+import RichTextEditor from "@/components/crm/RichTextEditor";
+import ProposalRichContent from "@/components/crm/ProposalRichContent";
 
 type Proposal = {
   id: string;
@@ -100,6 +102,14 @@ type Proposal = {
   depositPaidAmount?: number;
   depositPaymentMethod?: string;
   depositStripeSessionId?: string;
+  lineItems?: ProposalLineItem[];
+};
+
+type ProposalLineItem = {
+  id: string;
+  title: string;
+  scope: string;
+  price: number;
 };
 
 type InspectionPhoto = {
@@ -137,6 +147,49 @@ type ProposalTemplate = {
   brochureEnabled?: boolean;
   brochures?: BrochureFile[];
 };
+
+function sumLineItems(items: ProposalLineItem[] | undefined): number {
+  if (!items || items.length === 0) return 0;
+  return items.reduce((total, item) => total + (Number(item.price) || 0), 0);
+}
+
+// Collapsible editor group. On mobile it acts as an accordion (only the active
+// section is expanded); on desktop (lg+) every group is always shown so the
+// existing desktop sidebar layout is preserved.
+function EditorSection({
+  id,
+  title,
+  activeId,
+  onToggle,
+  children,
+  right,
+}: {
+  id: string;
+  title: string;
+  activeId: string;
+  onToggle: (id: string) => void;
+  children: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  const open = activeId === id;
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left lg:cursor-default"
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{title}</span>
+        <span className="flex items-center gap-2">
+          {right}
+          <svg viewBox="0 0 20 20" className={`h-4 w-4 fill-gray-400 transition-transform lg:hidden ${open ? "rotate-180" : ""}`} aria-hidden="true"><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z" /></svg>
+        </span>
+      </button>
+      <div className={`${open ? "block" : "hidden"} border-t border-gray-100 px-4 py-4 lg:block`}>{children}</div>
+    </div>
+  );
+}
 
 const proposalSections = ["Cover", "Inspection Photos", "Estimate", "BEST", "BETTER", "GOOD", "Summary", "Terms and Conditions"];
 const emailTemplatesLocalKey = "xrp-crm-proposal-email-templates";
@@ -354,23 +407,6 @@ function normalizeInspectionPhotos(photos?: InspectionPhoto[]) {
     ...defaultPhoto,
     ...(photos?.[index] || {}),
   })).slice(0, MAX_INSPECTION_PHOTOS);
-}
-
-
-
-function formatPastedProposalText(value: string) {
-  return value
-    .replace(/\r\n/g, "\n")
-    .replace(/\*\*(.*?)\*\*/g, "\n\n$1\n")
-    .replace(/\s+---\s+/g, "\n\n")
-    .replace(/\s+--\s+/g, "\n\n")
-    .replace(/\s+##\s+/g, "\n\n")
-    .replace(/\s+\*(?=\s*\S)/g, "\n- ")
-    .replace(/\n{3,}/g, "\n\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .trim();
 }
 
 const initialProposalTemplates: ProposalTemplate[] = [
@@ -666,9 +702,14 @@ export default function ProposalsPage() {
     depositValue: "",
     depositDueDate: "",
     depositAddToFuture: false,
+    lineItems: [] as ProposalLineItem[],
   });
 
   const [previewExpandedScopes, setPreviewExpandedScopes] = useState<Record<string, boolean>>({});
+  // Which editor section is expanded on mobile (accordion). On desktop (lg+)
+  // every section is shown regardless via CSS, so the desktop layout is
+  // unchanged; this only drives the collapsible behavior on small screens.
+  const [mobileSection, setMobileSection] = useState<string>("customer");
 
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId), [selectedJobId, jobs]);
   const selectedTemplate = useMemo(() => templates.find((template) => template.id === editorForm.template), [editorForm.template, templates]);
@@ -1043,13 +1084,14 @@ export default function ProposalsPage() {
         coverPhoto: editorForm.coverPhoto,
         coverText: editorForm.coverText,
         scope: editorForm.scope,
-        total: Number(editorForm.total) || 0,
+        total: editorForm.lineItems.length > 0 ? sumLineItems(editorForm.lineItems) : Number(editorForm.total) || 0,
         template: editorForm.template,
         notes: editorForm.notes,
         terms: editorForm.terms,
         showPackages: editorForm.showPackages,
         inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
         packages: normalizePackages(editorForm.packages),
+        lineItems: editorForm.lineItems.length > 0 ? editorForm.lineItems.map((item) => ({ ...item })) : undefined,
       };
 
       setProposals((currentProposals) =>
@@ -1237,6 +1279,44 @@ export default function ProposalsPage() {
     setEditorBrochures(template.brochureEnabled && template.brochures?.length ? [...template.brochures] : []);
   }
 
+  // Keep editorForm.total in sync with the line-item sum whenever line items
+  // exist, so the whole preview / deposit math keeps reading editorForm.total.
+  // When the last item is removed the total stays put and becomes editable again.
+  function applyLineItems(form: typeof editorForm, next: ProposalLineItem[]) {
+    return { ...form, lineItems: next, total: next.length > 0 ? String(sumLineItems(next)) : form.total };
+  }
+
+  function addLineItem() {
+    setEditorForm((form) =>
+      applyLineItems(form, [
+        ...form.lineItems,
+        { id: `li-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: "", scope: "", price: 0 },
+      ]),
+    );
+  }
+
+  function updateLineItem(id: string, patch: Partial<ProposalLineItem>) {
+    setEditorForm((form) => applyLineItems(form, form.lineItems.map((item) => (item.id === id ? { ...item, ...patch } : item))));
+  }
+
+  function removeLineItem(id: string) {
+    setEditorForm((form) => applyLineItems(form, form.lineItems.filter((item) => item.id !== id)));
+  }
+
+  function moveLineItem(index: number, target: number) {
+    setEditorForm((form) => {
+      if (target < 0 || target >= form.lineItems.length) return form;
+      const next = [...form.lineItems];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      return applyLineItems(form, next);
+    });
+  }
+
+  function toggleEditorSection(id: string) {
+    setMobileSection((current) => (current === id ? "" : id));
+  }
+
   function handleCreateTemplate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!templateForm.label || !templateForm.title) return;
@@ -1279,6 +1359,7 @@ export default function ProposalsPage() {
       depositValue: proposal.depositValue ? String(proposal.depositValue) : "",
       depositDueDate: proposal.depositDueDate || "",
       depositAddToFuture: proposal.depositAddToFuture || false,
+      lineItems: proposal.lineItems ? proposal.lineItems.map((item) => ({ ...item })) : [],
     });
     setEditorBrochures(proposal.brochures || []);
     setIsPreviewing(isProposalLocked(proposal));
@@ -1324,13 +1405,14 @@ export default function ProposalsPage() {
       coverPhoto: editorForm.coverPhoto,
       coverText: editorForm.coverText,
       scope: editorForm.scope,
-      total: Number(editorForm.total) || 0,
+      total: editorForm.lineItems.length > 0 ? sumLineItems(editorForm.lineItems) : Number(editorForm.total) || 0,
       template: editorForm.template,
       notes: editorForm.notes,
       terms: editorForm.terms,
       showPackages: editorForm.showPackages,
       inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
       packages: normalizePackages(editorForm.packages),
+      lineItems: editorForm.lineItems.length > 0 ? editorForm.lineItems.map((item) => ({ ...item })) : undefined,
       brochures: editorBrochures.length > 0 ? editorBrochures : undefined,
       depositType: editorForm.depositType || undefined,
       depositValue: Number(editorForm.depositValue) || undefined,
@@ -2038,6 +2120,15 @@ export default function ProposalsPage() {
           )}
         </div>
 
+        {/* Mobile sticky action bar — keeps Save / Preview / Send reachable while scrolling the form */}
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-gray-200 bg-white/95 px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] backdrop-blur lg:hidden print:hidden">
+          {!isProposalLocked(activeProposal) && (
+            <button type="button" onClick={handleSaveProposal} className="flex-1 rounded-lg bg-blue-50 px-3 py-2.5 text-sm font-bold text-blue-700 active:scale-95">Save</button>
+          )}
+          <button type="button" onClick={() => setIsPreviewing((current) => !current)} className="flex-1 rounded-lg bg-gray-900 px-3 py-2.5 text-sm font-bold text-white active:scale-95">{isPreviewing ? "Edit" : "Preview"}</button>
+          <button type="button" onClick={handleOpenSendModal} className="flex-1 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white active:scale-95">{activeProposal.status !== "Draft" ? "Resend" : "Send"}</button>
+        </div>
+
         {/* Sent Tracking Info */}
         {activeProposal.sentAt && activeProposal.status !== "Draft" && (
           <div className="border-b border-sky-100 bg-sky-50 px-4 py-3 print:hidden">
@@ -2129,110 +2220,162 @@ export default function ProposalsPage() {
 
         <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[300px_1fr]"}`} id="proposal-print-area">
           {!isPreviewing && (
-          <aside className="overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-5">
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Customer</p>
-                  <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-                  <AddressAutocomplete
-                    value={editorForm.address}
-                    onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
-                    placeholder="Start typing address..."
-                    className="mt-2 !rounded-md !py-2 !text-sm text-gray-600"
-                  />
-                  <input value={editorForm.customerPhone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editorForm.customerPhone, el.selectionStart); setEditorForm({ ...editorForm, customerPhone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Phone" />
-                  <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Email" />
-                </div>
-                <button className="text-gray-300 hover:text-gray-500 transition">•••</button>
+          <aside className="space-y-3 overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-4 pb-28 lg:space-y-3 lg:p-5 lg:pb-5">
+            <EditorSection id="customer" title="Customer" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} placeholder="Customer name" className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
+              <AddressAutocomplete
+                value={editorForm.address}
+                onChange={(addr) => setEditorForm({ ...editorForm, address: addr })}
+                placeholder="Start typing address..."
+                className="mt-2 !rounded-md !py-2 !text-sm text-gray-600"
+              />
+              <input value={editorForm.customerPhone} onChange={(event) => { const el = event.target; const { formatted, cursorPos } = handlePhoneChange(el.value, editorForm.customerPhone, el.selectionStart); setEditorForm({ ...editorForm, customerPhone: formatted }); requestAnimationFrame(() => { el.setSelectionRange(cursorPos, cursorPos); }); }} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Phone" />
+              <input value={editorForm.customerEmail} onChange={(event) => setEditorForm({ ...editorForm, customerEmail: event.target.value })} className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="Email" />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {activeProposal?.job?.id && (
+                  <a href={`/crm/leads?job=${encodeURIComponent(activeProposal.job.id)}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-600 transition hover:bg-blue-50">View Job →</a>
+                )}
+                <a href={`/crm/invoices?proposal=${encodeURIComponent(activeProposal?.id || "")}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-green-600 transition hover:bg-green-50">View Invoice →</a>
               </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeProposal?.job?.id && (
-                <a href={`/crm/leads?job=${encodeURIComponent(activeProposal.job.id)}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-blue-600 transition hover:bg-blue-50">View Job →</a>
-              )}
-              <a href={`/crm/invoices?proposal=${encodeURIComponent(activeProposal?.id || "")}`} className="rounded-md border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-green-600 transition hover:bg-green-50">View Invoice →</a>
-            </div>
-            <div className="mt-6">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Template</p>
-              <div className="space-y-1.5">
+            </EditorSection>
+
+            <EditorSection id="template" title="Template" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <select
+                value={editorForm.template}
+                onChange={(event) => { const template = templates.find((item) => item.id === event.target.value); if (template) applyTemplateToEditor(template); }}
+                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
+              >
+                {!selectedTemplate && <option value={editorForm.template}>Custom template</option>}
                 {templates.map((template) => (
-                  <button key={template.id} type="button" onClick={() => applyTemplateToEditor(template)} className={`w-full rounded-md px-3 py-2.5 text-left transition ${editorForm.template === template.id ? "bg-blue-50 ring-1 ring-blue-200" : "bg-white border border-gray-200 hover:border-gray-300"}`}>
-                    <span className={`block text-sm font-medium ${editorForm.template === template.id ? "text-blue-700" : "text-gray-700"}`}>{template.label}</span>
-                    <span className="mt-0.5 block text-xs text-gray-400">{template.description}</span>
-                  </button>
+                  <option key={template.id} value={template.id}>{template.label}</option>
                 ))}
-              </div>
-            </div>
-            <div className="mt-6 space-y-4">
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Title
-                <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </label>
-              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                <div className="flex items-center justify-between"><span>Summary</span><AiWriteButton getText={() => editorForm.summary} onReplace={(t) => setEditorForm({ ...editorForm, summary: t })} onInsert={(t) => setEditorForm({ ...editorForm, summary: editorForm.summary + "\n" + t })} context="proposal summary" /></div>
-                <textarea value={editorForm.summary} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, summary: event.target.value }); }} className="mt-1.5 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Cover photo URL
-                <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="/images/logo.jpeg" />
-              </label>
-              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                <div className="flex items-center justify-between"><span>Cover text</span><AiWriteButton getText={() => editorForm.coverText} onReplace={(t) => setEditorForm({ ...editorForm, coverText: t })} context="proposal cover text" /></div>
-                <textarea value={editorForm.coverText} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, coverText: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </div>
-              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                <div className="flex items-center justify-between"><span>Scope of work</span><AiWriteButton getText={() => editorForm.scope} onReplace={(t) => setEditorForm({ ...editorForm, scope: t })} onInsert={(t) => setEditorForm({ ...editorForm, scope: editorForm.scope + "\n" + t })} context="roofing proposal scope of work" /></div>
-                <textarea value={editorForm.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, scope: event.target.value }); }} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="mt-1.5 min-h-[8rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </div>
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                Total
-                <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal)} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
-                {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-amber-600">🔒 Locked at the signed amount</span>}
-              </label>
-              {/* Deposit Request trigger */}
-              <div className="rounded-md border border-gray-200 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Deposit Request</p>
-                  <button type="button" onClick={() => { if (!editorForm.depositType) setEditorForm({ ...editorForm, depositType: "percentage" }); setShowDepositModal(true); }} disabled={isProposalLocked(activeProposal)} className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">{editorForm.depositType ? "Edit" : "Configure"}</button>
+              </select>
+              {selectedTemplate?.description && <p className="mt-2 text-xs text-gray-400">{selectedTemplate.description}</p>}
+            </EditorSection>
+
+            <EditorSection id="details" title="Proposal Details" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <div className="space-y-4">
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Title
+                  <input value={editorForm.title} onChange={(event) => setEditorForm({ ...editorForm, title: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
+                </label>
+                <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  <div className="flex items-center justify-between"><span>Summary</span><AiWriteButton getText={() => editorForm.summary} onReplace={(t) => setEditorForm({ ...editorForm, summary: t })} onInsert={(t) => setEditorForm({ ...editorForm, summary: editorForm.summary + "\n" + t })} context="proposal summary" /></div>
+                  <textarea value={editorForm.summary} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, summary: event.target.value }); }} className="mt-1.5 min-h-[4rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
                 </div>
-                {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
-                  <p className="mt-2 text-sm font-semibold text-gray-700">
-                    {editorForm.depositType === "percentage" ? `${editorForm.depositValue}%` : `$${Number(editorForm.depositValue).toLocaleString()}`} deposit
-                    {" "}= ${(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString()}
-                    {editorForm.depositDueDate && ` · Due ${editorForm.depositDueDate}`}
-                  </p>
-                )}
-                {!editorForm.depositType && <p className="mt-2 text-xs text-gray-400">No deposit configured</p>}
-                {activeProposal?.depositPaidAt && (
-                  <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
-                )}
-              </div>
-              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                <div className="flex items-center justify-between"><span>Customer notes</span><AiWriteButton getText={() => editorForm.notes} onReplace={(t) => setEditorForm({ ...editorForm, notes: t })} onInsert={(t) => setEditorForm({ ...editorForm, notes: editorForm.notes + "\n" + t })} context="customer notes for a roofing proposal" /></div>
-                <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </div>
-              <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                <div className="flex items-center justify-between"><span>Terms and conditions</span><AiWriteButton getText={() => editorForm.terms} onReplace={(t) => setEditorForm({ ...editorForm, terms: t })} context="roofing proposal terms and conditions" /></div>
-                <textarea value={editorForm.terms} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, terms: event.target.value }); }} className="mt-1.5 min-h-[5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
-              </div>
-            </div>
-            <div className="mt-6">
-              {/* Good / Better / Best toggle */}
-              <label className="mb-4 flex cursor-pointer items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Good / Better / Best</p>
-                  <p className="text-xs text-gray-400">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Cover photo URL
+                  <input value={editorForm.coverPhoto} onChange={(event) => setEditorForm({ ...editorForm, coverPhoto: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" placeholder="/images/logo.jpeg" />
+                </label>
+                <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  <div className="flex items-center justify-between"><span>Cover text</span><AiWriteButton getText={() => editorForm.coverText} onReplace={(t) => setEditorForm({ ...editorForm, coverText: t })} context="proposal cover text" /></div>
+                  <textarea value={editorForm.coverText} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, coverText: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditorForm({ ...editorForm, showPackages: !editorForm.showPackages })}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${editorForm.showPackages ? "bg-blue-600" : "bg-gray-300"}`}
-                >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editorForm.showPackages ? "translate-x-5" : "translate-x-0.5"}`} />
-                </button>
-              </label>
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Sections</p>
+              </div>
+            </EditorSection>
+
+            <EditorSection id="scope" title="Scope of Work" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-gray-400"><span>Scope of work</span><AiWriteButton getText={() => editorForm.scope} onReplace={(t) => setEditorForm({ ...editorForm, scope: t })} onInsert={(t) => setEditorForm({ ...editorForm, scope: editorForm.scope + "\n" + t })} context="roofing proposal scope of work" /></div>
+              <RichTextEditor value={editorForm.scope} onChange={(html) => setEditorForm((form) => ({ ...form, scope: html }))} disabled={isProposalLocked(activeProposal)} ariaLabel="Scope of work" placeholder="Describe the scope of work…" />
+            </EditorSection>
+
+            <EditorSection id="pricing" title="Pricing" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <div className="space-y-4">
+                {/* Good / Better / Best toggle */}
+                <label className="flex cursor-pointer items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Good / Better / Best</p>
+                    <p className="text-xs text-gray-400">{editorForm.showPackages ? "Showing package options" : "Hidden — single proposal"}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditorForm({ ...editorForm, showPackages: !editorForm.showPackages })}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${editorForm.showPackages ? "bg-blue-600" : "bg-gray-300"}`}
+                  >
+                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${editorForm.showPackages ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </button>
+                </label>
+
+                {/* Optional line items — multiple scopes + prices in one proposal total */}
+                <div className="rounded-md border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Line Items</p>
+                      <p className="mt-0.5 text-xs text-gray-400">Optional. Combine several scopes + prices into one total.</p>
+                    </div>
+                    <button type="button" onClick={addLineItem} disabled={isProposalLocked(activeProposal)} className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-lg font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Add line item">+</button>
+                  </div>
+                  {editorForm.lineItems.length > 0 && (
+                    <div className="mt-3 space-y-3">
+                      {editorForm.lineItems.map((item, index) => (
+                        <div key={item.id} className="rounded-md border border-gray-200 bg-gray-50/60 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Item {index + 1}</span>
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => moveLineItem(index, index - 1)} disabled={index === 0 || isProposalLocked(activeProposal)} className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Move up">↑</button>
+                              <button type="button" onClick={() => moveLineItem(index, index + 1)} disabled={index === editorForm.lineItems.length - 1 || isProposalLocked(activeProposal)} className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Move down">↓</button>
+                              <button type="button" onClick={() => removeLineItem(item.id)} disabled={isProposalLocked(activeProposal)} className="flex h-7 w-7 items-center justify-center rounded text-red-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30" aria-label="Delete line item">✕</button>
+                            </div>
+                          </div>
+                          <input value={item.title} onChange={(event) => updateLineItem(item.id, { title: event.target.value })} disabled={isProposalLocked(activeProposal)} placeholder="Title (e.g. Patio roof repair)" className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:bg-gray-100" />
+                          <textarea value={item.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; updateLineItem(item.id, { scope: event.target.value }); }} disabled={isProposalLocked(activeProposal)} placeholder="Scope of work…" className="mt-2 min-h-[3.5rem] w-full resize-none rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:bg-gray-100" />
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-sm text-gray-400">$</span>
+                            <input type="number" value={item.price || ""} onChange={(event) => updateLineItem(item.id, { price: Number(event.target.value) || 0 })} disabled={isProposalLocked(activeProposal)} placeholder="Price" className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:bg-gray-100" />
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
+                        <span className="font-medium text-gray-600">Total</span>
+                        <span className="font-semibold text-gray-900">${sumLineItems(editorForm.lineItems).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <label className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Total
+                  <input type="number" value={editorForm.total} disabled={isProposalLocked(activeProposal) || editorForm.lineItems.length > 0} onChange={(event) => setEditorForm({ ...editorForm, total: event.target.value })} className="mt-1.5 w-full rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500" />
+                  {isProposalLocked(activeProposal) && <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-amber-600">🔒 Locked at the signed amount</span>}
+                  {!isProposalLocked(activeProposal) && editorForm.lineItems.length > 0 && <span className="mt-1 block text-[11px] font-medium normal-case tracking-normal text-gray-400">Calculated from line items</span>}
+                </label>
+                {/* Deposit Request trigger */}
+                <div className="rounded-md border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Deposit Request</p>
+                    <button type="button" onClick={() => { if (!editorForm.depositType) setEditorForm({ ...editorForm, depositType: "percentage" }); setShowDepositModal(true); }} disabled={isProposalLocked(activeProposal)} className="rounded-md bg-teal-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50">{editorForm.depositType ? "Edit" : "Configure"}</button>
+                  </div>
+                  {editorForm.depositType && Number(editorForm.depositValue) > 0 && Number(editorForm.total) > 0 && (
+                    <p className="mt-2 text-sm font-semibold text-gray-700">
+                      {editorForm.depositType === "percentage" ? `${editorForm.depositValue}%` : `$${Number(editorForm.depositValue).toLocaleString()}`} deposit
+                      {" "}= ${(editorForm.depositType === "percentage" ? Math.round(Number(editorForm.total) * Number(editorForm.depositValue) / 100) : Number(editorForm.depositValue)).toLocaleString()}
+                      {editorForm.depositDueDate && ` · Due ${editorForm.depositDueDate}`}
+                    </p>
+                  )}
+                  {!editorForm.depositType && <p className="mt-2 text-xs text-gray-400">No deposit configured</p>}
+                  {activeProposal?.depositPaidAt && (
+                    <p className="mt-2 text-xs font-bold text-emerald-700">✓ Deposit paid: ${(activeProposal.depositPaidAmount || 0).toLocaleString()} on {azDate(activeProposal.depositPaidAt)}</p>
+                  )}
+                </div>
+              </div>
+            </EditorSection>
+
+            <EditorSection id="terms" title="Terms and Notes" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <div className="space-y-4">
+                <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  <div className="flex items-center justify-between"><span>Customer notes</span><AiWriteButton getText={() => editorForm.notes} onReplace={(t) => setEditorForm({ ...editorForm, notes: t })} onInsert={(t) => setEditorForm({ ...editorForm, notes: editorForm.notes + "\n" + t })} context="customer notes for a roofing proposal" /></div>
+                  <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-1.5 min-h-[4.5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
+                </div>
+                <div className="block text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  <div className="flex items-center justify-between"><span>Terms and conditions</span><AiWriteButton getText={() => editorForm.terms} onReplace={(t) => setEditorForm({ ...editorForm, terms: t })} context="roofing proposal terms and conditions" /></div>
+                  <textarea value={editorForm.terms} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, terms: event.target.value }); }} className="mt-1.5 min-h-[5rem] w-full resize-none rounded-md border border-gray-200 px-3 py-2 text-sm normal-case tracking-normal text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
+                </div>
+              </div>
+            </EditorSection>
+
+            <EditorSection id="preview" title="Preview" activeId={mobileSection} onToggle={toggleEditorSection}>
+              <button type="button" onClick={() => setIsPreviewing(true)} className="mb-3 flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700">Open full preview →</button>
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-gray-400">Jump to section</p>
               <div className="space-y-1.5">
                 {proposalSections.filter((section) => editorForm.showPackages || !["BEST", "BETTER", "GOOD"].includes(section)).map((section) => (
                   <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-md px-3 py-2.5 text-left text-sm transition ${section === activeSection ? "bg-blue-50 font-medium text-blue-700 ring-1 ring-blue-200" : "bg-white font-normal text-gray-600 border border-gray-200 hover:border-gray-300"}`}>
@@ -2240,8 +2383,7 @@ export default function ProposalsPage() {
                   </button>
                 ))}
               </div>
-              <button className="mt-3 w-full rounded-md border border-dashed border-gray-300 bg-white px-4 py-2.5 text-center text-lg text-gray-400 transition hover:border-blue-300 hover:text-blue-600">+</button>
-            </div>
+            </EditorSection>
           </aside>
           )}
 
@@ -2363,16 +2505,20 @@ export default function ProposalsPage() {
                   <div className="mt-10">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Scope of Work</p>
                     <div className="mt-4 border-y border-gray-200 py-6">
-                      {isPreviewing ? (
-                        <>
-                          <p className="whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.scope}</p>
-                          {editorForm.notes && <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.notes}</p>}
-                        </>
-                      ) : (
-                        <>
-                          <textarea value={editorForm.scope} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, scope: event.target.value }); }} onPaste={(event) => { event.preventDefault(); setEditorForm({ ...editorForm, scope: formatPastedProposalText(event.clipboardData.getData("text")) }); }} className="min-h-[18rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" />
-                          <textarea value={editorForm.notes} onChange={(event) => { const el = event.target; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; setEditorForm({ ...editorForm, notes: event.target.value }); }} className="mt-4 min-h-[4rem] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-gray-600 outline-none" placeholder="Additional notes..." />
-                        </>
+                      <ProposalRichContent value={editorForm.scope} className="text-sm leading-7 text-gray-600" />
+                      {editorForm.notes && <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-600">{editorForm.notes}</p>}
+                      {editorForm.lineItems.length > 0 && (
+                        <div className="mt-6 space-y-3">
+                          {editorForm.lineItems.map((item, index) => (
+                            <div key={item.id} className="flex justify-between gap-4 border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-gray-800">{item.title || `Item ${index + 1}`}</p>
+                                {item.scope && <p className="mt-1 whitespace-pre-line text-sm leading-6 text-gray-500">{item.scope}</p>}
+                              </div>
+                              <span className="shrink-0 text-sm font-semibold text-gray-800">${(Number(item.price) || 0).toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <div className="mt-5 flex justify-between text-sm">

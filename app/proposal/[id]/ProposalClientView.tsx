@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { azDate, azDateTime, azTime } from "@/lib/arizona-time";
+import { toRenderableHtml } from "@/lib/proposal-rich-text";
 
 type PublicProposal = {
   id: string;
@@ -48,6 +49,14 @@ type PublicProposal = {
   firstViewedAt?: string;
   lastViewedAt?: string;
   declinedAt?: string;
+  lineItems?: ProposalLineItem[];
+};
+
+type ProposalLineItem = {
+  id?: string;
+  title?: string;
+  scope?: string;
+  price?: number;
 };
 
 type PackageOption = {
@@ -345,7 +354,28 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
             <h2 className="text-base font-black text-[#0A3D91]">Project Summary</h2>
             <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.summary || proposal.coverText || "Your customized XRP Roofing proposal is ready for review."}</p>
             <h3 className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Scope of Work</h3>
-            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{proposal.scope || "Scope details are included in the proposal prepared by XRP Roofing."}</p>
+            {proposal.scope ? (
+              <div className="proposal-rich-content mt-2 whitespace-pre-line text-sm leading-6 text-slate-600" dangerouslySetInnerHTML={{ __html: toRenderableHtml(proposal.scope) }} />
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-slate-600">Scope details are included in the proposal prepared by XRP Roofing.</p>
+            )}
+            {proposal.lineItems && proposal.lineItems.length > 0 && (
+              <div className="mt-5 space-y-3">
+                {proposal.lineItems.map((item, index) => (
+                  <div key={item.id || index} className="flex justify-between gap-4 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-slate-800">{item.title || `Item ${index + 1}`}</p>
+                      {item.scope && <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-500">{item.scope}</p>}
+                    </div>
+                    <span className="shrink-0 text-sm font-bold text-slate-800">{currency(item.price)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-slate-200 pt-3 text-sm">
+                  <span className="font-bold text-slate-600">Total</span>
+                  <span className="font-black text-slate-900">{currency(proposal.total)}</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {showPackages && (
