@@ -65,6 +65,10 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
+    // Plain-text alternative for better inbox placement (mailbox filters
+    // penalize HTML-only messages).
+    const text = `${data.message}\n\nView your proposal: ${data.proposalLink}\n\n— XRP Roofing`;
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -73,10 +77,12 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         from: "XRP Roofing <noreply@xrproofing.com>",
+        reply_to: "info@xrproofing.com",
         to: [data.toEmail],
         cc: parseCcRecipients(data.ccRecipients),
         subject: data.subject,
         html,
+        text,
       }),
     });
 

@@ -101,6 +101,12 @@ export async function POST(req: NextRequest) {
       </body>
       </html>`;
 
+    // Plain-text alternative for better inbox placement (mailbox filters
+    // penalize HTML-only messages).
+    const text = data.hideInvoiceCard
+      ? `${data.message}\n\nView your invoice: ${data.invoiceLink}\n\n— XRP Roofing`
+      : `${data.message}\n\nView your invoice: ${data.invoiceLink}\nPay your invoice: ${payLink}\n\n— XRP Roofing`;
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -109,9 +115,11 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         from: "XRP Roofing <noreply@xrproofing.com>",
+        reply_to: "info@xrproofing.com",
         to: [data.toEmail],
         subject: data.subject,
         html,
+        text,
         // Tag with the invoice id so the Resend webhook can map
         // email.delivered / email.opened events back to the invoice.
         ...(data.invoiceId ? { tags: [{ name: "invoice_id", value: data.invoiceId }] } : {}),
