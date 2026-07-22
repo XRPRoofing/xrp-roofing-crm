@@ -7,6 +7,7 @@ const schema = z.object({
   amount: z.number().positive(),
   paymentMethod: z.enum(["ach", "card"]),
   customerEmail: z.string().email(),
+  customerName: z.string().optional(),
   successUrl: z.string().url(),
   cancelUrl: z.string().url(),
 });
@@ -40,11 +41,13 @@ export async function POST(req: NextRequest) {
         "metadata[invoiceId]": data.invoiceId,
         "metadata[invoiceNumber]": data.invoiceNumber,
         "metadata[paymentMethod]": data.paymentMethod,
+        ...(data.customerName ? { "metadata[clientName]": data.customerName } : {}),
         // Copy metadata onto the PaymentIntent so payment_intent.* webhook
         // events can resolve back to this invoice.
         "payment_intent_data[metadata][invoiceId]": data.invoiceId,
         "payment_intent_data[metadata][invoiceNumber]": data.invoiceNumber,
         "payment_intent_data[metadata][paymentMethod]": data.paymentMethod,
+        ...(data.customerName ? { "payment_intent_data[metadata][clientName]": data.customerName } : {}),
       }),
     });
 

@@ -257,6 +257,7 @@ export default function ProposalClientView({ proposal: initialProposal }: { prop
           amount: depositAmount,
           paymentMethod,
           customerEmail: proposal.customerEmail || "customer@example.com",
+          customerName: proposal.customerName || "",
           successUrl: `${window.location.origin}/proposal/${encodeURIComponent(proposal.id)}?deposit=paid`,
           cancelUrl: `${window.location.origin}/proposal/${encodeURIComponent(proposal.id)}?deposit=cancelled`,
         }),
