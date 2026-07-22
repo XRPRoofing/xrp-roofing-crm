@@ -8,6 +8,7 @@
 // Adding new rules/triggers/actions later is pure UI + data — no backend edits.
 
 import { sendConversationSms } from "@/lib/twilio/server";
+import { publishConversationEvent } from "@/lib/twilio/realtime";
 import { pushServerNotification } from "@/lib/server-notifications";
 import { getAutomationClient } from "@/lib/automation/store.server";
 import { listRules, upsertRule, appendRun } from "@/lib/automation/store.server";
@@ -92,7 +93,22 @@ async function executeAction(action: WorkflowAction, ctx: AutomationContext): Pr
     case "send_sms": {
       const to = resolveRecipientPhone(p.recipient || "customer", ctx);
       if (!to) return `SMS skipped — no ${p.recipient || "customer"} number`;
-      await sendConversationSms({ to, body: p.message || "" });
+      const body = p.message || "";
+      const message = await sendConversationSms({ to, body });
+      // Log the outbound text into the conversation inbox so it threads into
+      // the customer's Messages history (same as a manually-sent SMS).
+      await publishConversationEvent({
+        id: message.sid,
+        type: "message_status",
+        direction: "outbound",
+        from: message.from,
+        to: message.to,
+        body: message.body || body,
+        status: message.status,
+        messageSid: message.sid,
+        payload: { sid: message.sid, status: message.status, source: "automation" },
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
       return `SMS → ${p.recipient || "customer"}`;
     }
     case "send_email": {
