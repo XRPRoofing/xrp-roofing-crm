@@ -241,7 +241,12 @@ export function buildTeamRoster(
         if (legacy.email && !match.legacyIds.includes(legacyEmail)) {
           match.legacyIds.push(legacyEmail);
         }
-        if (!match.name && legacy.name) match.name = legacy.name;
+        if (legacyNameKey && !match.legacyIds.includes(legacyNameKey)) {
+          match.legacyIds.push(legacyNameKey);
+        }
+        if (legacy.name && legacy.name.length > (match.name?.length || 0)) {
+          match.name = legacy.name;
+        }
       }
       continue;
     }
