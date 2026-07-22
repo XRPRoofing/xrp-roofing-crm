@@ -573,12 +573,38 @@ export default function CalendarPage() {
     return cells;
   }, [monthCursor]);
 
+  const monthWeekCells = useMemo(() => {
+    const inMonth = calendarCells.some((c) => dateKeyFromDate(c.date) === todayKey);
+    const target = inMonth ? (() => {
+      const t = arizonaToday();
+      return azNoon(t.year, t.month, t.day);
+    })() : currentDate;
+    const tp = azParts(target);
+    const start = new Date(azNoon(tp.year, tp.month, tp.day - tp.dow).getTime() - 21 * 86400000);
+    const monthP = azParts(monthCursor);
+    const weeks: Array<Array<{ date: Date; isCurrentMonth: boolean }>> = [];
+    for (let w = 0; w < 12; w += 1) {
+      const week: Array<{ date: Date; isCurrentMonth: boolean }> = [];
+      for (let d = 0; d < 7; d += 1) {
+        const date = new Date(start.getTime() + (w * 7 + d) * 86400000);
+        const p = azParts(date);
+        week.push({
+          date,
+          isCurrentMonth: p.month === monthP.month && p.year === monthP.year,
+        });
+      }
+      weeks.push(week);
+    }
+    return weeks;
+  }, [calendarCells, currentDate, monthCursor, todayKey]);
+
   // Scroll Month view to the target week (today, currentDate, or mini-calendar selection)
   useEffect(() => {
     if (viewMode !== "month" || !monthScrollRef.current) return;
 
     const container = monthScrollRef.current;
-    const cellKeys = new Set(calendarCells.map((c) => dateKeyFromDate(c.date)));
+    const flatCells = monthWeekCells.flat();
+    const cellKeys = new Set(flatCells.map((c) => dateKeyFromDate(c.date)));
 
     let targetKey: string | null = null;
     if (monthScrollTargetRef.current && cellKeys.has(monthScrollTargetRef.current)) {
@@ -596,9 +622,9 @@ export default function CalendarPage() {
     const cell = monthCellRefs.get(targetKey);
     if (!cell) return;
 
-    const top = Math.max(0, cell.offsetTop - cell.offsetHeight);
+    const top = cell.offsetTop;
     container.scrollTo({ top, behavior: "smooth" });
-  }, [viewMode, calendarCells, currentDate, todayKey, monthScrollTick]);
+  }, [viewMode, monthWeekCells, currentDate, todayKey, monthScrollTick]);
 
   const miniCalCells = useMemo(() => {
     const mc = azParts(monthCursor);
@@ -1713,56 +1739,66 @@ export default function CalendarPage() {
           ref={monthScrollRef}
           className="min-h-0 flex-1 overflow-y-auto scroll-smooth relative"
         >
-          <div
-            className="grid min-h-0 h-full grid-cols-7"
-            style={{ gridAutoRows: "1fr" }}
-          >
-            {calendarCells.map((cell, index) => {
-              const key = dateKeyFromDate(cell.date);
-              const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
-              const isToday = key === todayKey;
-              const isDaySelected = key === selectedDay;
-              const maxVisible = 3;
-
+          <div className="flex flex-col">
+            {monthWeekCells.map((week) => {
+              const weekStart = dateKeyFromDate(week[0].date);
               return (
                 <div
-                  key={`${key}-${index}`}
-                  ref={(el) => {
-                    if (el) monthCellRefs.set(key, el);
-                    else monthCellRefs.delete(key);
+                  key={weekStart}
+                  className="grid grid-cols-7"
+                  style={{
+                    gridAutoRows: "minmax(clamp(100px, 16vh, 220px), auto)",
                   }}
-                  data-date-key={key}
-                  className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
-                onClick={() => {
-                  setCurrentDate(cell.date);
-                  setSelectedDay(key);
-                  setViewMode("day");
-                }}
-                onDragOver={(e) => handleDragOver(e, key)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, key)}
-              >
-                <div className="mb-0.5 text-right sm:mb-1">
-                  <span
-                    className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}
-                  >
-                    {azParts(cell.date).day}
-                  </span>
+                >
+                  {week.map((cell) => {
+                    const key = dateKeyFromDate(cell.date);
+                    const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
+                    const isToday = key === todayKey;
+                    const isDaySelected = key === selectedDay;
+                    const maxVisible = 3;
+
+                    return (
+                      <div
+                        key={`month-cell-${key}`}
+                        ref={(el) => {
+                          if (el) monthCellRefs.set(key, el);
+                          else monthCellRefs.delete(key);
+                        }}
+                        data-date-key={key}
+                        className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 h-full ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                        onClick={() => {
+                          setCurrentDate(cell.date);
+                          setSelectedDay(key);
+                          setViewMode("day");
+                        }}
+                        onDragOver={(e) => handleDragOver(e, key)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, key)}
+                      >
+                        <div className="mb-0.5 text-right sm:mb-1">
+                          <span
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}
+                          >
+                            {azParts(cell.date).day}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {dayEvents.slice(0, maxVisible).map((event) =>
+                            renderEventChip(event, true),
+                          )}
+                          {dayEvents.length > maxVisible && (
+                            <div className="px-0.5 text-[10px] font-semibold text-blue-600 sm:px-1.5 sm:text-xs">
+                              +{dayEvents.length - maxVisible} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="space-y-0.5">
-                  {dayEvents.slice(0, maxVisible).map((event) =>
-                    renderEventChip(event, true),
-                  )}
-                  {dayEvents.length > maxVisible && (
-                    <div className="px-0.5 text-[10px] font-semibold text-blue-600 sm:px-1.5 sm:text-xs">
-                      +{dayEvents.length - maxVisible} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
       </div>
       </div>
     );
