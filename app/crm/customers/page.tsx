@@ -21,7 +21,7 @@ import type { ConversationChannel } from "@/types/conversations";
 import { proxyRecordingUrl } from "@/lib/twilio/client";
 import type { Customer, Lead } from "@/types/crm";
 import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, type BoardJobPayload } from "@/lib/crm-board-nav";
-import { getCachedCustomers, refreshCrewData, refreshInvoices, getCachedInvoices, refreshProposals, getCachedProposals, CACHE_EVENTS } from "@/lib/data-cache";
+import { getCachedCustomers, getCachedCrewData, refreshCrewData, refreshInvoices, getCachedInvoices, refreshProposals, getCachedProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { logCrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
@@ -379,9 +379,9 @@ function statusTone(status?: string) {
 
 export default function CustomersPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
-  const [savedCustomers, setSavedCustomers] = useState<Customer[]>([]);
-  const [jobList, setJobList] = useState<Lead[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [savedCustomers, setSavedCustomers] = useState<Customer[]>(() => getCachedCustomers<Customer>() ?? []);
+  const [jobList, setJobList] = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
+  const [initialLoading, setInitialLoading] = useState(() => getCachedCustomers<Customer>() === null);
   // Customer board shows ONLY live Supabase customer records (newest first from
   // /api/customers) — never seeded/demo customers derived from jobs.
   const customerList = savedCustomers;
@@ -730,7 +730,11 @@ export default function CustomersPage() {
           return;
         }
       }
-      setSavedCustomers(result.customers);
+      // Don't wipe an instantly-shown cached list if this fetch failed and came
+      // back empty; keep the seeded cache and let a later refresh reconcile.
+      if (result.customers.length > 0 || !result.error) {
+        setSavedCustomers(result.customers);
+      }
     }
     let initialDone = false;
     void init().finally(() => { if (mounted) { setInitialLoading(false); initialDone = true; } });

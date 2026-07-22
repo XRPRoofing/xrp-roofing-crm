@@ -644,8 +644,8 @@ function MobileInvoiceList({
 
 export default function InvoicesPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => getCachedInvoices<Invoice>() ?? []);
+  const [initialLoading, setInitialLoading] = useState(() => getCachedInvoices<Invoice>() === null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
