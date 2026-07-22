@@ -1558,24 +1558,28 @@ export default function ProposalsPage() {
           proposalVersion: sentProposal.proposalVersion,
         });
 
-        // Persist the Sent status to Supabase (both share + upsert) so it
-        // propagates in real time and never reverts to Draft.
-        try {
-          await fetch("/api/proposals/share", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(sentProposal),
-          });
-        } catch { /* upsert below is the durable path */ }
-        try {
-          await upsertProposalRecord(sentProposal);
-        } catch { /* sync effect will retry on next change */ }
-        // Repopulate the shared data cache with the fresh Sent record so a
-        // background refresh within the cache-fresh window can't serve a
-        // pre-send Draft copy.
-        try {
-          await refreshProposals<Proposal>(true);
-        } catch { /* realtime/next refresh reconciles */ }
+        // Persist the Sent status to Supabase (share + upsert) and refresh the
+        // cache in the BACKGROUND. The UI already reflects "Sent" locally and
+        // recentlySentRef guards against a stale reload downgrading it, so the
+        // send modal doesn't need to wait on these durability/sync round trips.
+        void (async () => {
+          try {
+            await fetch("/api/proposals/share", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(sentProposal),
+            });
+          } catch { /* upsert below is the durable path */ }
+          try {
+            await upsertProposalRecord(sentProposal);
+          } catch { /* sync effect will retry on next change */ }
+          // Repopulate the shared data cache with the fresh Sent record so a
+          // background refresh within the cache-fresh window can't serve a
+          // pre-send Draft copy.
+          try {
+            await refreshProposals<Proposal>(true);
+          } catch { /* realtime/next refresh reconciles */ }
+        })();
 
         // Log send activity
         const sendLog = JSON.parse(window.localStorage.getItem("xrp-crm-send-activity-log") || "[]") as Record<string, string>[];

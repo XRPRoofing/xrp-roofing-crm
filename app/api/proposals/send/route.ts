@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { z } from "zod";
 import { dispatchAutomation } from "@/lib/automation/engine.server";
 
@@ -83,8 +84,11 @@ export async function POST(req: NextRequest) {
       throw new Error(await response.text());
     }
 
-    // Fire admin-defined automations for the sent proposal (best-effort).
-    await dispatchAutomation({ trigger: "proposal_sent", customerName: data.toName, customerEmail: data.toEmail, proposalStatus: "Sent" }).catch(() => {});
+    // Fire admin-defined automations for the sent proposal (best-effort) AFTER
+    // the response is returned, so it never adds latency to the send call.
+    after(() => {
+      dispatchAutomation({ trigger: "proposal_sent", customerName: data.toName, customerEmail: data.toEmail, proposalStatus: "Sent" }).catch(() => {});
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
