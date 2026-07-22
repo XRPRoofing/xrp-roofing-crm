@@ -23,6 +23,7 @@ export type WorkflowTrigger =
   | "invoice_overdue"
   // Payments
   | "payment_received"
+  | "deposit_paid"
   // Calls
   | "call_missed"
   | "call_incoming"
@@ -155,6 +156,7 @@ export const TRIGGER_META: Record<WorkflowTrigger, { label: string; description:
   invoice_paid:          { label: "Payment Received",        description: "When customer payment is received",                   icon: "💰", category: "Invoices" },
   invoice_overdue:       { label: "Invoice Overdue",         description: "When an invoice passes its due date unpaid",          icon: "🚨", category: "Invoices" },
   payment_received:      { label: "Payment Received",        description: "When any customer payment is received",               icon: "💵", category: "Payments" },
+  deposit_paid:          { label: "Down Payment Received",    description: "When a customer pays the deposit/down payment on an estimate", icon: "🤝", category: "Payments" },
   // Calls
   call_missed:           { label: "Missed Call",             description: "When an incoming call is missed",                     icon: "📵", category: "Calls" },
   call_incoming:         { label: "Incoming Call",           description: "When a new call comes in",                            icon: "📞", category: "Calls" },
@@ -393,6 +395,17 @@ export const WORKFLOW_TEMPLATES: Omit<WorkflowRule, "id" | "createdAt" | "update
       { type: "move_job_to_stage", params: { stage: "paid" } },
       { type: "mark_invoice_paid", params: {} },
       { type: "log_activity", params: { message: "Payment received — job and invoice marked as Paid" } },
+    ],
+    enabled: true,
+  },
+  {
+    name: "Down Payment Received → Thank You SMS",
+    description: "When a customer pays the down payment on an estimate, text them a thank-you and let them know scheduling is next",
+    trigger: "deposit_paid",
+    conditions: [{ field: "always", operator: "exists", value: "" }],
+    actions: [
+      { type: "send_sms", params: { message: "Thank you! We've received your down payment. We'll now proceed with scheduling and confirm your appointment shortly. — XRP Roofing", recipient: "customer" } },
+      { type: "log_activity", params: { message: "Down payment received — thank-you SMS sent to customer" } },
     ],
     enabled: true,
   },
