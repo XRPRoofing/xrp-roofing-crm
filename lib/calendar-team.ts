@@ -52,10 +52,40 @@ function firstNameKey(value: string): string {
   return normalizeName(first);
 }
 
-const ROUTE_PLANNER_HIDDEN_NAMES = new Set(["lyca", "devintest"]);
+// Names that must never appear as selectable people in the Route Planner —
+// test/junk accounts and names that leaked in from calendar-event data but are
+// not real CRM users. Compared using normalizeName (lowercase, alphanumerics).
+const ROUTE_PLANNER_HIDDEN_NAMES = new Set(["lyca", "devintest", "ralphstewart"]);
 
 function isRoutePlannerHiddenName(name: string): boolean {
   return ROUTE_PLANNER_HIDDEN_NAMES.has(normalizeName(name));
+}
+
+// Known misspellings / variants of a real team member that should resolve to
+// that member instead of showing up as a separate person. Keys and values are
+// compared via normalizeName. Example: an event assigned to "joanthan" (a typo)
+// should be attributed to Jonathan Gonzalez rather than creating a duplicate.
+const ROUTE_PLANNER_NAME_ALIASES: Record<string, string> = {
+  joanthan: "jonathan",
+};
+
+// Push the alias identifiers onto whichever roster member the alias points at,
+// so lookups by the misspelled name resolve to the canonical member and no
+// duplicate ad-hoc entry is created for it.
+function applyNameAliases(roster: TeamRoster): void {
+  let changed = false;
+  for (const [alias, canonical] of Object.entries(ROUTE_PLANNER_NAME_ALIASES)) {
+    const aliasKey = normalizeName(alias);
+    const canonicalMember =
+      roster.byLegacyId.get(normalizeIdentifier(canonical)) ??
+      roster.byName.get(normalizeName(canonical));
+    if (!canonicalMember || !aliasKey) continue;
+    if (!canonicalMember.legacyIds.includes(aliasKey)) {
+      canonicalMember.legacyIds.push(aliasKey);
+      changed = true;
+    }
+  }
+  if (changed) rebuildRosterIndexes(roster);
 }
 
 function looksLikeEmail(value: string): boolean {
@@ -281,6 +311,7 @@ export function buildTeamRoster(
   }
 
   rebuildRosterIndexes(roster);
+  applyNameAliases(roster);
 
   return roster;
 }
@@ -304,12 +335,21 @@ function resolveString(value: string, roster: TeamRoster): ResolvedAssignee {
   if (!trimmed) return { kind: "unassigned", memberId: UNASSIGNED_ID, input: "" };
 
   const parts = trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+  let hiddenMatched = false;
   for (const part of parts) {
     const existing = findMemberByString(part, roster);
     if (existing) {
+      // A hidden name (non-CRM/junk) is treated as unassigned so its real
+      // appointments stay visible under "Unassigned" instead of disappearing.
+      if (isRoutePlannerHiddenName(existing.name)) {
+        hiddenMatched = true;
+        continue;
+      }
       return { kind: "roster", memberId: existing.id, input: part };
     }
   }
+
+  if (hiddenMatched) return { kind: "unassigned", memberId: UNASSIGNED_ID, input: "" };
 
   return { kind: "adHoc", memberId: normalizeIdentifier(trimmed), input: trimmed };
 }
@@ -343,7 +383,8 @@ export function eventMatchesMember(
   jobsById: Record<string, RouteJob> = {},
 ): boolean {
   if (memberId === UNASSIGNED_ID) {
-    return resolveInputs(event, jobsById).length === 0;
+    // No recognized assignee, or the only assignee is a hidden (non-CRM) name.
+    return resolveRouteAssignee(event, roster, jobsById).kind === "unassigned";
   }
 
   const inputs = resolveInputs(event, jobsById);
@@ -423,7 +464,10 @@ export function getSelectableRoster(
     ...baseRoster.members.map((m) =>
       m.source === "historical" ? { ...m, isSelectable: false } : m,
     ),
-    ...adHoc.map((m) => ({ ...m, isSelectable: true })),
+    // Ad-hoc members are names pulled from event data. Surface them as
+    // selectable so their appointments can be routed, but never surface names
+    // on the hide-list (test/junk accounts, non-CRM people).
+    ...adHoc.map((m) => ({ ...m, isSelectable: !isRoutePlannerHiddenName(m.name) })),
   ];
 
   const roster: TeamRoster = {

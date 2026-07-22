@@ -33,7 +33,7 @@ export type RouteLeg = {
 };
 
 export type RouteWarning = {
-  type: "insufficient_travel" | "long_drive" | "large_gap";
+  type: "insufficient_travel" | "long_drive" | "large_gap" | "invalid_address";
   fromStopIndex: number;
   toStopIndex: number;
   message: string;
@@ -47,6 +47,10 @@ export type RouteResult = {
   totalDurationSeconds: number;
   warnings: RouteWarning[];
   stops?: RouteStop[];
+  // Indexes (into the full stop list) of appointments whose address could not
+  // be located; they are skipped from the route rather than failing the whole
+  // request. The UI flags these as unmapped.
+  unroutableStopIndexes?: number[];
   error?: string;
 };
 

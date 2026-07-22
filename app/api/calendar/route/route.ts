@@ -19,6 +19,8 @@ type RouteRequest = {
   stops: RouteStop[];
 };
 
+type RoutedStop = { stop: RouteStop; originalIndex: number };
+
 type GoogleLatLng = { latitude: number; longitude: number };
 
 type GoogleRouteLeg = {
@@ -43,6 +45,11 @@ type GoogleRoutesError = {
     status?: string;
   };
 };
+
+// Result of one attempt to compute a route over a set of stops.
+type ComputeOutcome =
+  | { ok: true; result: RouteResult }
+  | { ok: false; status: number; message: string };
 
 function getApiKey(): string | undefined {
   return process.env.GOOGLE_ROUTES_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -152,34 +159,14 @@ function computeWarnings(
   return warnings;
 }
 
-export async function POST(req: NextRequest) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return NextResponse.json(buildError("Google Routes API key is not configured", []), { status: 500 });
-  }
-
-  const body = (await req.json().catch(() => ({}))) as RouteRequest;
-  const stops = Array.isArray(body.stops) ? body.stops : [];
-  const startAddress = body.startAddress?.trim() || "";
-
-  if (stops.length === 0) {
-    return NextResponse.json(buildError("No stops for the selected date", []));
-  }
-
-  const routedStops = stops
-    .map((stop, index) => ({ stop, originalIndex: index }))
-    .filter(({ stop }) => stop.address?.trim());
-
-  if (routedStops.length === 0) {
-    return NextResponse.json({
-      path: [],
-      legs: [],
-      totalDistanceMeters: 0,
-      totalDurationSeconds: 0,
-      warnings: [],
-    });
-  }
-
+// Compute a route over the given routed stops. `allStops` is the full stop list
+// (used for warning indexing, since legs reference original indexes).
+async function computeRouteForStops(
+  routedStops: RoutedStop[],
+  startAddress: string,
+  apiKey: string,
+  allStops: RouteStop[],
+): Promise<ComputeOutcome> {
   let origin: { address?: string } | undefined;
   let destination: { address?: string } | undefined;
   let intermediates: { address?: string }[] = [];
@@ -199,10 +186,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (intermediates.length > MAX_INTERMEDIATES) {
-    return NextResponse.json(
-      buildError(`Too many stops (${stops.length}). The route planner supports up to ${MAX_INTERMEDIATES + (startAddress ? 1 : 0)} appointments in Phase 1.`, stops),
-      { status: 400 },
-    );
+    return {
+      ok: false,
+      status: 400,
+      message: `Too many stops (${allStops.length}). The route planner supports up to ${MAX_INTERMEDIATES + (startAddress ? 1 : 0)} appointments in Phase 1.`,
+    };
   }
 
   const fieldMask = [
@@ -229,6 +217,32 @@ export async function POST(req: NextRequest) {
     payload.intermediates = intermediates;
   }
 
+  // For a lone stop we can short-circuit to a single geocoded pin.
+  const singleStopResult = async (): Promise<ComputeOutcome | null> => {
+    if (startAddress || routedStops.length !== 1) return null;
+    const loc = await geocodeAddress(routedStops[0].stop.address, apiKey);
+    if (!loc) return null;
+    const stopIndex = routedStops[0].originalIndex;
+    const leg: RouteLeg = {
+      fromStopIndex: stopIndex,
+      toStopIndex: stopIndex,
+      distanceMeters: 0,
+      durationSeconds: 0,
+      startLocation: loc,
+      endLocation: loc,
+    };
+    return {
+      ok: true,
+      result: {
+        path: [],
+        legs: [leg],
+        totalDistanceMeters: 0,
+        totalDurationSeconds: 0,
+        warnings: [],
+      },
+    };
+  };
+
   let googleData: { routes?: GoogleRoute[] } & GoogleRoutesError | undefined;
   try {
     const response = await fetch(
@@ -247,62 +261,24 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const message = googleData?.error?.message || `Google Routes API returned ${response.status}`;
-      if (!startAddress && routedStops.length === 1) {
-        const loc = await geocodeAddress(routedStops[0].stop.address, apiKey);
-        if (loc) {
-          const stopIndex = routedStops[0].originalIndex;
-          const leg: RouteLeg = {
-            fromStopIndex: stopIndex,
-            toStopIndex: stopIndex,
-            distanceMeters: 0,
-            durationSeconds: 0,
-            startLocation: loc,
-            endLocation: loc,
-          };
-          return NextResponse.json({
-            path: [],
-            legs: [leg],
-            totalDistanceMeters: 0,
-            totalDurationSeconds: 0,
-            warnings: [],
-          });
-        }
-      }
-      return NextResponse.json(buildError(message, stops), { status: response.status });
+      const single = await singleStopResult();
+      if (single) return single;
+      return { ok: false, status: response.status, message };
     }
   } catch (err) {
-    return NextResponse.json(
-      buildError(err instanceof Error ? err.message : "Failed to contact routing service", stops),
-      { status: 500 },
-    );
+    return {
+      ok: false,
+      status: 500,
+      message: err instanceof Error ? err.message : "Failed to contact routing service",
+    };
   }
 
-  let route = googleData?.routes?.[0];
-
-  if (!route && !startAddress && routedStops.length === 1) {
-    const loc = await geocodeAddress(routedStops[0].stop.address, apiKey);
-    if (loc) {
-      const stopIndex = routedStops[0].originalIndex;
-      const leg: RouteLeg = {
-        fromStopIndex: stopIndex,
-        toStopIndex: stopIndex,
-        distanceMeters: 0,
-        durationSeconds: 0,
-        startLocation: loc,
-        endLocation: loc,
-      };
-      return NextResponse.json({
-        path: [],
-        legs: [leg],
-        totalDistanceMeters: 0,
-        totalDurationSeconds: 0,
-        warnings: [],
-      });
-    }
-  }
+  const route = googleData?.routes?.[0];
 
   if (!route) {
-    return NextResponse.json(buildError("No route found — verify the addresses", stops), { status: 400 });
+    const single = await singleStopResult();
+    if (single) return single;
+    return { ok: false, status: 400, message: "No route found — verify the addresses" };
   }
 
   const encodedPolyline =
@@ -353,15 +329,82 @@ export async function POST(req: NextRequest) {
   const totalDurationSeconds =
     parseGoogleDuration(route.duration) || legs.reduce((sum, l) => sum + l.durationSeconds, 0);
 
-  const warnings = computeWarnings(stops, legs, startAddress);
+  const warnings = computeWarnings(allStops, legs, startAddress);
 
-  const result: RouteResult = {
-    path,
-    legs,
-    totalDistanceMeters,
-    totalDurationSeconds,
-    warnings,
+  return {
+    ok: true,
+    result: {
+      path,
+      legs,
+      totalDistanceMeters,
+      totalDurationSeconds,
+      warnings,
+    },
   };
+}
 
-  return NextResponse.json(result);
+export async function POST(req: NextRequest) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return NextResponse.json(buildError("Google Routes API key is not configured", []), { status: 500 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as RouteRequest;
+  const stops = Array.isArray(body.stops) ? body.stops : [];
+  const startAddress = body.startAddress?.trim() || "";
+
+  if (stops.length === 0) {
+    return NextResponse.json(buildError("No stops for the selected date", []));
+  }
+
+  const routedStops: RoutedStop[] = stops
+    .map((stop, index) => ({ stop, originalIndex: index }))
+    .filter(({ stop }) => stop.address?.trim());
+
+  if (routedStops.length === 0) {
+    return NextResponse.json({
+      path: [],
+      legs: [],
+      totalDistanceMeters: 0,
+      totalDurationSeconds: 0,
+      warnings: [],
+    });
+  }
+
+  const first = await computeRouteForStops(routedStops, startAddress, apiKey, stops);
+  if (first.ok) {
+    return NextResponse.json(first.result);
+  }
+
+  // Salvage: a single unresolvable address makes Google reject the whole
+  // route. Geocode each stop to pinpoint the bad one(s), skip just those, and
+  // route the remaining valid stops instead of failing everything.
+  if (routedStops.length > 1) {
+    const geocoded = await Promise.all(
+      routedStops.map(({ stop }) => geocodeAddress(stop.address, apiKey)),
+    );
+    const good = routedStops.filter((_, i) => geocoded[i]);
+    const badIndexes = routedStops
+      .filter((_, i) => !geocoded[i])
+      .map(({ originalIndex }) => originalIndex);
+
+    if (badIndexes.length > 0 && good.length > 0) {
+      const retry = await computeRouteForStops(good, startAddress, apiKey, stops);
+      if (retry.ok) {
+        retry.result.unroutableStopIndexes = badIndexes;
+        for (const idx of badIndexes) {
+          retry.result.warnings.push({
+            type: "invalid_address",
+            fromStopIndex: idx,
+            toStopIndex: idx,
+            message: "Address couldn't be located — skipped from the route. Please verify it.",
+            severity: "warning",
+          });
+        }
+        return NextResponse.json(retry.result);
+      }
+    }
+  }
+
+  return NextResponse.json(buildError(first.message, stops), { status: first.status });
 }
