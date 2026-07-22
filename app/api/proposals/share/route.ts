@@ -34,14 +34,20 @@ export async function POST(req: NextRequest) {
       .eq("id", proposal.id)
       .single();
 
-    // Preserve brochures from the existing record when the incoming data
-    // doesn't include them (background sync strips brochures for performance).
+    // Preserve heavy image fields (brochures + estimate/inspection photos) from
+    // the existing record when the incoming data doesn't include them — the
+    // board list strips them for performance, so a save from that slim copy
+    // must not wipe them.
     const existingPayload = existing?.payload as Record<string, unknown> | null;
-    const proposalWithBrochures = (existingPayload?.brochures && !proposal.brochures)
-      ? { ...proposal, brochures: existingPayload.brochures }
-      : proposal;
+    let preserved = proposal;
+    if (existingPayload?.brochures && !preserved.brochures) {
+      preserved = { ...preserved, brochures: existingPayload.brochures };
+    }
+    if (existingPayload?.inspectionPhotos && !preserved.inspectionPhotos) {
+      preserved = { ...preserved, inspectionPhotos: existingPayload.inspectionPhotos };
+    }
 
-    const payload = applyProposalLock(existingPayload ?? null, proposalWithBrochures);
+    const payload = applyProposalLock(existingPayload ?? null, preserved);
 
     const { error } = await supabase
       .from("proposal_shares")
