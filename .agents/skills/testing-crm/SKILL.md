@@ -132,6 +132,17 @@ To test proposal preview features:
 3. **Preview mode**: Click the "Preview" button in the toolbar to see the rendered proposal.
 4. **Collapsible scope**: Packages with >2 scope items show `max-h-32` CSS clip with fade gradient and "See full scope of work" button. Packages with ≤2 items show no button/gradient. Each package expands/collapses independently.
 
+### Mobile proposal editor (collapsible sections + sticky action bar)
+The proposal editor (`app/crm/proposals/page.tsx`, active when `activeProposal` is set) has a mobile layout that differs from desktop at the Tailwind `lg` breakpoint (1024px):
+- **Testing mobile width**: resize the Chrome window narrow+tall with `wmctrl` (e.g. `wmctrl -ir <winid> -e 0,20,20,430,900`) so `lg:hidden`/`lg:block` mobile styles render. `xdotool key super+Up` maximizes wide and would hit the desktop layout. Below `sm` (640px) the Team-chat FAB is hidden (`hidden sm:flex`).
+- **Collapsible sections**: mobile shows one accordion section open at a time (`mobileSection` state); desktop keeps all expanded via `lg:block`. Section headers: Customer, Template, Proposal Details, Scope of Work, Pricing, Terms and Notes, Preview.
+- **Sticky action bar gotcha (z-index)**: the mobile Save/Preview/Send bar is `fixed bottom-0`. The CRM global mobile bottom nav (`CrmShell.tsx`) is ALSO `fixed bottom-0` but `z-[9999]`, so any page-level `fixed bottom-0` bar with a lower z-index is completely hidden behind the nav. When testing/adding a mobile bottom bar, verify it's actually visible (not just present in the DOM) — offset it above the nav with `bottom-[calc(72px+env(safe-area-inset-bottom))]` (the same offset the Team-chat FAB uses) rather than relying on z-index alone, and add bottom padding to scrollable panes so content isn't hidden behind it.
+- **Rich Scope editor** (`components/crm/RichTextEditor.tsx`) is an uncontrolled `contentEditable` using `document.execCommand` (bold/insertUnorderedList/insertOrderedList/undo/redo). Core regression to check: type + format, switch to another section and back — text/formatting must survive (no reset). Rich HTML is sanitized via `lib/proposal-rich-text.ts` allowlist before public render.
+- **Optional line items** are additive JSON (`lineItems` on the proposal payload; no schema change). When ≥1 line item exists the manual Total input is disabled and shows the summed total ("Calculated from line items"); with 0 items the manual total is preserved. Separate from Good/Better/Best.
+
+### Dev-server gotcha: don't `npm run build` while `npm run dev` is running
+Both share the `.next` directory; running a production `build` against a running dev server corrupts it and the browser then shows a plain **"Internal Server Error"** (even though `curl` may still 200 a cached route). Recover by killing the dev processes, `rm -rf .next`, and restarting `npm run dev`. To verify a build for CI, do it in a separate checkout or after stopping the dev server.
+
 ## Crew camera / photo upload
 The camera + Before/Progress/After photo sections exist in TWO places (share the same handler logic):
 - **Field Crew Portal** — `/crew` (phone view; pick a team member, tap a job, "Job Completion Form").
@@ -156,8 +167,36 @@ The Conversation board is at `/crm/conversations` (`ConversationBoard.tsx`).
 - **Summary generation speed** (the OpenAI prompt + `max_tokens` limit in `lib/twilio/recording-insights.ts`) is server-side and only runs on a real call in production — it can't be timed locally. Test the display/layout changes locally and state the latency caveat honestly.
 - At tablet width (~820px) the board switches to the mobile single-panel layout with the bottom nav; the inbox preview still shows the concise summary. Resize the window with `wmctrl` to test intermediate widths.
 
+## Automation Center (workflow rules / triggers / templates)
+The Automation Center is at `/crm/automations`. Triggers, action metadata, and pre-built templates live in `lib/workflow-engine.ts` (`WorkflowTrigger`, `TRIGGER_META`, `WORKFLOW_TEMPLATES`); the server execution engine is `lib/automation/engine.server.ts`.
+
+### What CAN be tested locally (UI + rule config)
+- New triggers show up grouped by `TRIGGER_META[...].category` in the **New Rule** builder's "WHEN this happens" `<select>` (grouped into `<optgroup>`s). Verify the option appears under the right category with its label/emoji and that selecting it shows the trigger description.
+- Rules seeded from `WORKFLOW_TEMPLATES` appear automatically as rows in the Workflow Rules table (default workflows are seeded into localStorage on first load), so a newly-added template's rule may already be present — no need to add it manually to verify it exists. The **Templates** button toggles a picker to add one on demand.
+- Open a rule's **Edit** view to confirm exact action config: e.g. `Send SMS` → Recipient (`customer`/`office`/`assigned_crew`) + the exact SMS message text; `Log Activity` message. The stripped DOM (`read_dom`) exposes `<option selected>` / `<input text=...>` values, which is the fastest way to assert exact copy.
+
+### What CANNOT be tested locally
+- Actual firing of a trigger from a live event and real SMS/email delivery. This needs the shared server engine (apply `supabase/automation-engine.sql` — the on-page yellow banner reminds you) plus Twilio/Stripe/Supabase creds. Locally, rules are "on this device only" and `dispatchAutomation` won't send. Verify the dispatch wiring (e.g. `deposit_paid` fired from `app/api/proposals/share/route.ts` on first `depositPaidAt`) by code review + `npx tsc --noEmit` + `npm run build`, and state the runtime-delivery caveat honestly.
+
+## Testing the customer-facing proposal (`/proposal/[id]`)
+- The public proposal route (`app/proposal/[id]/page.tsx`) loads the payload from Supabase and needs `SUPABASE_SERVICE_ROLE_KEY`. Without it (local mode) the URL shows "proposal link unavailable", so you can't test the real URL locally.
+- Workaround: render the real `ProposalClientView` component directly via a **temporary** harness page (e.g. `app/proposal-test-preview/page.tsx`) that passes a mock `proposal` object. This exercises the exact customer rendering (scope via `toRenderableHtml`, line items, packages, photos). Delete the harness + any test images afterward and confirm `git status` is clean.
+- Staff **preview** and the **customer** page render scope through the SAME `toRenderableHtml()` sanitizer, so they stay consistent — but they are separate components: a field shown in the staff preview is NOT necessarily rendered on the customer page. Verify each field on the customer component specifically. Example gap found: estimate/`inspectionPhotos` were shown in the staff preview but not on the customer page until a "Project Photos" section was added to `ProposalClientView`.
+- Photos: `brochures[]` = "Product Brochure"; `inspectionPhotos[]` (label/image/note) = estimate photos → "Project Photos". Both render as `<img src={dataUrl}>`. `inspectionPhotos` persist in the shared payload (only `brochures` are stripped by the list API).
+- Dev-server stale cache: after editing a harness/page, the browser may serve a minutes-old cached render — force a hard refresh (Ctrl+Shift+R) before trusting what you see.
+
+## Testing Supabase-sync-only code paths with a mock Supabase
+Some changes only run when Supabase is configured (`hasSupabaseConfig()` / `proposalSyncEnabled()` in `lib/supabase/client.ts` + `lib/proposal-sync.ts`) — e.g. the proposals board's server fetch, per-id photo rehydration (`/api/proposals/share?id=`), and the slim list payload in `/api/proposals`. In pure `TEST_FORCE_LOCAL=1` mode these paths are skipped, so to exercise them without touching production, run a **local mock PostgREST** and point the app at it:
+- Start `npx next dev` with `NEXT_PUBLIC_SUPABASE_URL=http://localhost:<port>`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon`, `SUPABASE_SERVICE_ROLE_KEY=test-service`, `NEXT_PUBLIC_TEST_BYPASS_AUTH=1`, and `NEXT_PUBLIC_TEST_FORCE_LOCAL=0`. This flips `hasSupabaseConfig()` true and routes the real API handlers through your mock — no prod creds, no prod writes.
+- The mock only needs to implement the PostgREST subset the routes use: `GET`/`POST` on `proposal_shares` (with `?id=eq.<id>` and `select=`), returning `{ payload, id }` rows; return empty arrays for unrelated tables. Seed a couple of rows whose `payload` includes `inspectionPhotos` (label/image/note) and `brochures` so you can assert photo stripping vs rehydration.
+- **Seed realistic rows**: real proposals always have `total`, `status`, etc. The board renders `proposal.total.toLocaleString()` directly (`app/crm/proposals/page.tsx`), so a seeded/curled row missing `total` throws a runtime `Cannot read properties of undefined (reading 'toLocaleString')` — a test-data artifact, not a bug. Include the fields real payloads have.
+- **`POST /api/proposals` expects the raw proposal object** as the request body (not wrapped in `{proposal: ...}`) — it parses `proposalSchema.parse(await req.json())`. Wrapping it returns `{"error":"Invalid proposal"}` (HTTP 400).
+- Keep the mock server OUTSIDE the repo (e.g. `/home/ubuntu/mock-supabase/server.js`) so it's never committed.
+- Assertions this enables: list API strips `inspectionPhotos`+`brochures` (count 0) while keeping names/totals; `/api/proposals/share?id=` returns the photos; a slim-copy POST that omits `inspectionPhotos` still preserves the stored photos on re-fetch (save-preservation, protects against data loss).
+
 ## Known limitations when testing locally
 - **Optimistic "instant display" can't be proven in localStorage mode** — local saves are already instant, so optimistic vs normal render look identical. Its real payoff is over slow Supabase sync in production. State this honestly; don't claim the production speed-up was proven locally.
+- **Mobile load-speed / slim-payload changes**: the mock-Supabase harness (above) proves the *mechanism* (slim list, local-first render, on-open rehydration, save preservation) but not a real wall-clock number — that depends on production network/Supabase latency. Confirm perceived speed on the Vercel PR preview.
 - **Real-time cross-device sync** needs a live Supabase DB — only the no-F5 auto-reload-on-focus path is testable locally.
 - Selecting/deselecting a job toggles the right detail panel; opening DevTools can deselect it — re-click the job row.
 - **Port conflicts**: If port 3000 is in use, Next.js may start on 3001. Delete `.next/dev/lock` and kill old processes if needed.
