@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowUpDown, Check } from "lucide-react";
-import { requestOpenInvoice } from "@/lib/crm-board-nav";
-import { getCachedInvoices, refreshInvoices, CACHE_EVENTS } from "@/lib/data-cache";
+import { requestOpenInvoice, requestOpenEstimate } from "@/lib/crm-board-nav";
+import { getCachedInvoices, refreshInvoices, getCachedProposals, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { azDate } from "@/lib/arizona-time";
 import { subscribeToInvoiceShares } from "@/lib/invoice-sync";
+import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
 type PaymentRecord = {
@@ -31,7 +32,18 @@ type LoadedInvoice = {
   discount?: number;
 };
 
-type Tab = "unpaid" | "paid";
+type DepositProposal = {
+  id: string;
+  proposalNumber?: string;
+  customerName?: string;
+  customerPhone?: string;
+  address?: string;
+  depositPaidAt?: string;
+  depositPaidAmount?: number;
+  depositPaymentMethod?: string;
+};
+
+type Tab = "unpaid" | "paid" | "deposits";
 type SortDir = "desc" | "asc";
 
 const paidStatuses = new Set(["Paid", "Paid Mail Check"]);
@@ -69,6 +81,7 @@ function formatDate(dateStr: string | undefined): string {
 export default function PaymentsPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<LoadedInvoice[]>(() => getCachedInvoices<LoadedInvoice>() ?? []);
+  const [proposals, setProposals] = useState<DepositProposal[]>(() => getCachedProposals<DepositProposal>() ?? []);
   const [loading, setLoading] = useState(() => getCachedInvoices<LoadedInvoice>() === null);
   const [tab, setTab] = useState<Tab>("unpaid");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -80,12 +93,23 @@ export default function PaymentsPage() {
     router.push("/crm/invoices");
   }
 
+  function openProposal(id: string) {
+    requestOpenEstimate(id);
+    router.push("/crm/proposals");
+  }
+
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        const invs = await refreshInvoices<LoadedInvoice>();
-        if (mounted) setInvoices(invs);
+        const [invs, props] = await Promise.all([
+          refreshInvoices<LoadedInvoice>(),
+          refreshProposals<DepositProposal>().catch(() => getCachedProposals<DepositProposal>() ?? []),
+        ]);
+        if (mounted) {
+          setInvoices(invs);
+          setProposals(props);
+        }
       } catch {
         /* leave empty */
       } finally {
@@ -100,21 +124,35 @@ export default function PaymentsPage() {
       }).catch(() => {});
     });
 
+    const unsubscribeProposals = subscribeToProposalRecords(() => {
+      void refreshProposals<DepositProposal>().then((data) => {
+        if (mounted) setProposals(data);
+      }).catch(() => {});
+    });
+
     function onCacheRefresh() {
       const cached = getCachedInvoices<LoadedInvoice>();
       if (cached && mounted) setInvoices(cached);
     }
+    function onProposalCacheRefresh() {
+      const cached = getCachedProposals<DepositProposal>();
+      if (cached && mounted) setProposals(cached);
+    }
     window.addEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
+    window.addEventListener(CACHE_EVENTS.proposals, onProposalCacheRefresh);
 
     return () => {
       mounted = false;
       unsubscribe();
+      unsubscribeProposals();
       window.removeEventListener(CACHE_EVENTS.invoices, onCacheRefresh);
+      window.removeEventListener(CACHE_EVENTS.proposals, onProposalCacheRefresh);
     };
   }, []);
 
   useAutoRefresh(() => {
     void refreshInvoices<LoadedInvoice>().then(setInvoices).catch(() => {});
+    void refreshProposals<DepositProposal>().then(setProposals).catch(() => {});
   });
 
   const { paidInvoices, unpaidInvoices, totalPaid, totalUnpaid } = useMemo(() => {
@@ -141,6 +179,32 @@ export default function PaymentsPage() {
 
     return { paidInvoices: paid, unpaidInvoices: unpaid, totalPaid: paidSum, totalUnpaid: unpaidSum };
   }, [invoices]);
+
+  const { deposits, totalDeposits } = useMemo(() => {
+    const paidDeposits = proposals.filter((p) => !!p.depositPaidAt);
+    const sum = paidDeposits.reduce((total, p) => total + (p.depositPaidAmount || 0), 0);
+    return { deposits: paidDeposits, totalDeposits: sum };
+  }, [proposals]);
+
+  const displayedDeposits = useMemo(() => {
+    const filtered = search.trim()
+      ? deposits.filter((p) => {
+          const q = search.toLowerCase();
+          return (
+            (p.customerName || "").toLowerCase().includes(q) ||
+            (p.proposalNumber || "").toLowerCase().includes(q) ||
+            (p.address || "").toLowerCase().includes(q) ||
+            (p.customerPhone || "").toLowerCase().includes(q)
+          );
+        })
+      : deposits;
+
+    return [...filtered].sort((a, b) => {
+      const tA = a.depositPaidAt ? new Date(a.depositPaidAt).getTime() : 0;
+      const tB = b.depositPaidAt ? new Date(b.depositPaidAt).getTime() : 0;
+      return sortDir === "desc" ? tB - tA : tA - tB;
+    });
+  }, [deposits, search, sortDir]);
 
   const displayedInvoices = useMemo(() => {
     const list = tab === "paid" ? paidInvoices : unpaidInvoices;
@@ -177,7 +241,7 @@ export default function PaymentsPage() {
   }, [tab, paidInvoices, unpaidInvoices, search, sortDir]);
 
   const currentYear = new Date().getFullYear();
-  const sortLabel = tab === "paid" ? "paid date" : "due date";
+  const sortLabel = tab === "unpaid" ? "due date" : tab === "paid" ? "paid date" : "deposit date";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 px-0 pb-8 sm:gap-5">
@@ -231,15 +295,25 @@ export default function PaymentsPage() {
           >
             Paid
           </button>
+          <button
+            onClick={() => setTab("deposits")}
+            className={`flex-1 rounded-full border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide transition sm:px-6 sm:py-2.5 sm:text-sm ${
+              tab === "deposits"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            Down Payments
+          </button>
         </div>
 
         {/* Total banner */}
-        <div className={`rounded-md p-2.5 text-center sm:rounded-lg sm:p-4 ${tab === "paid" ? "bg-blue-50" : "bg-orange-50"}`}>
+        <div className={`rounded-md p-2.5 text-center sm:rounded-lg sm:p-4 ${tab === "unpaid" ? "bg-orange-50" : "bg-blue-50"}`}>
           <p className="text-xs font-bold uppercase tracking-wide text-gray-500 sm:text-sm">
-            {tab === "paid" ? "Total Revenue" : "Total Outstanding"}
+            {tab === "paid" ? "Total Revenue" : tab === "deposits" ? "Total Down Payments" : "Total Outstanding"}
           </p>
-          <p className={`mt-0.5 text-2xl font-bold sm:mt-1 sm:text-3xl ${tab === "paid" ? "text-blue-700" : "text-orange-700"}`}>
-            {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : totalUnpaid)}
+          <p className={`mt-0.5 text-2xl font-bold sm:mt-1 sm:text-3xl ${tab === "unpaid" ? "text-orange-700" : "text-blue-700"}`}>
+            {loading ? "—" : formatMoney(tab === "paid" ? totalPaid : tab === "deposits" ? totalDeposits : totalUnpaid)}
           </p>
         </div>
       </div>
@@ -258,13 +332,44 @@ export default function PaymentsPage() {
         </button>
       </div>
 
-      {/* Invoice list */}
+      {/* Down Payments list */}
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />
           ))}
         </div>
+      ) : tab === "deposits" ? (
+        displayedDeposits.length === 0 ? (
+          <p className="py-12 text-center text-sm font-semibold text-gray-400">
+            {search.trim() ? "No matching down payments." : "No down payments yet."}
+          </p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {displayedDeposits.map((p) => (
+              <article
+                key={p.id}
+                className="flex cursor-pointer items-center justify-between py-4 transition hover:bg-gray-50 active:bg-gray-100"
+                onClick={() => openProposal(p.id)}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-gray-900">
+                    {p.customerName || "Customer"}
+                    {p.proposalNumber ? ` · #${p.proposalNumber}` : ""}
+                  </p>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
+                    <span>Paid {formatDate(p.depositPaidAt)}</span>
+                    <Check className="h-3.5 w-3.5 text-blue-500" />
+                    {p.depositPaymentMethod ? <span className="capitalize">· {p.depositPaymentMethod}</span> : null}
+                  </div>
+                </div>
+                <span className="ml-4 whitespace-nowrap text-sm font-bold text-gray-800">
+                  {formatMoney(p.depositPaidAmount || 0)}
+                </span>
+              </article>
+            ))}
+          </div>
+        )
       ) : displayedInvoices.length === 0 ? (
         <p className="py-12 text-center text-sm font-semibold text-gray-400">
           {search.trim() ? "No matching invoices." : `No ${tab} invoices.`}
