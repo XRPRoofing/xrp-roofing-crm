@@ -190,6 +190,37 @@ export async function PATCH(req: NextRequest) {
       await dispatchAutomation({ trigger: "proposal_signed", customerName: proposalCustomerName, jobId, proposalStatus: "Signed", jobStage: "approved" }).catch(() => {});
     }
 
+    // Fire down-payment automations the first time a deposit is recorded.
+    if (updates.depositPaidAt && !(proposal as Record<string, unknown>).depositPaidAt) {
+      const customerPhone = ((proposal as Record<string, unknown>).customerPhone as string) || "";
+      const customerEmail = ((proposal as Record<string, unknown>).customerEmail as string) || "";
+      const paymentAmount = Number(updates.depositPaidAmount ?? (proposal as Record<string, unknown>).depositPaidAmount ?? 0) || undefined;
+
+      await pushServerNotification({
+        title: "Down payment received",
+        message: `${proposalCustomerName} paid a down payment on proposal ${id}`,
+        actor: proposalCustomerName,
+        module: "Proposals",
+      });
+      if (jobId) {
+        try {
+          await supabase.from("crew_activity_log").insert({
+            id: `act-pdep-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            job_id: jobId,
+            job_name: proposalCustomerName,
+            actor: proposalCustomerName || "Client",
+            action: `Down payment received from ${proposalCustomerName || "client"}`,
+            details: `Down payment recorded on proposal ${id}`,
+            module: "Proposal",
+            created_at: new Date().toISOString(),
+          });
+        } catch { /* ignore */ }
+      }
+
+      // Fire admin-defined automations for the down payment (best-effort).
+      await dispatchAutomation({ trigger: "deposit_paid", customerName: proposalCustomerName, customerPhone, customerEmail, jobId, paymentAmount, proposalStatus: "Signed" }).catch(() => {});
+    }
+
     return NextResponse.json({ proposal: nextProposal });
   } catch (error) {
     if (error instanceof z.ZodError) {
