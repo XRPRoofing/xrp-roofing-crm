@@ -380,6 +380,12 @@ export default function CalendarPage() {
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // Month-view auto-scroll state/refs
+  const monthScrollRef = useRef<HTMLDivElement>(null);
+  const monthCellRefs = useRef(new Map<string, HTMLDivElement>()).current;
+  const monthScrollTargetRef = useRef<string | null>(null);
+  const [monthScrollTick, setMonthScrollTick] = useState(0);
+
   // Sync state when URL search params change (Next.js soft navigation)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
@@ -537,10 +543,8 @@ export default function CalendarPage() {
     [monthCursor],
   );
 
-  const todayKey = useMemo(() => {
-    const t = arizonaToday();
-    return dateKey(t.year, t.month, t.day);
-  }, []);
+  const t = arizonaToday();
+  const todayKey = dateKey(t.year, t.month, t.day);
 
   const calendarCells = useMemo(() => {
     const mc = azParts(monthCursor);
@@ -568,6 +572,33 @@ export default function CalendarPage() {
     }
     return cells;
   }, [monthCursor]);
+
+  // Scroll Month view to the target week (today, currentDate, or mini-calendar selection)
+  useEffect(() => {
+    if (viewMode !== "month" || !monthScrollRef.current) return;
+
+    const container = monthScrollRef.current;
+    const cellKeys = new Set(calendarCells.map((c) => dateKeyFromDate(c.date)));
+
+    let targetKey: string | null = null;
+    if (monthScrollTargetRef.current && cellKeys.has(monthScrollTargetRef.current)) {
+      targetKey = monthScrollTargetRef.current;
+      monthScrollTargetRef.current = null;
+    } else {
+      if (monthScrollTargetRef.current) monthScrollTargetRef.current = null;
+      if (cellKeys.has(todayKey)) {
+        targetKey = todayKey;
+      } else {
+        targetKey = dateKeyFromDate(currentDate);
+      }
+    }
+
+    const cell = monthCellRefs.get(targetKey);
+    if (!cell) return;
+
+    const top = Math.max(0, cell.offsetTop - cell.offsetHeight);
+    container.scrollTo({ top, behavior: "smooth" });
+  }, [viewMode, calendarCells, currentDate, todayKey, monthScrollTick]);
 
   const miniCalCells = useMemo(() => {
     const mc = azParts(monthCursor);
@@ -1679,20 +1710,29 @@ export default function CalendarPage() {
 
         {/* Calendar Cells */}
         <div
-          className="grid min-h-0 flex-1 grid-cols-7"
-          style={{ gridAutoRows: "1fr" }}
+          ref={monthScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto scroll-smooth relative"
         >
-          {calendarCells.map((cell, index) => {
-            const key = dateKeyFromDate(cell.date);
-            const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
-            const isToday = key === todayKey;
-            const isDaySelected = key === selectedDay;
-            const maxVisible = 3;
+          <div
+            className="grid min-h-0 h-full grid-cols-7"
+            style={{ gridAutoRows: "1fr" }}
+          >
+            {calendarCells.map((cell, index) => {
+              const key = dateKeyFromDate(cell.date);
+              const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
+              const isToday = key === todayKey;
+              const isDaySelected = key === selectedDay;
+              const maxVisible = 3;
 
-            return (
-              <div
-                key={`${key}-${index}`}
-                className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+              return (
+                <div
+                  key={`${key}-${index}`}
+                  ref={(el) => {
+                    if (el) monthCellRefs.set(key, el);
+                    else monthCellRefs.delete(key);
+                  }}
+                  data-date-key={key}
+                  className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
                 onClick={() => {
                   setCurrentDate(cell.date);
                   setSelectedDay(key);
@@ -1723,6 +1763,7 @@ export default function CalendarPage() {
             );
           })}
         </div>
+      </div>
       </div>
     );
   }
@@ -2189,8 +2230,14 @@ export default function CalendarPage() {
                     type="button"
                     key={`mini-${idx}`}
                     onClick={() => {
-                      goToDate(cell.date);
-                      setViewMode("day");
+                      if (viewMode === "month") {
+                        goToDate(cell.date);
+                        monthScrollTargetRef.current = cell.key;
+                        setMonthScrollTick((n) => n + 1);
+                      } else {
+                        goToDate(cell.date);
+                        setViewMode("day");
+                      }
                     }}
                     className={`relative rounded-full py-0.5 text-xs cursor-pointer hover:bg-gray-100 ${isSelected && !isToday2 ? "bg-blue-100 font-bold text-blue-700" : isToday2 ? "bg-blue-600 font-bold text-white" : cell.isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}
                   >
