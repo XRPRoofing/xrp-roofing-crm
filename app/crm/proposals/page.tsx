@@ -2120,8 +2120,9 @@ export default function ProposalsPage() {
           )}
         </div>
 
-        {/* Mobile sticky action bar — keeps Save / Preview / Send reachable while scrolling the form */}
-        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-gray-200 bg-white/95 px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] backdrop-blur lg:hidden print:hidden">
+        {/* Mobile sticky action bar — keeps Save / Preview / Send reachable while scrolling the form.
+            Sits above the global mobile bottom nav (which is fixed bottom-0) so it stays visible. */}
+        <div className="fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-40 flex items-center gap-2 border-t border-gray-200 bg-white/95 px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.06)] backdrop-blur lg:hidden print:hidden">
           {!isProposalLocked(activeProposal) && (
             <button type="button" onClick={handleSaveProposal} className="flex-1 rounded-lg bg-blue-50 px-3 py-2.5 text-sm font-bold text-blue-700 active:scale-95">Save</button>
           )}
@@ -2220,7 +2221,7 @@ export default function ProposalsPage() {
 
         <div className={`grid min-h-[calc(100vh-8.5rem)] grid-cols-1 print:min-h-0 print:block ${isPreviewing ? "" : "lg:grid-cols-[300px_1fr]"}`} id="proposal-print-area">
           {!isPreviewing && (
-          <aside className="space-y-3 overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-4 pb-28 lg:space-y-3 lg:p-5 lg:pb-5">
+          <aside className="space-y-3 overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-4 pb-40 lg:space-y-3 lg:p-5 lg:pb-5">
             <EditorSection id="customer" title="Customer" activeId={mobileSection} onToggle={toggleEditorSection}>
               <input value={editorForm.customerName} onChange={(event) => setEditorForm({ ...editorForm, customerName: event.target.value })} placeholder="Customer name" className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50" />
               <AddressAutocomplete
@@ -2387,7 +2388,7 @@ export default function ProposalsPage() {
           </aside>
           )}
 
-          <main className="bg-gray-50/30 p-6 print:bg-white print:p-0">
+          <main className="bg-gray-50/30 p-6 pb-40 lg:pb-6 print:bg-white print:p-0 print:pb-0">
             <div className="mx-auto max-w-[760px] print:max-w-none">
               <p className="mb-4 text-center text-sm font-medium text-gray-500 print:hidden">{selectedTemplate?.label || "Custom Proposal"}</p>
               <div className={`min-h-[900px] rounded-2xl border bg-white p-8 shadow-sm print:min-h-0 print:rounded-none print:border-none print:p-0 print:shadow-none ${editorForm.template === "premium" ? "border-orange-200" : editorForm.template === "insurance" ? "border-blue-200" : "border-gray-200"}`}>
