@@ -30,6 +30,7 @@ type PublicProposal = {
     best?: string | { scope?: string; price?: number };
   };
   brochures?: { name: string; dataUrl: string; type: string }[];
+  inspectionPhotos?: { label?: string; image?: string; note?: string }[];
 };
 
 async function getProposal(id: string) {
