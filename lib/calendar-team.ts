@@ -189,6 +189,26 @@ function deduplicateProfileMembers(members: TeamMember[]): TeamMember[] {
   return result;
 }
 
+function mergeInfoProfile(members: TeamMember[]): void {
+  const infoIndex = members.findIndex(
+    (m) =>
+      normalizeIdentifier(m.email) === "info@xrproofing.com" &&
+      normalizeName(m.name) === "info",
+  );
+  if (infoIndex === -1) return;
+
+  const target =
+    members.find((m) => m.legacyIds.includes("office")) ??
+    members.find((m) => normalizeName(m.name) === "office") ??
+    members.find((m) => m.legacyIds.includes("jonathan")) ??
+    members.find((m) => normalizeName(m.name).startsWith("jonathan"));
+  if (!target) return;
+
+  const info = members[infoIndex];
+  mergeProfileMembers(target, info);
+  members.splice(infoIndex, 1);
+}
+
 export function buildTeamRoster(
   profiles: ProfileLike[] = [],
   legacyMembers = TEAM_MEMBERS,
@@ -253,6 +273,8 @@ export function buildTeamRoster(
 
     members.push(buildMemberFromLegacy(legacy));
   }
+
+  mergeInfoProfile(members);
 
   for (const member of members) {
     if (isRoutePlannerHiddenName(member.name)) member.isSelectable = false;
