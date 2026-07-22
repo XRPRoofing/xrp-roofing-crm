@@ -79,13 +79,15 @@ function formatUsd(v: number) {
 export default function CrmDashboardPage() {
   const router = useRouter();
 
-  const [jobs,      setJobs]      = useState<Lead[]>([]);
-  const [proposals, setProposals] = useState<ProposalSnap[]>([]);
-  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>([]);
-  const [, setCustomers] = useState<{ id: string; createdAt?: string }[]>([]);
+  const [jobs,      setJobs]      = useState<Lead[]>(() => getCachedCrewData()?.jobs ?? []);
+  const [proposals, setProposals] = useState<ProposalSnap[]>(() => (getCachedProposals<ProposalSnap>() ?? []).filter((p) => !p.deletedAt));
+  const [invoices,  setInvoices]  = useState<InvoiceSnap[]>(() => getCachedInvoices<InvoiceSnap>() ?? []);
+  const [, setCustomers] = useState<{ id: string; createdAt?: string }[]>(() => getCachedCustomers<{ id: string; createdAt?: string }>() ?? []);
   const [events,    setEvents]    = useState<TwilioConversationEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(
+    () => getCachedCrewData() === null && getCachedInvoices() === null && getCachedProposals() === null,
+  );
   const [syncDot,   setSyncDot]   = useState(false);
 
   useEffect(() => {
