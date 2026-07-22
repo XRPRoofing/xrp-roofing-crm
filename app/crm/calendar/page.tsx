@@ -380,11 +380,9 @@ export default function CalendarPage() {
   });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  // Month-view auto-scroll state/refs
-  const monthScrollRef = useRef<HTMLDivElement>(null);
-  const monthCellRefs = useRef(new Map<string, HTMLDivElement>()).current;
-  const monthScrollTargetRef = useRef<string | null>(null);
-  const [monthScrollTick, setMonthScrollTick] = useState(0);
+  // Month-view wheel navigation lock
+  const monthWheelLock = useRef(false);
+  const monthViewRef = useRef<HTMLDivElement>(null);
 
   // Sync state when URL search params change (Next.js soft navigation)
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -573,58 +571,28 @@ export default function CalendarPage() {
     return cells;
   }, [monthCursor]);
 
-  const monthWeekCells = useMemo(() => {
-    const inMonth = calendarCells.some((c) => dateKeyFromDate(c.date) === todayKey);
-    const target = inMonth ? (() => {
-      const t = arizonaToday();
-      return azNoon(t.year, t.month, t.day);
-    })() : currentDate;
-    const tp = azParts(target);
-    const start = new Date(azNoon(tp.year, tp.month, tp.day - tp.dow).getTime() - 21 * 86400000);
-    const monthP = azParts(monthCursor);
-    const weeks: Array<Array<{ date: Date; isCurrentMonth: boolean }>> = [];
-    for (let w = 0; w < 12; w += 1) {
-      const week: Array<{ date: Date; isCurrentMonth: boolean }> = [];
-      for (let d = 0; d < 7; d += 1) {
-        const date = new Date(start.getTime() + (w * 7 + d) * 86400000);
-        const p = azParts(date);
-        week.push({
-          date,
-          isCurrentMonth: p.month === monthP.month && p.year === monthP.year,
-        });
-      }
-      weeks.push(week);
-    }
-    return weeks;
-  }, [calendarCells, currentDate, monthCursor, todayKey]);
-
-  // Scroll Month view to the target week (today, currentDate, or mini-calendar selection)
+  // Mouse-wheel month navigation while hovering Month view
   useEffect(() => {
-    if (viewMode !== "month" || !monthScrollRef.current) return;
+    if (viewMode !== "month") return;
+    const el = monthViewRef.current;
+    if (!el) return;
 
-    const container = monthScrollRef.current;
-    const flatCells = monthWeekCells.flat();
-    const cellKeys = new Set(flatCells.map((c) => dateKeyFromDate(c.date)));
+    const handleWheel = (e: WheelEvent) => {
+      if (monthWheelLock.current) return;
+      if (Math.abs(e.deltaY) < 30) return;
+      e.preventDefault();
+      e.stopPropagation();
+      monthWheelLock.current = true;
+      navigate(e.deltaY > 0 ? 1 : -1);
+      window.setTimeout(() => {
+        monthWheelLock.current = false;
+      }, 400);
+    };
 
-    let targetKey: string | null = null;
-    if (monthScrollTargetRef.current && cellKeys.has(monthScrollTargetRef.current)) {
-      targetKey = monthScrollTargetRef.current;
-      monthScrollTargetRef.current = null;
-    } else {
-      if (monthScrollTargetRef.current) monthScrollTargetRef.current = null;
-      if (cellKeys.has(todayKey)) {
-        targetKey = todayKey;
-      } else {
-        targetKey = dateKeyFromDate(currentDate);
-      }
-    }
-
-    const cell = monthCellRefs.get(targetKey);
-    if (!cell) return;
-
-    const top = cell.offsetTop;
-    container.scrollTo({ top, behavior: "smooth" });
-  }, [viewMode, monthWeekCells, currentDate, todayKey, monthScrollTick]);
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
 
   const miniCalCells = useMemo(() => {
     const mc = azParts(monthCursor);
@@ -1720,7 +1688,7 @@ export default function CalendarPage() {
 
   function renderMonthView() {
     return (
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div ref={monthViewRef} className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white">
         {/* Weekday Headers */}
         <div className="grid shrink-0 grid-cols-7 border-b border-gray-200 bg-gray-50">
           {WEEKDAYS_FULL.map((day, i) => (
@@ -1735,71 +1703,53 @@ export default function CalendarPage() {
         </div>
 
         {/* Calendar Cells */}
-        <div
-          ref={monthScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto scroll-smooth relative"
-        >
-          <div className="flex flex-col">
-            {monthWeekCells.map((week) => {
-              const weekStart = dateKeyFromDate(week[0].date);
+        <div className="min-h-0 flex-1 relative">
+          <div
+            className="grid min-h-0 h-full grid-cols-7"
+            style={{ gridAutoRows: "1fr" }}
+          >
+            {calendarCells.map((cell, index) => {
+              const key = dateKeyFromDate(cell.date);
+              const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
+              const isToday = key === todayKey;
+              const isDaySelected = key === selectedDay;
+              const maxVisible = 3;
+
               return (
                 <div
-                  key={weekStart}
-                  className="grid grid-cols-7"
-                  style={{
-                    gridAutoRows: "minmax(clamp(100px, 16vh, 220px), auto)",
+                  key={`${key}-${index}`}
+                  className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
+                  onClick={() => {
+                    setCurrentDate(cell.date);
+                    setSelectedDay(key);
+                    setViewMode("day");
                   }}
+                  onDragOver={(e) => handleDragOver(e, key)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, key)}
                 >
-                  {week.map((cell) => {
-                    const key = dateKeyFromDate(cell.date);
-                    const dayEvents = (eventsByDate[key] || []).filter(isEventVisible);
-                    const isToday = key === todayKey;
-                    const isDaySelected = key === selectedDay;
-                    const maxVisible = 3;
-
-                    return (
-                      <div
-                        key={`month-cell-${key}`}
-                        ref={(el) => {
-                          if (el) monthCellRefs.set(key, el);
-                          else monthCellRefs.delete(key);
-                        }}
-                        data-date-key={key}
-                        className={`min-h-[80px] cursor-pointer border-b border-r border-gray-100 p-0.5 transition-colors hover:bg-blue-50/40 sm:min-h-[120px] sm:p-1.5 h-full ${dragOverDate === key ? "bg-blue-100 ring-2 ring-inset ring-blue-400" : isDaySelected ? "bg-blue-50/60" : !cell.isCurrentMonth ? "bg-gray-50/50" : "bg-white"}`}
-                        onClick={() => {
-                          setCurrentDate(cell.date);
-                          setSelectedDay(key);
-                          setViewMode("day");
-                        }}
-                        onDragOver={(e) => handleDragOver(e, key)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, key)}
-                      >
-                        <div className="mb-0.5 text-right sm:mb-1">
-                          <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}
-                          >
-                            {azParts(cell.date).day}
-                          </span>
-                        </div>
-                        <div className="space-y-0.5">
-                          {dayEvents.slice(0, maxVisible).map((event) =>
-                            renderEventChip(event, true),
-                          )}
-                          {dayEvents.length > maxVisible && (
-                            <div className="px-0.5 text-[10px] font-semibold text-blue-600 sm:px-1.5 sm:text-xs">
-                              +{dayEvents.length - maxVisible} more
-                            </div>
-                          )}
-                        </div>
+                  <div className="mb-0.5 text-right sm:mb-1">
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${isToday ? "bg-blue-600 text-white" : cell.isCurrentMonth ? "text-gray-900" : "text-gray-400"}`}
+                    >
+                      {azParts(cell.date).day}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {dayEvents.slice(0, maxVisible).map((event) =>
+                      renderEventChip(event, true),
+                    )}
+                    {dayEvents.length > maxVisible && (
+                      <div className="px-0.5 text-[10px] font-semibold text-blue-600 sm:px-1.5 sm:text-xs">
+                        +{dayEvents.length - maxVisible} more
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
-      </div>
+        </div>
       </div>
     );
   }
@@ -2268,8 +2218,6 @@ export default function CalendarPage() {
                     onClick={() => {
                       if (viewMode === "month") {
                         goToDate(cell.date);
-                        monthScrollTargetRef.current = cell.key;
-                        setMonthScrollTick((n) => n + 1);
                       } else {
                         goToDate(cell.date);
                         setViewMode("day");
