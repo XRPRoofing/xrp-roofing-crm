@@ -902,6 +902,14 @@ export default function ProposalsPage() {
       const local = retain(readLocalProposals());
 
       if (proposalSyncEnabled()) {
+        // Render the last-known proposals immediately so the board isn't blank
+        // while the (potentially large) server list downloads on mobile. The
+        // server fetch below reconciles in the background.
+        if (local.length && mounted) {
+          prevProposalsRef.current = local;
+          setProposals(local);
+          setDataLoaded(true);
+        }
         const server = await loadProposalRecords<Proposal>();
         if (!mounted) return;
         const serverIds = new Set(server.map((proposal) => proposal.id));
@@ -1375,14 +1383,30 @@ export default function ProposalsPage() {
     setActiveProposal(proposal);
     if (!fromJob) pushProposalHash();
 
-    if (!proposal.brochures?.length && proposalSyncEnabled()) {
+    // The board list loads proposals WITHOUT the heavy image payloads
+    // (brochures + estimate/inspection photos) for speed, so fetch the full
+    // record per-id and rehydrate them into the editor when either is missing.
+    const needsBrochures = !proposal.brochures?.length;
+    const needsPhotos = !normalizeInspectionPhotos(proposal.inspectionPhotos).some((p) => p.image);
+    if ((needsBrochures || needsPhotos) && proposalSyncEnabled()) {
       fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`)
         .then((r) => r.ok ? r.json() : null)
         .then((data: { proposal?: Proposal } | null) => {
-          const brochures = data?.proposal?.brochures;
+          const full = data?.proposal;
+          if (!full) return;
+          const brochures = full.brochures;
           if (brochures?.length) {
             setEditorBrochures(brochures);
             setProposals((cur) => cur.map((p) => p.id === proposal.id ? { ...p, brochures } : p));
+          }
+          const photos = full.inspectionPhotos;
+          if (Array.isArray(photos) && photos.some((p) => p?.image)) {
+            const normalized = normalizeInspectionPhotos(photos);
+            setProposals((cur) => cur.map((p) => p.id === proposal.id ? { ...p, inspectionPhotos: photos } : p));
+            setActiveProposal((cur) => cur && cur.id === proposal.id ? { ...cur, inspectionPhotos: photos } : cur);
+            // Only fill the editor if the user hasn't already added photos since
+            // opening (avoid clobbering in-progress edits).
+            setEditorForm((f) => f.inspectionPhotos.some((p) => p.image) ? f : { ...f, inspectionPhotos: normalized });
           }
         })
         .catch(() => {});
@@ -1417,7 +1441,13 @@ export default function ProposalsPage() {
       notes: editorForm.notes,
       terms: editorForm.terms,
       showPackages: editorForm.showPackages,
-      inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos),
+      // Only include inspectionPhotos when at least one slot has an image. The
+      // board list loads proposals WITHOUT photos (for speed) and they are
+      // rehydrated per-id when opened; sending `undefined` here lets the server
+      // preserve the stored photos so a save before rehydration never wipes them.
+      inspectionPhotos: normalizeInspectionPhotos(editorForm.inspectionPhotos).some((p) => p.image)
+        ? normalizeInspectionPhotos(editorForm.inspectionPhotos)
+        : undefined,
       packages: normalizePackages(editorForm.packages),
       lineItems: editorForm.lineItems.length > 0 ? editorForm.lineItems.map((item) => ({ ...item })) : undefined,
       brochures: editorBrochures.length > 0 ? editorBrochures : undefined,

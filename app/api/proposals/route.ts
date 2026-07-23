@@ -43,7 +43,12 @@ export async function GET() {
     .filter((row) => !row.id.startsWith("_"))
     .map((row) => {
       if (!row.payload) return null;
-      const { brochures: _b, ...rest } = row.payload as Proposal & { brochures?: unknown };
+      // Strip the heavy image payloads (product brochures + estimate/inspection
+      // photos) from the board list — they can be many MB of base64 and make the
+      // list slow to load on mobile. The full record (with photos) is fetched
+      // per-id via /api/proposals/share when a proposal is opened, and POST
+      // preserves these fields so saving from the slim list copy never loses them.
+      const { brochures: _b, inspectionPhotos: _p, ...rest } = row.payload as Proposal & { brochures?: unknown; inspectionPhotos?: unknown };
       return { ...rest, id: row.id };
     })
     .filter((proposal): proposal is Proposal => Boolean(proposal));
@@ -70,11 +75,15 @@ export async function POST(req: NextRequest) {
     .select("payload")
     .eq("id", proposal.id)
     .single();
-  // Preserve brochures from the existing record when the incoming data doesn't
-  // include them (the list API strips brochures for performance).
+  // Preserve heavy image fields from the existing record when the incoming data
+  // doesn't include them (the list API strips brochures + inspectionPhotos for
+  // performance, so a save originating from that slim copy must not wipe them).
   const existingPayload = existing?.payload as Record<string, unknown> | null;
   if (existingPayload?.brochures && !proposal.brochures) {
     proposal = { ...proposal, brochures: existingPayload.brochures } as Proposal;
+  }
+  if (existingPayload?.inspectionPhotos && !proposal.inspectionPhotos) {
+    proposal = { ...proposal, inspectionPhotos: existingPayload.inspectionPhotos } as Proposal;
   }
 
   const payload = applyProposalLock(existingPayload ?? null, proposal);

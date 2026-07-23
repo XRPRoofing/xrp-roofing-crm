@@ -291,7 +291,11 @@ export default function CalendarRoutePlanner({
           setRoute(null);
           return;
         }
-        setRoute({ ...data, stops: selectedStops });
+        const unroutable = new Set(data.unroutableStopIndexes || []);
+        const mergedStops = unroutable.size
+          ? selectedStops.map((s, i) => (unroutable.has(i) ? { ...s, isUnmapped: true } : s))
+          : selectedStops;
+        setRoute({ ...data, stops: mergedStops });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -309,7 +313,10 @@ export default function CalendarRoutePlanner({
 
   // Create the map instance as soon as the script is ready so we can surface
   // Google auth/key errors and never leave the map container as a gray box.
+  // Depends on `open`: the drawer unmounts its DOM when closed, so the map must
+  // be (re)created against the fresh container each time it opens.
   useEffect(() => {
+    if (!open) return;
     const google = getGoogleApi();
     if (!mapLoaded || !mapRef.current || !google?.maps?.Map || mapInstanceRef.current) return;
 
@@ -320,10 +327,25 @@ export default function CalendarRoutePlanner({
       streetViewControl: false,
       fullscreenControl: false,
     });
-  }, [mapLoaded]);
+  }, [mapLoaded, open]);
+
+  // When the drawer closes its DOM is removed, but the map/marker/polyline refs
+  // survive and point at detached nodes. Tear them down so a reopen rebuilds a
+  // fresh map instead of skipping init and showing a blank/gray box.
+  useEffect(() => {
+    if (open) return;
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+    mapInstanceRef.current = null;
+    stopPositionsRef.current = [];
+  }, [open]);
 
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !route) return;
+    if (!open || !mapLoaded || !mapRef.current || !route) return;
     const google = getGoogleApi();
     if (!google?.maps) return;
 
@@ -415,7 +437,7 @@ export default function CalendarRoutePlanner({
         polylineRef.current = null;
       }
     };
-  }, [mapLoaded, route, selectedStops, eventsForDate, onSelectEvent]);
+  }, [open, mapLoaded, route, selectedStops, eventsForDate, onSelectEvent]);
 
   const handleSelectStop = (index: number) => {
     setHighlightedIndex(index);
@@ -479,8 +501,8 @@ export default function CalendarRoutePlanner({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          <div ref={mapRef} className="mb-4 h-64 w-full rounded-lg border bg-gray-100" />
+        <div className="flex-1 overflow-y-auto px-4 py-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-3">
+          <div ref={mapRef} className="mb-4 h-56 w-full rounded-lg border bg-gray-100 sm:h-64" />
 
           {mapLoadError && (
             <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
