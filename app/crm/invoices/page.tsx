@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 // html2canvas and jsPDF are loaded dynamically when generating PDFs to keep
 // the initial page bundle small (~460 KB savings).
 import { leads } from "@/lib/crm-data";
 import type { Lead } from "@/types/crm";
 import { loadInvoiceShares, subscribeToInvoiceShares, upsertInvoiceRecord, deleteInvoiceRecord, loadAllInvoices, type InvoiceSharePayload } from "@/lib/invoice-sync";
-import { payloadToLead, takeInvoiceIntent } from "@/lib/crm-board-nav";
+import { payloadToLead, takeInvoiceIntent, consumeJobCardOpening, type JobCardReturnState } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { updateJobRecord, crewSyncUpdatedEvent } from "@/lib/crew-sync";
 import { getCachedInvoices, getCachedProposals, refreshInvoices, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
@@ -716,6 +716,8 @@ export default function InvoicesPage() {
 
   const invoiceCardHashRef = useRef(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [jobCardReturnState, setJobCardReturnState] = useState<JobCardReturnState | null>(null);
 
   const closeInvoiceCard = useCallback(() => {
     setSelectedInvoiceId(null);
@@ -727,6 +729,9 @@ export default function InvoicesPage() {
   }, []);
 
   function pushInvoiceHash() {
+    const { fromJob, state } = consumeJobCardOpening();
+    setJobCardReturnState(state);
+    if (fromJob) return;
     window.location.hash = "#card";
     invoiceCardHashRef.current = true;
   }
@@ -795,6 +800,8 @@ export default function InvoicesPage() {
           setSelectedInvoiceId(created.id);
           return [created, ...current];
         });
+        const { fromJob: fromJobProposal, state: jobReturnProposal } = consumeJobCardOpening();
+        if (fromJobProposal) setJobCardReturnState(jobReturnProposal);
       }
       return;
     }
@@ -807,6 +814,8 @@ export default function InvoicesPage() {
         setSelectedInvoiceId(created.id);
         return [created, ...current];
       });
+      const { fromJob, state: jobReturnState } = consumeJobCardOpening();
+      if (fromJob) setJobCardReturnState(jobReturnState);
     }
   }, []);
 
@@ -2182,9 +2191,15 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
           <div className="mx-auto my-2 sm:my-6 max-w-6xl rounded-lg sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-2xl">
             <div className="flex flex-col justify-between gap-4 border-b border-gray-200 pb-4 sm:pb-5 lg:flex-row lg:items-start">
               <div>
-                <button onClick={closeInvoiceCard} className="mb-3 sm:mb-4 text-sm font-bold text-blue-700 flex items-center gap-1">
-                  <span>←</span> Back to board
-                </button>
+                {jobCardReturnState ? (
+                  <button onClick={() => router.back()} className="mb-3 sm:mb-4 text-sm font-bold text-blue-700 flex items-center gap-1">
+                    <span>←</span> Back to job
+                  </button>
+                ) : (
+                  <button onClick={closeInvoiceCard} className="mb-3 sm:mb-4 text-sm font-bold text-blue-700 flex items-center gap-1">
+                    <span>←</span> Back to board
+                  </button>
+                )}
                 <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-orange-600">{selectedInvoice.invoiceNumber}</p>
                 <h2 className="mt-1 sm:mt-2 text-xl sm:text-3xl font-bold text-blue-700">{selectedInvoice.clientName}</h2>
                 <p className="mt-1 font-semibold text-sm sm:text-base text-gray-600">{selectedInvoice.jobName}</p>

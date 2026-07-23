@@ -14,7 +14,7 @@ import { createManualFolder } from "@/lib/manual-folders";
 import { deleteProposalRecord, loadProposalRecords, loadTemplateRecords, proposalSyncEnabled, saveTemplateRecords, subscribeToProposalRecords, upsertProposalRecord } from "@/lib/proposal-sync";
 import { isProposalLocked } from "@/lib/proposal-lock";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
-import { payloadToLead, takeEstimateIntent, requestCreateInvoiceFromProposal, requestOpenInvoice } from "@/lib/crm-board-nav";
+import { payloadToLead, takeEstimateIntent, requestCreateInvoiceFromProposal, requestOpenInvoice, consumeJobCardOpening, type JobCardReturnState } from "@/lib/crm-board-nav";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { getCachedCrewData, getCachedInvoices, getCachedProposals, refreshCrewData, refreshProposals, CACHE_EVENTS } from "@/lib/data-cache";
 import { createClient } from "@/lib/supabase/client";
@@ -515,6 +515,7 @@ export default function ProposalsPage() {
   const [proposalFilter, setProposalFilter] = useState<"all" | "drafts">("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeProposal, setActiveProposal] = useState<Proposal | null>(null);
+  const [jobCardReturnState, setJobCardReturnState] = useState<JobCardReturnState | null>(null);
   const proposalCardHashRef = useRef(false);
   const proposalSearchParams = useSearchParams();
   const router = useRouter();
@@ -986,8 +987,7 @@ export default function ProposalsPage() {
       const match = proposals.find((p) => p.id === proposalId && !p.deletedAt);
       if (match) {
         setActiveProposal(match);
-        window.location.hash = "#card";
-        proposalCardHashRef.current = true;
+        pushProposalHash();
       }
     }
   }, [proposalSearchParams, proposals, activeProposal]);
@@ -1337,7 +1337,15 @@ export default function ProposalsPage() {
     setTemplateForm({ label: "", description: "", title: "", summary: "", terms: "", packages: defaultPackages, brochureEnabled: false, brochures: [] });
   }
 
+  function pushProposalHash() {
+    window.location.hash = "#card";
+    proposalCardHashRef.current = true;
+  }
+
   function openProposal(proposal: Proposal) {
+    const { fromJob, state } = consumeJobCardOpening();
+    setJobCardReturnState(state);
+
     setEditorForm({
       customerName: proposal.customerName,
       customerEmail: proposal.customerEmail || proposal.job?.email || "",
@@ -1365,8 +1373,7 @@ export default function ProposalsPage() {
     setIsPreviewing(isProposalLocked(proposal));
     setActiveSection("Estimate");
     setActiveProposal(proposal);
-    window.location.hash = "#card";
-    proposalCardHashRef.current = true;
+    if (!fromJob) pushProposalHash();
 
     if (!proposal.brochures?.length && proposalSyncEnabled()) {
       fetch(`/api/proposals/share?id=${encodeURIComponent(proposal.id)}`)
@@ -2086,7 +2093,11 @@ export default function ProposalsPage() {
         <div className="sticky top-16 z-30 border-b border-gray-200 bg-white shadow-sm lg:top-20 print:hidden">
           {/* Row 1 — back + address */}
           <div className="flex h-10 items-center justify-between px-4">
-            <button type="button" onClick={closeProposalCard} className="text-sm font-bold text-blue-700">← Back to proposals</button>
+            {jobCardReturnState ? (
+              <button type="button" onClick={() => router.back()} className="text-sm font-bold text-blue-700">← Back to job</button>
+            ) : (
+              <button type="button" onClick={closeProposalCard} className="text-sm font-bold text-blue-700">← Back to proposals</button>
+            )}
             <div className="hidden text-sm font-semibold text-gray-700 md:block">{editorForm.address}</div>
           </div>
           {/* Row 2 — action buttons, scrollable on mobile */}

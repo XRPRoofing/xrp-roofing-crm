@@ -18,7 +18,7 @@ import { azDateTime, azDate } from "@/lib/arizona-time";
 import { ensureInvoiceTaskForJob } from "@/lib/office-tasks";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 import { findOrCreateCustomer } from "@/lib/customer-sync";
-import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice } from "@/lib/crm-board-nav";
+import { jobToBoardPayload, requestCreateEstimate, requestCreateInvoice, requestOpenEstimate, requestOpenInvoice, stashJobCardReturn, takeJobCardReturn, setJobCardSkipHash, clearJobCardReturn } from "@/lib/crm-board-nav";
 import { subscribeToProposalRecords } from "@/lib/proposal-sync";
 import { upsertProposalRecord } from "@/lib/proposal-sync";
 import { upsertInvoiceRecord } from "@/lib/invoice-sync";
@@ -662,12 +662,15 @@ export default function LeadsPage() {
   const checklistDone = PHOTO_CHECKLIST_ITEMS.filter((item) => photoChecklist[item]).length;
 
   const jobCardHashRef = useRef(false);
+  const jobCardRef = useRef<HTMLDivElement | null>(null);
+  const scrollRestorationRef = useRef<number | null>(null);
 
   const closeJobCard = useCallback(() => {
     flushPendingUpdates();
     setSelectedJobId(null);
     setShowLinkPicker(null);
     jobCardHashRef.current = false;
+    clearJobCardReturn();
     const url = new URL(window.location.href);
     url.searchParams.delete("job");
     url.searchParams.delete("from");
@@ -703,18 +706,46 @@ export default function LeadsPage() {
     return () => { flushPendingUpdates(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-select a job when navigated from global search with ?job=<id>
+  // Auto-select a job when navigated from a ?job=<id> link or when returning
+  // from an estimate/invoice editor with a stashed job-card return state.
   useEffect(() => {
-    const jobId = searchParams.get("job");
-    if (jobId && jobs.length > 0 && !selectedJobId) {
+    if (jobs.length === 0 || selectedJobId) return;
+
+    const queryJobId = searchParams.get("job");
+    const saved = takeJobCardReturn();
+    const jobId = queryJobId || saved?.jobId;
+
+    if (jobId) {
       const match = jobs.find((j) => j.id === jobId);
       if (match) {
         setSelectedJobId(match.id);
+        if (saved?.jobId === match.id) {
+          if (typeof saved.checklistOpen === "boolean") setChecklistOpen(saved.checklistOpen);
+          if (typeof saved.scrollTop === "number") scrollRestorationRef.current = saved.scrollTop;
+        }
         window.location.hash = "#card";
         jobCardHashRef.current = true;
       }
     }
   }, [searchParams, jobs, selectedJobId]);
+
+  // Restore the job card scroll position after the card opens and its content
+  // has had a chance to layout (including any restored expanded sections).
+  useEffect(() => {
+    if (selectedJobId && jobCardRef.current && scrollRestorationRef.current !== null) {
+      const el = jobCardRef.current;
+      const target = scrollRestorationRef.current;
+      let raf = 0;
+      const apply = () => {
+        raf = requestAnimationFrame(() => {
+          el.scrollTop = target;
+          scrollRestorationRef.current = null;
+        });
+      };
+      apply();
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [selectedJobId, checklistOpen]);
 
   // Resolve the current user's display name for note attribution.
   useEffect(() => {
@@ -963,7 +994,15 @@ export default function LeadsPage() {
   }
 
   function openBoardFromJob(path: string) {
-    if (typeof window !== "undefined") window.sessionStorage.setItem("crm-return-to-jobs", "1");
+    if (selectedJob && typeof window !== "undefined") {
+      stashJobCardReturn({
+        jobId: selectedJob.id,
+        checklistOpen,
+        scrollTop: jobCardRef.current?.scrollTop ?? 0,
+      });
+      setJobCardSkipHash();
+      window.sessionStorage.setItem("crm-return-to-jobs", "1");
+    }
     router.push(path);
   }
 
@@ -1828,7 +1867,7 @@ export default function LeadsPage() {
 
       {selectedJob && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-black/20 backdrop-blur-sm" onClick={closeJobCard}>
-          <aside className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <aside ref={jobCardRef} className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3 sm:p-5">
               <div className="flex items-start justify-between gap-2 sm:gap-4">
                 <div className="min-w-0 flex-1">
