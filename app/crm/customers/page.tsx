@@ -156,6 +156,51 @@ function getCustomerActivities(activities: CrewActivity[], idSet: Set<string>, c
   return activities.filter((activity) => idSet.has(activity.jobId) || (name.length > 0 && normalizeText(activity.jobName) === name));
 }
 
+// Collapse photo uploads into one timeline entry per upload session instead of
+// one entry per individual photo, so the history isn't flooded when a batch is
+// uploaded. Photos are grouped by uploader + photo type + job, bucketed to the
+// minute (a single upload batch shares a near-identical timestamp). A group of
+// one keeps its per-photo detail; a group of many becomes a single summary
+// (e.g. "Uploaded 12 photos"). Purely a display change — no photos are altered.
+function groupPhotoUploadSessions(photos: JobPhoto[]): TimelineItem[] {
+  const groups = new Map<string, JobPhoto[]>();
+  for (const photo of photos) {
+    const minuteBucket = (photo.createdAt || "").slice(0, 16); // YYYY-MM-DDTHH:mm
+    const key = `${photo.jobId}|${photo.uploadedBy}|${photo.photoType}|${minuteBucket}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(photo);
+    else groups.set(key, [photo]);
+  }
+
+  const result: TimelineItem[] = [];
+  for (const group of groups.values()) {
+    const first = group[0];
+    const typeLabel = first.photoType === "Job Photo" ? "photo" : `${first.photoType} photo`;
+    if (group.length === 1) {
+      result.push({
+        id: `photo-${first.id}`,
+        at: first.createdAt,
+        icon: Camera,
+        category: "File",
+        title: `${first.photoType === "Job Photo" ? "Photo" : `${first.photoType} photo`} uploaded`,
+        detail: first.name,
+        actor: first.uploadedBy,
+      });
+    } else {
+      const latest = group.reduce((max, p) => (p.createdAt > max ? p.createdAt : max), first.createdAt);
+      result.push({
+        id: `photos-${first.jobId}-${first.uploadedBy}-${first.photoType}-${(first.createdAt || "").slice(0, 16)}`,
+        at: latest,
+        icon: Camera,
+        category: "File",
+        title: `Uploaded ${group.length} ${typeLabel}s`,
+        actor: first.uploadedBy,
+      });
+    }
+  }
+  return result;
+}
+
 // Merge every source into one newest-first timeline, de-duplicating a
 // synthesized "Customer created" entry when the activity log already has one.
 function buildCustomerTimeline(
@@ -168,17 +213,7 @@ function buildCustomerTimeline(
 
   events.forEach((event) => items.push(eventToTimelineItem(event, customer.name)));
   activities.forEach((activity) => items.push(activityToTimelineItem(activity)));
-  photos.forEach((photo) =>
-    items.push({
-      id: `photo-${photo.id}`,
-      at: photo.createdAt,
-      icon: Camera,
-      category: "File",
-      title: `${photo.photoType === "Job Photo" ? "Photo" : `${photo.photoType} photo`} uploaded`,
-      detail: photo.name,
-      actor: photo.uploadedBy,
-    }),
-  );
+  groupPhotoUploadSessions(photos).forEach((item) => items.push(item));
 
   const hasCreated = activities.some((activity) => activity.action.toLowerCase().includes("customer created"));
   const createdIso = customerCreatedIso(customer);
