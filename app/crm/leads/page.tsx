@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, Link2, ListChecks, Mail, MapPin, MessageSquare, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, Users, X } from "lucide-react";
+import { CalendarDays, Camera, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Clock, DollarSign, Download, FileText, Filter, GripVertical, History, Home, Image, Link2, ListChecks, Mail, MapPin, MessageSquare, Mic, Pencil, Phone, Plus, RotateCcw, Save, Search, Square, StickyNote, Tag, Trash2, UploadCloud, User, Users, Voicemail, X } from "lucide-react";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import LiveCameraCapture from "@/components/LiveCameraCapture";
 import { AddressLink } from "@/components/ContactLinks";
@@ -26,7 +26,10 @@ import { getCachedCrewData, getCachedProposals, getCachedInvoices, getCachedCust
 import type { Customer } from "@/types/crm";
 import { loadJobActivities, logCrewActivity, subscribeToCrewActivities, type CrewActivity } from "@/lib/crew-activity";
 import { useSaveToast } from "@/components/crm/SaveToast";
-import { handlePhoneChange } from "@/lib/format-phone";
+import { handlePhoneChange, digitsOnly } from "@/lib/format-phone";
+import { listConversationEvents, subscribeToConversationEvents, proxyRecordingUrl } from "@/lib/twilio/client";
+import { normalizeCallHistory } from "@/lib/twilio/call-history";
+import type { TwilioConversationEvent } from "@/types/twilio-conversations";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import { listRecentProjects, listProjectPhotos, searchProjectsForJob, matchProjectByAddress, findAddressMatches, findStreetNumberCandidates, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
@@ -344,6 +347,173 @@ function groupJobFileActivities(files: JobPhoto[]): JobFileActivityRow[] {
   }
 
   return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// ── Job Card "Customer Communications" section ─────────────────────────────
+// A read-only, collapsible view of the customer's existing call & message
+// history (SMS, calls, AI summaries, transcripts, voicemails/recordings),
+// matched to the job by phone number. It only reads the conversation events the
+// app already records (same source as the Phone module and the customer
+// profile's Communication History) — no writes, no new backend, nothing added
+// to the phone/messaging systems.
+type JobCommItem = {
+  id: string;
+  at: string;
+  kind: "call" | "sms";
+  direction: "inbound" | "outbound";
+  title: string;
+  status?: string;
+  duration?: string;
+  handledBy?: string;
+  body?: string;
+  summary?: string;
+  transcript?: string;
+  recordingUrl?: string;
+  disposition?: string;
+  notes?: string;
+};
+
+function formatCallDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function payloadText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function JobCommunications({ phone }: { phone?: string }) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [events, setEvents] = useState<TwilioConversationEvent[]>([]);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Lazily load conversation events the first time the section is opened, then
+  // keep them live via the shared realtime subscription (same as the Phone /
+  // Customers modules) so new calls/texts appear without a refresh.
+  useEffect(() => {
+    if (!open || loaded) return;
+    let mounted = true;
+    void listConversationEvents().then((rows) => { if (mounted) { setEvents(rows); setLoaded(true); } }).catch(() => { if (mounted) setLoaded(true); });
+    let unsubscribe: (() => void) | undefined;
+    try {
+      unsubscribe = subscribeToConversationEvents((evt) => {
+        if (!mounted) return;
+        setEvents((prev) => {
+          const exists = prev.some((e) => e.id === evt.id);
+          return exists ? prev.map((e) => (e.id === evt.id ? evt : e)) : [evt, ...prev];
+        });
+      });
+    } catch { /* realtime unavailable — static load still works */ }
+    return () => { mounted = false; unsubscribe?.(); };
+  }, [open, loaded]);
+
+  const target = digitsOnly(phone || "").slice(-10);
+
+  const items = useMemo<JobCommItem[]>(() => {
+    if (!target) return [];
+    const matches = (value?: string) => value ? digitsOnly(value).slice(-10) === target : false;
+
+    // Calls — normalizeCallHistory folds multi-leg calls, recordings, notes and
+    // AI insights (summary/transcript) into one record per call.
+    const calls: JobCommItem[] = normalizeCallHistory(events)
+      .filter((c) => matches(c.customerPhone) || matches(c.from) || matches(c.to))
+      .map((c) => ({
+        id: `call-${c.callSid}`,
+        at: c.startAt,
+        kind: "call" as const,
+        direction: c.direction,
+        title: `${c.direction === "outbound" ? "Outbound" : "Inbound"} call`,
+        status: c.status,
+        duration: c.durationSec ? formatCallDuration(c.durationSec) : undefined,
+        handledBy: c.answeredBy,
+        summary: c.summary,
+        transcript: c.transcript,
+        recordingUrl: c.recordingUrl,
+        disposition: c.disposition,
+        notes: c.notes,
+      }));
+
+    // SMS — dedupe status callbacks (queued/sent/delivered) to one row per
+    // message, preferring the event carrying the body / latest status.
+    const smsByKey = new Map<string, TwilioConversationEvent>();
+    for (const e of events) {
+      if (e.type !== "incoming_sms" && e.type !== "message_status") continue;
+      if (!matches(e.from) && !matches(e.to)) continue;
+      const key = e.messageSid || e.id;
+      const prev = smsByKey.get(key);
+      if (!prev) { smsByKey.set(key, e); continue; }
+      const preferNew = (!prev.body && Boolean(e.body)) || new Date(e.createdAt).getTime() > new Date(prev.createdAt).getTime();
+      if (preferNew) smsByKey.set(key, { ...prev, ...e, body: e.body || prev.body });
+    }
+    const sms: JobCommItem[] = Array.from(smsByKey.values()).map((e) => ({
+      id: `sms-${e.messageSid || e.id}`,
+      at: e.createdAt,
+      kind: "sms" as const,
+      direction: e.direction === "outbound" ? "outbound" : "inbound",
+      title: `${e.direction === "outbound" ? "Outbound" : "Inbound"} text`,
+      body: e.body || "",
+      handledBy: e.direction === "outbound" ? (payloadText(e.payload?.answeredByName) || "Office") : undefined,
+    }));
+
+    return [...calls, ...sms].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }, [events, target]);
+
+  return (
+    <>
+      <div>
+        <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs font-bold text-gray-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+          <MessageSquare className="h-4 w-4" />Customer Communications
+          {items.length > 0 && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{items.length}</span>}
+          <ChevronRight className={`ml-auto h-3.5 w-3.5 text-gray-400 transition ${open ? "rotate-90" : ""}`} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Customer Communications</p>
+          <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+            {!target && <p className="text-sm font-semibold text-gray-400">No phone number on this job.</p>}
+            {target && items.length === 0 && <p className="text-sm font-semibold text-gray-400">{loaded ? "No calls or messages for this customer yet." : "Loading…"}</p>}
+            {items.map((item) => {
+              const isOpen = expandedId === item.id;
+              const Icon = item.kind === "sms" ? MessageSquare : (item.recordingUrl && item.status?.startsWith("Missed")) ? Voicemail : Phone;
+              const hasDetails = Boolean(item.body || item.summary || item.transcript || item.recordingUrl || item.disposition || item.notes);
+              const preview = item.kind === "sms" ? (item.body || "") : (item.summary || item.disposition || item.notes || "");
+              return (
+                <div key={item.id} className="rounded-lg bg-gray-50 px-3 py-2">
+                  <button type="button" onClick={() => hasDetails && setExpandedId(isOpen ? null : item.id)} className="flex w-full items-start gap-3 text-left">
+                    <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.direction === "outbound" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}><Icon className="h-3.5 w-3.5" /></div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-bold text-gray-900">{item.title}</span>
+                        {item.status && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600">{item.status}</span>}
+                        {item.duration && <span className="text-[10px] font-bold text-gray-400">{item.duration}</span>}
+                      </div>
+                      {preview && <p className="mt-0.5 truncate text-xs text-gray-600">{preview}</p>}
+                      <p className="mt-1 text-[11px] font-semibold text-gray-400">{azDateTime(item.at)}{item.handledBy ? ` • ${item.handledBy}` : ""}</p>
+                    </div>
+                    {hasDetails && <ChevronRight className={`mt-1 h-3.5 w-3.5 shrink-0 text-gray-400 transition ${isOpen ? "rotate-90" : ""}`} />}
+                  </button>
+                  {isOpen && hasDetails && (
+                    <div className="mt-2 space-y-2 border-t border-gray-200 pl-10 pt-2">
+                      {item.kind === "sms" && item.body && <p className="whitespace-pre-wrap text-sm text-gray-700">{item.body}</p>}
+                      {item.summary && <div><p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">AI Summary</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">{item.summary}</p></div>}
+                      {item.transcript && <div><p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Transcript</p><p className="mt-0.5 whitespace-pre-wrap text-sm text-gray-700">{item.transcript}</p></div>}
+                      {item.disposition && <p className="text-xs text-gray-600"><span className="font-bold">Disposition:</span> {item.disposition}</p>}
+                      {item.notes && <p className="text-xs text-gray-600"><span className="font-bold">Notes:</span> {item.notes}</p>}
+                      {item.recordingUrl && <audio controls preload="none" src={proxyRecordingUrl(item.recordingUrl)} className="mt-1 w-full" />}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelete }: {
@@ -2540,6 +2710,8 @@ export default function LeadsPage() {
                   </div>
                 )}
               </div>
+
+              <JobCommunications phone={selectedJob.phone} />
 
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-700"><StickyNote className="h-3.5 w-3.5" />Notes</div>
