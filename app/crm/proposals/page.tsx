@@ -21,7 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { sendSms } from "@/lib/twilio/client";
 import { getTwilioLines, type TwilioLine } from "@/lib/twilio/numbers";
 import type { Lead } from "@/types/crm";
-import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
+import { allocateNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
 import RichTextEditor from "@/components/crm/RichTextEditor";
@@ -1151,7 +1151,7 @@ export default function ProposalsPage() {
     return newJob;
   }
 
-  function handleCreateProposal(event: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateProposal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (proposalMode === "job" && !selectedJob) return;
     if (proposalMode === "new" && (!customerName || !address)) return;
@@ -1165,7 +1165,7 @@ export default function ProposalsPage() {
       }
     }
 
-    const unifiedNum = getNextUnifiedNumber();
+    const unifiedNum = await allocateNextUnifiedNumber();
     const newProposal: Proposal = {
       id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       proposalNumber: String(unifiedNum),
@@ -1224,8 +1224,8 @@ export default function ProposalsPage() {
   // Create an estimate directly from a job (one-click from the Jobs board /
   // customer profile) and open its editor. The job is stored on the proposal so
   // future clicks open this same estimate instead of creating another.
-  function createEstimateFromLead(job: Lead) {
-    const unifiedNum = getNextUnifiedNumber();
+  async function createEstimateFromLead(job: Lead) {
+    const unifiedNum = await allocateNextUnifiedNumber();
     const newProposal: Proposal = {
       id: `P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       proposalNumber: String(unifiedNum),
@@ -2019,12 +2019,12 @@ export default function ProposalsPage() {
     }
   }
 
-  function handleDuplicateProposal() {
+  async function handleDuplicateProposal() {
     if (!activeProposal) return;
     const duplicated: Proposal = {
       ...activeProposal,
       id: `proposal-${Date.now()}`,
-      proposalNumber: String(getNextUnifiedNumber()),
+      proposalNumber: String(await allocateNextUnifiedNumber()),
       status: "Draft",
       locked: false,
       signedAt: undefined,
