@@ -150,6 +150,42 @@ export async function listConversationEvents(limit = 1000) {
   return { ok: true as const, events: rows.map(mapConversationEventRow).reverse() };
 }
 
+/** Read-only lookup of every stored conversation event involving a specific
+ * phone number, regardless of how old it is. `listConversationEvents` only
+ * returns the most recent `limit` rows globally, so on a busy CRM a customer's
+ * older calls/texts fall outside that window and appear "missing". Filtering by
+ * the phone's last-10 digits in the database returns that customer's full
+ * history and a much smaller payload. Digits are sanitized to a numeric string,
+ * so the ilike filter is injection-safe. */
+export async function listConversationEventsForPhone(phone: string, limit = 5000) {
+  const supabase = getAdminClient();
+
+  if (!supabase) return { ok: false as const, reason: "Supabase realtime storage is not configured", events: [] };
+
+  const digits = (phone || "").replace(/\D/g, "").slice(-10);
+  if (digits.length < 10) return { ok: true as const, events: [] };
+
+  const requested = Math.min(Math.max(Math.floor(limit), 1), 100_000);
+  const rows: Record<string, unknown>[] = [];
+  const pageSize = 1000;
+
+  for (let offset = 0; offset < requested; offset += pageSize) {
+    const pageLimit = Math.min(pageSize, requested - offset);
+    const { data, error } = await supabase
+      .from("conversation_events")
+      .select("*")
+      .or(`from_phone.ilike.%${digits}%,to_phone.ilike.%${digits}%`)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageLimit - 1);
+
+    if (error) return { ok: false as const, reason: getConversationEventsErrorMessage(error.message), events: [] };
+    rows.push(...((data || []) as Record<string, unknown>[]));
+    if (!data || data.length < pageLimit) break;
+  }
+
+  return { ok: true as const, events: rows.map(mapConversationEventRow).reverse() };
+}
+
 function getConversationEventsErrorMessage(message: string) {
   if (message.includes("conversation_events") && message.includes("schema cache")) {
     return "Call history table is missing. Run supabase/conversation-events.sql in the Supabase SQL editor.";

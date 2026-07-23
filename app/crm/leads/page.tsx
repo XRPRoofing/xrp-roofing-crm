@@ -395,7 +395,10 @@ function JobCommunications({ phone }: { phone?: string }) {
   useEffect(() => {
     if (!open || loaded) return;
     let mounted = true;
-    void listConversationEvents().then((rows) => { if (mounted) { setEvents(rows); setLoaded(true); } }).catch(() => { if (mounted) setLoaded(true); });
+    // Scope the fetch to this job's phone so the server returns the customer's
+    // complete call/text history (not just the most recent events globally,
+    // which drops older jobs' communications).
+    void listConversationEvents(5000, phone).then((rows) => { if (mounted) { setEvents(rows); setLoaded(true); } }).catch(() => { if (mounted) setLoaded(true); });
     let unsubscribe: (() => void) | undefined;
     try {
       unsubscribe = subscribeToConversationEvents((evt) => {
@@ -407,7 +410,7 @@ function JobCommunications({ phone }: { phone?: string }) {
       });
     } catch { /* realtime unavailable — static load still works */ }
     return () => { mounted = false; unsubscribe?.(); };
-  }, [open, loaded]);
+  }, [open, loaded, phone]);
 
   const target = digitsOnly(phone || "").slice(-10);
 
@@ -2711,7 +2714,7 @@ export default function LeadsPage() {
                 )}
               </div>
 
-              <JobCommunications phone={selectedJob.phone} />
+              <JobCommunications key={selectedJob.id} phone={selectedJob.phone} />
 
               <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-700"><StickyNote className="h-3.5 w-3.5" />Notes</div>
