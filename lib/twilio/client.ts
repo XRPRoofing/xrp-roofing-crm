@@ -148,8 +148,13 @@ function mapConversationEventRow(row: Record<string, unknown>): TwilioConversati
   };
 }
 
-export async function listConversationEvents(limit = 1000) {
-  const response = await fetch(`/api/twilio/events?limit=${limit}`);
+export async function listConversationEvents(limit = 1000, phone?: string) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  // When a phone is passed, the server returns that number's full history
+  // (not just the most recent events globally), so older calls/texts are
+  // never dropped for a specific customer.
+  if (phone) params.set("phone", phone);
+  const response = await fetch(`/api/twilio/events?${params.toString()}`);
   const data = await response.json().catch(() => null) as { events?: TwilioConversationEvent[]; error?: string } | null;
 
   if (!response.ok || data?.error) throw new Error(data?.error || "Unable to load saved call history");
