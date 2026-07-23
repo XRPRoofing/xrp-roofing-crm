@@ -29,7 +29,7 @@ import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
-import { listRecentProjects, listProjectPhotos, searchProjects, matchProjectByAddress, findAddressMatches, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, parseJobAddress, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
+import { listRecentProjects, listProjectPhotos, searchProjectsForJob, matchProjectByAddress, findAddressMatches, findStreetNumberCandidates, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
 import { loadDocumentsByJob, type PdfDocument } from "@/lib/pdf-signer-db";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
@@ -1009,10 +1009,9 @@ export default function LeadsPage() {
 
     setCcLoading(true);
     try {
-      // 2. Search CompanyCam by the job's street (name or address line 1).
-      const parsed = parseJobAddress(selectedJob);
-      const query = parsed.street || selectedJob.address;
-      const results = await searchProjects(query);
+      // 2. Search CompanyCam by the job's street number + full street so an
+      //    existing project is found regardless of address formatting.
+      const results = await searchProjectsForJob(selectedJob);
       const pool = dedupeProjectsById([...results, ...ccProjects]);
       const matches = findAddressMatches(selectedJob, pool);
 
@@ -1023,14 +1022,22 @@ export default function LeadsPage() {
         // 4. Multiple matches — let the user choose (never guess).
         setCcPicker({ jobId, matches, mode: "auto" });
       } else {
-        // 5. No match — create a new project and link it permanently.
-        const created = await createProjectForJob({
-          name: selectedJob.name,
-          address: selectedJob.address,
-          city: selectedJob.city,
-        });
-        if (created) await linkProjectToJob(jobId, created);
-        else setCcError("Couldn't reach CompanyCam. Check the connection and try again.");
+        // 5. No exact match. Before creating, guard against duplicating an
+        //    existing project whose address only differs in formatting: if any
+        //    project shares the job's street number, show the picker (with a
+        //    create option) instead of silently making a new folder.
+        const candidates = findStreetNumberCandidates(selectedJob, pool).slice(0, 15);
+        if (candidates.length > 0) {
+          setCcPicker({ jobId, matches: candidates, mode: "relink" });
+        } else {
+          const created = await createProjectForJob({
+            name: selectedJob.name,
+            address: selectedJob.address,
+            city: selectedJob.city,
+          });
+          if (created) await linkProjectToJob(jobId, created);
+          else setCcError("Couldn't reach CompanyCam. Check the connection and try again.");
+        }
       }
     } finally {
       setCcLoading(false);
@@ -1044,14 +1051,14 @@ export default function LeadsPage() {
     setCcError(null);
     setCcLoading(true);
     try {
-      const parsed = parseJobAddress(selectedJob);
-      const query = parsed.street || selectedJob.address;
-      const results = query ? await searchProjects(query) : [];
+      const results = selectedJob.address ? await searchProjectsForJob(selectedJob) : [];
       const pool = dedupeProjectsById([...results, ...ccProjects]).filter((p) => !p.archived);
       const exact = findAddressMatches(selectedJob, pool);
       const exactIds = new Set(exact.map((p) => p.id));
-      const others = pool.filter((p) => !exactIds.has(p.id)).slice(0, 15);
-      setCcPicker({ jobId: selectedJob.id, matches: [...exact, ...others], mode: "relink" });
+      const numberCandidates = findStreetNumberCandidates(selectedJob, pool).filter((p) => !exactIds.has(p.id));
+      const numberIds = new Set(numberCandidates.map((p) => p.id));
+      const others = pool.filter((p) => !exactIds.has(p.id) && !numberIds.has(p.id)).slice(0, 15);
+      setCcPicker({ jobId: selectedJob.id, matches: [...exact, ...numberCandidates, ...others], mode: "relink" });
     } finally {
       setCcLoading(false);
     }
