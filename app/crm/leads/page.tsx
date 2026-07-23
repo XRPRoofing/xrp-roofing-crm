@@ -281,6 +281,71 @@ const photoMetaStorageKey = "xrp-crm-photo-meta";
 function loadPhotoMeta(): PhotoMetaMap { try { return JSON.parse(localStorage.getItem(photoMetaStorageKey) || "{}"); } catch { return {}; } }
 function savePhotoMeta(meta: PhotoMetaMap) { localStorage.setItem(photoMetaStorageKey, JSON.stringify(meta)); }
 
+// Row descriptor for the Job Card "Activity History" file/photo section.
+type JobFileActivityRow = { id: string; createdAt: string; uploadedBy: string; badge: string; text: string };
+
+// Collapse the Job Card Activity History so a batch of photos uploaded in the
+// same session becomes ONE "Uploaded N photos" row instead of one row per photo.
+// Documents (name prefixed "Document - ") and single photos keep their own row.
+// Photos are grouped by uploader + photo type, bucketed to the minute (a single
+// upload batch shares a near-identical timestamp). Purely a display change — no
+// photos or files are altered, deleted, or reordered in storage.
+function groupJobFileActivities(files: JobPhoto[]): JobFileActivityRow[] {
+  const documents: JobPhoto[] = [];
+  const photos: JobPhoto[] = [];
+  for (const file of files) {
+    if (file.name.startsWith("Document - ")) documents.push(file);
+    else photos.push(file);
+  }
+
+  const rows: JobFileActivityRow[] = [];
+
+  for (const doc of documents) {
+    rows.push({
+      id: doc.id,
+      createdAt: doc.createdAt,
+      uploadedBy: doc.uploadedBy || "Unknown",
+      badge: doc.photoType || "File",
+      text: doc.name.replace("Document - ", "Uploaded document: "),
+    });
+  }
+
+  const groups = new Map<string, JobPhoto[]>();
+  for (const photo of photos) {
+    const minuteBucket = (photo.createdAt || "").slice(0, 16); // YYYY-MM-DDTHH:mm
+    const key = `${photo.uploadedBy}|${photo.photoType}|${minuteBucket}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(photo);
+    else groups.set(key, [photo]);
+  }
+
+  for (const group of groups.values()) {
+    const first = group[0];
+    const badge = first.photoType || "File";
+    if (group.length === 1) {
+      rows.push({
+        id: first.id,
+        createdAt: first.createdAt,
+        uploadedBy: first.uploadedBy || "Unknown",
+        badge,
+        text: `Uploaded photo: ${first.name}`,
+      });
+    } else {
+      const typeLabel = first.photoType && first.photoType !== "Job Photo" ? `${first.photoType} photo` : "photo";
+      const latest = group.reduce((max, p) => (p.createdAt > max ? p.createdAt : max), first.createdAt);
+      rows.push({
+        id: `photos-${first.uploadedBy}-${first.photoType}-${(first.createdAt || "").slice(0, 16)}`,
+        createdAt: latest,
+        uploadedBy: first.uploadedBy || "Unknown",
+        badge,
+        text: `Uploaded ${group.length} ${typeLabel}s`,
+      });
+    }
+  }
+
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelete }: {
   photos: JobPhoto[];
   initialIndex: number;
@@ -2457,17 +2522,17 @@ export default function LeadsPage() {
                         );
                       })}
 
-                      {/* File / photo activities */}
-                      {[...jobFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((file) => (
-                        <div key={file.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
-                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-black text-orange-700">{file.uploadedBy ? file.uploadedBy.charAt(0).toUpperCase() : "?"}</div>
+                      {/* File / photo activities — photo batches collapsed into one summary row */}
+                      {groupJobFileActivities(jobFiles).map((row) => (
+                        <div key={row.id} className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-black text-orange-700">{row.uploadedBy ? row.uploadedBy.charAt(0).toUpperCase() : "?"}</div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-gray-900">{file.uploadedBy || "Unknown"}</span>
-                              <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-600">{file.photoType || "File"}</span>
+                              <span className="text-sm font-bold text-gray-900">{row.uploadedBy}</span>
+                              <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-600">{row.badge}</span>
                             </div>
-                            <p className="mt-0.5 text-sm font-semibold text-gray-700">{file.name.startsWith("Document - ") ? file.name.replace("Document - ", "Uploaded document: ") : `Uploaded photo: ${file.name}`}</p>
-                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{azDateTime(file.createdAt)}</p>
+                            <p className="mt-0.5 text-sm font-semibold text-gray-700">{row.text}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-gray-400">{azDateTime(row.createdAt)}</p>
                           </div>
                         </div>
                       ))}
