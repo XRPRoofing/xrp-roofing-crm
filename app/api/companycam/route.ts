@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
   if (action === "search") {
     const q = req.nextUrl.searchParams.get("q") || "";
     if (!q) return NextResponse.json([]);
-    return ccFetch(`/projects?query=${encodeURIComponent(q)}&per_page=20`);
+    return ccFetch(`/projects?query=${encodeURIComponent(q)}&per_page=100`);
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
