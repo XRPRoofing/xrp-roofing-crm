@@ -82,6 +82,20 @@ export async function listProjects(page = 1): Promise<CompanyCamProject[]> {
   }
 }
 
+/**
+ * Fetch several pages of projects (most-recent first) so address matching has a
+ * wide enough pool. Stops early when a page comes back short.
+ */
+export async function listRecentProjects(maxPages = 3): Promise<CompanyCamProject[]> {
+  const all: CompanyCamProject[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const batch = await listProjects(page);
+    all.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return all;
+}
+
 export async function listProjectPhotos(projectId: string, page = 1): Promise<CompanyCamPhoto[]> {
   try {
     return await ccGet<CompanyCamPhoto[]>({ action: "photos", projectId, page: String(page), per_page: "50" });
@@ -255,6 +269,53 @@ export function findExactAddressMatches(
     if (parsed.city && addr.city && normStreet(parsed.city) !== normStreet(addr.city)) return false;
     if (parsed.zip && addr.postal_code && parsed.zip !== addr.postal_code) return false;
     return true;
+  });
+}
+
+/**
+ * Loose street comparison used to recognize an existing project even when its
+ * address is only in the project NAME (common for crew-made projects) or is
+ * formatted differently ("W" vs "West", "Ave" vs "Avenue", punctuation). Uses
+ * `normalizeAddress` (strips directionals/suffixes/punctuation) and requires the
+ * street NUMBER to appear plus at least one street-name word to overlap.
+ */
+function streetLikeMatch(jobStreet: string, candidate: string | null | undefined): boolean {
+  const normJob = normalizeAddress(jobStreet);
+  const normCand = normalizeAddress(candidate || "");
+  if (!normJob || !normCand) return false;
+  const jobTokens = normJob.split(" ").filter(Boolean);
+  const candTokens = normCand.split(" ").filter(Boolean);
+  if (jobTokens.length < 2 || candTokens.length < 1) return false;
+  const jobNumber = jobTokens[0];
+  if (!candTokens.includes(jobNumber)) return false;
+  const candSet = new Set(candTokens);
+  return jobTokens.slice(1).some((token) => candSet.has(token));
+}
+
+/**
+ * Return non-archived CompanyCam projects that match a job's address, checking
+ * BOTH the structured address and the project name so existing crew-made
+ * projects are found instead of creating an empty duplicate. City/ZIP are used
+ * as a guard only when the project exposes a structured address for them.
+ * 1 match → auto-link, >1 → picker, 0 → create (last resort).
+ */
+export function findAddressMatches(
+  job: { address: string; city?: string },
+  projects: CompanyCamProject[],
+): CompanyCamProject[] {
+  const parsed = parseJobAddress(job);
+  const jobStreet = parsed.street;
+  if (!normStreet(jobStreet)) return [];
+
+  return projects.filter((project) => {
+    if (project.archived) return false;
+    const addr = project.address;
+    if (addr && streetLikeMatch(jobStreet, addr.street_address_1)) {
+      if (parsed.city && addr.city && normStreet(parsed.city) !== normStreet(addr.city)) return false;
+      if (parsed.zip && addr.postal_code && parsed.zip !== addr.postal_code) return false;
+      return true;
+    }
+    return streetLikeMatch(jobStreet, project.name);
   });
 }
 

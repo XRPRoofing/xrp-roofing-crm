@@ -29,7 +29,7 @@ import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
-import { listProjects, listProjectPhotos, searchProjects, matchProjectByAddress, findExactAddressMatches, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, parseJobAddress, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
+import { listRecentProjects, listProjectPhotos, searchProjects, matchProjectByAddress, findAddressMatches, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, parseJobAddress, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
 import { loadDocumentsByJob, type PdfDocument } from "@/lib/pdf-signer-db";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
@@ -878,7 +878,7 @@ export default function LeadsPage() {
 
   // Load CompanyCam projects + the persisted job→project link map once.
   useEffect(() => {
-    listProjects().then(setCcProjects).catch(() => {});
+    listRecentProjects().then(setCcProjects).catch(() => {});
     loadJobLinks().then(setCcLinks).catch(() => {});
   }, []);
 
@@ -1009,19 +1009,19 @@ export default function LeadsPage() {
 
     setCcLoading(true);
     try {
-      // 2. Search CompanyCam by the job's exact address.
+      // 2. Search CompanyCam by the job's street (name or address line 1).
       const parsed = parseJobAddress(selectedJob);
-      const query = [parsed.street, parsed.city].filter(Boolean).join(" ") || selectedJob.address;
+      const query = parsed.street || selectedJob.address;
       const results = await searchProjects(query);
       const pool = dedupeProjectsById([...results, ...ccProjects]);
-      const exact = findExactAddressMatches(selectedJob, pool);
+      const matches = findAddressMatches(selectedJob, pool);
 
-      if (exact.length === 1) {
-        // 3. One exact match — auto-link and open.
-        await linkProjectToJob(jobId, exact[0]);
-      } else if (exact.length > 1) {
-        // 4. Multiple matches — let the user choose.
-        setCcPicker({ jobId, matches: exact, mode: "auto" });
+      if (matches.length === 1) {
+        // 3. One match — auto-link the existing project and open.
+        await linkProjectToJob(jobId, matches[0]);
+      } else if (matches.length > 1) {
+        // 4. Multiple matches — let the user choose (never guess).
+        setCcPicker({ jobId, matches, mode: "auto" });
       } else {
         // 5. No match — create a new project and link it permanently.
         const created = await createProjectForJob({
@@ -1045,10 +1045,10 @@ export default function LeadsPage() {
     setCcLoading(true);
     try {
       const parsed = parseJobAddress(selectedJob);
-      const query = [parsed.street, parsed.city].filter(Boolean).join(" ") || selectedJob.address;
+      const query = parsed.street || selectedJob.address;
       const results = query ? await searchProjects(query) : [];
       const pool = dedupeProjectsById([...results, ...ccProjects]).filter((p) => !p.archived);
-      const exact = findExactAddressMatches(selectedJob, pool);
+      const exact = findAddressMatches(selectedJob, pool);
       const exactIds = new Set(exact.map((p) => p.id));
       const others = pool.filter((p) => !exactIds.has(p.id)).slice(0, 15);
       setCcPicker({ jobId: selectedJob.id, matches: [...exact, ...others], mode: "relink" });
