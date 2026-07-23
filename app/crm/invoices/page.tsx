@@ -26,7 +26,7 @@ import { PhoneLink, EmailLink, AddressLink } from "@/components/ContactLinks";
 import QuickSmsModal from "@/components/crm/QuickSmsModal";
 import type { Customer } from "@/types/crm";
 import { logCrewActivity } from "@/lib/crew-activity";
-import { getNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
+import { allocateNextUnifiedNumber, ensureCounterAtLeast, parseUnifiedNumber, syncCounterFromDatabase } from "@/lib/unified-numbering";
 import type { OfficeTask } from "@/lib/office-tasks";
 import { readOfficeTasks, syncInvoiceStatusToTask } from "@/lib/office-tasks";
 import { upsertTaskToSupabase } from "@/lib/task-sync";
@@ -327,15 +327,13 @@ function getComputedStatus(invoice: Invoice): InvoiceStatus {
   return invoice.status === "Pending" || invoice.status === "Due Soon" || invoice.status === "Overdue" ? invoice.status : "Pending";
 }
 
-function createInvoiceNumber(_count?: number) {
-  const num = getNextUnifiedNumber();
-  return `#${num}`;
-}
-
-function createBlankInvoice(count: number): Invoice {
+function createBlankInvoice(_count?: number): Invoice {
   return {
     id: "",
-    invoiceNumber: createInvoiceNumber(count),
+    // Number is left blank on purpose and allocated only when the invoice is
+    // actually saved (see handleCreateInvoice) so opening/resetting the form
+    // never consumes a number and creates gaps.
+    invoiceNumber: "",
     clientName: "",
     email: "",
     phone: "",
@@ -380,7 +378,9 @@ function createInvoiceFromProposal(proposal: StoredProposal, count: number): Inv
   const selectedPackage = getProposalSelectedPackage(proposal);
   const job = proposal.job;
   const base = createBlankInvoice(count);
-  const invoiceNumber = proposal.proposalNumber ? `#${proposal.proposalNumber}` : base.invoiceNumber;
+  // Reuse the proposal's number so the customer sees one consistent reference;
+  // if the proposal has none, leave blank and allocate at save.
+  const invoiceNumber = proposal.proposalNumber ? `#${proposal.proposalNumber}` : "";
 
   return {
     ...base,
@@ -668,7 +668,7 @@ export default function InvoicesPage() {
   const [smsTarget, setSmsTarget] = useState<{ phone: string; name?: string } | null>(null);
   const [createForm, setCreateForm] = useState<Invoice>({
     id: "",
-    invoiceNumber: createInvoiceNumber(invoices.length),
+    invoiceNumber: "",
     clientName: "",
     email: "",
     phone: "",
@@ -1118,11 +1118,15 @@ export default function InvoicesPage() {
     }
   }
 
-  function handleCreateInvoice() {
+  async function handleCreateInvoice() {
+    // Reuse an existing number (e.g. from a won proposal); otherwise allocate a
+    // fresh one atomically at this deliberate "Create" action — never on render.
+    const existing = createForm.invoiceNumber?.trim();
+    const invoiceNumber = existing ? existing : `#${await allocateNextUnifiedNumber()}`;
     const invoice: Invoice = {
       ...createForm,
       id: `inv-${Date.now()}`,
-      invoiceNumber: createInvoiceNumber(invoices.length),
+      invoiceNumber,
       status: getComputedStatus(createForm),
       activity: ["Invoice created"],
     };
@@ -2446,7 +2450,7 @@ ${reference ? `<tr><td>Reference / Check #</td><td>${reference}</td></tr>` : ""}
             <div className="flex items-center justify-between border-b border-gray-200 p-4 sm:p-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-600">New invoice</p>
-                <h2 className="mt-0.5 text-xl font-bold text-blue-700 sm:text-2xl">{createForm.invoiceNumber}</h2>
+                <h2 className="mt-0.5 text-xl font-bold text-blue-700 sm:text-2xl">{createForm.invoiceNumber || "Number assigned on save"}</h2>
               </div>
               <button onClick={() => setShowCreateModal(false)} className="rounded-lg px-2 text-2xl leading-none text-gray-500 hover:bg-gray-100">×</button>
             </div>
