@@ -12,9 +12,39 @@ NEXT_PUBLIC_TEST_BYPASS_AUTH=1
 NEXT_PUBLIC_TEST_FORCE_LOCAL=1
 ```
 - `TEST_BYPASS_AUTH` skips login so you land directly in the CRM.
-- `TEST_FORCE_LOCAL` runs in "Local mode" — data (jobs, customers, draft invoices, crew photos) is stored in the browser's localStorage instead of Supabase. The header shows a "Local mode (configure Supabase for live sync)" banner.
+- `TEST_FORCE_LOCAL` is *intended* to run in "Local mode" (data in localStorage, not Supabase).
 
 Start with `npm run dev` (serves on http://localhost:3000). Maximize the browser before recording.
+
+### IMPORTANT: `TEST_FORCE_LOCAL` may not actually force local mode
+As of this writing, `TEST_FORCE_LOCAL` is **not wired into `hasSupabaseConfig()`** (`lib/supabase/client.ts`). `hasSupabaseConfig()` only checks that a URL + anon key resolve — and both have hardcoded fallbacks (`lib/supabase/url.ts` falls back to the **production** Supabase URL, and the anon key has a literal fallback). So with an empty `.env.local` the app thinks Supabase is configured and tries to read **production** (fails with 401/503, board shows built-in sample data, not your seed). Verify which mode you're in before trusting results — if you see network calls to a `*.supabase.co` host, you are NOT isolated.
+
+Two ways to get true local isolation for a test session (both **temporary, revert before merge**):
+1. **Force-local + stub (used successfully for CompanyCam testing).** Make `hasSupabaseConfig()` return `false` when `NEXT_PUBLIC_TEST_FORCE_LOCAL==='1'`. This alone crashes `CrmShell` because several callers call `createClient()` **without** guarding on `hasSupabaseConfig()` — notably `lib/twilio/client.ts` (`ensureCallSignalChannel`, `subscribeToConversationEvents`, `subscribeToConversationReadStates`, presence). Fix by ALSO making `createClient()` return a harmless stub in force-local mode instead of throwing:
+   ```ts
+   // lib/supabase/client.ts (TEMP TEST)
+   export function hasSupabaseConfig() {
+     if (process.env.NEXT_PUBLIC_TEST_FORCE_LOCAL === "1") return false;
+     return Boolean(supabaseUrl && supabaseAnonKey);
+   }
+   // inside createClient(), when !hasSupabaseConfig() and force-local:
+   const channel = { on: () => channel, subscribe: () => channel, unsubscribe: () => {}, send: () => {} };
+   return { channel: () => channel, removeChannel: () => {},
+            auth: { getSession: async () => ({ data: { session: null }, error: null }) } } as any;
+   ```
+   Data-read/write paths (jobs, customers, invoices, proposals) already early-return to localStorage when `!hasSupabaseConfig()`, so only realtime/auth callers hit the stub. After this, seed data via localStorage and reload.
+2. **Point at the local mock Supabase** (`node /home/ubuntu/mock-supabase/server.js` on :5599) by setting `NEXT_PUBLIC_SUPABASE_URL=http://localhost:5599`. `createClient()` then works everywhere (realtime just fails to connect, non-fatally), but the mock must implement every table the screen queries (e.g. `jobs`, `job_photos`, `job_notes`, `job_checklist_items` for the Jobs board) or the board is empty. Only worth it when you need real Supabase query semantics.
+
+Restart `npm run dev` after editing client code / env. After ANY of these temp edits, `git checkout --` the touched files before finalizing and confirm `git show HEAD:<file> | grep -c CC_MOCK` (etc.) is 0 so nothing leaks into the feature PR.
+
+### Chrome relaunch (if it crashes mid-test)
+The pre-launched Chrome exposes CDP on port 29229; `/home/ubuntu/.local/bin/google-chrome` is only a CDP *helper* (opens a URL in the already-running browser), NOT a launcher. If Chrome dies, relaunch the real binary in a **persistent** shell (a one-shot `nohup`/`setsid` from the exec tool often dies immediately):
+```
+DISPLAY=:0 /opt/.devin/chrome/chrome/linux-*/chrome-linux64/chrome \
+  --remote-debugging-port=29229 --user-data-dir=/home/ubuntu/.config/google-chrome-for-testing \
+  --no-first-run --start-maximized "http://localhost:3000/crm/leads"
+```
+dbus errors in the log are harmless; wait for "DevTools listening on ws://...29229". Seed localStorage via DevTools console after relaunch (a fresh launch may show built-in sample jobs until you re-seed).
 
 ## Twilio Call Flow Testing
 
@@ -131,6 +161,25 @@ To test proposal preview features:
    ```
 3. **Preview mode**: Click the "Preview" button in the toolbar to see the rendered proposal.
 4. **Collapsible scope**: Packages with >2 scope items show `max-h-32` CSS clip with fade gradient and "See full scope of work" button. Packages with ≤2 items show no button/gradient. Each package expands/collapses independently.
+
+## CompanyCam Job linking (Job Card "Open CompanyCam")
+Jobs Board is `/crm/leads` (`app/crm/leads/page.tsx`). Open a job row → right panel → "Job Photos" card → green button. Flow: saved link → exact address search (street/city/ZIP) → 1 match auto-links, >1 shows a picker, 0 creates+links. Link is persisted per-job in `app_integrations` (row `companycam_job_links`) via `/api/companycam/links` (GET/POST/DELETE) — no `jobs` schema change. Button label: `ccLoading?"Opening...":ccLinkedProject?"Open CompanyCam":"Link & Open"`.
+
+### Mock CompanyCam without a real token (temporary, revert before merge)
+Gate the proxy `app/api/companycam/route.ts` and `app/api/companycam/links/route.ts` on `process.env.CC_MOCK==="1"`: return canned projects for `action=status|projects|search`, append a `cc-created-N` for `create_project`, and keep an in-memory `globalThis.__ccLinks` map for the links GET/POST/DELETE (remember to make **GET** return the mock map too, else saved links vanish on reload). No real `COMPANYCAM_API_TOKEN` needed.
+
+### Seeding jobs with controlled addresses
+Seed `localStorage['xrp-crm-jobs-board']` with an array of jobs `{id,name,email,phone,address,city,stage:'new_lead',value,assignedTo,roofType,source,lastActivity,nextAction,dueDate}`. Use one address with exactly one mock match, one with two (→ picker), one with none (→ create). Reload after seeding.
+
+### High-signal evidence (beyond the UI)
+Curl the mock to prove behavior objectively:
+- `curl -s localhost:3000/api/companycam?action=projects | <count>` before/after — count unchanged = matched existing (no duplicate); +1 = created.
+- `curl -s localhost:3000/api/companycam/links` — confirms which `projectId` a job linked to (e.g. picking "Option B" must link `cc-3`, not `cc-2`).
+- Saved-link fast path: `tail` the dev-server log across the click and confirm **no** `action=search` request fired.
+Clicking a linked project opens `app.companycam.com/projects/<id>`, which redirects to CompanyCam sign-in for mock IDs — expected, confirms the URL opened.
+
+### Known correctness note
+`findExactAddressMatches` (`lib/companycam.ts`) matches street+city+ZIP but does **not** compare state independently (state is AZ-locked via `parseJobAddress`). Fine for a single-state business; might need a state check if the business ever spans states. Can't be exercised with AZ-only mock data.
 
 ## Crew camera / photo upload
 The camera + Before/Progress/After photo sections exist in TWO places (share the same handler logic):
