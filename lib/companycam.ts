@@ -113,6 +113,65 @@ export async function searchProjects(query: string): Promise<CompanyCamProject[]
 }
 
 /**
+ * Search CompanyCam for projects that might belong to a job, using several
+ * formatting-agnostic query variants and unioning the results.
+ *
+ * CompanyCam's `query` param does a *substring* match on project name / address
+ * line 1, so a single query of the full street ("8548 W Carol Ave") misses a
+ * project formatted differently ("8548 West Carol Avenue", "8548 W. Carol Ave.",
+ * or "8548 Carol Ave - Gerkensmeyer"). Searching the street NUMBER alone is the
+ * most robust across those variants, so we query the number, the full street,
+ * and the raw address, then dedupe by id. Precise filtering still happens in
+ * `findAddressMatches`, so widening the search here cannot create false links.
+ */
+export async function searchProjectsForJob(job: {
+  address: string;
+  city?: string;
+}): Promise<CompanyCamProject[]> {
+  const parsed = parseJobAddress(job);
+  const street = parsed.street || job.address || "";
+  const streetNumber = street.trim().split(/\s+/)[0] || "";
+  const queries = Array.from(
+    new Set(
+      [streetNumber, street, job.address]
+        .map((q) => (q || "").trim())
+        .filter((q) => q.length >= 2),
+    ),
+  );
+  const batches = await Promise.all(queries.map((q) => searchProjects(q)));
+  const seen = new Set<string>();
+  const out: CompanyCamProject[] = [];
+  for (const project of batches.flat()) {
+    if (seen.has(project.id)) continue;
+    seen.add(project.id);
+    out.push(project);
+  }
+  return out;
+}
+
+/**
+ * Loose guard used to AVOID silently creating a duplicate: returns non-archived
+ * projects whose name or structured street address contains the job's street
+ * NUMBER as a whole word. Broader than `findAddressMatches` (no street-name
+ * token required) — used only to decide "show a picker" vs. "create new" so a
+ * plausible existing project is never bypassed by a formatting difference.
+ */
+export function findStreetNumberCandidates(
+  job: { address: string; city?: string },
+  projects: CompanyCamProject[],
+): CompanyCamProject[] {
+  const parsed = parseJobAddress(job);
+  const streetNumber = (parsed.street.trim().split(/\s+/)[0] || "").trim();
+  if (!/^\d+$/.test(streetNumber)) return [];
+  const wordRe = new RegExp(`(?:^|\\D)${streetNumber}(?:\\D|$)`);
+  return projects.filter((project) => {
+    if (project.archived) return false;
+    const haystack = `${project.name || ""} ${project.address?.street_address_1 || ""}`;
+    return wordRe.test(haystack);
+  });
+}
+
+/**
  * Create a new CompanyCam project from CRM job data.
  */
 export async function createProject(opts: {
