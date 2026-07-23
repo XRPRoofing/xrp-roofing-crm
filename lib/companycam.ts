@@ -147,6 +147,131 @@ export async function ensureProjectForJob(job: {
   return created;
 }
 
+// ── Persistent job → project links ───────────────────────────────────────────
+
+export type CompanyCamJobLink = {
+  projectId: string;
+  projectUrl: string;
+  address: string;
+  linkedAt: string;
+};
+
+/** Load the full { jobId -> link } map (shared across all devices/users). */
+export async function loadJobLinks(): Promise<Record<string, CompanyCamJobLink>> {
+  try {
+    const res = await fetch("/api/companycam/links", { cache: "no-store" });
+    if (!res.ok) return {};
+    const data = (await res.json()) as { links?: Record<string, CompanyCamJobLink> };
+    return data.links || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Permanently link a CompanyCam project to a job. */
+export async function saveJobLink(
+  jobId: string,
+  project: CompanyCamProject,
+): Promise<boolean> {
+  try {
+    const res = await fetch("/api/companycam/links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jobId,
+        projectId: project.id,
+        projectUrl: project.project_url,
+        address: project.address?.street_address_1 || "",
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Remove the saved link for a job. */
+export async function removeJobLink(jobId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/companycam/links?jobId=${encodeURIComponent(jobId)}`, {
+      method: "DELETE",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Exact address matching (search-first workflow) ───────────────────────────
+
+export type ParsedJobAddress = {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+};
+
+/**
+ * Parse a CRM job's free-form address + city into components. The CRM stores
+ * `address` (often "123 Main St, Phoenix, AZ 85003" or just the street) and a
+ * separate `city`; state is Arizona-locked for this business.
+ */
+export function parseJobAddress(job: { address: string; city?: string }): ParsedJobAddress {
+  const raw = (job.address || "").trim();
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  const zip = raw.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "";
+  const state = raw.match(/\b([A-Z]{2})\b/)?.[1] || "AZ";
+  let city = (job.city || "").trim();
+  if (!city && parts.length >= 2) city = parts[1].replace(/\b[A-Z]{2}\b.*$/, "").trim();
+  return { street: parts[0] || raw, city, state, zip };
+}
+
+function normStreet(value: string | null | undefined): string {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[.,#]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Return CompanyCam projects whose address is an EXACT match for the job:
+ * the street must match exactly, and city/ZIP must match whenever both sides
+ * provide them. Used to decide auto-link (1 match) vs. picker (>1) vs. create.
+ */
+export function findExactAddressMatches(
+  job: { address: string; city?: string },
+  projects: CompanyCamProject[],
+): CompanyCamProject[] {
+  const parsed = parseJobAddress(job);
+  const jobStreet = normStreet(parsed.street);
+  if (!jobStreet) return [];
+
+  return projects.filter((project) => {
+    if (project.archived) return false;
+    const addr = project.address;
+    if (!addr) return false;
+    if (normStreet(addr.street_address_1) !== jobStreet) return false;
+    if (parsed.city && addr.city && normStreet(parsed.city) !== normStreet(addr.city)) return false;
+    if (parsed.zip && addr.postal_code && parsed.zip !== addr.postal_code) return false;
+    return true;
+  });
+}
+
+/** Create a CompanyCam project for a job using customer name + parsed address. */
+export async function createProjectForJob(job: {
+  name: string;
+  address: string;
+  city?: string;
+}): Promise<CompanyCamProject | null> {
+  const parsed = parseJobAddress(job);
+  const projectName = [job.name, parsed.street].filter(Boolean).join(" — ") || "Untitled Project";
+  return createProject({
+    name: projectName,
+    address: { street: parsed.street, city: parsed.city, state: parsed.state, zip: parsed.zip },
+  });
+}
+
 // ── Address matching ─────────────────────────────────────────────────────────
 
 function normalizeAddress(addr: string): string {

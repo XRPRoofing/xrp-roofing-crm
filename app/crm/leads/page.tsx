@@ -29,7 +29,7 @@ import { useSaveToast } from "@/components/crm/SaveToast";
 import { handlePhoneChange } from "@/lib/format-phone";
 import { AiWriteButton } from "@/components/crm/AiWritingAssistant";
 import { useAiRecordContext } from "@/components/crm/AiChatContext";
-import { listProjects, listProjectPhotos, matchProjectByAddress, ensureProjectForJob, type CompanyCamProject, type CompanyCamPhoto } from "@/lib/companycam";
+import { listProjects, listProjectPhotos, searchProjects, matchProjectByAddress, findExactAddressMatches, createProjectForJob, loadJobLinks, saveJobLink, removeJobLink, parseJobAddress, type CompanyCamProject, type CompanyCamPhoto, type CompanyCamJobLink } from "@/lib/companycam";
 import { loadDocumentsByJob, type PdfDocument } from "@/lib/pdf-signer-db";
 
 type ProposalSnap = { id: string; proposalNumber?: string; job?: { id?: string }; status: string; customerName?: string; address?: string; deletedAt?: string };
@@ -554,6 +554,46 @@ function PhotoLightbox({ photos, initialIndex, onClose, onSaveAnnotated, onDelet
   );
 }
 
+// Build a minimal CompanyCamProject from a saved link so the UI can render the
+// linked project's header/photos even before the full project list has loaded.
+function linkToStubProject(link: CompanyCamJobLink): CompanyCamProject {
+  return {
+    id: link.projectId,
+    company_id: "",
+    creator_name: "",
+    status: "",
+    archived: false,
+    name: null,
+    address: {
+      street_address_1: link.address || null,
+      street_address_2: null,
+      city: null,
+      state: null,
+      postal_code: null,
+      country: null,
+    },
+    feature_image: [],
+    slug: "",
+    project_url: link.projectUrl,
+    public_url: link.projectUrl,
+    photo_count: 0,
+    notepad: null,
+    created_at: 0,
+    updated_at: 0,
+  };
+}
+
+function dedupeProjectsById(projects: CompanyCamProject[]): CompanyCamProject[] {
+  const seen = new Set<string>();
+  const out: CompanyCamProject[] = [];
+  for (const project of projects) {
+    if (seen.has(project.id)) continue;
+    seen.add(project.id);
+    out.push(project);
+  }
+  return out;
+}
+
 export default function LeadsPage() {
   const { showSaveToast, SaveToastUI } = useSaveToast();
   const [jobs, setJobs] = useState<Lead[]>([]);
@@ -581,6 +621,12 @@ export default function LeadsPage() {
   const [ccPhotos, setCcPhotos] = useState<CompanyCamPhoto[]>([]);
   const [ccMatchedProject, setCcMatchedProject] = useState<CompanyCamProject | null>(null);
   const [ccLoading, setCcLoading] = useState(false);
+  // Persisted { jobId -> linked CompanyCam project } map (shared across devices).
+  const [ccLinks, setCcLinks] = useState<Record<string, CompanyCamJobLink>>({});
+  // When an "Open CompanyCam" address search returns >1 exact match, show a
+  // picker instead of guessing.
+  const [ccPicker, setCcPicker] = useState<{ jobId: string; matches: CompanyCamProject[]; mode: "auto" | "relink" } | null>(null);
+  const [ccError, setCcError] = useState<string | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [photoChecklist, setPhotoChecklist] = useState<Record<string, boolean>>({});
   const [noteToast, setNoteToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -799,9 +845,10 @@ export default function LeadsPage() {
     return () => { mounted = false; };
   }, [selectedJobId]);
 
-  // Load CompanyCam projects once
+  // Load CompanyCam projects + the persisted job→project link map once.
   useEffect(() => {
     listProjects().then(setCcProjects).catch(() => {});
+    loadJobLinks().then(setCcLinks).catch(() => {});
   }, []);
 
   // Sync CompanyCam photos into CRM storage (avoid duplicates by checking existing file names)
@@ -842,52 +889,176 @@ export default function LeadsPage() {
     }
   };
 
-  // Match CompanyCam project when selected job changes (match existing, don't auto-create yet)
+  // A saved link exists for the currently-open job.
+  const ccLinkedProject = selectedJob ? ccLinks[selectedJob.id] : undefined;
+
+  const loadProjectPhotosInto = useCallback((jobId: string, projectId: string) => {
+    setCcLoading(true);
+    listProjectPhotos(projectId)
+      .then((photos) => {
+        if (selectedJobIdRef.current !== jobId) return;
+        setCcPhotos(photos);
+        if (photos.length > 0) void syncCcPhotosToCrm(jobId, photos);
+      })
+      .catch(() => {})
+      .finally(() => setCcLoading(false));
+  }, []);
+
+  // When the open job changes, show its photos: the permanently-linked project
+  // if one is saved, otherwise a display-only fuzzy suggestion (opening still
+  // runs the search-first workflow, so a suggestion is never opened blindly).
   useEffect(() => {
     setCcPhotos([]);
     setCcMatchedProject(null);
-    if (!selectedJob || !selectedJob.address) return;
-    if (ccProjects.length === 0) return;
-    const matched = matchProjectByAddress(selectedJob.address, ccProjects);
-    if (matched) {
-      setCcMatchedProject(matched);
-      setCcLoading(true);
-      listProjectPhotos(matched.id)
-        .then((photos) => {
-          setCcPhotos(photos);
-          if (selectedJob.id && photos.length > 0) {
-            void syncCcPhotosToCrm(selectedJob.id, photos);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setCcLoading(false));
-    }
-  }, [selectedJobId, ccProjects.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Open CompanyCam: find existing project or auto-create one, then open in new tab
-  const openCompanyCam = async () => {
+    setCcError(null);
+    setCcPicker(null);
     if (!selectedJob) return;
-    // Already matched — open directly
-    if (ccMatchedProject) {
-      window.open(ccMatchedProject.project_url, "_blank");
+
+    const link = ccLinks[selectedJob.id];
+    if (link) {
+      const project =
+        ccProjects.find((p) => p.id === link.projectId) || linkToStubProject(link);
+      setCcMatchedProject(project);
+      loadProjectPhotosInto(selectedJob.id, link.projectId);
       return;
     }
-    // Ensure project exists (match or create)
-    setCcLoading(true);
-    const project = await ensureProjectForJob(
-      { address: selectedJob.address, city: selectedJob.city, name: selectedJob.name },
-      ccProjects
-    );
-    if (project) {
-      setCcMatchedProject(project);
-      setCcProjects((prev) => [...prev, project]);
-      listProjectPhotos(project.id).then((photos) => {
-        setCcPhotos(photos);
-        if (photos.length > 0) void syncCcPhotosToCrm(selectedJob.id, photos);
-      }).catch(() => {});
-      window.open(project.project_url, "_blank");
+
+    if (!selectedJob.address || ccProjects.length === 0) return;
+    const suggestion = matchProjectByAddress(selectedJob.address, ccProjects);
+    if (suggestion) {
+      setCcMatchedProject(suggestion);
+      loadProjectPhotosInto(selectedJob.id, suggestion.id);
     }
-    setCcLoading(false);
+  }, [selectedJobId, ccProjects.length, ccLinks, loadProjectPhotosInto]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Permanently link a project to a job (persist + local state), optionally open it.
+  const linkProjectToJob = async (
+    jobId: string,
+    project: CompanyCamProject,
+    { open = true }: { open?: boolean } = {},
+  ) => {
+    setCcProjects((prev) => (prev.some((p) => p.id === project.id) ? prev : [...prev, project]));
+    setCcLinks((prev) => ({
+      ...prev,
+      [jobId]: {
+        projectId: project.id,
+        projectUrl: project.project_url,
+        address: project.address?.street_address_1 || "",
+        linkedAt: new Date().toISOString(),
+      },
+    }));
+    if (jobId === selectedJobIdRef.current) {
+      setCcMatchedProject(project);
+      loadProjectPhotosInto(jobId, project.id);
+    }
+    if (open && project.project_url) window.open(project.project_url, "_blank");
+    const ok = await saveJobLink(jobId, project);
+    if (!ok) setCcError("Project opened, but saving the link failed — it will retry next time.");
+  };
+
+  // Open CompanyCam for the current job following the address-search-first flow:
+  // saved link → exact address match (1 = link, >1 = pick) → create + link.
+  const openCompanyCam = async () => {
+    if (!selectedJob) return;
+    const jobId = selectedJob.id;
+    setCcError(null);
+
+    // 1. Already linked — open the saved project instantly.
+    const existing = ccLinks[jobId];
+    if (existing) {
+      const url = existing.projectUrl || ccProjects.find((p) => p.id === existing.projectId)?.project_url;
+      if (url) window.open(url, "_blank");
+      return;
+    }
+
+    if (!selectedJob.address) {
+      setCcError("Add a job address first, then link CompanyCam.");
+      return;
+    }
+
+    setCcLoading(true);
+    try {
+      // 2. Search CompanyCam by the job's exact address.
+      const parsed = parseJobAddress(selectedJob);
+      const query = [parsed.street, parsed.city].filter(Boolean).join(" ") || selectedJob.address;
+      const results = await searchProjects(query);
+      const pool = dedupeProjectsById([...results, ...ccProjects]);
+      const exact = findExactAddressMatches(selectedJob, pool);
+
+      if (exact.length === 1) {
+        // 3. One exact match — auto-link and open.
+        await linkProjectToJob(jobId, exact[0]);
+      } else if (exact.length > 1) {
+        // 4. Multiple matches — let the user choose.
+        setCcPicker({ jobId, matches: exact, mode: "auto" });
+      } else {
+        // 5. No match — create a new project and link it permanently.
+        const created = await createProjectForJob({
+          name: selectedJob.name,
+          address: selectedJob.address,
+          city: selectedJob.city,
+        });
+        if (created) await linkProjectToJob(jobId, created);
+        else setCcError("Couldn't reach CompanyCam. Check the connection and try again.");
+      }
+    } finally {
+      setCcLoading(false);
+    }
+  };
+
+  // Admin: search for candidate projects and show the picker so the linked
+  // project can be changed / relinked.
+  const startRelink = async () => {
+    if (!selectedJob) return;
+    setCcError(null);
+    setCcLoading(true);
+    try {
+      const parsed = parseJobAddress(selectedJob);
+      const query = [parsed.street, parsed.city].filter(Boolean).join(" ") || selectedJob.address;
+      const results = query ? await searchProjects(query) : [];
+      const pool = dedupeProjectsById([...results, ...ccProjects]).filter((p) => !p.archived);
+      const exact = findExactAddressMatches(selectedJob, pool);
+      const exactIds = new Set(exact.map((p) => p.id));
+      const others = pool.filter((p) => !exactIds.has(p.id)).slice(0, 15);
+      setCcPicker({ jobId: selectedJob.id, matches: [...exact, ...others], mode: "relink" });
+    } finally {
+      setCcLoading(false);
+    }
+  };
+
+  // Admin: remove the saved link (does not touch the CompanyCam project itself).
+  const unlinkCompanyCam = async () => {
+    if (!selectedJob) return;
+    const jobId = selectedJob.id;
+    setCcLinks((prev) => {
+      const next = { ...prev };
+      delete next[jobId];
+      return next;
+    });
+    setCcMatchedProject(null);
+    setCcPhotos([]);
+    await removeJobLink(jobId);
+  };
+
+  // Admin: create a brand-new project from the relink picker.
+  const createAndLinkNew = async (jobId: string) => {
+    if (!selectedJob) return;
+    setCcLoading(true);
+    try {
+      const created = await createProjectForJob({
+        name: selectedJob.name,
+        address: selectedJob.address,
+        city: selectedJob.city,
+      });
+      if (created) {
+        setCcPicker(null);
+        await linkProjectToJob(jobId, created);
+      } else {
+        setCcError("Couldn't create the project. Check the CompanyCam connection.");
+      }
+    } finally {
+      setCcLoading(false);
+    }
   };
 
   // Re-sync CompanyCam photos when user returns to CRM tab (after taking photos in CompanyCam)
@@ -1974,8 +2145,8 @@ export default function LeadsPage() {
                       <span className="text-xs font-bold text-green-700">Job Photos</span>
                       <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-600">{(ccMatchedProject?.photo_count || 0) + jobFiles.length} photos</span>
                     </div>
-                    {ccMatchedProject && (
-                      <a href={ccMatchedProject.project_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-green-600 hover:text-green-800">
+                    {ccLinkedProject && (
+                      <a href={ccLinkedProject.projectUrl || ccMatchedProject?.project_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-semibold text-green-600 hover:text-green-800">
                         Open in CompanyCam →
                       </a>
                     )}
@@ -1988,7 +2159,7 @@ export default function LeadsPage() {
                         onClick={() => void openCompanyCam()}
                         className={`flex items-center justify-center gap-1 rounded-md bg-green-600 px-2 py-1.5 text-[11px] font-bold text-white transition hover:bg-green-700 active:scale-95 ${ccLoading ? "pointer-events-none opacity-60" : ""}`}
                       >
-                        <Camera className="h-3.5 w-3.5" /> {ccLoading ? "Opening..." : "CompanyCam"}
+                        <Camera className="h-3.5 w-3.5" /> {ccLoading ? "Opening..." : ccLinkedProject ? "Open CompanyCam" : "Link & Open"}
                       </button>
                       <button
                         type="button"
@@ -2003,6 +2174,22 @@ export default function LeadsPage() {
                         <input type="file" accept="image/*,video/*" multiple className="hidden" disabled={fileBusy} onChange={(event) => { const input = event.currentTarget; void handleJobFileUpload("Job Photo", input.files).finally(() => { input.value = ""; }); }} />
                       </label>
                     </div>
+
+                    {/* CompanyCam link status + admin controls */}
+                    {ccError && <p className="mt-2 rounded-md border border-orange-200 bg-orange-50 px-2 py-1.5 text-[11px] font-semibold text-orange-800">{ccError}</p>}
+                    {ccLinkedProject ? (
+                      <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-green-100 bg-green-50 px-2 py-1.5">
+                        <span className="truncate text-[10px] font-semibold text-green-700">
+                          Linked{ccLinkedProject.address ? ` · ${ccLinkedProject.address}` : ""}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <button type="button" disabled={ccLoading} onClick={() => void startRelink()} className="text-[10px] font-bold text-green-700 underline-offset-2 hover:underline disabled:opacity-50">Change</button>
+                          <button type="button" disabled={ccLoading} onClick={() => void unlinkCompanyCam()} className="text-[10px] font-bold text-gray-500 underline-offset-2 hover:underline disabled:opacity-50">Unlink</button>
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[10px] font-semibold text-gray-400">Not linked yet — “Link &amp; Open” finds the project by address (or creates one) and links it permanently.</p>
+                    )}
 
                     {/* CompanyCam photos */}
                     {ccLoading && <p className="mt-2 text-[11px] text-gray-400">Loading CompanyCam photos...</p>}
@@ -2327,6 +2514,64 @@ export default function LeadsPage() {
           }).catch(() => {});
         }
       }} />}
+      {ccPicker && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4" onClick={() => setCcPicker(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">
+                  {ccPicker.mode === "auto" ? "Multiple matching projects" : "Choose CompanyCam project"}
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  {ccPicker.mode === "auto"
+                    ? "More than one CompanyCam project matches this address — pick the correct one."
+                    : "Pick the project to link, or create a new one."}
+                </p>
+              </div>
+              <button type="button" onClick={() => setCcPicker(null)} className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-80 overflow-y-auto p-3">
+              {ccPicker.matches.length === 0 && (
+                <p className="px-1 py-2 text-[12px] text-gray-500">No existing projects found for this address.</p>
+              )}
+              <div className="space-y-1.5">
+                {ccPicker.matches.map((project) => {
+                  const addr = [project.address?.street_address_1, project.address?.city, project.address?.postal_code].filter(Boolean).join(", ");
+                  return (
+                    <button
+                      key={project.id}
+                      type="button"
+                      disabled={ccLoading}
+                      onClick={() => { const jobId = ccPicker.jobId; setCcPicker(null); void linkProjectToJob(jobId, project); }}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 text-left transition hover:border-green-300 hover:bg-green-50 disabled:opacity-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12px] font-bold text-gray-800">{project.name || addr || "Untitled project"}</span>
+                        {addr && <span className="block truncate text-[10px] text-gray-500">{addr}</span>}
+                      </span>
+                      <span className="shrink-0 rounded-md bg-green-600 px-2 py-1 text-[10px] font-bold text-white">Use this</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {ccPicker.mode === "relink" && (
+              <div className="border-t border-gray-100 px-3 py-2.5">
+                <button
+                  type="button"
+                  disabled={ccLoading}
+                  onClick={() => void createAndLinkNew(ccPicker.jobId)}
+                  className="w-full rounded-lg border border-dashed border-green-300 px-3 py-2 text-[12px] font-bold text-green-700 transition hover:bg-green-50 disabled:opacity-50"
+                >
+                  + Create a new project for this address
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <SaveToastUI />
     </div>
   );
